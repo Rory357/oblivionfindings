@@ -98,7 +98,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const connectionStatusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
     connected: { label: 'Connected', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle },
-    disconnected: { label: 'Disconnected', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400', icon: XCircle },
+    disconnected: { label: 'Disconnected', className: 'bg-muted text-foreground dark:bg-muted/50 dark:text-muted-foreground', icon: XCircle },
     error: { label: 'Error', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: ShieldAlert },
 };
 
@@ -133,9 +133,9 @@ function deviceStatusBadge(status?: string | null): { label: string; className: 
         case 'maintenance':
             return { label: 'Maintenance', className: 'border-blue-500/30 text-blue-500' };
         case 'decommissioned':
-            return { label: 'Retired', className: 'border-slate-500/30 text-slate-500' };
+            return { label: 'Retired', className: 'border-slate-500/30 text-muted-foreground' };
         default:
-            return { label: status || 'Unknown', className: 'border-slate-500/30 text-slate-500' };
+            return { label: status || 'Unknown', className: 'border-slate-500/30 text-muted-foreground' };
     }
 }
 

@@ -34,16 +34,16 @@ type Props = {
 
 const SUBJECT_TYPES = [
     { value: 'client', label: 'Client', icon: Users, color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-    { value: 'staff', label: 'Staff Member', icon: Briefcase, color: 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100' },
-    { value: 'other', label: 'Other Person', icon: User, color: 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100' },
+    { value: 'staff', label: 'Staff Member', icon: Briefcase, color: 'border-primary bg-primary/10 text-primary hover:bg-primary/10' },
+    { value: 'other', label: 'Other Person', icon: User, color: 'border-border bg-muted text-foreground hover:bg-muted' },
 ];
 
 const CONCERN_TYPES = [
     { value: 'concern', label: 'Concern', color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
     { value: 'allegation', label: 'Allegation', color: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
-    { value: 'disclosure', label: 'Disclosure', color: 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100' },
+    { value: 'disclosure', label: 'Disclosure', color: 'border-primary bg-primary/10 text-primary hover:bg-primary/10' },
     { value: 'observation', label: 'Observation', color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
-    { value: 'third_party_report', label: 'Third Party Report', color: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
+    { value: 'third_party_report', label: 'Third Party Report', color: 'border-primary bg-primary/10 text-primary hover:bg-primary/10' },
 ];
 
 const SEVERITY_OPTIONS = [
@@ -147,7 +147,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                 {/* Page header */}
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 text-purple-600">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                             <Shield className="h-5 w-5" />
                         </div>
                         <div>
@@ -172,13 +172,13 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                     <Card>
                         <CardContent className="pt-5">
                             <div className="mb-4 flex items-center gap-2">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">1</div>
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">1</div>
                                 <h2 className="font-semibold">Who is at risk?</h2>
                             </div>
 
                             <div className="space-y-4">
                                 <div>
-                                    <Label className="text-xs text-slate-500 mb-2 block">Subject type *</Label>
+                                    <Label className="text-xs text-muted-foreground mb-2 block">Subject type *</Label>
                                     <div className="grid grid-cols-3 gap-3">
                                         {SUBJECT_TYPES.map((type) => {
                                             const Icon = type.icon;
@@ -195,7 +195,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                                     className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-sm font-medium transition-all ${
                                                         isSelected
                                                             ? `${type.color} ring-2 ring-offset-1`
-                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                            : 'border-border bg-white text-muted-foreground hover:border-border hover:bg-muted'
                                                     }`}
                                                 >
                                                     <Icon className="h-5 w-5" />
@@ -209,7 +209,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {data.subject_type === 'client' && (
                                     <div className="max-w-md">
-                                        <Label className="text-xs text-slate-500">Select client *</Label>
+                                        <Label className="text-xs text-muted-foreground">Select client *</Label>
                                         <Select value={data.subject_id} onValueChange={(v) => setData('subject_id', v)}>
                                             <SelectTrigger><SelectValue placeholder="Choose a client" /></SelectTrigger>
                                             <SelectContent>
@@ -226,7 +226,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {data.subject_type === 'staff' && (
                                     <div className="max-w-md">
-                                        <Label className="text-xs text-slate-500">Select staff member *</Label>
+                                        <Label className="text-xs text-muted-foreground">Select staff member *</Label>
                                         <Select value={data.subject_id} onValueChange={(v) => setData('subject_id', v)}>
                                             <SelectTrigger><SelectValue placeholder="Choose a staff member" /></SelectTrigger>
                                             <SelectContent>
@@ -246,7 +246,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {data.subject_type === 'other' && (
                                     <div className="max-w-md">
-                                        <Label className="text-xs text-slate-500">Person name *</Label>
+                                        <Label className="text-xs text-muted-foreground">Person name *</Label>
                                         <Input
                                             value={data.other_subject_name}
                                             onChange={(e) => setData('other_subject_name', e.target.value)}
@@ -263,14 +263,14 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                     <Card>
                         <CardContent className="pt-5">
                             <div className="mb-4 flex items-center gap-2">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">2</div>
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">2</div>
                                 <h2 className="font-semibold">What happened?</h2>
                             </div>
 
                             <div className="space-y-4">
                                 {/* Concern type cards */}
                                 <div>
-                                    <Label className="text-xs text-slate-500 mb-2 block">Concern type *</Label>
+                                    <Label className="text-xs text-muted-foreground mb-2 block">Concern type *</Label>
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                                         {CONCERN_TYPES.map((type) => {
                                             const isSelected = data.concern_type === type.value;
@@ -282,7 +282,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                                     className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
                                                         isSelected
                                                             ? `${type.color} ring-2 ring-offset-1`
-                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                            : 'border-border bg-white text-muted-foreground hover:border-border hover:bg-muted'
                                                     }`}
                                                 >
                                                     {type.label}
@@ -295,7 +295,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {/* Abuse category */}
                                 <div className="max-w-md">
-                                    <Label className="text-xs text-slate-500">Abuse category</Label>
+                                    <Label className="text-xs text-muted-foreground">Abuse category</Label>
                                     <Select value={data.abuse_category} onValueChange={(v) => setData('abuse_category', v)}>
                                         <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                                         <SelectContent>
@@ -309,7 +309,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {/* Severity buttons */}
                                 <div>
-                                    <Label className="text-xs text-slate-500 mb-2 block">Severity *</Label>
+                                    <Label className="text-xs text-muted-foreground mb-2 block">Severity *</Label>
                                     <div className="flex flex-wrap gap-3">
                                         {SEVERITY_OPTIONS.map((opt) => {
                                             const isSelected = data.severity === opt.value;
@@ -333,7 +333,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {/* Description */}
                                 <div>
-                                    <Label className="text-xs text-slate-500">
+                                    <Label className="text-xs text-muted-foreground">
                                         <span className="flex items-center gap-1">
                                             <MessageSquare className="h-3 w-3" />
                                             Description of concern *
@@ -352,7 +352,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                 {/* Date/time and location */}
                                 <div className="grid gap-4 sm:grid-cols-3">
                                     <div>
-                                        <Label className="text-xs text-slate-500">
+                                        <Label className="text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <Calendar className="h-3 w-3" />
                                                 Occurred at
@@ -368,7 +368,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     </div>
 
                                     <div>
-                                        <Label className="text-xs text-slate-500">
+                                        <Label className="text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <Calendar className="h-3 w-3" />
                                                 Reported at
@@ -384,7 +384,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     </div>
 
                                     <div>
-                                        <Label className="text-xs text-slate-500">
+                                        <Label className="text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <MapPin className="h-3 w-3" />
                                                 Location / Site
@@ -418,7 +418,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {siteSelection === 'other' && (
                                     <div className="max-w-md">
-                                        <Label className="text-xs text-slate-500">Other location *</Label>
+                                        <Label className="text-xs text-muted-foreground">Other location *</Label>
                                         <Input
                                             value={data.location}
                                             onChange={(e) => setData('location', e.target.value)}
@@ -440,18 +440,18 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                 className="flex w-full items-center justify-between"
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">3</div>
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">3</div>
                                     <h2 className="font-semibold">Alleged Perpetrator</h2>
                                     <Badge variant="outline" className="text-[10px]">Optional</Badge>
                                 </div>
-                                {perpetratorOpen ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                {perpetratorOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                             </button>
 
                             {perpetratorOpen && (
                                 <div className="mt-4 space-y-4 border-t pt-4">
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label className="text-xs text-slate-500">Perpetrator type</Label>
+                                            <Label className="text-xs text-muted-foreground">Perpetrator type</Label>
                                             <Select value={data.alleged_perpetrator_type} onValueChange={(v) => {
                                                 setData('alleged_perpetrator_type', v);
                                                 setData('alleged_perpetrator_id', '');
@@ -468,7 +468,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                         {data.alleged_perpetrator_type === 'client' && (
                                             <div>
-                                                <Label className="text-xs text-slate-500">Select client</Label>
+                                                <Label className="text-xs text-muted-foreground">Select client</Label>
                                                 <Select value={data.alleged_perpetrator_id} onValueChange={(v) => setData('alleged_perpetrator_id', v)}>
                                                     <SelectTrigger><SelectValue placeholder="Choose a client" /></SelectTrigger>
                                                     <SelectContent>
@@ -484,7 +484,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                         {data.alleged_perpetrator_type === 'staff' && (
                                             <div>
-                                                <Label className="text-xs text-slate-500">Select staff member</Label>
+                                                <Label className="text-xs text-muted-foreground">Select staff member</Label>
                                                 <Select value={data.alleged_perpetrator_id} onValueChange={(v) => setData('alleged_perpetrator_id', v)}>
                                                     <SelectTrigger><SelectValue placeholder="Choose a staff member" /></SelectTrigger>
                                                     <SelectContent>
@@ -503,7 +503,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                         {(data.alleged_perpetrator_type === 'family' || data.alleged_perpetrator_type === 'other') && (
                                             <div>
-                                                <Label className="text-xs text-slate-500">Person name</Label>
+                                                <Label className="text-xs text-muted-foreground">Person name</Label>
                                                 <Input
                                                     value={data.other_perpetrator_name}
                                                     onChange={(e) => setData('other_perpetrator_name', e.target.value)}
@@ -514,7 +514,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     </div>
 
                                     <div className="max-w-md">
-                                        <Label className="text-xs text-slate-500">Relationship to subject</Label>
+                                        <Label className="text-xs text-muted-foreground">Relationship to subject</Label>
                                         <Input
                                             value={data.perpetrator_relationship}
                                             onChange={(e) => setData('perpetrator_relationship', e.target.value)}
@@ -530,13 +530,13 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                     <Card>
                         <CardContent className="pt-5">
                             <div className="mb-4 flex items-center gap-2">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">4</div>
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">4</div>
                                 <h2 className="font-semibold">Immediate Response</h2>
                             </div>
 
                             <div className="space-y-4">
                                 {/* Immediate action */}
-                                <div className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-slate-50">
+                                <div className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-muted">
                                     <Checkbox
                                         id="immediate_action"
                                         checked={data.immediate_action_taken}
@@ -545,13 +545,13 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     />
                                     <div className="flex-1">
                                         <Label htmlFor="immediate_action" className="cursor-pointer font-medium">Immediate action was taken</Label>
-                                        <p className="text-xs text-slate-500">Was any immediate action taken to ensure safety?</p>
+                                        <p className="text-xs text-muted-foreground">Was any immediate action taken to ensure safety?</p>
                                     </div>
                                 </div>
 
                                 {data.immediate_action_taken && (
                                     <div className="ml-8">
-                                        <Label className="text-xs text-slate-500">Describe immediate action taken</Label>
+                                        <Label className="text-xs text-muted-foreground">Describe immediate action taken</Label>
                                         <Textarea
                                             value={data.immediate_action_description}
                                             onChange={(e) => setData('immediate_action_description', e.target.value)}
@@ -562,7 +562,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                 )}
 
                                 {/* Police notified */}
-                                <div className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-slate-50">
+                                <div className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-muted">
                                     <Checkbox
                                         id="police_notified"
                                         checked={data.police_notified}
@@ -571,13 +571,13 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     />
                                     <div className="flex-1">
                                         <Label htmlFor="police_notified" className="cursor-pointer font-medium">Police were notified</Label>
-                                        <p className="text-xs text-slate-500">Were NZ Police contacted regarding this concern?</p>
+                                        <p className="text-xs text-muted-foreground">Were NZ Police contacted regarding this concern?</p>
                                     </div>
                                 </div>
 
                                 {data.police_notified && (
                                     <div className="ml-8 max-w-md">
-                                        <Label className="text-xs text-slate-500">Police reference number</Label>
+                                        <Label className="text-xs text-muted-foreground">Police reference number</Label>
                                         <Input
                                             value={data.police_reference}
                                             onChange={(e) => setData('police_reference', e.target.value)}
@@ -587,7 +587,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                 )}
 
                                 {/* External referral */}
-                                <div className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-slate-50">
+                                <div className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-muted">
                                     <Checkbox
                                         id="requires_referral"
                                         checked={data.requires_external_referral}
@@ -596,13 +596,13 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     />
                                     <div className="flex-1">
                                         <Label htmlFor="requires_referral" className="cursor-pointer font-medium">Requires external referral</Label>
-                                        <p className="text-xs text-slate-500">Does this need to be referred to an external agency?</p>
+                                        <p className="text-xs text-muted-foreground">Does this need to be referred to an external agency?</p>
                                     </div>
                                 </div>
 
                                 {data.requires_external_referral && (
                                     <div className="ml-8">
-                                        <Label className="text-xs text-slate-500">Suggested referral agencies</Label>
+                                        <Label className="text-xs text-muted-foreground">Suggested referral agencies</Label>
                                         <Textarea
                                             value={data.suggested_referral_agencies}
                                             onChange={(e) => setData('suggested_referral_agencies', e.target.value)}
@@ -614,7 +614,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
 
                                 {/* Witnesses */}
                                 <div>
-                                    <Label className="text-xs text-slate-500">
+                                    <Label className="text-xs text-muted-foreground">
                                         <span className="flex items-center gap-1">
                                             <Users className="h-3 w-3" />
                                             Witnesses
@@ -638,7 +638,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                         <Button type="button" variant="outline" onClick={() => router.visit('/safeguarding')}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={processing} className="bg-purple-600 hover:bg-purple-700">
+                        <Button type="submit" disabled={processing} className="bg-primary hover:bg-primary">
                             <Shield className="mr-1.5 h-4 w-4" />
                             {processing
                                 ? (isEdit ? 'Saving...' : 'Reporting...')

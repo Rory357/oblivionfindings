@@ -20,7 +20,7 @@ export default function RespiteProceduresIndex({ templates }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Procedure Templates</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Define procedure steps for respite workflows.
                         </div>
                     </div>
@@ -36,7 +36,7 @@ export default function RespiteProceduresIndex({ templates }: Props) {
                             <CardHeader>
                                 <CardTitle className="text-base">{t.name} (v{t.version})</CardTitle>
                             </CardHeader>
-                            <CardContent className="text-sm text-slate-600">
+                            <CardContent className="text-sm text-muted-foreground">
                                 <Link href={`/respite/procedures/${t.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                     View
                                 </Link>
@@ -44,7 +44,7 @@ export default function RespiteProceduresIndex({ templates }: Props) {
                         </Card>
                     ))}
                     {!templates.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No procedure templates found.
                         </div>
                     )}

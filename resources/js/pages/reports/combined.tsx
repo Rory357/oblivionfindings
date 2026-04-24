@@ -28,19 +28,19 @@ export default function CombinedReport({ report, generated_at, metrics, sections
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">{report.label}</CardTitle>
-                        <div className="text-sm text-slate-500">{report.description}</div>
+                        <div className="text-sm text-muted-foreground">{report.description}</div>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-1">
                             {report.modules.map((module) => (
-                                <span key={module} className="rounded-full border px-2 py-0.5 text-[11px] text-slate-600">
+                                <span key={module} className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
                                     {module}
                                 </span>
                             ))}
                         </div>
-                        <div className="mt-3 text-xs text-slate-500">Generated at: {generated_at}</div>
+                        <div className="mt-3 text-xs text-muted-foreground">Generated at: {generated_at}</div>
                         <div className="mt-3">
-                            <a href={report.export_route} className="rounded-md border px-2 py-1 text-xs hover:bg-slate-50">
+                            <a href={report.export_route} className="rounded-md border px-2 py-1 text-xs hover:bg-muted">
                                 Export CSV
                             </a>
                         </div>
@@ -55,7 +55,7 @@ export default function CombinedReport({ report, generated_at, metrics, sections
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                             {metrics.map((metric) => (
                                 <div key={metric.label} className="rounded-md border p-3">
-                                    <div className="text-xs text-slate-500">{metric.label}</div>
+                                    <div className="text-xs text-muted-foreground">{metric.label}</div>
                                     <div className="mt-1 text-2xl font-semibold">{metric.value}</div>
                                 </div>
                             ))}

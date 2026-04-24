@@ -57,7 +57,7 @@ export default function CreateAsset({ categories }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Create Asset</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Register a new company asset
                     </div>
                 </div>

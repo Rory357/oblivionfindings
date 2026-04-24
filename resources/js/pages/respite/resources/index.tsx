@@ -40,7 +40,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Resource Allocations</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Track bed/room/equipment allocations.
                     </div>
                 </div>
@@ -60,7 +60,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                             <div className="sm:col-span-2">
-                                <Label className="text-xs text-slate-500">Asset *</Label>
+                                <Label className="text-xs text-muted-foreground">Asset *</Label>
                                 <Select
                                     value={form.data.resource_id}
                                     onValueChange={(v) => form.setData('resource_id', v)}
@@ -77,7 +77,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                                 </Select>
                             </div>
                             <div className="sm:col-span-1">
-                                <Label className="text-xs text-slate-500">Booking ID</Label>
+                                <Label className="text-xs text-muted-foreground">Booking ID</Label>
                                 <Input
                                     value={form.data.booking_id}
                                     onChange={(e) => form.setData('booking_id', e.target.value)}
@@ -85,7 +85,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                                 />
                             </div>
                             <div className="sm:col-span-1">
-                                <Label className="text-xs text-slate-500">Start *</Label>
+                                <Label className="text-xs text-muted-foreground">Start *</Label>
                                 <Input
                                     type="datetime-local"
                                     value={form.data.start_at}
@@ -93,7 +93,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                                 />
                             </div>
                             <div className="sm:col-span-1">
-                                <Label className="text-xs text-slate-500">End *</Label>
+                                <Label className="text-xs text-muted-foreground">End *</Label>
                                 <Input
                                     type="datetime-local"
                                     value={form.data.end_at}
@@ -115,7 +115,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Resource Type</Label>
+                            <Label className="text-xs text-muted-foreground">Resource Type</Label>
                             <Select value="asset" onValueChange={() => {}}>
                                 <SelectTrigger><SelectValue placeholder="Asset" /></SelectTrigger>
                                 <SelectContent>
@@ -134,14 +134,14 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                                     {a.asset ? `${a.asset.name}${a.asset.asset_tag ? ` (${a.asset.asset_tag})` : ''}` : `Asset #${a.resource_id}`}
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="text-sm text-slate-600 space-y-1">
+                            <CardContent className="text-sm text-muted-foreground space-y-1">
                                 <div>{formatDateTime(a.start_at)} → {formatDateTime(a.end_at)}</div>
                                 <div>Status: {a.status}</div>
                             </CardContent>
                         </Card>
                     ))}
                     {!allocations.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No resource allocations found.
                         </div>
                     )}

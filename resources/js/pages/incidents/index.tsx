@@ -65,9 +65,9 @@ const severityConfig: Record<string, { bg: string; text: string; dot: string; bo
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock; darkBg: string; darkText: string }> = {
-    draft: { bg: 'bg-slate-100', text: 'text-slate-700', icon: FileEdit, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-slate-300' },
+    draft: { bg: 'bg-muted', text: 'text-foreground', icon: FileEdit, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-muted-foreground' },
     submitted: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock, darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-300' },
-    reviewed: { bg: 'bg-purple-100', text: 'text-purple-700', icon: CheckCircle2, darkBg: 'dark:bg-purple-500/10', darkText: 'dark:text-purple-300' },
+    reviewed: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
     closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2, darkBg: 'dark:bg-green-500/10', darkText: 'dark:text-green-300' },
 };
 
@@ -333,7 +333,7 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                                                             <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 text-[10px]">WorkSafe</Badge>
                                                         )}
                                                         {i.requires_followup && (
-                                                            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 text-[10px]">Follow-up</Badge>
+                                                            <Badge variant="outline" className="border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/10 dark:text-primary/70 text-[10px]">Follow-up</Badge>
                                                         )}
                                                     </div>
                                                     {preview && (

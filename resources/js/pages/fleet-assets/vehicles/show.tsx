@@ -306,10 +306,10 @@ export default function VehicleShow({
                     </Card>
                     <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
-                            <Card className="border bg-purple-50 dark:bg-purple-950/30 flex flex-col items-center justify-center py-3">
+                            <Card className="border bg-primary/10 dark:bg-primary/30 flex flex-col items-center justify-center py-3">
                                 <ProgressRing value={state?.battery_pct ?? 0} size={70} color={FLEET_COLORS.primary} label="Battery" />
                             </Card>
-                            <Card className="border bg-purple-50 dark:bg-purple-950/30 flex flex-col items-center justify-center py-3">
+                            <Card className="border bg-primary/10 dark:bg-primary/30 flex flex-col items-center justify-center py-3">
                                 <ProgressRing value={Math.min(((trips ?? []).length / 30) * 100, 100)} size={70} color={FLEET_COLORS.secondary} label="Utilization" />
                             </Card>
                         </div>
@@ -464,7 +464,7 @@ export default function VehicleShow({
                                         <p className={`text-sm font-bold ${
                                             new Date(vehicle.inspection_due_at) < new Date() ? 'text-red-600' :
                                             new Date(vehicle.inspection_due_at) < new Date(Date.now() + 30 * 86400000) ? 'text-amber-600' :
-                                            'text-purple-600'
+                                            'text-primary'
                                         }`}>
                                             {formatDate(vehicle.inspection_due_at)}
                                             {new Date(vehicle.inspection_due_at) < new Date() && <Badge variant="destructive" className="ml-2 text-[9px]">Overdue</Badge>}
@@ -496,7 +496,7 @@ export default function VehicleShow({
                             </div>
                             <div className="flex gap-2">
                                 {canInspect && (
-                                    <Button variant="default" size="sm" className="h-8 text-xs bg-purple-600 hover:bg-purple-700" asChild>
+                                    <Button variant="default" size="sm" className="h-8 text-xs bg-primary hover:bg-primary" asChild>
                                         <Link href={`/fleet-assets/inspections/create?asset_id=${vehicle.id}&type=pre-trip`}>Start Pre-Trip Inspection</Link>
                                     </Button>
                                 )}
@@ -541,21 +541,21 @@ export default function VehicleShow({
                 {/*  SECTION 3C - Predictive Maintenance                        */}
                 {/* ============================================================ */}
                 {service_prediction && (
-                    <Card className="border-purple-200 dark:border-purple-800">
+                    <Card className="border-primary dark:border-primary/30">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm flex items-center gap-2">
-                                <Gauge className="h-4 w-4 text-purple-600" />
+                                <Gauge className="h-4 w-4 text-primary" />
                                 Predictive Maintenance
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                <div className="rounded-lg border bg-purple-50/50 p-3 dark:bg-purple-950/20">
+                                <div className="rounded-lg border bg-primary/10/50 p-3 dark:bg-primary/20">
                                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Est. Next Service</p>
                                     <p className={`text-lg font-bold ${
                                         service_prediction.predicted_days != null && service_prediction.predicted_days <= 7 ? 'text-red-600' :
                                         service_prediction.predicted_days != null && service_prediction.predicted_days <= 30 ? 'text-amber-600' :
-                                        'text-purple-600'
+                                        'text-primary'
                                     }`}>
                                         {service_prediction.predicted_days != null
                                             ? `${service_prediction.predicted_days} days`
@@ -644,7 +644,7 @@ export default function VehicleShow({
                                     key={item.key}
                                     className={`flex items-center justify-between rounded-xl border-2 p-3 transition-all ${
                                         (vehicle as Record<string, unknown>)[item.key]
-                                            ? 'border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-900/10'
+                                            ? 'border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/10'
                                             : 'border-muted bg-muted/20'
                                     }`}
                                 >
@@ -658,7 +658,7 @@ export default function VehicleShow({
                                                 }, { preserveScroll: true });
                                             }}
                                             className={`h-7 w-12 rounded-full transition-colors ${
-                                                (vehicle as Record<string, unknown>)[item.key] ? 'bg-purple-600' : 'bg-slate-300'
+                                                (vehicle as Record<string, unknown>)[item.key] ? 'bg-primary' : 'bg-slate-300'
                                             }`}
                                         >
                                             <span

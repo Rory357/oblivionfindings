@@ -106,7 +106,7 @@ const severityConfig: Record<string, { bg: string; text: string }> = {
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
     open: { bg: 'bg-red-100', text: 'text-red-700', icon: AlertTriangle },
     in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
-    mitigated: { bg: 'bg-purple-100', text: 'text-purple-700', icon: CheckCircle2 },
+    mitigated: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
     closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
 };
 

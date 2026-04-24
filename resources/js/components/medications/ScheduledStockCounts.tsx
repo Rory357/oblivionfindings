@@ -247,7 +247,7 @@ export default function ScheduledStockCounts({
             completed: 'bg-emerald-100 text-emerald-800',
         };
         return (
-            <Badge className={colors[status] || 'bg-slate-100'}>{status}</Badge>
+            <Badge className={colors[status] || 'bg-muted'}>{status}</Badge>
         );
     };
 
@@ -346,11 +346,11 @@ export default function ScheduledStockCounts({
                 )}
 
                 {loading ? (
-                    <div className="py-8 text-center text-sm text-slate-500">
+                    <div className="py-8 text-center text-sm text-muted-foreground">
                         Loading...
                     </div>
                 ) : counts.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-slate-500">
+                    <div className="py-8 text-center text-sm text-muted-foreground">
                         No scheduled stock counts.
                     </div>
                 ) : (
@@ -362,7 +362,7 @@ export default function ScheduledStockCounts({
                                     className={`rounded-lg border p-3 ${
                                         count.is_overdue
                                             ? 'border-red-200 bg-red-50'
-                                            : 'bg-slate-50'
+                                            : 'bg-muted'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
@@ -427,7 +427,7 @@ export default function ScheduledStockCounts({
                                                     )}
                                             </div>
                                             {count.completed_by && (
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     Completed by{' '}
                                                     {count.completed_by}
                                                     {count.witnessed_by &&
@@ -441,7 +441,7 @@ export default function ScheduledStockCounts({
                                     )}
 
                                     {completingId === count.id && (
-                                        <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+                                        <div className="mt-3 space-y-3 border-t border-border pt-3">
                                             <div className="flex items-center gap-2 text-amber-700">
                                                 <AlertCircle className="h-4 w-4" />
                                                 <span className="text-sm">

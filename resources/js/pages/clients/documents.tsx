@@ -174,7 +174,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                 <div key={d.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
                                     <div>
                                         <div className="text-sm font-medium">{d.title || d.original_name}</div>
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="mt-1 text-xs text-muted-foreground">
                                             {[
                                                 d.category && `Category: ${d.category}`,
                                                 d.version && `Version: ${d.version}`,
@@ -186,7 +186,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                 .filter(Boolean)
                                                 .join(' - ')}
                                         </div>
-                                        {d.notes && <div className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">{d.notes}</div>}
+                                        {d.notes && <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">{d.notes}</div>}
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -228,7 +228,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                 </div>
                             ))}
 
-                            {!documents.length && <div className="text-sm text-slate-500">No documents uploaded.</div>}
+                            {!documents.length && <div className="text-sm text-muted-foreground">No documents uploaded.</div>}
                         </div>
                     </CardContent>
                 </Card>

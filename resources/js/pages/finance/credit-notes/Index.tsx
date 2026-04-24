@@ -43,14 +43,14 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
     approved: { label: 'Approved', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
     applied: { label: 'Applied', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
     cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
 };
 
 const typeConfig: Record<string, { label: string; className: string }> = {
-    payable: { label: 'AP', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' },
+    payable: { label: 'AP', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
     receivable: { label: 'AR', className: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300' },
 };
 
@@ -172,7 +172,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                                 </Link>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-gray-100 text-gray-800'}>
+                                                <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-muted text-foreground'}>
                                                     {typeConfig[creditNote.type]?.label ?? creditNote.type}
                                                 </Badge>
                                             </TableCell>
@@ -180,7 +180,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                             <TableCell>{formatDate(creditNote.credit_date)}</TableCell>
                                             <TableCell className="text-right font-medium">{formatCurrency(creditNote.total_amount)}</TableCell>
                                             <TableCell>
-                                                <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-gray-100 text-gray-800'}>
+                                                <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
                                                     {statusConfig[creditNote.status]?.label ?? creditNote.status}
                                                 </Badge>
                                             </TableCell>

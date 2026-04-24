@@ -183,11 +183,11 @@ function getInitials(name: string) {
 }
 
 const BOARD_ROLE_COLOURS: Record<string, string> = {
-    chair: 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300',
+    chair: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70',
     secretary: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
     treasurer: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
     member: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
-    observer: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    observer: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground',
 };
 
 // --- Three-state override toggle ---
@@ -206,7 +206,7 @@ function OverrideToggle({
                 onClick={() => onChange('inherit')}
                 className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                     value === 'inherit'
-                        ? 'bg-gray-200 text-gray-700 shadow-sm dark:bg-gray-700 dark:text-gray-200'
+                        ? 'bg-muted text-foreground shadow-sm dark:bg-gray-700 dark:text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
@@ -373,7 +373,7 @@ function PermissionOverridesTab({
                     <Card>
                         <CardContent className="flex items-center justify-between gap-4 py-4">
                             <div className="flex items-center gap-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700 dark:bg-violet-900 dark:text-violet-300">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary dark:bg-primary dark:text-primary/70">
                                     {getInitials(selectedUser.name)}
                                 </div>
                                 <div>
@@ -430,13 +430,13 @@ function PermissionOverridesTab({
                                             <CardHeader className="cursor-pointer select-none transition-colors hover:bg-muted/50">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
-                                                        <Icon className="h-5 w-5 text-violet-600" />
+                                                        <Icon className="h-5 w-5 text-primary" />
                                                         <div>
                                                             <CardTitle className="text-sm">{mod.label}</CardTitle>
                                                             <CardDescription className="text-xs">
                                                                 {mod.permissions.length} permission{mod.permissions.length !== 1 ? 's' : ''}
                                                                 {overrideCount > 0 && (
-                                                                    <span className="ml-1.5 text-violet-600">
+                                                                    <span className="ml-1.5 text-primary">
                                                                         ({overrideCount} override{overrideCount !== 1 ? 's' : ''})
                                                                     </span>
                                                                 )}
@@ -517,7 +517,7 @@ function PermissionOverridesTab({
                         )}
 
                         <div className="flex items-center gap-3 pt-2">
-                            <Button type="submit" disabled={form.processing} className="bg-violet-600 hover:bg-violet-700">
+                            <Button type="submit" disabled={form.processing} className="bg-primary hover:bg-primary">
                                 Save Overrides
                             </Button>
                             <Button type="button" variant="outline" onClick={() => form.reset()}>
@@ -618,8 +618,8 @@ function BoardGovernanceTab({
             <div className="grid gap-4 sm:grid-cols-3">
                 <Card>
                     <CardContent className="flex items-center gap-3 py-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900">
-                            <Users className="h-5 w-5 text-violet-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary">
+                            <Users className="h-5 w-5 text-primary" />
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{boardMembers.length}</div>
@@ -655,7 +655,7 @@ function BoardGovernanceTab({
             <div className="flex justify-end">
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
-                        <Button className="bg-violet-600 hover:bg-violet-700" disabled={availableUsers.length === 0}>
+                        <Button className="bg-primary hover:bg-primary" disabled={availableUsers.length === 0}>
                             <UserPlus className="mr-2 h-4 w-4" />
                             Appoint Member
                         </Button>
@@ -735,7 +735,7 @@ function BoardGovernanceTab({
                                 />
                             </div>
                             <DialogFooter>
-                                <Button type="submit" disabled={form.processing} className="bg-violet-600 hover:bg-violet-700">
+                                <Button type="submit" disabled={form.processing} className="bg-primary hover:bg-primary">
                                     Appoint
                                 </Button>
                             </DialogFooter>
@@ -754,7 +754,7 @@ function BoardGovernanceTab({
                                 <CardContent className="py-4">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-start gap-3">
-                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700 dark:bg-violet-900 dark:text-violet-300">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary dark:bg-primary dark:text-primary/70">
                                                 {getInitials(member.user.name)}
                                             </div>
                                             <div>
@@ -769,7 +769,7 @@ function BoardGovernanceTab({
                                                             Active
                                                         </Badge>
                                                     ) : (
-                                                        <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                                                        <Badge className="bg-muted text-foreground dark:bg-muted dark:text-muted-foreground">
                                                             Expired
                                                         </Badge>
                                                     )}
@@ -873,7 +873,7 @@ function BoardGovernanceTab({
                             />
                         </div>
                         <DialogFooter>
-                            <Button type="submit" disabled={editForm.processing} className="bg-violet-600 hover:bg-violet-700">
+                            <Button type="submit" disabled={editForm.processing} className="bg-primary hover:bg-primary">
                                 Save Changes
                             </Button>
                         </DialogFooter>

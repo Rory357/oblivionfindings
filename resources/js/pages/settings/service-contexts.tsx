@@ -91,11 +91,11 @@ const CATEGORY_ORDER = [
 
 const CATEGORY_COLOURS: Record<string, { bg: string; text: string; border: string; badge: string; icon: string }> = {
     Residential: {
-        bg: 'bg-violet-500/10',
-        text: 'text-violet-400',
+        bg: 'bg-primary/10',
+        text: 'text-primary',
         border: 'border-l-violet-500',
-        badge: 'bg-violet-500/20 text-violet-300',
-        icon: 'text-violet-400',
+        badge: 'bg-primary/20 text-primary/70',
+        icon: 'text-primary',
     },
     Community: {
         bg: 'bg-blue-500/10',
@@ -134,10 +134,10 @@ const CATEGORY_COLOURS: Record<string, { bg: string; text: string; border: strin
     },
     'Flexible / Other': {
         bg: 'bg-slate-500/10',
-        text: 'text-slate-400',
+        text: 'text-muted-foreground',
         border: 'border-l-slate-500',
         badge: 'bg-slate-500/20 text-slate-300',
-        icon: 'text-slate-400',
+        icon: 'text-muted-foreground',
     },
 };
 
@@ -292,12 +292,12 @@ export default function ServiceContextsPage(props: Props) {
                 <div className="space-y-6">
                     {/* Stats Row */}
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl border bg-indigo-500/5 p-4">
+                        <div className="rounded-xl border bg-primary/5 p-4">
                             <div className="flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-indigo-400" />
+                                <Layers className="h-4 w-4 text-primary" />
                                 <span className="text-xs font-medium text-muted-foreground">Total Contexts</span>
                             </div>
-                            <div className="mt-2 text-2xl font-bold text-indigo-400">{totalContexts}</div>
+                            <div className="mt-2 text-2xl font-bold text-primary">{totalContexts}</div>
                         </div>
                         <div className="rounded-xl border bg-emerald-500/5 p-4">
                             <div className="flex items-center gap-2">
@@ -479,7 +479,7 @@ export default function ServiceContextsPage(props: Props) {
 
                                     {/* Type description hint */}
                                     {selectedCreateType && (
-                                        <div className={`rounded-lg p-3 text-xs ${CATEGORY_COLOURS[selectedCreateType.category]?.bg ?? 'bg-slate-500/10'} ${CATEGORY_COLOURS[selectedCreateType.category]?.text ?? 'text-slate-400'}`}>
+                                        <div className={`rounded-lg p-3 text-xs ${CATEGORY_COLOURS[selectedCreateType.category]?.bg ?? 'bg-slate-500/10'} ${CATEGORY_COLOURS[selectedCreateType.category]?.text ?? 'text-muted-foreground'}`}>
                                             <span className="font-medium">{selectedCreateType.label}:</span>{' '}
                                             {selectedCreateType.description}
                                         </div>
@@ -724,14 +724,14 @@ function ContextCard({
                                 Active
                             </Badge>
                         ) : (
-                            <Badge variant="secondary" className="border-0 bg-slate-500/20 text-[10px] text-slate-400">
+                            <Badge variant="secondary" className="border-0 bg-slate-500/20 text-[10px] text-muted-foreground">
                                 Inactive
                             </Badge>
                         )}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">{label}</div>
                     {c.description && (
-                        <div className="mt-1.5 line-clamp-2 text-xs text-slate-400">
+                        <div className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
                             {c.description}
                         </div>
                     )}

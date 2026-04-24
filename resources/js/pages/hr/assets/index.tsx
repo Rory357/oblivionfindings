@@ -53,7 +53,7 @@ const statusColors: Record<string, string> = {
     available: 'bg-green-100 text-green-800',
     assigned: 'bg-blue-100 text-blue-800',
     maintenance: 'bg-yellow-100 text-yellow-800',
-    retired: 'bg-slate-100 text-slate-800',
+    retired: 'bg-muted text-foreground',
 };
 
 const categoryLabels: Record<string, string> = {
@@ -93,7 +93,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Asset Management</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Track company assets and their assignments
                         </div>
                     </div>
@@ -115,7 +115,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by name, tag, serial..."
                                 value={filters.search || ''}
@@ -123,7 +123,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Category</Label>
+                            <Label className="text-xs text-muted-foreground">Category</Label>
                             <Select
                                 value={filters.category || 'all'}
                                 onValueChange={(val) => onFilter({ category: val === 'all' ? null : val })}
@@ -138,7 +138,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status || 'all'}
                                 onValueChange={(val) => onFilter({ status: val === 'all' ? null : val })}
@@ -183,7 +183,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                                         <TableCell>
                                             <Badge variant="outline">{categoryLabels[asset.category] || asset.category}</Badge>
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {[asset.make, asset.model].filter(Boolean).join(' ') || '-'}
                                         </TableCell>
                                         <TableCell>
@@ -199,7 +199,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                                 ))}
                                 {!assets.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                                             No assets found.
                                         </TableCell>
                                     </TableRow>

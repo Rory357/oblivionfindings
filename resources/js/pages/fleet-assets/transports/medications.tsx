@@ -112,7 +112,7 @@ function statusBadge(status: string) {
         case 'administered':
             return <Badge className="bg-blue-600 text-white">Administered</Badge>;
         case 'returned':
-            return <Badge className="bg-purple-600 text-white">Returned</Badge>;
+            return <Badge className="bg-primary text-white">Returned</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }

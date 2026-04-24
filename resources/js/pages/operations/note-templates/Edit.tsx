@@ -109,7 +109,7 @@ export default function NoteTemplateEdit({ template }: Props) {
                                                 type="checkbox"
                                                 checked={Boolean(field.required)}
                                                 onChange={(event) => updateField(index, 'required', event.target.checked)}
-                                                className="h-4 w-4 rounded border-gray-300"
+                                                className="h-4 w-4 rounded border-border"
                                             />
                                             <Label className="text-xs">Req</Label>
                                         </div>
@@ -129,7 +129,7 @@ export default function NoteTemplateEdit({ template }: Props) {
                                     type="checkbox"
                                     checked={data.is_active}
                                     onChange={(event) => setData('is_active', event.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300"
+                                    className="h-4 w-4 rounded border-border"
                                 />
                                 <Label htmlFor="is_active" className="cursor-pointer">Active</Label>
                             </div>

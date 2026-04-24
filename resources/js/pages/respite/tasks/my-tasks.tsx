@@ -10,16 +10,16 @@ type Props = {
 };
 
 const priorityColors: Record<string, string> = {
-    low: 'bg-slate-100 text-slate-800',
+    low: 'bg-muted text-foreground',
     medium: 'bg-blue-100 text-blue-800',
     high: 'bg-orange-100 text-orange-800',
     urgent: 'bg-red-100 text-red-800',
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-slate-100 text-slate-800',
+    pending: 'bg-muted text-foreground',
     assigned: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-indigo-100 text-indigo-800',
+    in_progress: 'bg-primary/10 text-primary',
     submitted_for_approval: 'bg-amber-100 text-amber-800',
 };
 
@@ -35,7 +35,7 @@ export default function MyTasks({ tasks }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">My Tasks</h1>
-                    <div className="mt-1 text-sm text-slate-500">Tasks assigned to you, sorted by priority.</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Tasks assigned to you, sorted by priority.</div>
                 </div>
                 <RespiteSubnav />
 
@@ -52,11 +52,11 @@ export default function MyTasks({ tasks }: Props) {
                                                 <Badge className={statusColors[t.status] || ''}>{t.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
                                             {t.due_at && (
-                                                <div className="mt-2 text-xs text-slate-500">Due: {formatDateTime(t.due_at)}</div>
+                                                <div className="mt-2 text-xs text-muted-foreground">Due: {formatDateTime(t.due_at)}</div>
                                             )}
                                             {t.procedure_run && (
                                                 <div className="mt-1">
-                                                    <Link href={`/respite/procedure-runs/${t.procedure_run.id}`} className="text-xs text-indigo-500 hover:text-indigo-400">
+                                                    <Link href={`/respite/procedure-runs/${t.procedure_run.id}`} className="text-xs text-primary hover:text-primary">
                                                         Procedure: {t.procedure_run.template?.name || `Run #${t.procedure_run.id}`}
                                                     </Link>
                                                 </div>
@@ -71,7 +71,7 @@ export default function MyTasks({ tasks }: Props) {
                         </Card>
                     ))}
                     {!tasks.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No tasks assigned to you.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No tasks assigned to you.</div>
                     )}
                 </div>
             </div>

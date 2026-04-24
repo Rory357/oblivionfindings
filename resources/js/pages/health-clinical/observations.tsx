@@ -174,10 +174,10 @@ export default function ObservationRegister({
                 {/* Hero Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
                             Last 7 days
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-violet-700">
+                        <p className="mt-1 text-2xl font-bold text-primary">
                             {stats.total_7d}
                         </p>
                     </div>
@@ -194,10 +194,10 @@ export default function ObservationRegister({
                             key={t.value}
                             className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4"
                         >
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 {t.label} (30d)
                             </p>
-                            <p className="mt-1 text-2xl font-bold text-slate-700">
+                            <p className="mt-1 text-2xl font-bold text-foreground">
                                 {stats.by_type[t.value] ?? 0}
                             </p>
                         </div>

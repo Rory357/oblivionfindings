@@ -51,7 +51,7 @@ const typeColors: Record<string, string> = {
     employee: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
     leave: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
     compliance: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    time: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    time: 'border-primary/30 text-primary bg-primary/10',
     training: 'border-orange-500/30 text-orange-400 bg-orange-500/10',
 };
 

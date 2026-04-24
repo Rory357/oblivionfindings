@@ -40,7 +40,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Data Retention Policies</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Manage data retention periods and automated deletion rules
                         </div>
                     </div>
@@ -67,7 +67,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Total Policies</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Total Policies</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -75,7 +75,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Active Policies</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Active Policies</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-green-600">{stats.active}</div>
@@ -90,7 +90,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by name or model type"
                                 value={filters.q || ''}
@@ -99,7 +99,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.active ?? ANY}
                                 onValueChange={(v) => onFilter({ active: v === ANY ? null : v })}
@@ -123,7 +123,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 font-semibold">
-                                                <Database className="h-4 w-4 text-purple-500" />
+                                                <Database className="h-4 w-4 text-primary" />
                                                 {policy.policy_name}
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
@@ -144,11 +144,11 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                                                 )}
                                             </div>
                                             {policy.description && (
-                                                <div className="mt-2 text-sm text-slate-600">
+                                                <div className="mt-2 text-sm text-muted-foreground">
                                                     {policy.description}
                                                 </div>
                                             )}
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {policy.archive_after_years && `Archive after ${policy.archive_after_years} years • `}
                                                 {policy.hard_delete_after_years && `Delete after ${policy.hard_delete_after_years} years`}
                                             </div>
@@ -162,7 +162,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                         </Card>
                     ))}
                     {!policies.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No retention policies found.
                         </div>
                     )}

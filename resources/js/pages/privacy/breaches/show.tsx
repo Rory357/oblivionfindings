@@ -29,9 +29,9 @@ export default function ShowDataBreach({ breach }: Props) {
             case 'resolved':
                 return 'bg-green-100 text-green-800';
             case 'notified':
-                return 'bg-purple-100 text-purple-800';
+                return 'bg-primary/10 text-primary';
             default:
-                return 'bg-slate-100 text-slate-800';
+                return 'bg-muted text-foreground';
         }
     };
 
@@ -110,40 +110,40 @@ export default function ShowDataBreach({ breach }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Calendar className="h-5 w-5 text-purple-500" />
+                                <Calendar className="h-5 w-5 text-primary" />
                                 Timeline
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <span className="text-xs text-slate-500">Discovered</span>
+                                <span className="text-xs text-muted-foreground">Discovered</span>
                                 <p className="font-medium">{formatDate(breach.discovered_at)}</p>
                             </div>
                             {breach.discovered_by && (
                                 <div>
-                                    <span className="text-xs text-slate-500">Discovered By</span>
+                                    <span className="text-xs text-muted-foreground">Discovered By</span>
                                     <p className="font-medium">{breach.discovered_by.name}</p>
                                 </div>
                             )}
                             {breach.authority_notified_at && (
                                 <div>
-                                    <span className="text-xs text-slate-500">ICO Notified</span>
+                                    <span className="text-xs text-muted-foreground">ICO Notified</span>
                                     <p className="font-medium">{formatDate(breach.authority_notified_at)}</p>
                                     {breach.authority_reference && (
-                                        <p className="text-xs text-slate-500">Ref: {breach.authority_reference}</p>
+                                        <p className="text-xs text-muted-foreground">Ref: {breach.authority_reference}</p>
                                     )}
                                 </div>
                             )}
                             {breach.subjects_notified_at && (
                                 <div>
-                                    <span className="text-xs text-slate-500">Subjects Notified</span>
+                                    <span className="text-xs text-muted-foreground">Subjects Notified</span>
                                     <p className="font-medium">{formatDate(breach.subjects_notified_at)}</p>
-                                    <p className="text-xs text-slate-500">Method: {breach.notification_method}</p>
+                                    <p className="text-xs text-muted-foreground">Method: {breach.notification_method}</p>
                                 </div>
                             )}
                             {breach.resolved_at && (
                                 <div>
-                                    <span className="text-xs text-slate-500">Resolved</span>
+                                    <span className="text-xs text-muted-foreground">Resolved</span>
                                     <p className="font-medium">{formatDate(breach.resolved_at)}</p>
                                 </div>
                             )}
@@ -159,7 +159,7 @@ export default function ShowDataBreach({ breach }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <span className="text-xs text-slate-500">Individuals Affected</span>
+                                <span className="text-xs text-muted-foreground">Individuals Affected</span>
                                 <p className="font-medium">
                                     {breach.approximate_individuals_affected
                                         ? `~${breach.approximate_individuals_affected.toLocaleString()}`
@@ -167,11 +167,11 @@ export default function ShowDataBreach({ breach }: Props) {
                                 </p>
                             </div>
                             <div>
-                                <span className="text-xs text-slate-500">ICO Notification Required</span>
+                                <span className="text-xs text-muted-foreground">ICO Notification Required</span>
                                 <p className="font-medium">{breach.requires_authority_notification ? 'Yes' : 'No'}</p>
                             </div>
                             <div>
-                                <span className="text-xs text-slate-500">Subject Notification Required</span>
+                                <span className="text-xs text-muted-foreground">Subject Notification Required</span>
                                 <p className="font-medium">{breach.requires_subject_notification ? 'Yes' : 'No'}</p>
                             </div>
                         </CardContent>
@@ -187,31 +187,31 @@ export default function ShowDataBreach({ breach }: Props) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div>
-                            <span className="text-xs text-slate-500">Nature of Breach</span>
-                            <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">
+                            <span className="text-xs text-muted-foreground">Nature of Breach</span>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                 {breach.nature_of_breach}
                             </p>
                         </div>
                         {breach.likely_consequences && (
                             <div>
-                                <span className="text-xs text-slate-500">Likely Consequences</span>
-                                <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">Likely Consequences</span>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                     {breach.likely_consequences}
                                 </p>
                             </div>
                         )}
                         {breach.measures_taken && (
                             <div>
-                                <span className="text-xs text-slate-500">Measures Taken</span>
-                                <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">Measures Taken</span>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                     {breach.measures_taken}
                                 </p>
                             </div>
                         )}
                         {breach.resolution_notes && (
                             <div>
-                                <span className="text-xs text-slate-500">Resolution Notes</span>
-                                <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">Resolution Notes</span>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                     {breach.resolution_notes}
                                 </p>
                             </div>

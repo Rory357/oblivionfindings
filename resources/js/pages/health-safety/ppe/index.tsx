@@ -132,7 +132,7 @@ const conditionColor = (c: string) => {
         case 'condemned':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -147,9 +147,9 @@ const statusColor = (s: string) => {
         case 'condemned':
             return 'bg-red-100 text-red-800';
         case 'retired':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -162,19 +162,19 @@ const categoryColor = (c: string) => {
         case 'ear':
             return 'bg-teal-100 text-teal-800';
         case 'respiratory':
-            return 'bg-purple-100 text-purple-800';
+            return 'bg-primary/10 text-primary';
         case 'hand':
             return 'bg-amber-100 text-amber-800';
         case 'foot':
             return 'bg-orange-100 text-orange-800';
         case 'body':
-            return 'bg-indigo-100 text-indigo-800';
+            return 'bg-primary/10 text-primary';
         case 'fall_protection':
             return 'bg-red-100 text-red-800';
         case 'high_visibility':
             return 'bg-yellow-100 text-yellow-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -336,7 +336,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                             </CardHeader>
                             <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                                 <div>
-                                    <Label className="text-xs text-slate-500">Site</Label>
+                                    <Label className="text-xs text-muted-foreground">Site</Label>
                                     <Select
                                         value={currentFilters.site_id ?? ANY}
                                         onValueChange={(v) => onFilter({ site_id: v === ANY ? null : v })}
@@ -355,7 +355,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     </Select>
                                 </div>
                                 <div>
-                                    <Label className="text-xs text-slate-500">PPE Type</Label>
+                                    <Label className="text-xs text-muted-foreground">PPE Type</Label>
                                     <Select
                                         value={currentFilters.ppe_type_id ?? ANY}
                                         onValueChange={(v) => onFilter({ ppe_type_id: v === ANY ? null : v })}
@@ -374,7 +374,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     </Select>
                                 </div>
                                 <div>
-                                    <Label className="text-xs text-slate-500">Condition</Label>
+                                    <Label className="text-xs text-muted-foreground">Condition</Label>
                                     <Select
                                         value={currentFilters.condition ?? ANY}
                                         onValueChange={(v) => onFilter({ condition: v === ANY ? null : v })}
@@ -393,7 +393,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     </Select>
                                 </div>
                                 <div>
-                                    <Label className="text-xs text-slate-500">Status</Label>
+                                    <Label className="text-xs text-muted-foreground">Status</Label>
                                     <Select
                                         value={currentFilters.status ?? ANY}
                                         onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -422,7 +422,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
-                                            <tr className="border-b text-left text-xs text-slate-500">
+                                            <tr className="border-b text-left text-xs text-muted-foreground">
                                                 <th className="pb-2 pr-4 font-medium">Type</th>
                                                 <th className="pb-2 pr-4 font-medium">Brand / Model</th>
                                                 <th className="pb-2 pr-4 font-medium">Serial #</th>
@@ -510,7 +510,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                         </tbody>
                                     </table>
                                     {!inventory.data.length && (
-                                        <div className="py-6 text-center text-sm text-slate-500">
+                                        <div className="py-6 text-center text-sm text-muted-foreground">
                                             No PPE inventory items found.
                                         </div>
                                     )}
@@ -559,29 +559,29 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                             </Badge>
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="space-y-2 text-xs text-slate-600">
+                                    <CardContent className="space-y-2 text-xs text-muted-foreground">
                                         {t.description && <p>{t.description}</p>}
                                         {t.hazards_addressed && (
                                             <div>
-                                                <span className="font-medium text-slate-700">Hazards: </span>
+                                                <span className="font-medium text-foreground">Hazards: </span>
                                                 {t.hazards_addressed}
                                             </div>
                                         )}
                                         {t.standards_reference && (
                                             <div>
-                                                <span className="font-medium text-slate-700">Standards: </span>
+                                                <span className="font-medium text-foreground">Standards: </span>
                                                 {t.standards_reference}
                                             </div>
                                         )}
                                         {t.inspection_frequency && (
                                             <div>
-                                                <span className="font-medium text-slate-700">Inspection: </span>
+                                                <span className="font-medium text-foreground">Inspection: </span>
                                                 {t.inspection_frequency.replace(/_/g, ' ')}
                                             </div>
                                         )}
                                         {t.typical_lifespan_months && (
                                             <div>
-                                                <span className="font-medium text-slate-700">Lifespan: </span>
+                                                <span className="font-medium text-foreground">Lifespan: </span>
                                                 {t.typical_lifespan_months} months
                                             </div>
                                         )}
@@ -589,7 +589,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                 </Card>
                             ))}
                             {!types.length && (
-                                <div className="col-span-full py-8 text-center text-sm text-slate-500">
+                                <div className="col-span-full py-8 text-center text-sm text-muted-foreground">
                                     No PPE types defined yet.
                                 </div>
                             )}
@@ -603,7 +603,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
-                                            <tr className="border-b text-left text-xs text-slate-500">
+                                            <tr className="border-b text-left text-xs text-muted-foreground">
                                                 <th className="pb-2 pr-4 font-medium">Worker</th>
                                                 <th className="pb-2 pr-4 font-medium">PPE Type</th>
                                                 <th className="pb-2 pr-4 font-medium">Item</th>
@@ -647,7 +647,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                         {a.acknowledged ? (
                                                             <Badge className="bg-green-100 text-green-800">Yes</Badge>
                                                         ) : (
-                                                            <Badge className="bg-slate-100 text-slate-600">No</Badge>
+                                                            <Badge className="bg-muted text-muted-foreground">No</Badge>
                                                         )}
                                                     </td>
                                                     <td className="py-2.5">
@@ -663,7 +663,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                             </Button>
                                                         )}
                                                         {a.returned_at && (
-                                                            <span className="text-xs text-slate-400">
+                                                            <span className="text-xs text-muted-foreground">
                                                                 Returned {fmtDate(a.returned_at)}
                                                             </span>
                                                         )}
@@ -673,7 +673,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                         </tbody>
                                     </table>
                                     {!(allocations?.data ?? []).length && (
-                                        <div className="py-6 text-center text-sm text-slate-500">
+                                        <div className="py-6 text-center text-sm text-muted-foreground">
                                             No PPE allocations found.
                                         </div>
                                     )}

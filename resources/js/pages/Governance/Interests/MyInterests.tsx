@@ -58,7 +58,7 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
       <Head title="My Interests" />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">My Interests</h1>
+          <h1 className="text-2xl font-bold text-foreground">My Interests</h1>
           <Button onClick={() => setShowForm(!showForm)} dusk="declare-interest" disabled={!canDeclare}>
             <Plus className="w-4 h-4 mr-2" /> Declare Interest
           </Button>
@@ -66,7 +66,7 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
 
         {!canDeclare && (
           <Card className="mb-6">
-            <CardContent className="p-6 text-sm text-gray-600">
+            <CardContent className="p-6 text-sm text-muted-foreground">
               Your account is not linked to an active board-member record yet, so personal interest declarations are unavailable.
             </CardContent>
           </Card>
@@ -131,10 +131,10 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
                       <Badge variant="outline">{interest.interest_type}</Badge>
                       <span className="font-medium">{interest.nature_of_interest}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{interest.description}</p>
-                    {interest.organization_name && <p className="text-sm text-gray-500">{interest.organization_name}</p>}
+                    <p className="text-sm text-muted-foreground mt-1">{interest.description}</p>
+                    {interest.organization_name && <p className="text-sm text-muted-foreground">{interest.organization_name}</p>}
                   </div>
-                  <Badge className={interest.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                  <Badge className={interest.is_active ? 'bg-green-100 text-green-800' : 'bg-muted text-foreground'}>
                     {interest.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
@@ -142,7 +142,7 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
             </Card>
           ))}
           {interests.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-gray-500">{canDeclare ? 'No interests declared. Use the button above to add one.' : 'No personal interest declarations are available for this account.'}</CardContent></Card>
+            <Card><CardContent className="p-8 text-center text-muted-foreground">{canDeclare ? 'No interests declared. Use the button above to add one.' : 'No personal interest declarations are available for this account.'}</CardContent></Card>
           )}
         </div>
       </div>

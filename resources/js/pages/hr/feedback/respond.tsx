@@ -28,7 +28,7 @@ const QUESTION_ICONS: Record<string, string> = {
     overall: 'from-indigo-500/10 to-indigo-500/5',
 };
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
+const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
@@ -145,7 +145,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                         </div>
                         <div className="flex gap-2">
                             <Button type="button" variant="outline" onClick={() => history.back()}>Cancel</Button>
-                            <Button type="submit" className="gap-1.5 bg-violet-600 hover:bg-violet-700" disabled={form.processing}>
+                            <Button type="submit" className="gap-1.5 bg-primary hover:bg-primary" disabled={form.processing}>
                                 <Send className="h-3.5 w-3.5" />Submit Feedback
                             </Button>
                         </div>

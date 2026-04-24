@@ -286,7 +286,7 @@ export default function ClientMedical({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                     <ClipboardList className="h-4 w-4" />
                                 </div>
                                 Medication Chart (Source of Truth)
@@ -361,8 +361,8 @@ export default function ClientMedical({
                                 <p className="mt-1 text-lg font-bold text-rose-900 dark:text-rose-300">{profile?.allergies || 'None recorded'}</p>
                             </div>
                             <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4 dark:from-violet-950/20 dark:to-purple-950/20">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Active Medications</p>
-                                <p className="mt-1 text-lg font-bold text-violet-900 dark:text-violet-300">{medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Active Medications</p>
+                                <p className="mt-1 text-lg font-bold text-primary dark:text-primary/70">{medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length}</p>
                                 {medications.some((m: any) => m.controlled_drug || m.is_controlled_drug) && (
                                     <p className="mt-0.5 text-[10px] text-amber-600">{medications.filter((m: any) => m.controlled_drug || m.is_controlled_drug).length} controlled</p>
                                 )}
@@ -439,7 +439,7 @@ export default function ClientMedical({
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center justify-between text-sm">
                                         <span className="flex items-center gap-2">
-                                            <Pill className="h-4 w-4 text-violet-500" />
+                                            <Pill className="h-4 w-4 text-primary" />
                                             Active Medications
                                         </span>
                                         <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('medications')}>View all</Button>
@@ -765,7 +765,7 @@ export default function ClientMedical({
 
                             {can_edit && (
                                 <Button
-                                    className="bg-violet-600 hover:bg-violet-700"
+                                    className="bg-primary hover:bg-primary"
                                     onClick={() =>
                                         profileForm.put(
                                             `/operations/clients/${client.id}/medical/profile`,
@@ -788,7 +788,7 @@ export default function ClientMedical({
                     <Card className={cn(focusSection !== 'medications' && 'hidden')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                     <Pill className="h-4 w-4" />
                                 </div>
                                 Medications
@@ -801,9 +801,9 @@ export default function ClientMedical({
                                 </Button>
                             )}
                             {can_edit && showAddMed && (
-                                <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 p-4">
+                                <div className="rounded-xl border border-dashed border-primary bg-primary/10/30 p-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                             <Plus className="h-4 w-4" />
                                             Add medication
                                         </div>
@@ -1055,7 +1055,7 @@ export default function ClientMedical({
                                     </div>
                                     <div className="mt-3">
                                         <Button
-                                            className="bg-violet-600 hover:bg-violet-700"
+                                            className="bg-primary hover:bg-primary"
                                             onClick={() => {
                                                 // Inertia's useForm().transform() does not always support chaining in all versions.
                                                 // Normalize dose_times without relying on chained calls.
@@ -1098,12 +1098,12 @@ export default function ClientMedical({
                                                 'rounded-lg border p-4 transition-colors',
                                                 isActive
                                                     ? 'border-l-4 border-l-violet-400 bg-white'
-                                                    : 'border-l-4 border-l-slate-200 bg-slate-50/50',
+                                                    : 'border-l-4 border-l-slate-200 bg-muted/50',
                                             )}
                                         >
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex items-center gap-2">
-                                                    <Pill className="h-4 w-4 text-violet-500" />
+                                                    <Pill className="h-4 w-4 text-primary" />
                                                     <span className="text-sm font-semibold">{m.name}</span>
                                                     {m.controlled_drug && (
                                                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
@@ -1116,7 +1116,7 @@ export default function ClientMedical({
                                                         </span>
                                                     )}
                                                     {!isActive && (
-                                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                                             {m.state || 'Inactive'}
                                                         </span>
                                                     )}
@@ -1447,7 +1447,7 @@ export default function ClientMedical({
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-semibold">{ec.name}</span>
                                                         {ec.relationship && (
-                                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                                                 {ec.relationship}
                                                             </span>
                                                         )}
@@ -1458,7 +1458,7 @@ export default function ClientMedical({
                                                             </span>
                                                         )}
                                                         {ec.contact_order && (
-                                                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                                                                 #{ec.contact_order}
                                                             </span>
                                                         )}
@@ -1807,7 +1807,7 @@ export default function ClientMedical({
                                                         Cancel
                                                     </Button>
                                                     <Button
-                                                        className="bg-violet-600 hover:bg-violet-700"
+                                                        className="bg-primary hover:bg-primary"
                                                         onClick={submitAdministration}
                                                         disabled={administrationForm.processing}
                                                     >
@@ -1838,7 +1838,7 @@ export default function ClientMedical({
                                                 a.status === 'given' ? 'bg-emerald-100 text-emerald-700' :
                                                 a.status === 'refused' ? 'bg-red-100 text-red-700' :
                                                 a.status === 'missed' ? 'bg-amber-100 text-amber-700' :
-                                                'bg-slate-100 text-slate-700',
+                                                'bg-muted text-foreground',
                                             )}>
                                                 {a.status}
                                             </span>
@@ -1887,7 +1887,7 @@ export default function ClientMedical({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                     <Package className="h-4 w-4" />
                                 </div>
                                 Stock
@@ -1900,9 +1900,9 @@ export default function ClientMedical({
                                 </Button>
                             )}
                             {can_stock && medications.length > 0 && showStockForm && (
-                                <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 p-4">
+                                <div className="rounded-xl border border-dashed border-primary bg-primary/10/30 p-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                             <Plus className="h-4 w-4" />
                                             Update stock
                                         </div>
@@ -2053,7 +2053,7 @@ export default function ClientMedical({
                                     </div>
                                     <div className="mt-3">
                                         <Button
-                                            className="bg-indigo-600 hover:bg-indigo-700"
+                                            className="bg-primary hover:bg-primary"
                                             onClick={() => {
                                                 stockForm.clearErrors();
                                                 if (!stockForm.data.medication_id) return;
@@ -2091,7 +2091,7 @@ export default function ClientMedical({
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2">
-                                                <Package className="h-4 w-4 text-indigo-500" />
+                                                <Package className="h-4 w-4 text-primary" />
                                                 <span className="text-sm font-medium">{m.name}</span>
                                             </div>
                                             <div className="text-xs font-medium text-foreground">
@@ -2203,7 +2203,7 @@ export default function ClientMedical({
                                         </div>
                                         <span className={cn(
                                             'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                                            d.status === 'open' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600',
+                                            d.status === 'open' ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground',
                                         )}>
                                             {d.status}
                                             {d.reported_at
@@ -2283,7 +2283,7 @@ export default function ClientMedical({
                             Cancel
                         </Button>
                         <Button
-                            className="bg-violet-600 hover:bg-violet-700"
+                            className="bg-primary hover:bg-primary"
                             onClick={() => {
                                 if (!selectedDiscId) return;
                                 closeDiscForm.post(

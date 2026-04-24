@@ -20,7 +20,7 @@ export default function RespiteBookingsIndex({ bookings }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Approved Bookings</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Central list of bookings created from approved requests.
                     </div>
                 </div>
@@ -39,7 +39,7 @@ export default function RespiteBookingsIndex({ bookings }: Props) {
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge variant="outline">{b.status}</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(b.start_at)} → {formatDateTime(b.end_at)}
                                             </div>
                                         </div>
@@ -50,14 +50,14 @@ export default function RespiteBookingsIndex({ bookings }: Props) {
                                 </CardTitle>
                             </CardHeader>
                             {b.coordinator && (
-                                <CardContent className="text-xs text-slate-500">
+                                <CardContent className="text-xs text-muted-foreground">
                                     Coordinator: {b.coordinator.name}
                                 </CardContent>
                             )}
                         </Card>
                     ))}
                     {!bookings.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No approved bookings found.
                         </div>
                     )}

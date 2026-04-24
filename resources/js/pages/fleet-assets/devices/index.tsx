@@ -222,7 +222,7 @@ export default function DevicesIndex({ devices, stats, pairing_options }: Props)
                     <FleetStatCard label="ONLINE" value={onlineCount} icon={Wifi} color="amber" valueClassName="text-green-400" subtitle="Currently reporting" />
                     <FleetStatCard label="OFFLINE" value={offlineCount} icon={WifiOff} color="red" valueClassName="text-red-400" subtitle="Not responding" />
                     <FleetStatCard label="UNPAIRED" value={unpairedCount} icon={Unplug} subtitle="No asset linked" />
-                    <Card className="border bg-purple-50 dark:bg-purple-950/20">
+                    <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="flex items-center justify-center p-4">
                             <ProgressRing value={onlinePct} size={80} color={FLEET_COLORS.primary} label="Online %" />
                         </CardContent>

@@ -59,7 +59,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusClass: Record<string, string> = {
-    pending: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+    pending: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
     retrying: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
     success: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     failed: 'border-red-500/30 text-red-400 bg-red-500/10',

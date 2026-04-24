@@ -90,10 +90,10 @@ const categoryLabels: Record<string, string> = {
 
 const categoryColors: Record<string, string> = {
     vehicle: 'bg-blue-100 text-blue-800',
-    equipment: 'bg-purple-100 text-purple-800',
+    equipment: 'bg-primary/10 text-primary',
     building: 'bg-amber-100 text-amber-800',
     furniture: 'bg-teal-100 text-teal-800',
-    it_equipment: 'bg-indigo-100 text-indigo-800',
+    it_equipment: 'bg-primary/10 text-primary',
     land: 'bg-green-100 text-green-800',
 };
 
@@ -106,7 +106,7 @@ const statusLabels: Record<string, string> = {
 const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
     fully_depreciated: 'bg-amber-100 text-amber-800',
-    disposed: 'bg-gray-100 text-gray-600',
+    disposed: 'bg-muted text-muted-foreground',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [

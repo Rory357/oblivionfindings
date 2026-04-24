@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
@@ -27,6 +28,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('settings/profile/landing', [ProfileController::class, 'updateLanding'])->name('profile.landing.update');
     Route::post('settings/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
     Route::delete('settings/profile/photo', [ProfileController::class, 'destroyPhoto'])->name('profile.photo.destroy');
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -37,9 +39,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:6,1')
         ->name('user-password.update');
 
-    Route::get('settings/appearance', function () {
-        return Inertia::render('settings/appearance');
-    })->name('appearance.edit');
+    Route::get('settings/appearance', [AppearanceController::class, 'edit'])
+        ->name('appearance.edit');
+    Route::put('settings/appearance', [AppearanceController::class, 'update'])
+        ->name('appearance.update');
+    Route::post('settings/appearance/reset', [AppearanceController::class, 'reset'])
+        ->name('appearance.reset');
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
@@ -119,6 +124,8 @@ Route::middleware('auth')->group(function () {
         ->name('settings.notifications');
     Route::put('settings/notifications', [NotificationPreferencesController::class, 'update'])
         ->name('settings.notifications.update');
+    Route::put('settings/notifications/delivery', [NotificationPreferencesController::class, 'updateDelivery'])
+        ->name('settings.notifications.delivery.update');
 
     // Role defaults (admin)
     Route::get('settings/notifications/roles', [NotificationPreferencesController::class, 'roles'])

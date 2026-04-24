@@ -51,21 +51,21 @@ const STATUSES = [
 function categoryBadge(cat: string) {
     switch (cat) {
         case 'fire_safety': return 'bg-red-100 text-red-800 border-red-200';
-        case 'chemical_handling': return 'bg-purple-100 text-purple-800 border-purple-200';
+        case 'chemical_handling': return 'bg-primary/10 text-primary border-primary';
         case 'manual_handling': return 'bg-blue-100 text-blue-800 border-blue-200';
         case 'infection_control': return 'bg-green-100 text-green-800 border-green-200';
         case 'emergency_procedures': return 'bg-orange-100 text-orange-800 border-orange-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusBadge(status: string) {
     switch (status) {
         case 'approved': return 'bg-green-100 text-green-800 border-green-200';
-        case 'draft': return 'bg-slate-100 text-slate-800 border-slate-200';
+        case 'draft': return 'bg-muted text-foreground border-border';
         case 'under_review': return 'bg-amber-100 text-amber-800 border-amber-200';
         case 'archived': return 'bg-red-100 text-red-800 border-red-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -109,7 +109,7 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Category</Label>
+                            <Label className="text-xs text-muted-foreground">Category</Label>
                             <Select
                                 value={currentFilters.category ?? ANY}
                                 onValueChange={(v) => onFilter({ category: v === ANY ? null : v })}
@@ -124,7 +124,7 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={currentFilters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -147,7 +147,7 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 font-medium">Reference</th>
                                         <th className="pb-2 font-medium">Title</th>
                                         <th className="pb-2 font-medium">Category</th>
@@ -192,7 +192,7 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                                     })}
                                     {!procedures.data.length && (
                                         <tr>
-                                            <td colSpan={8} className="py-8 text-center text-slate-500">No procedures found.</td>
+                                            <td colSpan={8} className="py-8 text-center text-muted-foreground">No procedures found.</td>
                                         </tr>
                                     )}
                                 </tbody>

@@ -40,7 +40,7 @@ interface Props {
 }
 
 const priorityConfig: Record<string, { className: string; label: string }> = {
-    low: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Low' },
+    low: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Low' },
     normal: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Normal' },
     high: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'High' },
     urgent: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Urgent' },
@@ -97,7 +97,7 @@ export default function AnnouncementShow({ announcement, userAcknowledged, can }
                                 {announcement.content}
                             </div>
 
-                            <div className="mt-6 flex flex-wrap items-center gap-4 border-t pt-4 text-xs text-slate-500">
+                            <div className="mt-6 flex flex-wrap items-center gap-4 border-t pt-4 text-xs text-muted-foreground">
                                 <span>Posted by {announcement.creator?.name ?? 'Unknown'}</span>
                                 <span>Published {formatDateTime(announcement.published_at)}</span>
                                 {announcement.expires_at && <span>Expires {formatDateTime(announcement.expires_at)}</span>}
@@ -111,7 +111,7 @@ export default function AnnouncementShow({ announcement, userAcknowledged, can }
                             <CardContent className="flex items-center justify-between p-5">
                                 <div>
                                     <p className="font-medium">Acknowledgement Required</p>
-                                    <p className="text-sm text-slate-500">
+                                    <p className="text-sm text-muted-foreground">
                                         Please confirm you have read and understood this announcement.
                                     </p>
                                 </div>

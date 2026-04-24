@@ -210,7 +210,7 @@ export default function CarePlansIndex({
                     <Card className="overflow-hidden">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-100 text-indigo-600">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
                                     <ClipboardList className="h-3.5 w-3.5" />
                                 </div>
                                 Plans by Status
@@ -227,7 +227,7 @@ export default function CarePlansIndex({
                         </CardContent>
                         {/* Legend */}
                         {s.total > 0 && (
-                            <div className="border-t bg-slate-50/50 px-4 py-2.5">
+                            <div className="border-t bg-muted/50 px-4 py-2.5">
                                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                                     {donutSegments.filter(seg => seg.value > 0).map((seg) => (
                                         <div key={seg.label} className="flex items-center gap-1.5 text-[11px]">
@@ -258,26 +258,26 @@ export default function CarePlansIndex({
                                     <span className="text-muted-foreground">Active Plan Rate</span>
                                     <span className="font-bold text-emerald-600">{completionRate}%</span>
                                 </div>
-                                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
                                     <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${completionRate}%` }} />
                                 </div>
                             </div>
                             {/* Key metrics */}
                             <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-lg bg-slate-50 p-2.5 text-center">
-                                    <div className="text-lg font-bold text-indigo-600">{s.active}</div>
+                                <div className="rounded-lg bg-muted p-2.5 text-center">
+                                    <div className="text-lg font-bold text-primary">{s.active}</div>
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Active</div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 p-2.5 text-center">
+                                <div className="rounded-lg bg-muted p-2.5 text-center">
                                     <div className="text-lg font-bold text-amber-600">{s.in_review}</div>
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">In Review</div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 p-2.5 text-center">
-                                    <div className="text-lg font-bold text-slate-600">{s.draft}</div>
+                                <div className="rounded-lg bg-muted p-2.5 text-center">
+                                    <div className="text-lg font-bold text-muted-foreground">{s.draft}</div>
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Drafts</div>
                                 </div>
-                                <div className="rounded-lg bg-slate-50 p-2.5 text-center">
-                                    <div className={`text-lg font-bold ${s.overdue_goals > 0 ? 'text-red-600' : 'text-slate-400'}`}>{s.overdue_goals}</div>
+                                <div className="rounded-lg bg-muted p-2.5 text-center">
+                                    <div className={`text-lg font-bold ${s.overdue_goals > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{s.overdue_goals}</div>
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Overdue Goals</div>
                                 </div>
                             </div>
@@ -288,7 +288,7 @@ export default function CarePlansIndex({
                     <Card className="overflow-hidden">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-100 text-violet-600">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">
                                     <Sparkles className="h-3.5 w-3.5" />
                                 </div>
                                 Plans by Type
@@ -307,7 +307,7 @@ export default function CarePlansIndex({
                 </div>
 
                 {/* ─── Filter Bar ─── */}
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-3 shadow-sm dark:bg-slate-950/50">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-3 shadow-sm dark:bg-muted/50">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
@@ -361,8 +361,8 @@ export default function CarePlansIndex({
                     {(carePlans?.data ?? []).length === 0 && (
                         <Card className="border-dashed">
                             <CardContent className="flex flex-col items-center justify-center py-16">
-                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50">
-                                    <Heart className="h-8 w-8 text-indigo-400" />
+                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                    <Heart className="h-8 w-8 text-primary" />
                                 </div>
                                 <h2 className="text-lg font-semibold">No Care Plans Found</h2>
                                 <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">

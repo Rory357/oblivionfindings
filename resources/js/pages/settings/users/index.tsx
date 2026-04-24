@@ -133,11 +133,11 @@ function statusBadge(user: UserItem) {
 
 function userTypeBadge(type: string) {
     const map: Record<string, { label: string; className: string }> = {
-        staff: { label: 'Staff', className: 'border-violet-300 bg-violet-50 text-violet-700' },
+        staff: { label: 'Staff', className: 'border-primary bg-primary/10 text-primary' },
         client: { label: 'Client', className: 'border-blue-300 bg-blue-50 text-blue-700' },
         next_of_kin: { label: 'Whanau', className: 'border-cyan-300 bg-cyan-50 text-cyan-700' },
         board: { label: 'Board', className: 'border-amber-300 bg-amber-50 text-amber-700' },
-        user: { label: 'User', className: 'border-slate-300 bg-slate-50 text-slate-700' },
+        user: { label: 'User', className: 'border-border bg-muted text-foreground' },
     };
     const info = map[type] ?? map.user;
     return <Badge variant="outline" className={info!.className}>{info!.label}</Badge>;
@@ -264,7 +264,7 @@ export default function UsersIndex({
                                     <Download className="mr-2 h-4 w-4" />
                                     Export CSV
                                 </Button>
-                                <Button asChild className="bg-violet-600 hover:bg-violet-700" dusk="users-create-link">
+                                <Button asChild className="bg-primary hover:bg-primary" dusk="users-create-link">
                                     <Link href="/system/users/create">
                                             <UserPlus className="mr-2 h-4 w-4" />
                                             Create User
@@ -393,8 +393,8 @@ export default function UsersIndex({
 
                     {/* Bulk Actions */}
                     {selectedIds.length > 0 && (
-                        <div className="flex items-center gap-3 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2">
-                            <span className="text-sm font-medium text-violet-700">
+                        <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/10 px-4 py-2">
+                            <span className="text-sm font-medium text-primary">
                                 {selectedIds.length} user{selectedIds.length !== 1 ? 's' : ''} selected
                             </span>
                             <div className="ml-auto flex gap-2">
@@ -430,8 +430,8 @@ export default function UsersIndex({
                         <CardContent className="p-0">
                             {allData.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                                    <div className="mb-4 rounded-full bg-violet-100 p-4">
-                                        <Users className="h-8 w-8 text-violet-600" />
+                                    <div className="mb-4 rounded-full bg-primary/10 p-4">
+                                        <Users className="h-8 w-8 text-primary" />
                                     </div>
                                     <h3 className="text-lg font-semibold">No users found</h3>
                                     <p className="mt-1 text-sm text-muted-foreground">
@@ -484,7 +484,7 @@ export default function UsersIndex({
                                                     >
                                                         <Avatar className="h-8 w-8">
                                                             {user.avatar && <AvatarImage src={user.avatar} />}
-                                                            <AvatarFallback className="bg-violet-100 text-xs text-violet-700">
+                                                            <AvatarFallback className="bg-primary/10 text-xs text-primary">
                                                                 {getInitials(user.name)}
                                                             </AvatarFallback>
                                                         </Avatar>
@@ -613,7 +613,7 @@ export default function UsersIndex({
                                         variant={link.active ? 'default' : 'outline'}
                                         size="sm"
                                         disabled={!link.url}
-                                        className={link.active ? 'bg-violet-600 hover:bg-violet-700' : ''}
+                                        className={link.active ? 'bg-primary hover:bg-primary' : ''}
                                         asChild={!!link.url}
                                     >
                                         {link.url ? (

@@ -85,12 +85,12 @@ function notificationContext(n: { data: any }): Array<{ label: string; value: st
 }
 
 const MODULE_DOT_COLOURS: Record<string, string> = {
-    operations: 'bg-violet-500',
+    operations: 'bg-primary',
     hr: 'bg-blue-500',
     governance: 'bg-emerald-500',
     sites: 'bg-amber-500',
     incidents: 'bg-red-500',
-    fleet: 'bg-purple-500',
+    fleet: 'bg-primary',
     system: 'bg-slate-500',
 };
 
@@ -234,7 +234,7 @@ export default function InboxMenus() {
                                                 {relativeTime(n.created_at)}
                                             </span>
                                             {isUnread && (
-                                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500" />
+                                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                                             )}
                                         </div>
                                     </DropdownMenuItem>
@@ -266,7 +266,7 @@ export default function InboxMenus() {
                     <div className="p-1.5">
                         <Link
                             href="/notifications"
-                            className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                            className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 dark:text-primary dark:hover:bg-primary/30"
                         >
                             View All Notifications
                             <ArrowRight className="h-3.5 w-3.5" />

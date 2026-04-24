@@ -34,7 +34,7 @@ export default function RespiteBookingCreate({ clients, requests, pendingRequest
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New Booking</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Bookings are confirmed placements. Start from an approved request where possible.
                     </div>
                 </div>
@@ -75,7 +75,7 @@ export default function RespiteBookingCreate({ clients, requests, pendingRequest
                                         </SelectContent>
                                     </Select>
                                     {requests.length === 0 && (
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="mt-1 text-xs text-muted-foreground">
                                             No approved requests yet. Approve a booking request first, or proceed ad-hoc.
                                         </div>
                                     )}

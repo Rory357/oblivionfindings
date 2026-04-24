@@ -18,7 +18,7 @@ export default function UnacknowledgedHandoverNotes({ notes }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Unacknowledged Handover Notes</h1>
-                    <div className="mt-1 text-sm text-slate-500">Handover notes that have not yet been acknowledged by incoming staff.</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Handover notes that have not yet been acknowledged by incoming staff.</div>
                 </div>
                 <RespiteSubnav />
 
@@ -36,8 +36,8 @@ export default function UnacknowledgedHandoverNotes({ notes }: Props) {
                                                 <Badge variant="outline">{n.handover_type?.replace(/_/g, ' ')}</Badge>
                                                 <Badge className="bg-amber-100 text-amber-800">Unacknowledged</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500 line-clamp-2">{n.notes}</div>
-                                            <div className="mt-1 text-xs text-slate-400">{formatDateTime(n.created_at)}</div>
+                                            <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{n.notes}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(n.created_at)}</div>
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <Link href={`/respite/handover-notes/${n.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted text-center">
@@ -53,7 +53,7 @@ export default function UnacknowledgedHandoverNotes({ notes }: Props) {
                         </Card>
                     ))}
                     {!notes.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No unacknowledged handover notes.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No unacknowledged handover notes.</div>
                     )}
                 </div>
 

@@ -120,18 +120,18 @@ const statusConfig: Record<string, { className: string; label: string }> = {
 };
 
 const defaultShiftTypeConfig = {
-    className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+    className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
     label: 'Standard',
 };
 
 const shiftTypeConfig: Record<string, { className: string; label: string }> = {
     standard: defaultShiftTypeConfig,
     sleepover: {
-        className: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
+        className: 'border-primary/30 text-primary bg-primary/10',
         label: 'Sleepover',
     },
     on_call: {
-        className: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+        className: 'border-primary/30 text-primary bg-primary/10',
         label: 'On-Call',
     },
     split: {

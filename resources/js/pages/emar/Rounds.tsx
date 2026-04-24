@@ -53,7 +53,7 @@ type Props = {
 };
 
 const statusConfig: Record<string, { color: string; icon: any }> = {
-    pending: { color: 'bg-gray-100 text-gray-700', icon: Clock },
+    pending: { color: 'bg-muted text-foreground', icon: Clock },
     in_progress: { color: 'bg-blue-100 text-blue-700', icon: Play },
     completed: { color: 'bg-green-100 text-green-700', icon: CheckCircle },
     partial: { color: 'bg-amber-100 text-amber-700', icon: AlertTriangle },

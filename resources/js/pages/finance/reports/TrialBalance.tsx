@@ -127,7 +127,7 @@ export default function TrialBalance({ report, filters }: Props) {
                         <CardContent className="flex items-center justify-between pt-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Credits</p>
-                                <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                                <p className="text-2xl font-bold text-primary dark:text-primary">
                                     {formatCurrency(report.total_credits)}
                                 </p>
                             </div>

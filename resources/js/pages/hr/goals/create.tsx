@@ -58,7 +58,7 @@ const goalTypeIcons: Record<string, typeof Building2> = {
 };
 
 const statusColors: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-800',
+    draft: 'bg-muted text-foreground',
     active: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
@@ -404,7 +404,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 <Badge variant="outline" className="text-xs capitalize">
                                                     {parentContext.goal_type}
                                                 </Badge>
-                                                <Badge className={`text-xs ${statusColors[parentContext.status] ?? 'bg-slate-100 text-slate-800'}`}>
+                                                <Badge className={`text-xs ${statusColors[parentContext.status] ?? 'bg-muted text-foreground'}`}>
                                                     {parentContext.status.replace(/_/g, ' ')}
                                                 </Badge>
                                             </div>
@@ -417,7 +417,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                             <span>Progress</span>
                                             <span>{parentContext.progress_percentage}%</span>
                                         </div>
-                                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                             <div
                                                 className="h-full rounded-full bg-emerald-500 transition-all"
                                                 style={{ width: `${parentContext.progress_percentage}%` }}

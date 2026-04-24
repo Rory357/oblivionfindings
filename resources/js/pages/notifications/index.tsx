@@ -84,12 +84,12 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 const MODULE_COLOURS: Record<string, { border: string; bg: string; text: string; icon: typeof Bell; dot: string }> = {
-    operations: { border: 'border-l-violet-500', bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-300', icon: ClipboardList, dot: 'bg-violet-500' },
+    operations: { border: 'border-l-violet-500', bg: 'bg-primary/10 dark:bg-primary/30', text: 'text-primary dark:text-primary/70', icon: ClipboardList, dot: 'bg-primary' },
     hr: { border: 'border-l-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', icon: Users, dot: 'bg-blue-500' },
     governance: { border: 'border-l-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', icon: ShieldAlert, dot: 'bg-emerald-500' },
     sites: { border: 'border-l-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', icon: Building2, dot: 'bg-amber-500' },
     incidents: { border: 'border-l-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: TriangleAlert, dot: 'bg-red-500' },
-    system: { border: 'border-l-slate-500', bg: 'bg-slate-100 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', icon: Wrench, dot: 'bg-slate-500' },
+    system: { border: 'border-l-slate-500', bg: 'bg-muted dark:bg-muted/30', text: 'text-foreground dark:text-muted-foreground', icon: Wrench, dot: 'bg-slate-500' },
 };
 
 function getModuleStyle(module?: string) {
@@ -214,8 +214,8 @@ export default function NotificationsIndex({
                 {/* Header */}
                 <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
-                            <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/30">
+                            <Bell className="h-5 w-5 text-primary dark:text-primary" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight">Notification Centre</h1>
@@ -226,7 +226,7 @@ export default function NotificationsIndex({
                         variant="default"
                         size="sm"
                         disabled={!unread}
-                        className="bg-violet-600 hover:bg-violet-700"
+                        className="bg-primary hover:bg-primary"
                         onClick={markAllRead}
                     >
                         <CheckCircle2 className="mr-1.5 h-4 w-4" />
@@ -236,24 +236,24 @@ export default function NotificationsIndex({
 
                 {/* Stats Row */}
                 <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <Card className="border-indigo-200 dark:border-indigo-800">
+                    <Card className="border-primary dark:border-primary/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                                <Inbox className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                <Inbox className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalNotifs}</p>
+                                <p className="text-2xl font-bold text-primary dark:text-primary">{totalNotifs}</p>
                                 <p className="text-xs font-medium text-muted-foreground">Total</p>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-violet-200 dark:border-violet-800">
+                    <Card className="border-primary dark:border-primary/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                                <BellRing className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                <BellRing className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">{unread}</p>
+                                <p className="text-2xl font-bold text-primary dark:text-primary">{unread}</p>
                                 <p className="text-xs font-medium text-muted-foreground">Unread</p>
                             </div>
                         </CardContent>
@@ -292,7 +292,7 @@ export default function NotificationsIndex({
                                     <Bell className="mr-1.5 h-4 w-4" />
                                     Notifications
                                     {totalNotifs > 0 && (
-                                        <Badge variant="secondary" className="ml-2 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 text-xs">
+                                        <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70 text-xs">
                                             {totalNotifs}
                                         </Badge>
                                     )}
@@ -357,7 +357,7 @@ export default function NotificationsIndex({
                                                 placeholder="Search notifications..."
                                                 value={searchText}
                                                 onChange={(e) => setSearchText(e.target.value)}
-                                                className="h-8 w-full rounded-md border bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:border-violet-400 focus:ring-1 focus:ring-violet-400 focus:outline-none"
+                                                className="h-8 w-full rounded-md border bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-ring focus:outline-none"
                                             />
                                         </div>
 
@@ -365,7 +365,7 @@ export default function NotificationsIndex({
                                             <button
                                                 type="button"
                                                 onClick={clearFilters}
-                                                className="text-xs font-medium text-violet-600 underline underline-offset-2 hover:text-violet-700 dark:text-violet-400"
+                                                className="text-xs font-medium text-primary underline underline-offset-2 hover:text-primary dark:text-primary"
                                             >
                                                 Clear all
                                             </button>
@@ -377,7 +377,7 @@ export default function NotificationsIndex({
                                 {filteredNotifData.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
                                         <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30">
-                                            <BellOff className="h-10 w-10 text-violet-400 dark:text-violet-500" />
+                                            <BellOff className="h-10 w-10 text-primary dark:text-primary" />
                                         </div>
                                         <h3 className="text-xl font-semibold text-foreground">All caught up!</h3>
                                         <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
@@ -385,7 +385,7 @@ export default function NotificationsIndex({
                                         </p>
                                         <Link
                                             href="/settings/notifications"
-                                            className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                                            className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary dark:text-primary dark:hover:text-primary/70"
                                         >
                                             Manage notification preferences
                                             <ArrowRight className="h-4 w-4" />
@@ -446,7 +446,7 @@ export default function NotificationsIndex({
                                                                         </Badge>
                                                                     )}
                                                                     {isUnread && (
-                                                                        <span className="inline-block h-2 w-2 rounded-full bg-violet-500" />
+                                                                        <span className="inline-block h-2 w-2 rounded-full bg-primary" />
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -547,7 +547,7 @@ export default function NotificationsIndex({
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => setExpandedAnnouncement(isExpanded ? null : a.id)}
-                                                                            className="mt-1 text-xs text-violet-600 hover:underline dark:text-violet-400"
+                                                                            className="mt-1 text-xs text-primary hover:underline dark:text-primary"
                                                                         >
                                                                             {isExpanded ? 'Show less' : 'Read more'}
                                                                         </button>
@@ -606,7 +606,7 @@ export default function NotificationsIndex({
                                 </div>
                                 <Link
                                     href="/settings/notifications"
-                                    className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                                    className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary dark:text-primary"
                                 >
                                     All notification settings
                                     <ArrowRight className="h-3 w-3" />

@@ -148,7 +148,7 @@ export default function EmailSettings() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Mail className="h-5 w-5 text-violet-600" />
+                            <Mail className="h-5 w-5 text-primary" />
                             Email Configuration
                         </CardTitle>
                         <CardDescription>
@@ -165,19 +165,19 @@ export default function EmailSettings() {
                                     onClick={() => setFormData((current) => ({ ...current, provider: 'smtp' }))}
                                     className={`flex items-center gap-4 rounded-lg border-2 p-4 text-left transition-all ${
                                         formData.provider === 'smtp'
-                                            ? 'border-violet-600 bg-violet-50/60'
+                                            ? 'border-primary bg-primary/10/60'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
                                     <div
                                         className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
                                             formData.provider === 'smtp'
-                                                ? 'border-violet-600'
+                                                ? 'border-primary'
                                                 : 'border-muted-foreground/30'
                                         }`}
                                     >
                                         {formData.provider === 'smtp' && (
-                                            <div className="h-2 w-2 rounded-full bg-violet-600" />
+                                            <div className="h-2 w-2 rounded-full bg-primary" />
                                         )}
                                     </div>
                                     <div>
@@ -194,19 +194,19 @@ export default function EmailSettings() {
                                     onClick={() => setFormData((current) => ({ ...current, provider: 'microsoft' }))}
                                     className={`flex items-center gap-4 rounded-lg border-2 p-4 text-left transition-all ${
                                         formData.provider === 'microsoft'
-                                            ? 'border-violet-600 bg-violet-50/60'
+                                            ? 'border-primary bg-primary/10/60'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
                                     <div
                                         className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
                                             formData.provider === 'microsoft'
-                                                ? 'border-violet-600'
+                                                ? 'border-primary'
                                                 : 'border-muted-foreground/30'
                                         }`}
                                     >
                                         {formData.provider === 'microsoft' && (
-                                            <div className="h-2 w-2 rounded-full bg-violet-600" />
+                                            <div className="h-2 w-2 rounded-full bg-primary" />
                                         )}
                                     </div>
                                     <div className="flex-1">
@@ -229,19 +229,19 @@ export default function EmailSettings() {
                                     onClick={() => setFormData((current) => ({ ...current, provider: 'google' }))}
                                     className={`flex items-center gap-4 rounded-lg border-2 p-4 text-left transition-all ${
                                         formData.provider === 'google'
-                                            ? 'border-violet-600 bg-violet-50/60'
+                                            ? 'border-primary bg-primary/10/60'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
                                     <div
                                         className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
                                             formData.provider === 'google'
-                                                ? 'border-violet-600'
+                                                ? 'border-primary'
                                                 : 'border-muted-foreground/30'
                                         }`}
                                     >
                                         {formData.provider === 'google' && (
-                                            <div className="h-2 w-2 rounded-full bg-violet-600" />
+                                            <div className="h-2 w-2 rounded-full bg-primary" />
                                         )}
                                     </div>
                                     <div className="flex-1">
@@ -474,7 +474,7 @@ export default function EmailSettings() {
                         type="button"
                         onClick={handleSave}
                         disabled={processing}
-                        className="bg-violet-600 hover:bg-violet-700"
+                        className="bg-primary hover:bg-primary"
                     >
                         {saving ? (
                             <>

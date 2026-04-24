@@ -82,7 +82,7 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                 <div className="flex flex-wrap items-end justify-between gap-2">
                     <div>
                         <h1 className="text-lg font-semibold">New Handover Note</h1>
-                        <div className="mt-1 text-sm text-slate-500">Record handover information for a respite stay.</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Record handover information for a respite stay.</div>
                     </div>
                     <DraftSavedIndicator savedAt={savedAt} />
                 </div>

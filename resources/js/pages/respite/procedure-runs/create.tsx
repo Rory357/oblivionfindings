@@ -54,7 +54,7 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">New Procedure Run</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Start a procedure from an active template and attach it to a respite subject.
                         </div>
                     </div>
@@ -128,8 +128,8 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                             <CardHeader>
                                 <CardTitle className="text-base">Template Preview</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2 text-sm text-slate-600">
-                                <div className="font-medium text-slate-900">{selectedTemplate.name}</div>
+                            <CardContent className="space-y-2 text-sm text-muted-foreground">
+                                <div className="font-medium text-foreground">{selectedTemplate.name}</div>
                                 {selectedTemplate.description && <p>{selectedTemplate.description}</p>}
                                 <div>{stepCount} step{stepCount === 1 ? '' : 's'} will be created for this run.</div>
                             </CardContent>

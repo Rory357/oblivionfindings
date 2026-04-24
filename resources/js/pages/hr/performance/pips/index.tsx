@@ -37,7 +37,7 @@ const statusColors: Record<string, string> = {
     active: 'bg-blue-100 text-blue-800',
     in_progress: 'bg-yellow-100 text-yellow-800',
     completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-slate-100 text-slate-800',
+    cancelled: 'bg-muted text-foreground',
 };
 
 const outcomeColors: Record<string, string> = {
@@ -73,7 +73,7 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Performance Improvement Plans</h1>
-                        <p className="mt-0.5 text-sm text-slate-500">Manage and track employee improvement plans</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">Manage and track employee improvement plans</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Link href="/hr/performance">
@@ -136,7 +136,7 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
                                             {pieData.map((d) => (
                                                 <div key={d.name} className="flex items-center gap-2">
                                                     <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                                                    <span className="text-slate-600">{d.name}: <span className="font-medium">{d.value}</span></span>
+                                                    <span className="text-muted-foreground">{d.name}: <span className="font-medium">{d.value}</span></span>
                                                 </div>
                                             ))}
                                         </div>
@@ -182,7 +182,7 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
                             </TableHeader>
                             <TableBody>
                                 {pips.data.length === 0 && (
-                                    <TableRow><TableCell colSpan={6} className="text-center text-slate-400 py-8">No PIPs found</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No PIPs found</TableCell></TableRow>
                                 )}
                                 {pips.data.map((pip) => (
                                     <TableRow key={pip.id}>
@@ -191,10 +191,10 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
                                         </TableCell>
                                         <TableCell>{pip.employee?.name ?? '-'}</TableCell>
                                         <TableCell>{pip.manager?.name ?? '-'}</TableCell>
-                                        <TableCell className="text-sm text-slate-500">{formatDate(pip.start_date)} - {formatDate(pip.end_date)}</TableCell>
-                                        <TableCell><Badge className={statusColors[pip.status] || 'bg-slate-100'} variant="outline">{pip.status.replace('_', ' ')}</Badge></TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">{formatDate(pip.start_date)} - {formatDate(pip.end_date)}</TableCell>
+                                        <TableCell><Badge className={statusColors[pip.status] || 'bg-muted'} variant="outline">{pip.status.replace('_', ' ')}</Badge></TableCell>
                                         <TableCell>
-                                            {pip.outcome ? <Badge className={outcomeColors[pip.outcome] || 'bg-slate-100'} variant="outline">{pip.outcome}</Badge> : '-'}
+                                            {pip.outcome ? <Badge className={outcomeColors[pip.outcome] || 'bg-muted'} variant="outline">{pip.outcome}</Badge> : '-'}
                                         </TableCell>
                                     </TableRow>
                                 ))}

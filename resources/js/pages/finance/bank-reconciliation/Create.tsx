@@ -46,8 +46,8 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
 
             <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">New Bank Reconciliation</h1>
-                    <p className="text-gray-500 mt-1">
+                    <h1 className="text-3xl font-bold text-foreground">New Bank Reconciliation</h1>
+                    <p className="text-muted-foreground mt-1">
                         Start reconciling a bank statement against your ledger
                     </p>
                 </div>

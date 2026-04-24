@@ -115,28 +115,28 @@ export default function PortalClient({
                                 <div className="font-medium">
                                     Medical history
                                 </div>
-                                <div className="whitespace-pre-wrap text-slate-600">
+                                <div className="whitespace-pre-wrap text-muted-foreground">
                                     {profile?.medical_history || '-'}
                                 </div>
                             </div>
 
                             <div>
                                 <div className="font-medium">Disabilities</div>
-                                <div className="whitespace-pre-wrap text-slate-600">
+                                <div className="whitespace-pre-wrap text-muted-foreground">
                                     {profile?.disabilities || '-'}
                                 </div>
                             </div>
 
                             <div>
                                 <div className="font-medium">Allergies</div>
-                                <div className="whitespace-pre-wrap text-slate-600">
+                                <div className="whitespace-pre-wrap text-muted-foreground">
                                     {profile?.allergies || '-'}
                                 </div>
                             </div>
 
                             <div>
                                 <div className="font-medium">Notes</div>
-                                <div className="whitespace-pre-wrap text-slate-600">
+                                <div className="whitespace-pre-wrap text-muted-foreground">
                                     {profile?.notes || '-'}
                                 </div>
                             </div>
@@ -154,7 +154,7 @@ export default function PortalClient({
                                             <div className="text-sm font-medium">
                                                 {m.name}
                                             </div>
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 {[
                                                     m.dosage &&
                                                         `Dosage: ${m.dosage}`,
@@ -167,14 +167,14 @@ export default function PortalClient({
                                                     .join(' - ') || '-'}
                                             </div>
                                             {m.instructions && (
-                                                <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                                <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                                                     {m.instructions}
                                                 </div>
                                             )}
                                         </div>
                                     ))}
                                     {!medications.length && (
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             No medications listed.
                                         </div>
                                     )}
@@ -194,20 +194,20 @@ export default function PortalClient({
                                             <div className="text-sm font-medium">
                                                 {c.label}
                                                 {c.severity && (
-                                                    <span className="ml-2 text-xs text-slate-500">
+                                                    <span className="ml-2 text-xs text-muted-foreground">
                                                         ({c.severity})
                                                     </span>
                                                 )}
                                             </div>
                                             {c.notes && (
-                                                <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                                <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                                                     {c.notes}
                                                 </div>
                                             )}
                                         </div>
                                     ))}
                                     {!conditions.length && (
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             No conditions listed.
                                         </div>
                                     )}
@@ -229,7 +229,7 @@ export default function PortalClient({
                                             <div className="text-sm font-medium">
                                                 {e.name}
                                             </div>
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 {[
                                                     e.relationship &&
                                                         `Relationship: ${e.relationship}`,
@@ -242,14 +242,14 @@ export default function PortalClient({
                                                     .join(' - ') || '-'}
                                             </div>
                                             {e.notes && (
-                                                <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                                <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                                                     {e.notes}
                                                 </div>
                                             )}
                                         </div>
                                     ))}
                                     {!emergency_contacts.length && (
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             No emergency contacts listed.
                                         </div>
                                     )}
@@ -270,7 +270,7 @@ export default function PortalClient({
                                                 <div className="text-sm font-medium">
                                                     {d.title || d.original_name}
                                                 </div>
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     {[
                                                         d.category &&
                                                             `Category: ${d.category}`,
@@ -281,7 +281,7 @@ export default function PortalClient({
                                                         .join(' - ') || '-'}
                                                 </div>
                                                 {d.notes && (
-                                                    <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                                    <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                                                         {d.notes}
                                                     </div>
                                                 )}
@@ -295,7 +295,7 @@ export default function PortalClient({
                                         </div>
                                     ))}
                                     {!documents.length && (
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             No documents uploaded.
                                         </div>
                                     )}
@@ -315,7 +315,7 @@ export default function PortalClient({
                                             <div className="text-sm font-medium">
                                                 {a.name}
                                             </div>
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 {[
                                                     a.asset_tag
                                                         ? `#${a.asset_tag}`
@@ -329,7 +329,7 @@ export default function PortalClient({
                                         </div>
                                     ))}
                                     {!assets.length && (
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             No assets linked.
                                         </div>
                                     )}
@@ -342,7 +342,7 @@ export default function PortalClient({
                                 <div className="font-medium">
                                     Tracking consent
                                 </div>
-                                <div className="mt-2 text-xs text-slate-600">
+                                <div className="mt-2 text-xs text-muted-foreground">
                                     {tracking_consent ? (
                                         <div>
                                             Status: {tracking_consent.status}
@@ -377,13 +377,13 @@ export default function PortalClient({
                                                         <div>
                                                             <div className="text-sm font-medium">
                                                                 {i.type}{' '}
-                                                                <span className="ml-2 text-xs text-slate-500">
+                                                                <span className="ml-2 text-xs text-muted-foreground">
                                                                     (
                                                                     {i.severity}
                                                                     )
                                                                 </span>
                                                             </div>
-                                                            <div className="text-xs text-slate-500">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 {i.occurred_at
                                                                     ? new Date(
                                                                           i.occurred_at,
@@ -394,14 +394,14 @@ export default function PortalClient({
                                                     </div>
 
                                                     {i.description && (
-                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                                             {i.description}
                                                         </div>
                                                     )}
 
                                                     {i.immediate_action_taken && (
-                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                                            <span className="font-medium text-slate-700">
+                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                            <span className="font-medium text-foreground">
                                                                 Immediate
                                                                 action:
                                                             </span>{' '}
@@ -414,7 +414,7 @@ export default function PortalClient({
                                                     {!!(i.attachments || [])
                                                         .length && (
                                                         <div className="mt-3 space-y-2">
-                                                            <div className="text-xs font-medium text-slate-600">
+                                                            <div className="text-xs font-medium text-muted-foreground">
                                                                 Attachments
                                                             </div>
                                                             {(
@@ -449,7 +449,7 @@ export default function PortalClient({
                                                 </div>
                                             ))}
                                             {!incidents.length && (
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     No shared incidents.
                                                 </div>
                                             )}
@@ -498,7 +498,7 @@ export default function PortalClient({
 
                             {!!rag_answer?.sources?.length && (
                                 <div className="rounded-md border bg-white p-3">
-                                    <div className="text-xs font-medium text-slate-600">
+                                    <div className="text-xs font-medium text-muted-foreground">
                                         Sources
                                     </div>
                                     <div className="mt-2 space-y-2">
@@ -507,12 +507,12 @@ export default function PortalClient({
                                                 key={idx}
                                                 className="rounded-md border p-2"
                                             >
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     {s.filename ||
                                                         s.file_id ||
                                                         'Source'}
                                                 </div>
-                                                <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                                <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                                                     {s.text}
                                                 </div>
                                             </div>
@@ -521,7 +521,7 @@ export default function PortalClient({
                                 </div>
                             )}
 
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 Answers are generated from the client timeline +
                                 medical details.
                             </div>
@@ -542,7 +542,7 @@ export default function PortalClient({
                                     <div className="text-sm font-medium">
                                         {e.subject || e.type}
                                     </div>
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-muted-foreground">
                                         {e.occurred_at
                                             ? new Date(
                                                   e.occurred_at,
@@ -551,7 +551,7 @@ export default function PortalClient({
                                     </div>
                                 </div>
                                 {e.body && (
-                                    <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                    <div className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                                         {e.body}
                                     </div>
                                 )}
@@ -559,14 +559,14 @@ export default function PortalClient({
                                     eventType={e.type}
                                     meta={e.meta}
                                 />
-                                <div className="mt-2 text-xs text-slate-500">
+                                <div className="mt-2 text-xs text-muted-foreground">
                                     {e.actor?.name ? `By ${e.actor.name}` : ''}{' '}
                                     {e.site?.name ? `- ${e.site.name}` : ''}
                                 </div>
                             </div>
                         ))}
                         {!events.length && (
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-muted-foreground">
                                 No timeline events yet.
                             </div>
                         )}

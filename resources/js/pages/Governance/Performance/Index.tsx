@@ -31,12 +31,12 @@ interface Props extends PageProps {
 export default function PerformanceIndex({ auth, reviews, review_cycles }: Props) {
   const getStatusColor = (status: string) => {
     return {
-      drafting: 'bg-gray-100 text-gray-800',
+      drafting: 'bg-muted text-foreground',
       self_review: 'bg-blue-100 text-blue-800',
-      peer_review: 'bg-purple-100 text-purple-800',
+      peer_review: 'bg-primary/10 text-primary',
       board_review: 'bg-yellow-100 text-yellow-800',
       completed: 'bg-green-100 text-green-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getRatingColor = (rating: string | null) => {
@@ -45,7 +45,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
       meets: 'bg-blue-100 text-blue-800',
       needs_improvement: 'bg-yellow-100 text-yellow-800',
       unsatisfactory: 'bg-red-100 text-red-800',
-    }[rating || ''] || 'bg-gray-100 text-gray-800';
+    }[rating || ''] || 'bg-muted text-foreground';
   };
 
   return (
@@ -62,8 +62,8 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Performance Reviews</h1>
-              <p className="text-gray-500 mt-1">CEO and executive performance management</p>
+              <h1 className="text-3xl font-bold text-foreground">Performance Reviews</h1>
+              <p className="text-muted-foreground mt-1">CEO and executive performance management</p>
             </div>
             {(auth.can as any)?.governance?.performance?.create && (
               <Button asChild>
@@ -78,7 +78,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Active Reviews</p>
+                    <p className="text-sm text-muted-foreground">Active Reviews</p>
                     <p className="text-3xl font-bold">
                       {reviews.data.filter(r => r.status !== 'completed').length}
                     </p>
@@ -91,7 +91,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Completed</p>
+                    <p className="text-sm text-muted-foreground">Completed</p>
                     <p className="text-3xl font-bold">
                       {reviews.data.filter(r => r.status === 'completed').length}
                     </p>
@@ -104,7 +104,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Pending Board Review</p>
+                    <p className="text-sm text-muted-foreground">Pending Board Review</p>
                     <p className="text-3xl font-bold">
                       {reviews.data.filter(r => r.status === 'board_review').length}
                     </p>
@@ -117,10 +117,10 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Current Cycle</p>
+                    <p className="text-sm text-muted-foreground">Current Cycle</p>
                     <p className="text-lg font-bold">{review_cycles[0]?.label}</p>
                   </div>
-                  <Calendar className="w-8 h-8 text-purple-500" />
+                  <Calendar className="w-8 h-8 text-primary" />
                 </div>
               </CardContent>
             </Card>
@@ -136,11 +136,11 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
                 {reviews.data.map((review) => (
                   <div
                     key={review.id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-gray-900">
+                        <h3 className="font-semibold text-foreground">
                           <Link
                             href={showPerformance.url({ review: review.id })}
                             className="hover:text-blue-600"
@@ -158,7 +158,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span>Period: {new Date(review.period_start).toLocaleDateString()} - {new Date(review.period_end).toLocaleDateString()}</span>
                         <span>•</span>
                         <span>{review.goals_count} goals</span>

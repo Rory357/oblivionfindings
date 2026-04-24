@@ -422,7 +422,7 @@ export default function LeafletMap({
                         const leafletMarker = L!.marker([m.lat, m.lng], { icon });
                         if (m.popup || m.title) {
                             leafletMarker.bindPopup(
-                                `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-gray-500 mt-1">${m.popup}</div>` : ''}`,
+                                `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
                             );
                         }
                         if (onMarkerClick) leafletMarker.on('click', () => onMarkerClick(m.id));
@@ -446,7 +446,7 @@ export default function LeafletMap({
 
                     if (m.popup || m.title) {
                         leafletMarker.bindPopup(
-                            `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-gray-500 mt-1">${m.popup}</div>` : ''}`,
+                            `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
                         );
                     }
 

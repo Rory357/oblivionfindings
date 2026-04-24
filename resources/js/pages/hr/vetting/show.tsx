@@ -64,7 +64,7 @@ const getStatusColor = (status: string) => {
         case 'adverse':
             return 'bg-red-100 text-red-800 border-red-200';
         default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -101,10 +101,10 @@ export default function VettingShow({ check, can }: Props) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <Shield className="h-5 w-5 text-slate-500" />
+                            <Shield className="h-5 w-5 text-muted-foreground" />
                             {check.check_type.replace(/_/g, ' ')}
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {check.user.name}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -169,22 +169,22 @@ export default function VettingShow({ check, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Name</div>
+                                <div className="text-xs text-muted-foreground">Name</div>
                                 <div className="font-medium">{check.user.name}</div>
                             </div>
                             {check.user.email && (
                                 <div className="text-sm">
-                                    <div className="text-xs text-slate-500">Email</div>
+                                    <div className="text-xs text-muted-foreground">Email</div>
                                     <div>{check.user.email}</div>
                                 </div>
                             )}
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Verified By</div>
+                                <div className="text-xs text-muted-foreground">Verified By</div>
                                 <div className="font-medium">{check.verified_by?.name || 'Not verified'}</div>
                             </div>
                             {check.risk_assessor?.name && (
                                 <div className="text-sm">
-                                    <div className="text-xs text-slate-500">Risk Assessor</div>
+                                    <div className="text-xs text-muted-foreground">Risk Assessor</div>
                                     <div className="font-medium">{check.risk_assessor.name}</div>
                                 </div>
                             )}
@@ -200,15 +200,15 @@ export default function VettingShow({ check, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Check Type</div>
+                                <div className="text-xs text-muted-foreground">Check Type</div>
                                 <div className="font-medium capitalize">{check.check_type.replace(/_/g, ' ')}</div>
                             </div>
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Reference Number</div>
+                                <div className="text-xs text-muted-foreground">Reference Number</div>
                                 <div className="font-medium">{check.reference_number || 'Not assigned'}</div>
                             </div>
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Status</div>
+                                <div className="text-xs text-muted-foreground">Status</div>
                                 <div>
                                     <Badge className={getStatusColor(check.status)}>
                                         {check.status.replace(/_/g, ' ')}
@@ -217,7 +217,7 @@ export default function VettingShow({ check, can }: Props) {
                             </div>
                             {check.risk_decision && (
                                 <div className="text-sm">
-                                    <div className="text-xs text-slate-500">Risk Decision</div>
+                                    <div className="text-xs text-muted-foreground">Risk Decision</div>
                                     <div className="font-medium capitalize">{check.risk_decision.replace(/_/g, ' ')}</div>
                                 </div>
                             )}
@@ -229,26 +229,26 @@ export default function VettingShow({ check, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Calendar className="h-5 w-5 text-purple-500" />
+                                <Calendar className="h-5 w-5 text-primary" />
                                 Key Dates
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
-                                    <div className="text-xs text-slate-500">Requested</div>
+                                    <div className="text-xs text-muted-foreground">Requested</div>
                                     <div>{formatDate(check.created_at)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500">Completed</div>
+                                    <div className="text-xs text-muted-foreground">Completed</div>
                                     <div>{formatDate(check.verified_at)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500">Issued</div>
+                                    <div className="text-xs text-muted-foreground">Issued</div>
                                     <div>{formatDate(check.issue_date || check.check_date)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500">Expires</div>
+                                    <div className="text-xs text-muted-foreground">Expires</div>
                                     <div className={
                                         expired
                                             ? 'font-semibold text-red-600'
@@ -272,7 +272,7 @@ export default function VettingShow({ check, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Consent Recorded</div>
+                                <div className="text-xs text-muted-foreground">Consent Recorded</div>
                                 <div className="font-medium">
                                     {consentRecorded ? (
                                         <span className="flex items-center gap-1 text-green-600">
@@ -296,7 +296,7 @@ export default function VettingShow({ check, can }: Props) {
                             <CardTitle className="text-base">Notes</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-sm text-slate-700 whitespace-pre-wrap">{check.notes}</div>
+                            <div className="text-sm text-foreground whitespace-pre-wrap">{check.notes}</div>
                         </CardContent>
                     </Card>
                 )}
@@ -314,13 +314,13 @@ export default function VettingShow({ check, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Disclosures Present</div>
+                                <div className="text-xs text-muted-foreground">Disclosures Present</div>
                                 <div className="font-medium">{check.disclosures_present ? 'Yes' : 'No'}</div>
                             </div>
                             {check.disclosure_details && (
                                 <div className="text-sm">
-                                    <div className="text-xs text-slate-500">Disclosure Details</div>
-                                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-slate-700 whitespace-pre-wrap">
+                                    <div className="text-xs text-muted-foreground">Disclosure Details</div>
+                                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-foreground whitespace-pre-wrap">
                                         {check.disclosure_details}
                                     </div>
                                 </div>

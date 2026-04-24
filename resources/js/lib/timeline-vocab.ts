@@ -63,9 +63,9 @@ export const TIMELINE_CATEGORY_VOCAB: Record<TimelineCategory, TimelineCategoryE
     },
     clinical: {
         label: 'Clinical',
-        dot: 'bg-violet-500',
-        bg: 'bg-violet-50 border-l-violet-400 dark:bg-violet-950/30 dark:border-l-violet-500',
-        pill: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200',
+        dot: 'bg-primary',
+        bg: 'bg-primary/10 border-l-violet-400 dark:bg-primary/30 dark:border-l-violet-500',
+        pill: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
     },
     medication: {
         label: 'Medication',
@@ -89,7 +89,7 @@ export const TIMELINE_CATEGORY_VOCAB: Record<TimelineCategory, TimelineCategoryE
         label: 'Other',
         dot: 'bg-slate-400',
         bg: 'bg-card border-l-slate-300 dark:border-l-slate-600',
-        pill: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+        pill: 'bg-muted text-foreground dark:bg-muted dark:text-foreground',
     },
 };
 

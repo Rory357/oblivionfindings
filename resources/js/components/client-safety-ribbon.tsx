@@ -182,10 +182,10 @@ export default function ClientSafetyRibbon({
 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700 uppercase dark:text-slate-200">
+                        <span className="text-xs font-semibold tracking-wide text-foreground uppercase dark:text-foreground">
                             Safety information
                         </span>
-                        <span className="text-xs text-slate-600 dark:text-slate-300">
+                        <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                             Check before starting shift.
                         </span>
                     </div>

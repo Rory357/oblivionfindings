@@ -50,12 +50,12 @@ const statusConfig: Record<string, { bg: string; text: string; dot: string; labe
     pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400', label: 'Pending' },
     completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400', label: 'Completed' },
     declined: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400', label: 'Declined' },
-    expired: { bg: 'bg-slate-50', text: 'text-slate-600', dot: 'bg-slate-400', label: 'Expired' },
+    expired: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-slate-400', label: 'Expired' },
 };
 
 const reviewTypeConfig: Record<string, { label: string; color: string }> = {
     peer: { label: 'Peer', color: 'bg-blue-100 text-blue-700' },
-    manager: { label: 'Manager', color: 'bg-violet-100 text-violet-700' },
+    manager: { label: 'Manager', color: 'bg-primary/10 text-primary' },
     direct_report: { label: 'Direct Report', color: 'bg-emerald-100 text-emerald-700' },
     self: { label: 'Self', color: 'bg-amber-100 text-amber-700' },
 };
@@ -83,13 +83,13 @@ function getInitials(name: string) {
 
 const AVATAR_COLORS = [
     'bg-blue-500',
-    'bg-violet-500',
+    'bg-primary',
     'bg-emerald-500',
     'bg-amber-500',
     'bg-pink-500',
     'bg-cyan-500',
     'bg-rose-500',
-    'bg-indigo-500',
+    'bg-primary',
 ];
 
 function avatarColor(id: number) {
@@ -146,7 +146,7 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
                             {can.manage && (
                                 <Button
                                     size="sm"
-                                    className="ml-4 gap-1.5 bg-white text-violet-700 shadow-md hover:bg-white/90"
+                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-white/90"
                                     asChild
                                 >
                                     <Link href="/hr/feedback/request">
@@ -166,9 +166,9 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
                             value: totalCount,
                             icon: Send,
                             gradient: 'from-violet-500/10 to-purple-500/5',
-                            iconBg: 'bg-violet-100',
-                            iconColor: 'text-violet-600',
-                            hover: 'hover:border-violet-300',
+                            iconBg: 'bg-primary/10',
+                            iconColor: 'text-primary',
+                            hover: 'hover:border-primary',
                         },
                         {
                             label: 'Pending',
@@ -255,15 +255,15 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
                 {filtered.length === 0 ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                <MessageSquare className="h-8 w-8 text-violet-400" />
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                <MessageSquare className="h-8 w-8 text-primary" />
                             </div>
                             <p className="font-medium">No Feedback Requests</p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 {statusFilter ? `No ${statusFilter} feedback requests.` : 'Start by requesting feedback for a team member.'}
                             </p>
                             {can.manage && !statusFilter && (
-                                <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" asChild>
+                                <Button className="mt-4 gap-1.5 bg-primary hover:bg-primary" size="sm" asChild>
                                     <Link href="/hr/feedback/request">
                                         <Plus className="h-3.5 w-3.5" />
                                         Request Feedback
@@ -278,11 +278,11 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
                             const status = statusConfig[request.status] || statusConfig.pending;
                             const reviewType = reviewTypeConfig[request.review_type] || {
                                 label: request.review_type,
-                                color: 'bg-slate-100 text-slate-600',
+                                color: 'bg-muted text-muted-foreground',
                             };
 
                             return (
-                                <Card key={request.id} className="group overflow-hidden transition-all hover:border-violet-200 hover:shadow-md">
+                                <Card key={request.id} className="group overflow-hidden transition-all hover:border-primary hover:shadow-md">
                                     <CardContent className="p-4">
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="min-w-0 flex items-center gap-3">
@@ -327,7 +327,7 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
 
                                                 <div className="flex gap-1.5">
                                                     {request.status === 'pending' && (
-                                                        <Button size="sm" className="gap-1 bg-violet-600 text-xs hover:bg-violet-700" asChild>
+                                                        <Button size="sm" className="gap-1 bg-primary text-xs hover:bg-primary" asChild>
                                                             <Link href={`/hr/feedback/${request.id}/respond`}>
                                                                 <MessageSquare className="h-3 w-3" />
                                                                 Respond

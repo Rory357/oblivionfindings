@@ -122,7 +122,7 @@ export function expiryBadgeClass(status: string): string {
         case 'expired': return 'bg-red-600 text-white';
         case 'critical': return 'bg-orange-500 text-white';
         case 'warning': return 'bg-amber-500 text-white';
-        case 'ok': return 'bg-purple-600 text-white';
+        case 'ok': return 'bg-primary text-white';
         default: return 'bg-slate-400 text-white';
     }
 }
@@ -154,10 +154,10 @@ export function severityVariant(severity: string): 'default' | 'secondary' | 'de
 
 export function statusColor(status: string): string {
     switch (status) {
-        case 'online': case 'active': case 'completed': case 'accepted': case 'passed': case 'resolved': return 'bg-purple-600 text-white';
+        case 'online': case 'active': case 'completed': case 'accepted': case 'passed': case 'resolved': return 'bg-primary text-white';
         case 'pending': case 'pending_acceptance': case 'reported': return 'bg-amber-500 text-white';
         case 'approved': case 'investigating': case 'in_progress': return 'bg-blue-600 text-white';
-        case 'checked_out': case 'moving': return 'bg-purple-500 text-white';
+        case 'checked_out': case 'moving': return 'bg-primary text-white';
         case 'offline': case 'rejected': case 'cancelled': case 'failed': case 'disputed': return 'bg-red-500 text-white';
         case 'returned': case 'closed': case 'idle': return 'bg-slate-500 text-white';
         default: return 'bg-slate-400 text-white';

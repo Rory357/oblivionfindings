@@ -35,7 +35,7 @@ export default function IncidentTemplateEdit({ template }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{isNew ? 'New template' : 'Edit template'}</h1>
-                        <div className="mt-1 text-sm text-slate-500">Used to pre-fill incident reporting</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Used to pre-fill incident reporting</div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Link href="/incidents/templates" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">Back</Link>

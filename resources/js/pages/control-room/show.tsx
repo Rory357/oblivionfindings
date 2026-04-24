@@ -210,7 +210,7 @@ const STATUS_BADGE: Record<string, string> = {
     acknowledged: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
     triaging: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
     resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-    closed: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
+    closed: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
 };
 
 const WORKFLOW_STEPS = ['open', 'acknowledged', 'triaging', 'resolved', 'closed'] as const;
@@ -769,7 +769,7 @@ export default function ControlRoomAlertShow({
                                         <Card className="border-l-4 border-l-purple-500">
                                             <CardHeader className="pb-3">
                                                 <CardTitle className="text-base flex items-center gap-2">
-                                                    <Truck className="h-4 w-4 text-purple-600" />
+                                                    <Truck className="h-4 w-4 text-primary" />
                                                     Fleet Context
                                                     <Badge className={`capitalize text-xs ml-auto ${SEVERITY_BADGE[sig.severity_hint] ?? ''}`}>
                                                         {sig.severity_hint}
@@ -1451,7 +1451,7 @@ export default function ControlRoomAlertShow({
 
                                 {/* Close */}
                                 <Button
-                                    className="w-full justify-start gap-3 h-auto py-3 bg-gray-500/10 text-gray-700 border border-gray-500/30 hover:bg-gray-500/20 dark:text-gray-400"
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-gray-500/10 text-foreground border border-gray-500/30 hover:bg-gray-500/20 dark:text-muted-foreground"
                                     variant="outline"
                                     disabled={
                                         alert.status !== 'resolved' || !can.manage || processing

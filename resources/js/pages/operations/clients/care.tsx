@@ -345,7 +345,7 @@ export default function ClientCare({
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                     Care notes
                                 </p>
-                                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-foreground dark:text-foreground">
                                     {medical_notes}
                                 </p>
                             </div>

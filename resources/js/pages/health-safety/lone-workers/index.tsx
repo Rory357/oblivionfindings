@@ -110,11 +110,11 @@ const sessionStatusColor = (status: string) => {
         case 'overdue':
             return 'bg-red-100 text-red-800 animate-pulse';
         case 'completed':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         case 'emergency':
             return 'bg-red-600 text-white';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -127,7 +127,7 @@ const alertTypeColor = (type: string) => {
         case 'no_response':
             return 'bg-orange-100 text-orange-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -140,7 +140,7 @@ const alertStatusColor = (status: string) => {
         case 'resolved':
             return 'bg-green-100 text-green-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -283,7 +283,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Worker</th>
                                         <th className="pb-2 pr-4 font-medium">Site / Client</th>
                                         <th className="pb-2 pr-4 font-medium">Started</th>
@@ -299,7 +299,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                             <td className="py-2.5 pr-4">
                                                 <div className="font-medium">{s.user?.name ?? '-'}</div>
                                                 {s.location && (
-                                                    <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                                                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                                                         <MapPin className="h-3 w-3" />
                                                         {s.location}
                                                     </div>
@@ -308,7 +308,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                             <td className="py-2.5 pr-4 text-xs">
                                                 {s.site?.name ?? '-'}
                                                 {s.client && (
-                                                    <span className="text-slate-400"> / {s.client.name}</span>
+                                                    <span className="text-muted-foreground"> / {s.client.name}</span>
                                                 )}
                                             </td>
                                             <td className="py-2.5 pr-4 text-xs">{fmtDateTime(s.started_at)}</td>
@@ -368,7 +368,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                 </tbody>
                             </table>
                             {!sessions.data.length && (
-                                <div className="py-6 text-center text-sm text-slate-500">
+                                <div className="py-6 text-center text-sm text-muted-foreground">
                                     No active lone worker sessions.
                                 </div>
                             )}
@@ -415,15 +415,15 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                                     <div className="text-sm font-medium">{alert.session.user.name}</div>
                                                 )}
                                                 {alert.session?.site && (
-                                                    <div className="text-xs text-slate-500">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {alert.session.site.name}
                                                     </div>
                                                 )}
-                                                <div className="text-xs text-slate-400">
+                                                <div className="text-xs text-muted-foreground">
                                                     Triggered: {fmtDateTime(alert.triggered_at)}
                                                 </div>
                                                 {alert.notes && (
-                                                    <div className="text-xs text-slate-500">{alert.notes}</div>
+                                                    <div className="text-xs text-muted-foreground">{alert.notes}</div>
                                                 )}
                                             </div>
                                         </div>
@@ -660,7 +660,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                     <DialogHeader>
                         <DialogTitle>End Session</DialogTitle>
                     </DialogHeader>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-muted-foreground">
                         Are you sure you want to end this lone worker session? The worker will no longer be monitored.
                     </p>
                     <DialogFooter>
@@ -681,7 +681,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             Trigger Emergency Alert
                         </DialogTitle>
                     </DialogHeader>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-muted-foreground">
                         This will immediately trigger an emergency alert for this lone worker. Emergency contacts will be
                         notified. Are you sure you want to proceed?
                     </p>

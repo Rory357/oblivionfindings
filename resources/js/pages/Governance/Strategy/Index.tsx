@@ -29,11 +29,11 @@ interface Props extends PageProps {
 export default function StrategyIndex({ auth, plans }: Props) {
   const getStatusColor = (status: string) => {
     return {
-      draft: 'bg-gray-100 text-gray-800',
+      draft: 'bg-muted text-foreground',
       consultation: 'bg-blue-100 text-blue-800',
       approved: 'bg-green-100 text-green-800',
-      archived: 'bg-gray-100 text-gray-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+      archived: 'bg-muted text-foreground',
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getHorizonLabel = (horizon: string) => {
@@ -57,8 +57,8 @@ export default function StrategyIndex({ auth, plans }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Strategic Planning</h1>
-              <p className="text-gray-500 mt-1">Long-term goals and initiatives</p>
+              <h1 className="text-3xl font-bold text-foreground">Strategic Planning</h1>
+              <p className="text-muted-foreground mt-1">Long-term goals and initiatives</p>
             </div>
             <Button asChild>
               <Link href={createStrategy.url()}>New Strategic Plan</Link>
@@ -77,13 +77,13 @@ export default function StrategyIndex({ auth, plans }: Props) {
                         <h2 className="text-xl font-semibold">{plan.title}</h2>
                         <Badge className="bg-green-100 text-green-800">Active</Badge>
                       </div>
-                      <p className="text-gray-600">
+                      <p className="text-muted-foreground">
                         {new Date(plan.period_start).getFullYear()} - {new Date(plan.period_end).getFullYear()}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-3xl font-bold text-green-600">{plan.progress_pct}%</p>
-                      <p className="text-sm text-gray-500">Complete</p>
+                      <p className="text-sm text-muted-foreground">Complete</p>
                     </div>
                   </div>
                 ))}
@@ -116,12 +116,12 @@ export default function StrategyIndex({ auth, plans }: Props) {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex justify-between text-sm text-gray-500">
+                    <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Progress</span>
                       <span>{plan.progress_pct}%</span>
                     </div>
                     <Progress value={plan.progress_pct} />
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         {new Date(plan.period_start).getFullYear()} - {new Date(plan.period_end).getFullYear()}

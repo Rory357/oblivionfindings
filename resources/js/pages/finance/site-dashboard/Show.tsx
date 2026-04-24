@@ -230,9 +230,9 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4 sm:grid-cols-4">
-                            <div className="rounded-lg bg-purple-50 p-4 dark:bg-purple-950/30">
+                            <div className="rounded-lg bg-primary/10 p-4 dark:bg-primary/30">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Wages</p>
-                                <p className="mt-1 text-xl font-bold text-purple-700 dark:text-purple-300">{$(dashboard.staffing.wages)}</p>
+                                <p className="mt-1 text-xl font-bold text-primary dark:text-primary/70">{$(dashboard.staffing.wages)}</p>
                             </div>
                             <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Employer On-Costs</p>
@@ -243,9 +243,9 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Total Staffing</p>
                                 <p className="mt-1 text-xl font-bold text-cyan-700 dark:text-cyan-300">{$(dashboard.staffing.total_staffing_cost)}</p>
                             </div>
-                            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900/30">
+                            <div className="rounded-lg bg-muted p-4 dark:bg-muted/30">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">% of Total Cost</p>
-                                <p className="mt-1 text-xl font-bold text-slate-700 dark:text-slate-300">{pct(dashboard.staffing.staffing_pct_of_total)}</p>
+                                <p className="mt-1 text-xl font-bold text-foreground dark:text-muted-foreground">{pct(dashboard.staffing.staffing_pct_of_total)}</p>
                             </div>
                         </div>
                     </CardContent>

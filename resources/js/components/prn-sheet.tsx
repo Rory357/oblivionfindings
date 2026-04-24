@@ -422,7 +422,7 @@ function PickStep({
                                                         {med.is_controlled && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="shrink-0 border-purple-300 text-[10px] uppercase tracking-wide text-purple-700 dark:border-purple-800 dark:text-purple-300"
+                                                                className="shrink-0 border-primary text-[10px] uppercase tracking-wide text-primary dark:border-primary/30 dark:text-primary/70"
                                                             >
                                                                 CD
                                                             </Badge>
@@ -579,13 +579,13 @@ function RecordStep({
 
                 {/* Controlled / witness hint */}
                 {med.requires_witness && (
-                    <div className="flex items-start gap-3 rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-sm dark:border-purple-900 dark:bg-purple-950/20">
-                        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-purple-700 dark:text-purple-300" />
+                    <div className="flex items-start gap-3 rounded-lg border border-primary bg-primary/10/70 p-3 text-sm dark:border-primary/30 dark:bg-primary/20">
+                        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary/70" />
                         <div className="min-w-0">
-                            <p className="font-medium text-purple-900 dark:text-purple-100">
+                            <p className="font-medium text-primary dark:text-primary/70">
                                 Needs a witness
                             </p>
-                            <p className="mt-0.5 text-xs text-purple-800 dark:text-purple-200">
+                            <p className="mt-0.5 text-xs text-primary dark:text-primary/70">
                                 Record this dose on the full MAR with a witness, so the register stays correct.
                             </p>
                         </div>

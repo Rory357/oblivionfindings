@@ -1175,15 +1175,15 @@ export default function ClientShow({
                                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                                     {/* Care Plan Status */}
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-violet-500 uppercase">
+                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Care Plan
                                         </p>
-                                        <p className="mt-1 text-lg font-bold text-violet-900">
+                                        <p className="mt-1 text-lg font-bold text-primary">
                                             {activePlan ? 'Active' : 'None'}
                                         </p>
                                         {reviewDays !== null && (
                                             <p
-                                                className={`mt-0.5 text-xs ${reviewDays < 0 ? 'font-semibold text-red-600' : 'text-violet-600'}`}
+                                                className={`mt-0.5 text-xs ${reviewDays < 0 ? 'font-semibold text-red-600' : 'text-primary'}`}
                                             >
                                                 Review:{' '}
                                                 {reviewDays < 0
@@ -1195,15 +1195,15 @@ export default function ClientShow({
 
                                     {/* Goals */}
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-violet-500 uppercase">
+                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Goals
                                         </p>
-                                        <p className="mt-1 text-lg font-bold text-violet-900">
+                                        <p className="mt-1 text-lg font-bold text-primary">
                                             {goalsCompleted}/{goals.length}
                                         </p>
-                                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-violet-200">
+                                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-primary/20">
                                             <div
-                                                className="h-full rounded-full bg-violet-600 transition-all"
+                                                className="h-full rounded-full bg-primary transition-all"
                                                 style={{
                                                     width: `${goalsPct}%`,
                                                 }}
@@ -1213,16 +1213,16 @@ export default function ClientShow({
 
                                     {/* Shifts */}
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-violet-500 uppercase">
+                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Shifts
                                         </p>
-                                        <p className="mt-1 text-lg font-bold text-violet-900">
+                                        <p className="mt-1 text-lg font-bold text-primary">
                                             {nextShiftSummary
                                                 ? 'Upcoming'
                                                 : 'None'}
                                         </p>
                                         {nextShiftSummary?.starts_at && (
-                                            <p className="mt-0.5 text-xs text-violet-600">
+                                            <p className="mt-0.5 text-xs text-primary">
                                                 {new Date(
                                                     nextShiftSummary.starts_at,
                                                 ).toLocaleDateString('en-NZ', {
@@ -1233,7 +1233,7 @@ export default function ClientShow({
                                             </p>
                                         )}
                                         {nextShiftSummary && (
-                                            <div className="mt-2 space-y-1 text-xs text-violet-700">
+                                            <div className="mt-2 space-y-1 text-xs text-primary">
                                                 <p className="font-medium capitalize">
                                                     {nextShiftTypeLabel}
                                                     {nextShiftSummary
@@ -1276,7 +1276,7 @@ export default function ClientShow({
 
                                     {/* Risk Level — clickable dropdown */}
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-violet-500 uppercase">
+                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Risk Level
                                         </p>
                                         <div className="mt-1">
@@ -1306,7 +1306,7 @@ export default function ClientShow({
                                                                 : client.risk_level ===
                                                                     'low'
                                                                   ? 'bg-emerald-100 text-emerald-700'
-                                                                  : 'bg-slate-100 text-slate-500'
+                                                                  : 'bg-muted text-muted-foreground'
                                                     } rounded-full px-3`}
                                                 >
                                                     <SelectValue placeholder="Set level..." />
@@ -1327,7 +1327,7 @@ export default function ClientShow({
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <p className="mt-0.5 text-xs text-violet-600">
+                                        <p className="mt-0.5 text-xs text-primary">
                                             {risks.length} active risk
                                             {risks.length !== 1 ? 's' : ''}
                                         </p>
@@ -1335,14 +1335,14 @@ export default function ClientShow({
                                 </div>
 
                                 {client.site && siteCoverageSummary ? (
-                                    <Card className="mt-4 overflow-hidden border-indigo-200/70 bg-gradient-to-br from-white via-indigo-50/80 to-cyan-50/70">
+                                    <Card className="mt-4 overflow-hidden border-primary/70 bg-gradient-to-br from-white via-indigo-50/80 to-cyan-50/70">
                                         <CardHeader className="pb-3">
                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                                 <div>
-                                                    <CardTitle className="text-base text-slate-950">
+                                                    <CardTitle className="text-base text-foreground">
                                                         House coverage
                                                     </CardTitle>
-                                                    <p className="mt-1 text-xs text-slate-600">
+                                                    <p className="mt-1 text-xs text-muted-foreground">
                                                         Demand versus assigned
                                                         supply for{' '}
                                                         {
@@ -1408,7 +1408,7 @@ export default function ClientShow({
                                                                     }
                                                                     className="flex items-center justify-between gap-4"
                                                                 >
-                                                                    <span className="flex items-center gap-2 text-slate-700">
+                                                                    <span className="flex items-center gap-2 text-foreground">
                                                                         <span
                                                                             className="h-2.5 w-2.5 rounded-full"
                                                                             style={{
@@ -1420,7 +1420,7 @@ export default function ClientShow({
                                                                             segment.label
                                                                         }
                                                                     </span>
-                                                                    <span className="font-semibold text-slate-950">
+                                                                    <span className="font-semibold text-foreground">
                                                                         {
                                                                             segment.value
                                                                         }
@@ -1445,10 +1445,10 @@ export default function ClientShow({
                                                 <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div>
-                                                            <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                                                            <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                                                                 Coverage risk
                                                             </p>
-                                                            <p className="mt-1 text-2xl font-bold text-slate-950">
+                                                            <p className="mt-1 text-2xl font-bold text-foreground">
                                                                 {
                                                                     siteCoverageRiskRate
                                                                 }
@@ -1474,12 +1474,12 @@ export default function ClientShow({
                                                             }
                                                         />
                                                     </div>
-                                                    <p className="mt-2 text-xs text-slate-600">
+                                                    <p className="mt-2 text-xs text-muted-foreground">
                                                         Share of projected
                                                         windows below minimum
                                                         staffing. Largest single
                                                         gap:{' '}
-                                                        <span className="font-semibold text-slate-950">
+                                                        <span className="font-semibold text-foreground">
                                                             {
                                                                 siteCoverageSummary.largest_missing_staff
                                                             }{' '}
@@ -1493,10 +1493,10 @@ export default function ClientShow({
                                             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div>
-                                                        <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                                                        <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                                                             Next risk windows
                                                         </p>
-                                                        <p className="mt-1 text-sm text-slate-600">
+                                                        <p className="mt-1 text-sm text-muted-foreground">
                                                             The next
                                                             under-covered
                                                             periods affecting
@@ -1526,16 +1526,16 @@ export default function ClientShow({
                                                             (alert, index) => (
                                                                 <div
                                                                     key={`${alert.rule_name}-${index}`}
-                                                                    className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3"
+                                                                    className="rounded-xl border border-border/80 bg-muted/80 p-3"
                                                                 >
                                                                     <div className="flex items-center justify-between gap-2">
                                                                         <div className="min-w-0">
-                                                                            <p className="truncate text-sm font-semibold text-slate-950">
+                                                                            <p className="truncate text-sm font-semibold text-foreground">
                                                                                 {
                                                                                     alert.rule_name
                                                                                 }
                                                                             </p>
-                                                                            <p className="text-xs text-slate-600">
+                                                                            <p className="text-xs text-muted-foreground">
                                                                                 {
                                                                                     alert.window_label
                                                                                 }
@@ -1607,14 +1607,14 @@ export default function ClientShow({
                                 ) : null}
 
                                 {recurringShiftSeries.length > 0 && (
-                                    <Card className="mt-4 border-violet-200/70 bg-gradient-to-br from-violet-50/80 via-white to-fuchsia-50/70">
+                                    <Card className="mt-4 border-primary/70 bg-gradient-to-br from-violet-50/80 via-white to-fuchsia-50/70">
                                         <CardHeader className="pb-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
-                                                    <CardTitle className="text-base text-violet-950">
+                                                    <CardTitle className="text-base text-primary">
                                                         Recurring support
                                                     </CardTitle>
-                                                    <p className="mt-1 text-xs text-violet-700">
+                                                    <p className="mt-1 text-xs text-primary">
                                                         Active recurring roster
                                                         patterns for this
                                                         client.
@@ -1622,7 +1622,7 @@ export default function ClientShow({
                                                 </div>
                                                 <Badge
                                                     variant="secondary"
-                                                    className="bg-violet-100 text-violet-800"
+                                                    className="bg-primary/10 text-primary"
                                                 >
                                                     {
                                                         recurringShiftSeries.length
@@ -1640,7 +1640,7 @@ export default function ClientShow({
                                                 (series) => (
                                                     <div
                                                         key={series.id}
-                                                        className="rounded-xl border border-violet-200/70 bg-white/80 p-4"
+                                                        className="rounded-xl border border-primary/70 bg-white/80 p-4"
                                                     >
                                                         <div className="flex flex-wrap gap-2">
                                                             <Badge
@@ -1672,7 +1672,7 @@ export default function ClientShow({
                                                         </div>
 
                                                         <div className="mt-3 space-y-1">
-                                                            <div className="text-sm font-semibold text-violet-950">
+                                                            <div className="text-sm font-semibold text-primary">
                                                                 {series.weekdays
                                                                     .map(
                                                                         weekdayLabel,
@@ -1683,7 +1683,7 @@ export default function ClientShow({
                                                                     ? ` · ${seriesTimeLabel(series.starts_time, series.ends_time)}`
                                                                     : ''}
                                                             </div>
-                                                            <div className="text-xs text-violet-700">
+                                                            <div className="text-xs text-primary">
                                                                 {series
                                                                     .service_context
                                                                     ?.name ??
@@ -1692,13 +1692,13 @@ export default function ClientShow({
                                                                     ? ` · ${series.location}`
                                                                     : ''}
                                                             </div>
-                                                            <div className="text-xs text-violet-700">
+                                                            <div className="text-xs text-primary">
                                                                 {series.staff
                                                                     ?.name
                                                                     ? `Primary staff ${series.staff.name}`
                                                                     : 'Open recurring pattern'}
                                                             </div>
-                                                            <div className="text-xs text-violet-700">
+                                                            <div className="text-xs text-primary">
                                                                 {series.next_starts_at
                                                                     ? `Next ${new Date(
                                                                           series.next_starts_at,
@@ -1723,7 +1723,7 @@ export default function ClientShow({
                                                         <div className="mt-3">
                                                             <Link
                                                                 href={`/operations/shifts/series/${series.id}`}
-                                                                className="text-xs font-medium text-violet-700 underline underline-offset-4"
+                                                                className="text-xs font-medium text-primary underline underline-offset-4"
                                                             >
                                                                 Open recurring
                                                                 series
@@ -1749,37 +1749,37 @@ export default function ClientShow({
                                     <div className="space-y-4 lg:col-span-2">
                                         {/* About Me Card */}
                                         {hasAboutMe && (
-                                            <Card className="overflow-hidden border-violet-200">
+                                            <Card className="overflow-hidden border-primary">
                                                 <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
                                                     <h3 className="text-sm font-semibold text-white">
                                                         About{' '}
                                                         {client.first_name}
                                                     </h3>
-                                                    <p className="text-xs text-violet-200">
+                                                    <p className="text-xs text-primary/70">
                                                         What matters most to
                                                         this person
                                                     </p>
                                                 </div>
                                                 <CardContent className="space-y-3 p-5">
                                                     {aboutMe.dreams && (
-                                                        <div className="rounded-lg bg-violet-50 p-3">
-                                                            <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                        <div className="rounded-lg bg-primary/10 p-3">
+                                                            <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                 Dreams &amp;
                                                                 Aspirations
                                                             </p>
-                                                            <p className="mt-1 text-sm text-slate-700">
+                                                            <p className="mt-1 text-sm text-foreground">
                                                                 {aboutMe.dreams}
                                                             </p>
                                                         </div>
                                                     )}
                                                     <div className="grid gap-3 sm:grid-cols-2">
                                                         {aboutMe.important_to_me && (
-                                                            <div className="rounded-lg bg-purple-50 p-3">
-                                                                <p className="text-[10px] font-bold tracking-wider text-purple-500 uppercase">
+                                                            <div className="rounded-lg bg-primary/10 p-3">
+                                                                <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                     Important TO
                                                                     Me
                                                                 </p>
-                                                                <p className="mt-1 text-sm text-slate-700">
+                                                                <p className="mt-1 text-sm text-foreground">
                                                                     {
                                                                         aboutMe.important_to_me
                                                                     }
@@ -1787,12 +1787,12 @@ export default function ClientShow({
                                                             </div>
                                                         )}
                                                         {aboutMe.important_for_me && (
-                                                            <div className="rounded-lg bg-purple-50 p-3">
-                                                                <p className="text-[10px] font-bold tracking-wider text-purple-500 uppercase">
+                                                            <div className="rounded-lg bg-primary/10 p-3">
+                                                                <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                     Important
                                                                     FOR Me
                                                                 </p>
-                                                                <p className="mt-1 text-sm text-slate-700">
+                                                                <p className="mt-1 text-sm text-foreground">
                                                                     {
                                                                         aboutMe.important_for_me
                                                                     }
@@ -1801,11 +1801,11 @@ export default function ClientShow({
                                                         )}
                                                     </div>
                                                     {aboutMe.ideal_day && (
-                                                        <div className="rounded-lg bg-violet-50 p-3">
-                                                            <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                        <div className="rounded-lg bg-primary/10 p-3">
+                                                            <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                 My Ideal Day
                                                             </p>
-                                                            <p className="mt-1 text-sm text-slate-700">
+                                                            <p className="mt-1 text-sm text-foreground">
                                                                 {
                                                                     aboutMe.ideal_day
                                                                 }
@@ -1841,12 +1841,12 @@ export default function ClientShow({
                                                         )}
                                                     </div>
                                                     {aboutMe.how_to_support && (
-                                                        <div className="rounded-lg border border-violet-200 bg-white p-3">
-                                                            <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                        <div className="rounded-lg border border-primary bg-white p-3">
+                                                            <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                 How to Support
                                                                 Me Best
                                                             </p>
-                                                            <p className="mt-1 text-sm text-slate-700">
+                                                            <p className="mt-1 text-sm text-foreground">
                                                                 {
                                                                     aboutMe.how_to_support
                                                                 }
@@ -1868,7 +1868,7 @@ export default function ClientShow({
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-xs text-violet-600"
+                                                            className="text-xs text-primary"
                                                             asChild
                                                         >
                                                             <Link
@@ -1935,7 +1935,7 @@ export default function ClientShow({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-xs text-violet-600"
+                                                    className="text-xs text-primary"
                                                     onClick={() =>
                                                         setTab('timeline')
                                                     }
@@ -1996,14 +1996,14 @@ export default function ClientShow({
                                                                     key={
                                                                         item.id
                                                                     }
-                                                                    className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-sm"
+                                                                    className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-sm"
                                                                 >
                                                                     <span className="shrink-0 text-base">
                                                                         {
                                                                             item.icon
                                                                         }
                                                                     </span>
-                                                                    <span className="flex-1 text-xs text-slate-700">
+                                                                    <span className="flex-1 text-xs text-foreground">
                                                                         {
                                                                             item.text
                                                                         }
@@ -2236,8 +2236,8 @@ export default function ClientShow({
                                             </CardHeader>
                                             <CardContent className="space-y-2">
                                                 {client.key_worker && (
-                                                    <div className="flex items-center gap-2 rounded-lg bg-violet-50 p-2">
-                                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-200 text-xs font-bold text-violet-700">
+                                                    <div className="flex items-center gap-2 rounded-lg bg-primary/10 p-2">
+                                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
                                                             KW
                                                         </div>
                                                         <div>
@@ -2248,7 +2248,7 @@ export default function ClientShow({
                                                                         .name
                                                                 }
                                                             </p>
-                                                            <p className="text-[10px] text-violet-500">
+                                                            <p className="text-[10px] text-primary">
                                                                 Key Worker
                                                             </p>
                                                         </div>
@@ -2261,7 +2261,7 @@ export default function ClientShow({
                                                             key={sw.id}
                                                             className="flex items-center gap-2 p-1"
                                                         >
-                                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
+                                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
                                                                 SW
                                                             </div>
                                                             <p className="text-xs">
@@ -2270,7 +2270,7 @@ export default function ClientShow({
                                                         </div>
                                                     ))}
                                                 {client.funding_type && (
-                                                    <div className="mt-2 rounded bg-violet-50 px-2 py-1 text-center text-xs text-violet-600">
+                                                    <div className="mt-2 rounded bg-primary/10 px-2 py-1 text-center text-xs text-primary">
                                                         Funding:{' '}
                                                         {client.funding_type}
                                                     </div>
@@ -2295,16 +2295,16 @@ export default function ClientShow({
                                                     />
                                                 </div>
                                                 <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-                                                    <div className="rounded-lg bg-slate-50 p-2">
-                                                        <div className="text-sm font-bold text-violet-600">
+                                                    <div className="rounded-lg bg-muted p-2">
+                                                        <div className="text-sm font-bold text-primary">
                                                             {activeConsents}
                                                         </div>
                                                         <div className="text-[9px] text-muted-foreground uppercase">
                                                             Consents
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-lg bg-slate-50 p-2">
-                                                        <div className="text-sm font-bold text-violet-600">
+                                                    <div className="rounded-lg bg-muted p-2">
+                                                        <div className="text-sm font-bold text-primary">
                                                             {
                                                                 (
                                                                     documents ??
@@ -2316,8 +2316,8 @@ export default function ClientShow({
                                                             Documents
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-lg bg-slate-50 p-2">
-                                                        <div className="text-sm font-bold text-violet-600">
+                                                    <div className="rounded-lg bg-muted p-2">
+                                                        <div className="text-sm font-bold text-primary">
                                                             {
                                                                 (
                                                                     assessments ??
@@ -2330,14 +2330,14 @@ export default function ClientShow({
                                                         </div>
                                                     </div>
                                                     <div
-                                                        className="cursor-pointer rounded-lg bg-slate-50 p-2 transition-colors hover:bg-violet-50"
+                                                        className="cursor-pointer rounded-lg bg-muted p-2 transition-colors hover:bg-primary/10"
                                                         onClick={() =>
                                                             setTab(
                                                                 'personal_assets',
                                                             )
                                                         }
                                                     >
-                                                        <div className="text-sm font-bold text-violet-600">
+                                                        <div className="text-sm font-bold text-primary">
                                                             {
                                                                 (
                                                                     personal_assets ??
@@ -2371,9 +2371,9 @@ export default function ClientShow({
                                         {(client.mobility_needs ||
                                             client.sensory_needs ||
                                             client.cognitive_needs) && (
-                                            <Card className="border-violet-100">
+                                            <Card className="border-primary/30">
                                                 <CardContent className="p-4">
-                                                    <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                    <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                         Health &amp; Support
                                                         Needs
                                                     </p>
@@ -2411,9 +2411,9 @@ export default function ClientShow({
                                             </Card>
                                         )}
                                         {client.dietary_requirements && (
-                                            <Card className="border-violet-100">
+                                            <Card className="border-primary/30">
                                                 <CardContent className="p-4">
-                                                    <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                    <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                         Dietary Requirements
                                                     </p>
                                                     <p className="mt-2 text-xs">
@@ -2425,9 +2425,9 @@ export default function ClientShow({
                                             </Card>
                                         )}
                                         {client.sleep_preferences && (
-                                            <Card className="border-violet-100">
+                                            <Card className="border-primary/30">
                                                 <CardContent className="p-4">
-                                                    <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                    <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                         Sleep Preferences
                                                     </p>
                                                     <p className="mt-2 text-xs">
@@ -2451,9 +2451,9 @@ export default function ClientShow({
                                     client.employment_status ||
                                     client.gender) && (
                                     <div className="mt-4">
-                                        <Card className="border-violet-100">
+                                        <Card className="border-primary/30">
                                             <CardContent className="p-4">
-                                                <p className="mb-3 text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                <p className="mb-3 text-[10px] font-bold tracking-wider text-primary uppercase">
                                                     Identity &amp; Culture
                                                 </p>
                                                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -2570,9 +2570,9 @@ export default function ClientShow({
                                     client.strengths_abilities ||
                                     client.life_story) && (
                                     <div className="mt-4">
-                                        <Card className="border-violet-100">
+                                        <Card className="border-primary/30">
                                             <CardContent className="p-4">
-                                                <p className="mb-3 text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                <p className="mb-3 text-[10px] font-bold tracking-wider text-primary uppercase">
                                                     Interests &amp; Strengths
                                                 </p>
                                                 <div className="space-y-3">
@@ -2625,9 +2625,9 @@ export default function ClientShow({
                                     client.transport_needs.length > 0) ||
                                     client.transport_notes) && (
                                     <div className="mt-4">
-                                        <Card className="border-violet-100">
+                                        <Card className="border-primary/30">
                                             <CardContent className="p-4">
-                                                <p className="mb-2 text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                <p className="mb-2 text-[10px] font-bold tracking-wider text-primary uppercase">
                                                     Transport
                                                 </p>
                                                 {client.transport_needs &&
@@ -2767,7 +2767,7 @@ export default function ClientShow({
                                                 </div>
                                                 <div className="mt-1 h-2 rounded-full bg-muted">
                                                     <div
-                                                        className="h-2 rounded-full bg-indigo-500 transition-all"
+                                                        className="h-2 rounded-full bg-primary transition-all"
                                                         style={{
                                                             width: `${pct}%`,
                                                         }}
@@ -2835,7 +2835,7 @@ export default function ClientShow({
                                                 <div className="text-sm font-medium">
                                                     {item.label}
                                                 </div>
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     {item.complete
                                                         ? item.has_data
                                                             ? 'Added'
@@ -2847,7 +2847,7 @@ export default function ClientShow({
                                         {!item.has_data &&
                                             (can.manage_onboarding ||
                                                 can.edit) && (
-                                                <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                                                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                                                     <Checkbox
                                                         checked={item.override}
                                                         onCheckedChange={(
@@ -2893,7 +2893,7 @@ export default function ClientShow({
                                                 )
                                                     ? {
                                                           label: 'Compliance',
-                                                          color: 'bg-purple-100 text-purple-700',
+                                                          color: 'bg-primary/10 text-primary',
                                                       }
                                                     : /Referral|Assessment|Care Plan|Agreement|Staff|Introduction/i.test(
                                                             step.step_name ??
@@ -2905,7 +2905,7 @@ export default function ClientShow({
                                                         }
                                                       : {
                                                             label: 'Admin',
-                                                            color: 'bg-slate-100 text-slate-600',
+                                                            color: 'bg-muted text-muted-foreground',
                                                         };
                                             return (
                                                 <div
@@ -2928,7 +2928,7 @@ export default function ClientShow({
                                                                 {step.step_name}
                                                             </div>
                                                             {step.description && (
-                                                                <div className="mt-0.5 text-xs text-slate-500">
+                                                                <div className="mt-0.5 text-xs text-muted-foreground">
                                                                     {
                                                                         step.description
                                                                     }
@@ -3144,10 +3144,10 @@ export default function ClientShow({
                         {/* Quick Stats */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                             <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                                <div className="text-xl font-bold text-violet-700">
+                                <div className="text-xl font-bold text-primary">
                                     {medical.medications?.length ?? 0}
                                 </div>
-                                <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                <div className="text-[10px] tracking-wider text-primary uppercase">
                                     Medications
                                 </div>
                             </div>
@@ -3302,7 +3302,7 @@ export default function ClientShow({
                                                 .map((f) => (
                                                     <div
                                                         key={f.label}
-                                                        className="rounded-lg bg-slate-50 p-3"
+                                                        className="rounded-lg bg-muted p-3"
                                                     >
                                                         <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                                                             {f.label}
@@ -3315,7 +3315,7 @@ export default function ClientShow({
                                         </div>
                                         {medical.profile?.notes &&
                                             medical.profile.notes !== '-' && (
-                                                <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                                                <div className="mt-3 rounded-lg bg-muted p-3">
                                                     <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                                                         Notes
                                                     </p>
@@ -3332,7 +3332,7 @@ export default function ClientShow({
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between text-base">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                     <Pill className="h-4 w-4" />
                                                 </div>
                                                 Medications
@@ -3373,8 +3373,8 @@ export default function ClientShow({
                                                             key={m.id}
                                                             className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-white p-3 shadow-sm"
                                                         >
-                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-                                                                <Pill className="h-4 w-4 text-violet-600" />
+                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                                                <Pill className="h-4 w-4 text-primary" />
                                                             </div>
                                                             <div className="flex-1">
                                                                 <div className="flex items-center gap-2">
@@ -3416,7 +3416,7 @@ export default function ClientShow({
                                                                     )}
                                                                 </div>
                                                                 {m.instructions && (
-                                                                    <p className="mt-1 text-xs text-slate-600">
+                                                                    <p className="mt-1 text-xs text-muted-foreground">
                                                                         {
                                                                             m.instructions
                                                                         }
@@ -3718,7 +3718,7 @@ export default function ClientShow({
                                             className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-gradient-to-br from-rose-50 to-pink-50' : ''}`}
                                         >
                                             <div
-                                                className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-rose-700' : 'text-slate-400'}`}
+                                                className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-rose-700' : 'text-muted-foreground'}`}
                                             >
                                                 {controlledMeds.length}
                                             </div>
@@ -3727,7 +3727,7 @@ export default function ClientShow({
                                             </div>
                                         </div>
                                         <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4 text-center">
-                                            <div className="text-sm font-bold text-violet-700">
+                                            <div className="text-sm font-bold text-primary">
                                                 {emarSummary.next_review_date
                                                     ? new Date(
                                                           emarSummary.next_review_date,
@@ -3741,7 +3741,7 @@ export default function ClientShow({
                                                       )
                                                     : 'Not scheduled'}
                                             </div>
-                                            <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                            <div className="text-[10px] tracking-wider text-primary uppercase">
                                                 Next Review
                                             </div>
                                         </div>
@@ -3896,7 +3896,7 @@ export default function ClientShow({
                                                     <h3 className="text-sm font-semibold text-white">
                                                         PRN (As Needed)
                                                     </h3>
-                                                    <p className="text-xs text-indigo-200">
+                                                    <p className="text-xs text-primary/70">
                                                         {prnMeds.length}{' '}
                                                         medication
                                                         {prnMeds.length !== 1
@@ -3914,7 +3914,7 @@ export default function ClientShow({
                                                         key={m.id}
                                                         className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30"
                                                     >
-                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                                             <Pill className="h-5 w-5" />
                                                         </div>
                                                         <div className="min-w-0 flex-1">
@@ -3922,7 +3922,7 @@ export default function ClientShow({
                                                                 <span className="text-sm font-semibold">
                                                                     {m.name}
                                                                 </span>
-                                                                <Badge className="border-0 bg-indigo-100 text-[9px] text-indigo-700">
+                                                                <Badge className="border-0 bg-primary/10 text-[9px] text-primary">
                                                                     PRN
                                                                 </Badge>
                                                                 {m.controlled_drug && (
@@ -3954,7 +3954,7 @@ export default function ClientShow({
                                                                 )}
                                                             </div>
                                                             {m.prn_reason && (
-                                                                <p className="mt-1 text-xs text-indigo-600">
+                                                                <p className="mt-1 text-xs text-primary">
                                                                     Indication:{' '}
                                                                     {
                                                                         m.prn_reason
@@ -3992,7 +3992,7 @@ export default function ClientShow({
                                                         key={m.id}
                                                         className="flex items-center gap-4 px-5 py-2.5 opacity-50"
                                                     >
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                                                             <Pill className="h-4 w-4" />
                                                         </div>
                                                         <div className="min-w-0 flex-1">
@@ -4000,7 +4000,7 @@ export default function ClientShow({
                                                                 <span className="text-sm font-medium line-through">
                                                                     {m.name}
                                                                 </span>
-                                                                <Badge className="border-0 bg-slate-100 text-[9px] text-slate-500">
+                                                                <Badge className="border-0 bg-muted text-[9px] text-muted-foreground">
                                                                     Ceased
                                                                 </Badge>
                                                             </div>
@@ -4170,10 +4170,10 @@ export default function ClientShow({
                                         {/* Quick Stats */}
                                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                             <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                                                <div className="text-2xl font-bold text-violet-700">
+                                                <div className="text-2xl font-bold text-primary">
                                                     {goalsPct}%
                                                 </div>
-                                                <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                                <div className="text-[10px] tracking-wider text-primary uppercase">
                                                     Overall Progress
                                                 </div>
                                             </div>
@@ -4196,7 +4196,7 @@ export default function ClientShow({
                                             </div>
                                             <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
                                                 <div
-                                                    className={`text-2xl font-bold ${reviewDays !== null && reviewDays < 0 ? 'text-red-600' : 'text-violet-700'}`}
+                                                    className={`text-2xl font-bold ${reviewDays !== null && reviewDays < 0 ? 'text-red-600' : 'text-primary'}`}
                                                 >
                                                     {reviewDays !== null
                                                         ? reviewDays < 0
@@ -4204,7 +4204,7 @@ export default function ClientShow({
                                                             : `${reviewDays}d`
                                                         : '—'}
                                                 </div>
-                                                <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                                <div className="text-[10px] tracking-wider text-primary uppercase">
                                                     {reviewDays !== null &&
                                                     reviewDays < 0
                                                         ? 'Overdue'
@@ -4227,7 +4227,7 @@ export default function ClientShow({
                                                                         activePlan.title
                                                                     }
                                                                 </h3>
-                                                                <p className="text-xs text-violet-200">
+                                                                <p className="text-xs text-primary/70">
                                                                     {(
                                                                         activePlan.plan_type ??
                                                                         ''
@@ -4242,7 +4242,7 @@ export default function ClientShow({
                                                             </div>
                                                             <Button
                                                                 size="sm"
-                                                                className="bg-white font-semibold text-violet-700 shadow-sm hover:bg-violet-100"
+                                                                className="bg-white font-semibold text-primary shadow-sm hover:bg-primary/10"
                                                                 asChild
                                                             >
                                                                 <Link
@@ -4288,7 +4288,7 @@ export default function ClientShow({
                                                                                         }
                                                                                     </span>
                                                                                     <span
-                                                                                        className={`text-xs font-bold tabular-nums ${g.status === 'completed' ? 'text-emerald-600' : 'text-violet-600'}`}
+                                                                                        className={`text-xs font-bold tabular-nums ${g.status === 'completed' ? 'text-emerald-600' : 'text-primary'}`}
                                                                                     >
                                                                                         {g.progress_percentage ??
                                                                                             0}
@@ -4296,7 +4296,7 @@ export default function ClientShow({
                                                                                         %
                                                                                     </span>
                                                                                 </div>
-                                                                                <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                                                                                <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
                                                                                     <div
                                                                                         className={`h-full rounded-full transition-all ${g.status === 'completed' ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-purple-500'}`}
                                                                                         style={{
@@ -4309,7 +4309,7 @@ export default function ClientShow({
                                                                     )}
                                                             </div>
                                                             {/* Summary row */}
-                                                            <div className="mt-4 flex items-center justify-between rounded-xl bg-violet-50 px-4 py-3">
+                                                            <div className="mt-4 flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
                                                                 <div className="flex items-center gap-4">
                                                                     <span className="flex items-center gap-1.5 text-xs">
                                                                         <span className="h-3 w-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" />{' '}
@@ -4335,7 +4335,7 @@ export default function ClientShow({
                                                                             goalsInProgress}
                                                                     </span>
                                                                 </div>
-                                                                <span className="text-xs font-bold text-violet-700">
+                                                                <span className="text-xs font-bold text-primary">
                                                                     Avg:{' '}
                                                                     {
                                                                         avgProgress
@@ -4352,7 +4352,7 @@ export default function ClientShow({
 
                                                 {/* About Me */}
                                                 {hasAboutMe && (
-                                                    <Card className="overflow-hidden border-violet-200">
+                                                    <Card className="overflow-hidden border-primary">
                                                         <div className="bg-gradient-to-r from-rose-400 to-pink-500 px-5 py-2.5">
                                                             <h3 className="text-sm font-semibold text-white">
                                                                 About{' '}
@@ -4363,8 +4363,8 @@ export default function ClientShow({
                                                         </div>
                                                         <CardContent className="space-y-3 p-4">
                                                             {aboutMe.dreams && (
-                                                                <div className="rounded-lg bg-violet-50 p-3">
-                                                                    <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                                <div className="rounded-lg bg-primary/10 p-3">
+                                                                    <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                         Dreams &
                                                                         Aspirations
                                                                     </p>
@@ -4411,8 +4411,8 @@ export default function ClientShow({
                                                                 )}
                                                             </div>
                                                             {aboutMe.how_to_support && (
-                                                                <div className="rounded-lg border border-violet-200 bg-white p-3">
-                                                                    <p className="text-[10px] font-bold tracking-wider text-violet-500 uppercase">
+                                                                <div className="rounded-lg border border-primary bg-white p-3">
+                                                                    <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                         How to
                                                                         Support
                                                                         Me
@@ -4532,7 +4532,7 @@ export default function ClientShow({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                className="h-6 text-[10px] text-violet-600"
+                                                                className="h-6 text-[10px] text-primary"
                                                                 asChild
                                                             >
                                                                 <Link
@@ -4579,7 +4579,7 @@ export default function ClientShow({
                                                                                     </span>
                                                                                 </div>
                                                                                 {note.goal && (
-                                                                                    <span className="mt-0.5 inline-block rounded bg-violet-50 px-1 py-0.5 text-[9px] text-violet-600">
+                                                                                    <span className="mt-0.5 inline-block rounded bg-primary/10 px-1 py-0.5 text-[9px] text-primary">
                                                                                         {
                                                                                             note
                                                                                                 .goal
@@ -4605,8 +4605,8 @@ export default function ClientShow({
                                 ) : (
                                     <Card className="border-dashed">
                                         <CardContent className="flex flex-col items-center justify-center py-16">
-                                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                                <Heart className="h-8 w-8 text-violet-400" />
+                                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                                <Heart className="h-8 w-8 text-primary" />
                                             </div>
                                             <p className="font-medium">
                                                 No Active Care Plan
@@ -4618,7 +4618,7 @@ export default function ClientShow({
                                             </p>
                                             <Button
                                                 size="sm"
-                                                className="mt-4 bg-violet-600 hover:bg-violet-700"
+                                                className="mt-4 bg-primary hover:bg-primary"
                                                 asChild
                                             >
                                                 <Link
@@ -4680,7 +4680,7 @@ export default function ClientShow({
                                 key: 'tired',
                                 emoji: '😴',
                                 label: 'Tired',
-                                color: 'bg-indigo-100 border-indigo-300 text-indigo-700',
+                                color: 'bg-primary/10 border-primary text-primary',
                             },
                             {
                                 key: 'anxious',
@@ -4704,7 +4704,7 @@ export default function ClientShow({
                                 key: 'confused',
                                 emoji: '😕',
                                 label: 'Confused',
-                                color: 'bg-purple-100 border-purple-300 text-purple-700',
+                                color: 'bg-primary/10 border-primary text-primary',
                             },
                         ];
 
@@ -4755,12 +4755,12 @@ export default function ClientShow({
                         > = {
                             general: {
                                 border: 'border-l-violet-400',
-                                bg: 'bg-violet-50',
+                                bg: 'bg-primary/10',
                                 label: 'General',
                             },
                             goal_update: {
                                 border: 'border-l-indigo-400',
-                                bg: 'bg-indigo-50',
+                                bg: 'bg-primary/10',
                                 label: 'Goal Update',
                             },
                             observation: {
@@ -4793,10 +4793,10 @@ export default function ClientShow({
                                 {/* Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                                        <div className="text-xl font-bold text-violet-700">
+                                        <div className="text-xl font-bold text-primary">
                                             {notes.length}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-primary uppercase">
                                             Total Notes
                                         </div>
                                     </div>
@@ -4822,7 +4822,7 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-xl border p-3 text-center">
                                         <div
-                                            className={`text-xl font-bold ${flaggedCount > 0 ? 'text-red-600' : 'text-slate-400'}`}
+                                            className={`text-xl font-bold ${flaggedCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}
                                         >
                                             {flaggedCount}
                                         </div>
@@ -4918,7 +4918,7 @@ export default function ClientShow({
                                 )}
 
                                 {/* Add Note Form */}
-                                <Card className="overflow-hidden border-violet-200">
+                                <Card className="overflow-hidden border-primary">
                                     <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
                                         <h3 className="text-sm font-semibold text-white">
                                             Add Progress Note
@@ -5054,7 +5054,7 @@ export default function ClientShow({
                                             </p>
                                             <Button
                                                 size="sm"
-                                                className="gap-1.5 bg-violet-600 hover:bg-violet-700"
+                                                className="gap-1.5 bg-primary hover:bg-primary"
                                                 onClick={() => {
                                                     const content = (
                                                         document.getElementById(
@@ -5135,8 +5135,8 @@ export default function ClientShow({
                                 {notes.length === 0 ? (
                                     <Card className="border-dashed">
                                         <CardContent className="flex flex-col items-center justify-center py-12">
-                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                                                <FileText className="h-7 w-7 text-violet-400" />
+                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                                                <FileText className="h-7 w-7 text-primary" />
                                             </div>
                                             <p className="font-medium">
                                                 No Progress Notes
@@ -5162,7 +5162,7 @@ export default function ClientShow({
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="flex items-start gap-3">
                                                                 {/* Avatar */}
-                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                                                                     {(
                                                                         note
                                                                             .author
@@ -5248,7 +5248,7 @@ export default function ClientShow({
                                                                         )}
                                                                     </div>
                                                                     {note.goal && (
-                                                                        <span className="mt-0.5 inline-block rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">
+                                                                        <span className="mt-0.5 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
                                                                             Goal:{' '}
                                                                             {
                                                                                 note
@@ -5257,7 +5257,7 @@ export default function ClientShow({
                                                                             }
                                                                         </span>
                                                                     )}
-                                                                    <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                                                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                                                                         {(
                                                                             note.content ??
                                                                             ''
@@ -5342,10 +5342,10 @@ export default function ClientShow({
                                 {/* Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                                        <div className="text-xl font-bold text-violet-700">
+                                        <div className="text-xl font-bold text-primary">
                                             {agreements.length}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-primary uppercase">
                                             Total
                                         </div>
                                     </div>
@@ -5359,17 +5359,17 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
                                         <div
-                                            className={`text-xl font-bold ${overallPct > 90 ? 'text-red-600' : overallPct > 70 ? 'text-amber-600' : 'text-violet-700'}`}
+                                            className={`text-xl font-bold ${overallPct > 90 ? 'text-red-600' : overallPct > 70 ? 'text-amber-600' : 'text-primary'}`}
                                         >
                                             {overallPct}%
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-primary uppercase">
                                             Budget Used
                                         </div>
                                     </div>
                                     <div className="rounded-xl border p-3 text-center">
                                         <div
-                                            className={`text-xl font-bold ${expiringSoon > 0 ? 'text-amber-600' : 'text-slate-400'}`}
+                                            className={`text-xl font-bold ${expiringSoon > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}
                                         >
                                             {expiringSoon}
                                         </div>
@@ -5381,13 +5381,13 @@ export default function ClientShow({
 
                                 {/* Overall Budget Bar */}
                                 {totalBudget > 0 && (
-                                    <Card className="border-violet-200 bg-violet-50/30">
+                                    <Card className="border-primary bg-primary/10/30">
                                         <CardContent className="p-4">
                                             <div className="mb-2 flex items-center justify-between">
                                                 <span className="text-sm font-semibold">
                                                     Total Funding Overview
                                                 </span>
-                                                <span className="text-sm font-bold text-violet-700">
+                                                <span className="text-sm font-bold text-primary">
                                                     $
                                                     {new Intl.NumberFormat(
                                                         'en-NZ',
@@ -5399,9 +5399,9 @@ export default function ClientShow({
                                                     NZD
                                                 </span>
                                             </div>
-                                            <div className="h-4 w-full overflow-hidden rounded-full bg-violet-200">
+                                            <div className="h-4 w-full overflow-hidden rounded-full bg-primary/20">
                                                 <div
-                                                    className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-red-500' : overallPct > 70 ? 'bg-amber-500' : 'bg-violet-600'}`}
+                                                    className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-red-500' : overallPct > 70 ? 'bg-amber-500' : 'bg-primary'}`}
                                                     style={{
                                                         width: `${Math.min(overallPct, 100)}%`,
                                                     }}
@@ -5431,7 +5431,7 @@ export default function ClientShow({
                                     </span>
                                     <Button
                                         size="sm"
-                                        className="gap-1.5 bg-violet-600 hover:bg-violet-700"
+                                        className="gap-1.5 bg-primary hover:bg-primary"
                                         asChild
                                     >
                                         <Link
@@ -5446,8 +5446,8 @@ export default function ClientShow({
                                 {agreements.length === 0 ? (
                                     <Card className="border-dashed">
                                         <CardContent className="flex flex-col items-center justify-center py-12">
-                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                                                <DollarSign className="h-7 w-7 text-violet-400" />
+                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                                                <DollarSign className="h-7 w-7 text-primary" />
                                             </div>
                                             <p className="font-medium">
                                                 No Service Agreements
@@ -5496,7 +5496,7 @@ export default function ClientShow({
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="flex items-start gap-3">
                                                                 <div
-                                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}
+                                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground'}`}
                                                                 >
                                                                     <DollarSign className="h-5 w-5" />
                                                                 </div>
@@ -5508,7 +5508,7 @@ export default function ClientShow({
                                                                             }
                                                                         </span>
                                                                         <Badge
-                                                                            className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-700' : ag.status === 'draft' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'}`}
+                                                                            className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-700' : ag.status === 'draft' ? 'bg-muted text-muted-foreground' : 'bg-amber-100 text-amber-700'}`}
                                                                         >
                                                                             {
                                                                                 ag.status
@@ -5616,7 +5616,7 @@ export default function ClientShow({
                                                                         %)
                                                                     </span>
                                                                 </div>
-                                                                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                                                                     <div
                                                                         className={`h-full rounded-full ${budgetColor} transition-all`}
                                                                         style={{
@@ -5701,7 +5701,7 @@ export default function ClientShow({
                                                         {h.subject ||
                                                             'Handover'}
                                                     </div>
-                                                    <div className="text-xs text-slate-500">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {h.occurred_at
                                                             ? new Date(
                                                                   h.occurred_at,
@@ -5710,12 +5710,12 @@ export default function ClientShow({
                                                     </div>
                                                 </div>
                                                 {h.body && (
-                                                    <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                    <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                                         {h.body}
                                                     </div>
                                                 )}
                                                 <div className="mt-2 flex items-center justify-between gap-2">
-                                                    <div className="text-xs text-slate-500">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {h.actor?.name
                                                             ? `By ${h.actor.name}`
                                                             : ''}
@@ -5925,8 +5925,8 @@ export default function ClientShow({
                             {/* Visual Timeline */}
                             {filteredEvents.length === 0 ? (
                                 <div className="flex flex-col items-center py-12 text-center">
-                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                                        <Clock className="h-7 w-7 text-violet-400" />
+                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                                        <Clock className="h-7 w-7 text-primary" />
                                     </div>
                                     <p className="font-medium">
                                         {events.length
@@ -5954,13 +5954,13 @@ export default function ClientShow({
                                                 }
                                             > = {
                                                 note: {
-                                                    dot: 'bg-violet-500',
-                                                    bg: 'bg-violet-50',
+                                                    dot: 'bg-primary',
+                                                    bg: 'bg-primary/10',
                                                     icon: '📝',
                                                 },
                                                 progress_note: {
-                                                    dot: 'bg-indigo-500',
-                                                    bg: 'bg-indigo-50',
+                                                    dot: 'bg-primary',
+                                                    bg: 'bg-primary/10',
                                                     icon: '🎯',
                                                 },
                                                 handover: {
@@ -5993,7 +5993,7 @@ export default function ClientShow({
                                                 e.type
                                             ] ?? {
                                                 dot: 'bg-slate-400',
-                                                bg: 'bg-slate-50',
+                                                bg: 'bg-muted',
                                                 icon: '📌',
                                             };
 
@@ -6034,10 +6034,10 @@ export default function ClientShow({
                                                 <div key={e.id}>
                                                     {showDateHeader && (
                                                         <div className="relative mt-4 mb-2 flex items-center pl-8 first:mt-0">
-                                                            <div className="absolute left-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-violet-200">
-                                                                <div className="h-2 w-2 rounded-full bg-violet-500" />
+                                                            <div className="absolute left-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-primary/20">
+                                                                <div className="h-2 w-2 rounded-full bg-primary" />
                                                             </div>
-                                                            <span className="text-xs font-semibold text-violet-600">
+                                                            <span className="text-xs font-semibold text-primary">
                                                                 {eventDate}
                                                             </span>
                                                         </div>
@@ -6102,7 +6102,7 @@ export default function ClientShow({
                                                                 </span>
                                                             </div>
                                                             {e.body && (
-                                                                <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-slate-600">
+                                                                <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
                                                                     {e.body
                                                                         .length >
                                                                     250
@@ -6156,14 +6156,14 @@ export default function ClientShow({
                                                                                         calm: 'bg-sky-100 text-sky-700',
                                                                                         excited:
                                                                                             'bg-amber-100 text-amber-700',
-                                                                                        tired: 'bg-indigo-100 text-indigo-700',
+                                                                                        tired: 'bg-primary/10 text-primary',
                                                                                         anxious:
                                                                                             'bg-orange-100 text-orange-700',
                                                                                         sad: 'bg-blue-100 text-blue-700',
                                                                                         frustrated:
                                                                                             'bg-red-100 text-red-700',
                                                                                         confused:
-                                                                                            'bg-purple-100 text-purple-700',
+                                                                                            'bg-primary/10 text-primary',
                                                                                     };
                                                                                 return (
                                                                                     <span
@@ -6287,18 +6287,18 @@ export default function ClientShow({
                                 '';
                             return (
                                 FILE_ICONS[ext] ?? {
-                                    color: 'text-violet-600',
-                                    bg: 'bg-violet-100',
+                                    color: 'text-primary',
+                                    bg: 'bg-primary/10',
                                 }
                             );
                         };
                         const CAT_COLORS: Record<string, string> = {
-                            care_plan: 'bg-violet-100 text-violet-700',
+                            care_plan: 'bg-primary/10 text-primary',
                             assessment: 'bg-blue-100 text-blue-700',
                             medical: 'bg-red-100 text-red-700',
                             legal: 'bg-amber-100 text-amber-700',
                             policy: 'bg-emerald-100 text-emerald-700',
-                            consent: 'bg-purple-100 text-purple-700',
+                            consent: 'bg-primary/10 text-primary',
                         };
 
                         const grouped = (documents ?? []).reduce(
@@ -6332,7 +6332,7 @@ export default function ClientShow({
                                     </div>
                                     <Button
                                         size="sm"
-                                        className="gap-1.5 bg-violet-600 hover:bg-violet-700"
+                                        className="gap-1.5 bg-primary hover:bg-primary"
                                         asChild
                                     >
                                         <Link
@@ -6347,8 +6347,8 @@ export default function ClientShow({
                                 {(documents ?? []).length === 0 ? (
                                     <Card className="border-dashed">
                                         <CardContent className="flex flex-col items-center justify-center py-12">
-                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                                                <FolderOpen className="h-7 w-7 text-violet-400" />
+                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                                                <FolderOpen className="h-7 w-7 text-primary" />
                                             </div>
                                             <p className="font-medium">
                                                 No Documents
@@ -6429,7 +6429,7 @@ export default function ClientShow({
                                                                         )}
                                                                         {d.category && (
                                                                             <Badge
-                                                                                className={`h-4 border-0 px-1 text-[8px] ${CAT_COLORS[d.category] ?? 'bg-slate-100 text-slate-600'}`}
+                                                                                className={`h-4 border-0 px-1 text-[8px] ${CAT_COLORS[d.category] ?? 'bg-muted text-muted-foreground'}`}
                                                                             >
                                                                                 {d.category.replace(
                                                                                     /_/g,
@@ -6503,11 +6503,11 @@ export default function ClientShow({
                             reminder: {
                                 emoji: '⏰',
                                 label: 'Reminder',
-                                color: 'bg-purple-100 text-purple-700',
+                                color: 'bg-primary/10 text-primary',
                             },
                         };
                         const PRIORITY_COLORS: Record<string, string> = {
-                            low: 'bg-slate-100 text-slate-600',
+                            low: 'bg-muted text-muted-foreground',
                             normal: 'bg-blue-100 text-blue-700',
                             high: 'bg-orange-100 text-orange-700',
                             urgent: 'bg-red-100 text-red-700',
@@ -6516,7 +6516,7 @@ export default function ClientShow({
                             open: 'bg-blue-100 text-blue-700',
                             in_progress: 'bg-amber-100 text-amber-700',
                             completed: 'bg-emerald-100 text-emerald-700',
-                            cancelled: 'bg-gray-100 text-gray-600',
+                            cancelled: 'bg-muted text-muted-foreground',
                         };
 
                         return (
@@ -6535,7 +6535,7 @@ export default function ClientShow({
                                         className={`rounded-xl border p-3 text-center ${urgentCount > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}
                                     >
                                         <div
-                                            className={`text-xl font-bold ${urgentCount > 0 ? 'text-red-700' : 'text-slate-400'}`}
+                                            className={`text-xl font-bold ${urgentCount > 0 ? 'text-red-700' : 'text-muted-foreground'}`}
                                         >
                                             {urgentCount}
                                         </div>
@@ -6547,7 +6547,7 @@ export default function ClientShow({
                                         className={`rounded-xl border p-3 text-center ${overdueCount > 0 ? 'bg-gradient-to-br from-orange-50 to-amber-50' : ''}`}
                                     >
                                         <div
-                                            className={`text-xl font-bold ${overdueCount > 0 ? 'text-orange-700' : 'text-slate-400'}`}
+                                            className={`text-xl font-bold ${overdueCount > 0 ? 'text-orange-700' : 'text-muted-foreground'}`}
                                         >
                                             {overdueCount}
                                         </div>
@@ -6678,7 +6678,7 @@ export default function ClientShow({
                                                                     </p>
                                                                 )}
                                                                 {note.assigned_shift && (
-                                                                    <div className="mt-1 rounded-md border border-violet-200 bg-violet-50/50 px-2 py-1 text-xs text-violet-700">
+                                                                    <div className="mt-1 rounded-md border border-primary bg-primary/10/50 px-2 py-1 text-xs text-primary">
                                                                         <p className="font-medium">
                                                                             📋
                                                                             Assigned
@@ -6694,7 +6694,7 @@ export default function ClientShow({
                                                                             )}{' '}
                                                                             shift
                                                                         </p>
-                                                                        <p className="text-violet-600">
+                                                                        <p className="text-primary">
                                                                             {note
                                                                                 .assigned_shift
                                                                                 .staff_name ??
@@ -6714,7 +6714,7 @@ export default function ClientShow({
                                                                 )}
                                                                 {!note.assigned_shift &&
                                                                     note.assigned_shift_date && (
-                                                                        <p className="mt-1 text-xs text-violet-600">
+                                                                        <p className="mt-1 text-xs text-primary">
                                                                             📋
                                                                             Assigned
                                                                             to
@@ -6845,7 +6845,7 @@ export default function ClientShow({
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            className="h-7 gap-1 text-[10px] text-violet-600"
+                                                                            className="h-7 gap-1 text-[10px] text-primary"
                                                                             onClick={() =>
                                                                                 setAssigningId(
                                                                                     assigningId ===
@@ -7060,18 +7060,18 @@ export default function ClientShow({
                                                             b.end_at,
                                                         )}
                                                     </div>
-                                                    <div className="mt-1 text-xs text-slate-500">
+                                                    <div className="mt-1 text-xs text-muted-foreground">
                                                         Status: {b.status}
                                                         {b.coordinator?.name
                                                             ? ` | Coordinator: ${b.coordinator.name}`
                                                             : ''}
                                                     </div>
                                                     {b.shift_id ? (
-                                                        <div className="mt-1 text-xs text-slate-500">
+                                                        <div className="mt-1 text-xs text-muted-foreground">
                                                             Shift:{' '}
                                                             <Link
                                                                 href={`/operations/shifts/${b.shift_id}`}
-                                                                className="text-indigo-500 hover:text-indigo-400"
+                                                                className="text-primary hover:text-primary"
                                                             >
                                                                 View shift
                                                             </Link>
@@ -7088,7 +7088,7 @@ export default function ClientShow({
                                         </div>
                                     ))}
                                     {!respiteBookings.length && (
-                                        <div className="text-sm text-slate-500">
+                                        <div className="text-sm text-muted-foreground">
                                             No respite bookings yet.
                                         </div>
                                     )}
@@ -7118,7 +7118,7 @@ export default function ClientShow({
                                                             r.requested_end,
                                                         )}
                                                     </div>
-                                                    <div className="mt-1 text-xs text-slate-500">
+                                                    <div className="mt-1 text-xs text-muted-foreground">
                                                         Status: {r.status}
                                                     </div>
                                                 </div>
@@ -7132,7 +7132,7 @@ export default function ClientShow({
                                         </div>
                                     ))}
                                     {!respiteRequests.length && (
-                                        <div className="text-sm text-slate-500">
+                                        <div className="text-sm text-muted-foreground">
                                             No respite booking requests yet.
                                         </div>
                                     )}
@@ -7165,7 +7165,7 @@ export default function ClientShow({
                         const STATUS_COLORS: Record<string, string> = {
                             given: 'bg-emerald-100 text-emerald-700',
                             refused: 'bg-red-100 text-red-700',
-                            withdrawn: 'bg-slate-100 text-slate-600',
+                            withdrawn: 'bg-muted text-muted-foreground',
                             expired: 'bg-amber-100 text-amber-700',
                         };
 
@@ -7174,7 +7174,7 @@ export default function ClientShow({
                                 {/* Stats */}
                                 <div className="grid grid-cols-4 gap-3">
                                     <div className="rounded-lg border p-3 text-center">
-                                        <div className="text-lg font-bold text-indigo-600">
+                                        <div className="text-lg font-bold text-primary">
                                             {consents.length}
                                         </div>
                                         <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
@@ -7191,7 +7191,7 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-lg border p-3 text-center">
                                         <div
-                                            className={`text-lg font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-slate-400'}`}
+                                            className={`text-lg font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}
                                         >
                                             {expiringCount}
                                         </div>
@@ -7201,7 +7201,7 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-lg border p-3 text-center">
                                         <div
-                                            className={`text-lg font-bold ${expiredCount > 0 ? 'text-red-600' : 'text-slate-400'}`}
+                                            className={`text-lg font-bold ${expiredCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}
                                         >
                                             {expiredCount}
                                         </div>
@@ -7252,14 +7252,14 @@ export default function ClientShow({
                                                                         }
                                                                     </span>
                                                                     <span
-                                                                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_COLORS[displayStatus] ?? 'bg-slate-100 text-slate-600'}`}
+                                                                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_COLORS[displayStatus] ?? 'bg-muted text-muted-foreground'}`}
                                                                     >
                                                                         {
                                                                             displayStatus
                                                                         }
                                                                     </span>
                                                                     {c.capacity_assessed && (
-                                                                        <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700">
+                                                                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
                                                                             Capacity
                                                                             Assessed
                                                                         </span>
@@ -7326,7 +7326,7 @@ export default function ClientShow({
                                             'Client'}{' '}
                                         / Next of Kin)
                                     </span>
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                         {portal_users.length}
                                     </span>
                                 </div>
@@ -7342,7 +7342,7 @@ export default function ClientShow({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Portal users can view this{' '}
                                 {(
                                     labels?.['client.singular'] ?? 'Client'
@@ -7371,11 +7371,11 @@ export default function ClientShow({
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 {u.email}
                                             </div>
                                             {u.relation && (
-                                                <div className="mt-0.5 text-xs text-slate-500">
+                                                <div className="mt-0.5 text-xs text-muted-foreground">
                                                     Relation: {u.relation}
                                                 </div>
                                             )}
@@ -7387,7 +7387,7 @@ export default function ClientShow({
                                                     Active
                                                 </span>
                                             ) : (
-                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                                     Inactive
                                                 </span>
                                             )}
@@ -7395,7 +7395,7 @@ export default function ClientShow({
                                     </div>
                                 ))}
                                 {!portal_users.length && (
-                                    <div className="py-8 text-center text-sm text-slate-500">
+                                    <div className="py-8 text-center text-sm text-muted-foreground">
                                         No portal users linked. Add a next of
                                         kin or family member to get started.
                                     </div>
@@ -7435,9 +7435,9 @@ export default function ClientShow({
                                         <div className="text-xs text-muted-foreground">Transports (30d)</div>
                                     </CardContent>
                                 </Card>
-                                <Card className="border bg-purple-50/50 dark:bg-purple-950/20">
+                                <Card className="border bg-primary/10/50 dark:bg-primary/20">
                                     <CardContent className="p-4">
-                                        <div className="text-2xl font-bold text-purple-700 dark:text-purple-400">{ts.outings_30d}</div>
+                                        <div className="text-2xl font-bold text-primary dark:text-primary">{ts.outings_30d}</div>
                                         <div className="text-xs text-muted-foreground">Outings (30d)</div>
                                     </CardContent>
                                 </Card>
@@ -7625,7 +7625,7 @@ export default function ClientShow({
                             <CardTitle className="flex items-center justify-between text-base">
                                 <div className="flex items-center gap-2">
                                     <span>Assigned Workers</span>
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                         {client.support_workers?.length ?? 0}
                                     </span>
                                 </div>
@@ -7673,7 +7673,7 @@ export default function ClientShow({
                                                 </div>
                                             </div>
                                             {client.key_worker?.id === w.id && (
-                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                                                     Key Worker
                                                 </span>
                                             )}
@@ -7681,7 +7681,7 @@ export default function ClientShow({
                                     ))}
                                 </div>
                             ) : (
-                                <div className="py-8 text-center text-sm text-slate-500">
+                                <div className="py-8 text-center text-sm text-muted-foreground">
                                     No workers assigned yet.
                                 </div>
                             )}
@@ -7735,7 +7735,7 @@ function SupportPlanTab({
             </CardHeader>
             <CardContent className="space-y-3">
                 {!canEdit && !plan && (
-                    <div className="text-sm text-slate-500">
+                    <div className="text-sm text-muted-foreground">
                         No support plan recorded.
                     </div>
                 )}
@@ -7877,7 +7877,7 @@ const ASSESSMENT_TYPES: Record<
         label: 'WHODAS 2.0',
         icon: '\u{1F4CA}',
         border: 'border-l-violet-400',
-        bg: 'bg-violet-100',
+        bg: 'bg-primary/10',
         gradient: 'from-violet-50 to-purple-50',
     },
     risk: {
@@ -7912,7 +7912,7 @@ const ASSESSMENT_TYPES: Record<
         label: 'Needs Assessment (NASC)',
         icon: '\u{1F4CB}',
         border: 'border-l-indigo-400',
-        bg: 'bg-indigo-100',
+        bg: 'bg-primary/10',
         gradient: 'from-indigo-50 to-blue-50',
     },
     behaviour_support: {
@@ -7926,7 +7926,7 @@ const ASSESSMENT_TYPES: Record<
         label: 'Other',
         icon: '\u{1F4DD}',
         border: 'border-l-slate-400',
-        bg: 'bg-slate-100',
+        bg: 'bg-muted',
         gradient: 'from-slate-50 to-gray-50',
     },
 };
@@ -8061,16 +8061,16 @@ function AssessmentsTab({
             {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-violet-700">
+                    <div className="text-2xl font-bold text-primary">
                         {assessments.length}
                     </div>
-                    <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-primary uppercase">
                         Total Assessments
                     </div>
                 </div>
                 <div className="rounded-xl border bg-gradient-to-br from-red-50 to-rose-50 p-3 text-center">
                     <div
-                        className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-slate-400'}`}
+                        className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}
                     >
                         {overdueCount}
                     </div>
@@ -8117,7 +8117,7 @@ function AssessmentsTab({
 
             {/* Form with Gradient Header */}
             {canEdit && showForm && (
-                <Card className="overflow-hidden border-violet-200">
+                <Card className="overflow-hidden border-primary">
                     <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-white">
@@ -8226,7 +8226,7 @@ function AssessmentsTab({
                         </div>
                         <div className="mt-3 flex items-center gap-2">
                             <Button
-                                className="bg-violet-600 text-white hover:bg-violet-700"
+                                className="bg-primary text-white hover:bg-primary"
                                 onClick={submitForm}
                                 disabled={
                                     form.processing ||
@@ -8250,7 +8250,7 @@ function AssessmentsTab({
                 {canEdit && !showForm && (
                     <Button
                         size="sm"
-                        className="gap-1.5 bg-violet-600 text-white hover:bg-violet-700"
+                        className="gap-1.5 bg-primary text-white hover:bg-primary"
                         onClick={() => {
                             resetForm();
                             setShowForm(true);
@@ -8265,8 +8265,8 @@ function AssessmentsTab({
             {assessments.length === 0 ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                            <ClipboardList className="h-7 w-7 text-violet-400" />
+                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                            <ClipboardList className="h-7 w-7 text-primary" />
                         </div>
                         <p className="font-medium">No Assessments Recorded</p>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -8314,7 +8314,7 @@ function AssessmentsTab({
                                                         {typeStyle.label}
                                                     </span>
                                                     {a.score && (
-                                                        <Badge className="border-0 bg-violet-100 text-xs font-bold text-violet-700">
+                                                        <Badge className="border-0 bg-primary/10 text-xs font-bold text-primary">
                                                             Score: {a.score}
                                                         </Badge>
                                                     )}
@@ -8324,7 +8324,7 @@ function AssessmentsTab({
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                                     {a.assessed_at && (
                                                         <span className="flex items-center gap-1">
                                                             <Calendar className="h-3 w-3" />
@@ -8376,7 +8376,7 @@ function AssessmentsTab({
                                     {a.notes && (
                                         <div className="mt-2 ml-12">
                                             <button
-                                                className="text-xs text-violet-600 hover:underline"
+                                                className="text-xs text-primary hover:underline"
                                                 onClick={() =>
                                                     setExpandedId(
                                                         isExpanded
@@ -8390,7 +8390,7 @@ function AssessmentsTab({
                                                     : 'Show notes'}
                                             </button>
                                             {isExpanded && (
-                                                <div className="mt-1.5 border-l-2 border-violet-200 pl-3 text-xs whitespace-pre-wrap text-slate-600">
+                                                <div className="mt-1.5 border-l-2 border-primary pl-3 text-xs whitespace-pre-wrap text-muted-foreground">
                                                     {a.notes}
                                                 </div>
                                             )}
@@ -8596,7 +8596,7 @@ function PhotoGalleryTab({
                                         </p>
                                     )}
                                     <div className="mt-1 flex flex-wrap items-center gap-1">
-                                        <Badge className="h-4 border-0 bg-slate-100 px-1 text-[8px] text-slate-600">
+                                        <Badge className="h-4 border-0 bg-muted px-1 text-[8px] text-muted-foreground">
                                             {p.visibility.replace(/_/g, ' ')}
                                         </Badge>
                                         {p.status === 'pending_approval' && (
@@ -8665,7 +8665,7 @@ const ASSET_CATEGORIES: Record<
     },
     electronics: {
         label: 'Electronics',
-        color: 'bg-violet-100 text-violet-700',
+        color: 'bg-primary/10 text-primary',
         icon: '📱',
     },
     furniture: {
@@ -8690,7 +8690,7 @@ const ASSET_CATEGORIES: Record<
     },
     entertainment: {
         label: 'Entertainment',
-        color: 'bg-indigo-100 text-indigo-700',
+        color: 'bg-primary/10 text-primary',
         icon: '🎮',
     },
     transport: {
@@ -8698,7 +8698,7 @@ const ASSET_CATEGORIES: Record<
         color: 'bg-emerald-100 text-emerald-700',
         icon: '🚗',
     },
-    other: { label: 'Other', color: 'bg-slate-100 text-slate-600', icon: '📦' },
+    other: { label: 'Other', color: 'bg-muted text-muted-foreground', icon: '📦' },
 };
 
 const CONDITION_COLORS: Record<string, string> = {
@@ -8734,13 +8734,13 @@ const STATUS_CONFIG: Record<
     },
     disposed: {
         label: 'Disposed',
-        color: 'bg-slate-100 text-slate-600',
+        color: 'bg-muted text-muted-foreground',
         dot: 'bg-slate-400',
     },
     returned: {
         label: 'Returned',
-        color: 'bg-purple-100 text-purple-700',
-        dot: 'bg-purple-500',
+        color: 'bg-primary/10 text-primary',
+        dot: 'bg-primary',
     },
 };
 
@@ -8748,7 +8748,7 @@ const OWNERSHIP_CONFIG: Record<string, { label: string; color: string }> = {
     client: { label: 'Client Owned', color: 'bg-sky-100 text-sky-700' },
     provider: {
         label: 'Provider Owned',
-        color: 'bg-violet-100 text-violet-700',
+        color: 'bg-primary/10 text-primary',
     },
     funded: { label: 'Funded', color: 'bg-emerald-100 text-emerald-700' },
     loaned: { label: 'On Loan', color: 'bg-amber-100 text-amber-700' },
@@ -8986,7 +8986,7 @@ function PersonalAssetsTab({
             >
                 {/* Photo or category icon header */}
                 {a.photo_url ? (
-                    <div className="relative h-36 overflow-hidden bg-slate-100">
+                    <div className="relative h-36 overflow-hidden bg-muted">
                         <img
                             src={a.photo_url}
                             alt={a.name}
@@ -9012,7 +9012,7 @@ function PersonalAssetsTab({
                     </div>
                 ) : (
                     <div
-                        className={`relative flex h-20 items-center justify-center ${cat ? cat.color.replace('text-', 'bg-').split(' ')[0] : 'bg-slate-50'}`}
+                        className={`relative flex h-20 items-center justify-center ${cat ? cat.color.replace('text-', 'bg-').split(' ')[0] : 'bg-muted'}`}
                     >
                         <span className="text-3xl">{cat?.icon ?? '📦'}</span>
                         <div className="absolute top-2 left-2 flex gap-1">
@@ -9078,7 +9078,7 @@ function PersonalAssetsTab({
                                 )}
                                 {a.condition && (
                                     <Badge
-                                        className={`border-0 text-[10px] ${CONDITION_COLORS[a.condition] ?? 'bg-slate-100 text-slate-600'}`}
+                                        className={`border-0 text-[10px] ${CONDITION_COLORS[a.condition] ?? 'bg-muted text-muted-foreground'}`}
                                     >
                                         {a.condition}
                                     </Badge>
@@ -9136,7 +9136,7 @@ function PersonalAssetsTab({
                             parseFloat(a.estimated_value) > 0 && (
                                 <div className="flex items-center gap-1.5">
                                     <DollarSign className="h-3 w-3" />
-                                    <span className="font-medium text-slate-700">
+                                    <span className="font-medium text-foreground">
                                         $
                                         {parseFloat(
                                             a.estimated_value,
@@ -9237,7 +9237,7 @@ function PersonalAssetsTab({
                                     </span>
                                 </div>
                                 <span
-                                    className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${a.tracker.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}
+                                    className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${a.tracker.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
                                 >
                                     <span
                                         className={`h-1.5 w-1.5 rounded-full ${a.tracker.status === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`}
@@ -9270,7 +9270,7 @@ function PersonalAssetsTab({
                     )}
 
                     {a.notes && (
-                        <p className="line-clamp-2 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600">
+                        <p className="line-clamp-2 rounded-lg bg-muted p-2 text-[11px] text-muted-foreground">
                             {a.notes}
                         </p>
                     )}
@@ -9308,7 +9308,7 @@ function PersonalAssetsTab({
                             </button>
                             <button
                                 onClick={() => changeStatus(a.id, 'disposed')}
-                                className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                                className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
                             >
                                 Dispose
                             </button>
@@ -9327,7 +9327,7 @@ function PersonalAssetsTab({
                                     onClick={() =>
                                         changeStatus(a.id, 'disposed')
                                     }
-                                    className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                                    className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
                                 >
                                     Dispose
                                 </button>
@@ -9354,10 +9354,10 @@ function PersonalAssetsTab({
             {/* Gradient stat cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                    <div className="text-xl font-bold text-violet-700">
+                    <div className="text-xl font-bold text-primary">
                         {activeAssets.length}
                     </div>
-                    <div className="text-[10px] tracking-wider text-violet-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-primary uppercase">
                         Active Items
                     </div>
                 </div>
@@ -9379,12 +9379,12 @@ function PersonalAssetsTab({
                     className={`rounded-xl border p-3 text-center ${needsAttention > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50' : 'bg-gradient-to-br from-slate-50 to-gray-50'}`}
                 >
                     <div
-                        className={`text-xl font-bold ${needsAttention > 0 ? 'text-amber-700' : 'text-slate-400'}`}
+                        className={`text-xl font-bold ${needsAttention > 0 ? 'text-amber-700' : 'text-muted-foreground'}`}
                     >
                         {needsAttention}
                     </div>
                     <div
-                        className={`text-[10px] tracking-wider uppercase ${needsAttention > 0 ? 'text-amber-500' : 'text-slate-400'}`}
+                        className={`text-[10px] tracking-wider uppercase ${needsAttention > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}
                     >
                         Needs Attention
                     </div>
@@ -9480,7 +9480,7 @@ function PersonalAssetsTab({
                     {canEdit && (
                         <Button
                             size="sm"
-                            className="h-9 gap-1.5 bg-violet-600 hover:bg-violet-700"
+                            className="h-9 gap-1.5 bg-primary hover:bg-primary"
                             onClick={() => {
                                 resetForm();
                                 setShowForm(true);
@@ -9495,10 +9495,10 @@ function PersonalAssetsTab({
 
             {/* Add/Edit form */}
             {showForm && canEdit && (
-                <Card className="border-violet-200">
+                <Card className="border-primary">
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <Package className="h-4 w-4" />
                             </div>
                             {editingId ? 'Edit Asset' : 'Add Personal Asset'}
@@ -9975,7 +9975,7 @@ function PersonalAssetsTab({
                                 <Button
                                     type="submit"
                                     disabled={form.processing}
-                                    className="bg-violet-600 hover:bg-violet-700"
+                                    className="bg-primary hover:bg-primary"
                                 >
                                     {editingId ? 'Update Asset' : 'Add Asset'}
                                 </Button>
@@ -9996,8 +9996,8 @@ function PersonalAssetsTab({
             {assets.length === 0 && !showForm ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
-                            <Package className="h-7 w-7 text-violet-400" />
+                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                            <Package className="h-7 w-7 text-primary" />
                         </div>
                         <p className="font-medium">No Personal Assets</p>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -10007,7 +10007,7 @@ function PersonalAssetsTab({
                         {canEdit && (
                             <Button
                                 size="sm"
-                                className="mt-3 gap-1.5 bg-violet-600 hover:bg-violet-700"
+                                className="mt-3 gap-1.5 bg-primary hover:bg-primary"
                                 onClick={() => setShowForm(true)}
                             >
                                 <Plus className="h-3.5 w-3.5" />
@@ -10152,10 +10152,10 @@ const CAL_CATEGORIES = [
         bg: 'bg-amber-50 dark:bg-amber-950/40',
     },
     {
-        dot: 'bg-purple-500',
+        dot: 'bg-primary',
         label: 'Specialist',
         icon: Heart,
-        bg: 'bg-purple-50 dark:bg-purple-950/40',
+        bg: 'bg-primary/10 dark:bg-primary/40',
     },
     {
         dot: 'bg-cyan-500',
@@ -10164,10 +10164,10 @@ const CAL_CATEGORIES = [
         bg: 'bg-cyan-50 dark:bg-cyan-950/40',
     },
     {
-        dot: 'bg-violet-400',
+        dot: 'bg-primary/70',
         label: 'Family Notes',
         icon: ListTodo,
-        bg: 'bg-violet-50 dark:bg-violet-950/40',
+        bg: 'bg-primary/10 dark:bg-primary/40',
     },
 ];
 

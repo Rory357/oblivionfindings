@@ -90,8 +90,8 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
             <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Clinical Governance Trends</h1>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <h1 className="text-2xl font-bold text-foreground">Clinical Governance Trends</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Recent automated snapshot history for the Governance clinical indicators.
                         </p>
                     </div>
@@ -123,7 +123,7 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
                     </CardHeader>
                     <CardContent>
                         {!latestSnapshot ? (
-                            <p className="py-8 text-center text-sm text-gray-500">
+                            <p className="py-8 text-center text-sm text-muted-foreground">
                                 No clinical governance snapshots are available yet.
                             </p>
                         ) : (
@@ -135,16 +135,16 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
                                         <div key={indicator.id} className="rounded-xl border p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
-                                                    <p className="text-sm font-semibold text-gray-900">
+                                                    <p className="text-sm font-semibold text-foreground">
                                                         {indicator.name}
                                                     </p>
-                                                    <p className="text-xs text-gray-500">
+                                                    <p className="text-xs text-muted-foreground">
                                                         {indicator.category_label}
                                                     </p>
                                                 </div>
                                                 <Badge
                                                     className={cn(
-                                                        latestValue ? statusClasses[latestValue.status] : 'bg-slate-100 text-slate-700',
+                                                        latestValue ? statusClasses[latestValue.status] : 'bg-muted text-foreground',
                                                     )}
                                                 >
                                                     {latestValue?.status ?? 'No data'}
@@ -153,16 +153,16 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
 
                                             <div className="mt-3 flex items-end justify-between gap-3">
                                                 <div className="flex items-baseline gap-2">
-                                                    <span className="text-2xl font-bold text-gray-900">
+                                                    <span className="text-2xl font-bold text-foreground">
                                                         {latestValue ? latestValue.value : '—'}
                                                     </span>
                                                     {indicator.unit && (
-                                                        <span className="text-xs uppercase tracking-wide text-gray-500">
+                                                        <span className="text-xs uppercase tracking-wide text-muted-foreground">
                                                             {indicator.unit}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-gray-500">
+                                                <div className="text-muted-foreground">
                                                     {latestValue?.trend === 'up' ? (
                                                         <TrendingUp className="h-4 w-4" />
                                                     ) : latestValue?.trend === 'down' ? (
@@ -202,8 +202,8 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
                                     {activeIndicators.map((indicator) => (
                                         <tr key={indicator.id}>
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900">{indicator.name}</div>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="font-medium text-foreground">{indicator.name}</div>
+                                                <div className="text-xs text-muted-foreground">
                                                     Target {indicator.target_direction === 'below' ? '≤' : indicator.target_direction === 'above' ? '≥' : '='}{' '}
                                                     {indicator.target_value ?? '—'}
                                                 </div>
@@ -218,7 +218,7 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
                                                                 {entry.value}
                                                             </Badge>
                                                         ) : (
-                                                            <span className="text-gray-400">—</span>
+                                                            <span className="text-muted-foreground">—</span>
                                                         )}
                                                     </td>
                                                 );
@@ -240,7 +240,7 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm leading-6 text-gray-600">{latestSnapshot.narrative}</p>
+                            <p className="text-sm leading-6 text-muted-foreground">{latestSnapshot.narrative}</p>
                         </CardContent>
                     </Card>
                 )}

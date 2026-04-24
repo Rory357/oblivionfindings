@@ -137,7 +137,7 @@ export default function HandoversIndex({
                                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40'
                                                 : h.status === 'submitted'
                                                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40'
-                                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-900/40'
+                                                  : 'bg-muted text-foreground dark:bg-muted/40'
                                         }`}
                                     >
                                         {h.status === 'acknowledged' ? (

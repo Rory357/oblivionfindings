@@ -54,8 +54,8 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
             <Head title={`Edit: ${plan.title}`} />
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
-                    <Target className="w-8 h-8 text-purple-600" />
-                    <h1 className="text-3xl font-bold text-gray-900">Edit Strategic Plan</h1>
+                    <Target className="w-8 h-8 text-primary" />
+                    <h1 className="text-3xl font-bold text-foreground">Edit Strategic Plan</h1>
                 </div>
                 <Card>
                     <CardHeader><CardTitle>Plan Details</CardTitle></CardHeader>

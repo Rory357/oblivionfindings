@@ -20,7 +20,7 @@ export default function OverdueProcedureRuns({ runs }: Props) {
                     <h1 className="text-lg font-semibold">Overdue Procedure Runs</h1>
                     <Badge className="bg-red-100 text-red-800">{runs.data.length}</Badge>
                 </div>
-                <div className="text-sm text-slate-500">Procedure runs that have breached their SLA deadline.</div>
+                <div className="text-sm text-muted-foreground">Procedure runs that have breached their SLA deadline.</div>
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -35,13 +35,13 @@ export default function OverdueProcedureRuns({ runs }: Props) {
                                                 <Badge className="bg-red-100 text-red-800">{r.status?.replace(/_/g, ' ')}</Badge>
                                                 <Badge className="bg-red-100 text-red-800">SLA Breached</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Progress: {r.current_step || 0}/{r.total_steps || 0} steps
                                             </div>
                                             <div className="mt-1 text-xs text-red-600 font-medium">
                                                 SLA Deadline: {formatDateTime(r.sla_deadline)}
                                             </div>
-                                            <div className="mt-1 text-xs text-slate-400">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 Initiated by: {r.initiated_by?.name || 'Unknown'}
                                             </div>
                                         </div>
@@ -54,7 +54,7 @@ export default function OverdueProcedureRuns({ runs }: Props) {
                         </Card>
                     ))}
                     {!runs.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No overdue procedure runs.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No overdue procedure runs.</div>
                     )}
                 </div>
 

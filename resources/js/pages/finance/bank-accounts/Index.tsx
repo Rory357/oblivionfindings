@@ -108,8 +108,8 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-violet-500/10 p-2">
-                                            <Landmark className="h-5 w-5 text-violet-600" />
+                                        <div className="rounded-lg bg-primary/10 p-2">
+                                            <Landmark className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Account Count</p>

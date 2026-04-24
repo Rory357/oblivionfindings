@@ -153,7 +153,7 @@ export default function EvvIndex({ records = { data: [], links: [], current_page
                     {(records?.data ?? []).map((rec) => (
                         <Card key={rec.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
-                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${rec.has_issues ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'}`}>
+                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${rec.has_issues ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
                                     {rec.has_issues ? <Flag className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
                                 </div>
                                 <div className="min-w-0 flex-1">

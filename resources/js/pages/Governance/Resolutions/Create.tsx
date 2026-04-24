@@ -52,8 +52,8 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-6">
-            <Vote className="w-8 h-8 text-purple-500" />
-            <h1 className="text-3xl font-bold text-gray-900">New Resolution</h1>
+            <Vote className="w-8 h-8 text-primary" />
+            <h1 className="text-3xl font-bold text-foreground">New Resolution</h1>
           </div>
 
           <Card>
@@ -125,7 +125,7 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
                     </SelectContent>
                   </Select>
                   {errors.meeting_id && <p className="text-sm text-red-600 mt-1">{errors.meeting_id}</p>}
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Need a meeting?{' '}
                     <Link href="/governance/meetings/create" className="text-blue-600 hover:underline">
                       Create one here

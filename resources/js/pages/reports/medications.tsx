@@ -183,7 +183,7 @@ export default function MedicationsReport(props: Props) {
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {administrations.length === 0 && (
-                                <div className="text-sm text-slate-500">No administrations found for the selected filters.</div>
+                                <div className="text-sm text-muted-foreground">No administrations found for the selected filters.</div>
                             )}
                             {administrations.map((a) => (
                                 <div key={a.id} className="rounded-md border p-3">
@@ -191,9 +191,9 @@ export default function MedicationsReport(props: Props) {
                                         <div className="text-sm font-medium">
                                             {a.client?.first_name} {a.client?.last_name} — {a.medication?.name}
                                         </div>
-                                        <div className="text-xs text-slate-500">{a.status}</div>
+                                        <div className="text-xs text-muted-foreground">{a.status}</div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {a.administered_at} · {a.administeredBy?.name ?? 'Unknown'}
                                         {a.serviceContext?.name ? ` · ${a.serviceContext.name}` : ''}
                                     </div>
@@ -218,7 +218,7 @@ export default function MedicationsReport(props: Props) {
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {discrepancies.length === 0 && (
-                                <div className="text-sm text-slate-500">No discrepancies found for the selected filters.</div>
+                                <div className="text-sm text-muted-foreground">No discrepancies found for the selected filters.</div>
                             )}
                             {discrepancies.map((d) => (
                                 <div key={d.id} className="rounded-md border p-3">
@@ -226,11 +226,11 @@ export default function MedicationsReport(props: Props) {
                                         <div className="text-sm font-medium">
                                             {d.client?.first_name} {d.client?.last_name} — {d.medication?.name}
                                         </div>
-                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-slate-500'}`}>
+                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-muted-foreground'}`}>
                                             {d.status}
                                         </div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {d.reported_at} · {d.reportedBy?.name ?? 'Unknown'}
                                         {d.serviceContext?.name ? ` · ${d.serviceContext.name}` : ''}
                                     </div>

@@ -239,7 +239,7 @@ const EMOTION_INFO: Record<
     tired: {
         emoji: '😴',
         label: 'Tired',
-        color: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+        color: 'bg-primary/10 text-primary border-primary',
     },
     anxious: {
         emoji: '😰',
@@ -259,7 +259,7 @@ const EMOTION_INFO: Record<
     confused: {
         emoji: '😕',
         label: 'Confused',
-        color: 'bg-purple-100 text-purple-700 border-purple-200',
+        color: 'bg-primary/10 text-primary border-primary',
     },
 };
 
@@ -296,7 +296,7 @@ const statusColors: Record<string, string> = {
     scheduled: 'bg-blue-100 text-blue-800',
     in_progress: 'bg-amber-100 text-amber-800',
     completed: 'bg-emerald-100 text-emerald-800',
-    cancelled: 'bg-gray-100 text-gray-600',
+    cancelled: 'bg-muted text-muted-foreground',
     pending: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-emerald-100 text-emerald-800',
     declined: 'bg-red-100 text-red-800',
@@ -865,7 +865,7 @@ export default function FamilyDashboard({
                                                         </span>
                                                         {n.assigned_shift
                                                             ?.starts_at && (
-                                                            <p className="text-[10px] text-violet-600">
+                                                            <p className="text-[10px] text-primary">
                                                                 Assigned to{' '}
                                                                 {formatShiftTypeLabel(
                                                                     n

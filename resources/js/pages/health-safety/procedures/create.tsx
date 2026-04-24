@@ -238,7 +238,7 @@ export default function ProcedureCreate() {
                                             className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                                                 form.data.ppe_required.includes(item)
                                                     ? 'border-blue-300 bg-blue-100 text-blue-800'
-                                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                    : 'border-border bg-white text-muted-foreground hover:bg-muted'
                                             }`}
                                         >
                                             {item}
@@ -272,7 +272,7 @@ export default function ProcedureCreate() {
                                     onChange={(e) => form.setData('applicable_roles', e.target.value.split(',').map((r) => r.trim()).filter(Boolean))}
                                     placeholder="e.g. Support Worker, Team Leader, Nurse (comma-separated)"
                                 />
-                                <p className="mt-1 text-xs text-slate-500">Enter roles separated by commas</p>
+                                <p className="mt-1 text-xs text-muted-foreground">Enter roles separated by commas</p>
                             </div>
 
                             <div>
@@ -282,7 +282,7 @@ export default function ProcedureCreate() {
                                     onChange={(e) => form.setData('applicable_sites', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
                                     placeholder="e.g. All sites, or specific site names (comma-separated)"
                                 />
-                                <p className="mt-1 text-xs text-slate-500">Enter site names separated by commas, or 'All sites'</p>
+                                <p className="mt-1 text-xs text-muted-foreground">Enter site names separated by commas, or 'All sites'</p>
                             </div>
                         </CardContent>
                     </Card>

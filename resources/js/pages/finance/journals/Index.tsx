@@ -59,20 +59,20 @@ const formatNZD = (amount: string | number) =>
 
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
-        draft: 'bg-gray-100 text-gray-800',
+        draft: 'bg-muted text-foreground',
         posted: 'bg-green-100 text-green-800',
         reversed: 'bg-red-100 text-red-800',
     };
-    return map[status] ?? 'bg-gray-100 text-gray-800';
+    return map[status] ?? 'bg-muted text-foreground';
 };
 
 const typeBadge = (type: string) => {
     const map: Record<string, string> = {
         standard: 'bg-blue-100 text-blue-800',
         adjustment: 'bg-yellow-100 text-yellow-800',
-        opening: 'bg-purple-100 text-purple-800',
+        opening: 'bg-primary/10 text-primary',
     };
-    return map[type] ?? 'bg-gray-100 text-gray-800';
+    return map[type] ?? 'bg-muted text-foreground';
 };
 
 export default function JournalsIndex({ auth, journals, filters }: Props) {
@@ -115,8 +115,8 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Journals</h1>
-                        <p className="text-gray-500 mt-1">General ledger journal entries</p>
+                        <h1 className="text-3xl font-bold text-foreground">Journals</h1>
+                        <p className="text-muted-foreground mt-1">General ledger journal entries</p>
                     </div>
                     <Button asChild>
                         <Link href="/finance/journals/create">
@@ -131,7 +131,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                     <CardContent className="pt-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search number or description..."
                                     value={search}
@@ -206,7 +206,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                             <TableBody>
                                 {journals.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                             No journals found.
                                         </TableCell>
                                     </TableRow>
@@ -214,7 +214,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                                 {journals.data.map((journal) => (
                                     <TableRow
                                         key={journal.id}
-                                        className="cursor-pointer hover:bg-gray-50"
+                                        className="cursor-pointer hover:bg-muted"
                                         onClick={() => router.visit(`/finance/journals/${journal.id}`)}
                                     >
                                         <TableCell className="font-medium">{journal.journal_number}</TableCell>
@@ -241,7 +241,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                 {/* Pagination */}
                 {journals.last_page > 1 && (
                     <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                             Showing {(journals.current_page - 1) * journals.per_page + 1} to{' '}
                             {Math.min(journals.current_page * journals.per_page, journals.total)} of{' '}
                             {journals.total} journals

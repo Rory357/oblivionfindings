@@ -30,7 +30,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const typeColors: Record<string, string> = {
     compliance: 'bg-blue-100 text-blue-800 border-blue-200',
-    vetting: 'bg-purple-100 text-purple-800 border-purple-200',
+    vetting: 'bg-primary/10 text-primary border-primary',
     driver: 'bg-amber-100 text-amber-800 border-amber-200',
     training: 'bg-green-100 text-green-800 border-green-200',
 };
@@ -121,7 +121,7 @@ export default function ComplianceCalendar({ events, filters }: Props) {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="font-medium">{evt.title}</span>
-                                                        <Badge className={typeColors[evt.type] ?? 'bg-gray-100 text-gray-800'}>
+                                                        <Badge className={typeColors[evt.type] ?? 'bg-muted text-foreground'}>
                                                             {evt.type}
                                                         </Badge>
                                                     </div>

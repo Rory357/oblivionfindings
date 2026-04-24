@@ -174,7 +174,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-gray-900">{risk.title}</h1>
+                  <h1 className="text-2xl font-bold text-foreground">{risk.title}</h1>
                   <Badge variant="outline">{risk.risk_reference}</Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                   </Badge>
                   <Badge variant="outline">{getCategoryLabel(risk.category)}</Badge>
                   {!risk.within_appetite && (
-                    <Badge className="bg-purple-100 text-purple-800">Above Appetite</Badge>
+                    <Badge className="bg-primary/10 text-primary">Above Appetite</Badge>
                   )}
                   <Badge variant={risk.status === 'active' ? 'default' : 'secondary'}>
                     {risk.status}
@@ -322,7 +322,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                   <CardTitle>Description</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 whitespace-pre-wrap">{risk.description}</p>
+                  <p className="text-foreground whitespace-pre-wrap">{risk.description}</p>
                 </CardContent>
               </Card>
 
@@ -333,26 +333,26 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <p className="text-3xl font-bold text-gray-900">{risk.likelihood_score}</p>
-                      <p className="text-sm text-gray-500">Likelihood</p>
+                    <div className="text-center p-4 bg-muted rounded-lg">
+                      <p className="text-3xl font-bold text-foreground">{risk.likelihood_score}</p>
+                      <p className="text-sm text-muted-foreground">Likelihood</p>
                     </div>
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <p className="text-3xl font-bold text-gray-900">{risk.impact_score}</p>
-                      <p className="text-sm text-gray-500">Impact</p>
+                    <div className="text-center p-4 bg-muted rounded-lg">
+                      <p className="text-3xl font-bold text-foreground">{risk.impact_score}</p>
+                      <p className="text-sm text-muted-foreground">Impact</p>
                     </div>
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <p className="text-3xl font-bold text-gray-900">{risk.inherent_score}</p>
-                      <p className="text-sm text-gray-500">Inherent Score</p>
+                    <div className="text-center p-4 bg-muted rounded-lg">
+                      <p className="text-3xl font-bold text-foreground">{risk.inherent_score}</p>
+                      <p className="text-sm text-muted-foreground">Inherent Score</p>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-4">
                     <div className="p-4 border rounded-lg">
-                      <p className="text-sm text-gray-500">Control Effectiveness</p>
+                      <p className="text-sm text-muted-foreground">Control Effectiveness</p>
                       <p className="font-medium capitalize">{risk.control_effectiveness}</p>
                     </div>
                     <div className="p-4 border rounded-lg">
-                      <p className="text-sm text-gray-500">Residual Score</p>
+                      <p className="text-sm text-muted-foreground">Residual Score</p>
                       <div className="flex items-center gap-2">
                         <span className={cn('w-3 h-3 rounded-full', getRiskColor(risk.residual_score))} />
                         <p className="font-medium">{risk.residual_score} ({getRiskLevel(risk.residual_score)})</p>
@@ -361,7 +361,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                   </div>
                   <div className="mt-4 p-4 border rounded-lg">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Appetite Threshold</span>
+                      <span className="text-sm text-muted-foreground">Appetite Threshold</span>
                       <span className="font-medium">{risk.appetite_threshold}</span>
                     </div>
                     <div className="mt-2">
@@ -371,7 +371,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                           <span className="text-sm">Within appetite</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-purple-600">
+                        <div className="flex items-center gap-2 text-primary">
                           <AlertTriangle className="w-4 h-4" />
                           <span className="text-sm">Above appetite - requires acceptance</span>
                         </div>
@@ -395,7 +395,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="font-medium">{treatment.action_description}</p>
-                              <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <User className="w-4 h-4" />
                                   {treatment.assigned_to?.name || 'Unassigned'}
@@ -410,7 +410,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                               treatment.status === 'complete' && 'bg-green-100 text-green-800',
                               treatment.status === 'in_progress' && 'bg-blue-100 text-blue-800',
                               treatment.status === 'overdue' && 'bg-red-100 text-red-800',
-                              treatment.status === 'planned' && 'bg-gray-100 text-gray-800',
+                              treatment.status === 'planned' && 'bg-muted text-foreground',
                             )}>
                               {treatment.status}
                             </Badge>
@@ -424,7 +424,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-sm">No treatment actions defined yet.</p>
+                    <p className="text-muted-foreground text-sm">No treatment actions defined yet.</p>
                   )}
                 </CardContent>
               </Card>
@@ -468,19 +468,19 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Risk Owner</p>
+                    <p className="text-sm text-muted-foreground">Risk Owner</p>
                     <p className="font-medium">{risk.risk_owner?.name || 'Not assigned'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Mitigation Strategy</p>
+                    <p className="text-sm text-muted-foreground">Mitigation Strategy</p>
                     <p className="font-medium capitalize">{risk.mitigation_strategy}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Review Frequency</p>
+                    <p className="text-sm text-muted-foreground">Review Frequency</p>
                     <p className="font-medium capitalize">{risk.review_frequency}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Next Review</p>
+                    <p className="text-sm text-muted-foreground">Next Review</p>
                     <p className="font-medium">{risk.next_review_date}</p>
                   </div>
                 </CardContent>
@@ -495,14 +495,14 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                   <CardContent>
                     <div className="space-y-3">
                       {risk.acceptances.map((acceptance) => (
-                        <div key={acceptance.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                          <p className="text-sm text-purple-800 font-medium capitalize">
+                        <div key={acceptance.id} className="p-3 bg-primary/10 border border-primary rounded-lg">
+                          <p className="text-sm text-primary font-medium capitalize">
                             {acceptance.acceptance_type.replace('_', ' ')}
                           </p>
-                          <p className="text-xs text-purple-600 mt-1">
+                          <p className="text-xs text-primary mt-1">
                             Accepted by {acceptance.accepted_by?.name}
                           </p>
-                          <p className="text-xs text-purple-600">
+                          <p className="text-xs text-primary">
                             Expires: {acceptance.expires_at}
                           </p>
                         </div>

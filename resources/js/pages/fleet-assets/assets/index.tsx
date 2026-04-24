@@ -88,9 +88,9 @@ function categoryColor(category: string): string {
         case 'equipment':
             return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300';
         case 'property':
-            return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+            return 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70';
         default:
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+            return 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground';
     }
 }
 
@@ -252,7 +252,7 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
                                     )}
                                     {asset.tracker_count != null && (
                                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                            <Wifi className={`h-3 w-3 ${asset.tracker_count > 0 ? 'text-green-500' : 'text-gray-400'}`} />
+                                            <Wifi className={`h-3 w-3 ${asset.tracker_count > 0 ? 'text-green-500' : 'text-muted-foreground'}`} />
                                             {asset.tracker_count > 0 ? `${asset.tracker_count} tracker(s)` : 'No trackers'}
                                         </span>
                                     )}

@@ -54,9 +54,9 @@ const severityConfig: Record<string, { bg: string; text: string; dot: string; bo
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
-    draft: { bg: 'bg-slate-100', text: 'text-slate-700', icon: FileEdit },
+    draft: { bg: 'bg-muted', text: 'text-foreground', icon: FileEdit },
     submitted: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
-    reviewed: { bg: 'bg-purple-100', text: 'text-purple-700', icon: CheckCircle2 },
+    reviewed: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
     closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
 };
 
@@ -132,7 +132,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                         </div>
                         <div>
                             <h1 className="text-lg font-semibold">Incidents for {name}</h1>
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-muted-foreground">
                                 {incidents.length} incident{incidents.length !== 1 ? 's' : ''} recorded
                             </div>
                         </div>
@@ -154,19 +154,19 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-lg border bg-white p-3">
                         <div className="text-2xl font-bold">{incidents.length}</div>
-                        <div className="text-xs text-slate-500">Total incidents</div>
+                        <div className="text-xs text-muted-foreground">Total incidents</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
-                        <div className="text-2xl font-bold text-slate-600">{draftCount}</div>
-                        <div className="text-xs text-slate-500">Drafts</div>
+                        <div className="text-2xl font-bold text-muted-foreground">{draftCount}</div>
+                        <div className="text-xs text-muted-foreground">Drafts</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
-                        <div className={`text-2xl font-bold ${highCount > 0 ? 'text-red-600' : 'text-slate-600'}`}>{highCount}</div>
-                        <div className="text-xs text-slate-500">High severity</div>
+                        <div className={`text-2xl font-bold ${highCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{highCount}</div>
+                        <div className="text-xs text-muted-foreground">High severity</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
                         <div className="text-2xl font-bold text-blue-600">{awaitingReview}</div>
-                        <div className="text-xs text-slate-500">Awaiting review</div>
+                        <div className="text-xs text-muted-foreground">Awaiting review</div>
                     </div>
                 </div>
 
@@ -174,7 +174,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                 {showNew && can.create && (
                     <Card>
                         <CardContent className="pt-5 space-y-5">
-                            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                                 <Plus className="h-4 w-4" />
                                 New incident (draft)
                             </div>
@@ -182,7 +182,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                             {/* Template */}
                             {templates.length > 0 && (
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs text-slate-500">Template (optional)</Label>
+                                    <Label className="text-xs text-muted-foreground">Template (optional)</Label>
                                     <Select
                                         value={form.data.template_id || '__none__'}
                                         onValueChange={(v) => applyTemplate(v === '__none__' ? '' : v)}
@@ -200,7 +200,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
 
                             {/* Type selection with icons */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-slate-500">Type</Label>
+                                <Label className="text-xs text-muted-foreground">Type</Label>
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                     {typeOptions.map((opt) => {
                                         const Icon = opt.icon;
@@ -213,7 +213,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all ${
                                                     selected
                                                         ? 'border-primary bg-primary/5 text-primary font-medium ring-1 ring-primary/20'
-                                                        : 'hover:bg-slate-50 text-slate-600'
+                                                        : 'hover:bg-muted text-muted-foreground'
                                                 }`}
                                             >
                                                 <Icon className="h-4 w-4 shrink-0" />
@@ -226,7 +226,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
 
                             {/* Severity buttons */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-slate-500">Severity</Label>
+                                <Label className="text-xs text-muted-foreground">Severity</Label>
                                 <div className="flex gap-2">
                                     {(['low', 'medium', 'high'] as const).map((s) => {
                                         const colors = severityConfig[s];
@@ -239,7 +239,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                                 className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm capitalize transition-all ${
                                                     selected
                                                         ? `${colors.bg} ${colors.text} font-medium ring-1 ring-current/20`
-                                                        : 'hover:bg-slate-50 text-slate-600'
+                                                        : 'hover:bg-muted text-muted-foreground'
                                                 }`}
                                             >
                                                 <span className={`h-2 w-2 rounded-full ${colors.dot}`} />
@@ -253,7 +253,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                             {/* Date and follow-up */}
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs text-slate-500">Occurred at</Label>
+                                    <Label className="text-xs text-muted-foreground">Occurred at</Label>
                                     <Input
                                         type="datetime-local"
                                         value={form.data.occurred_at}
@@ -271,7 +271,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
 
                             {/* Text fields */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-slate-500">Description</Label>
+                                <Label className="text-xs text-muted-foreground">Description</Label>
                                 <Textarea
                                     value={form.data.description}
                                     onChange={(e) => form.setData('description', e.target.value)}
@@ -279,7 +279,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-slate-500">Immediate action taken</Label>
+                                <Label className="text-xs text-muted-foreground">Immediate action taken</Label>
                                 <Textarea
                                     value={form.data.immediate_action_taken}
                                     onChange={(e) => form.setData('immediate_action_taken', e.target.value)}
@@ -287,7 +287,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-xs text-slate-500">Witnesses</Label>
+                                <Label className="text-xs text-muted-foreground">Witnesses</Label>
                                 <Textarea
                                     value={form.data.witnesses}
                                     onChange={(e) => form.setData('witnesses', e.target.value)}
@@ -358,22 +358,22 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                                     <Badge className="bg-red-100 text-red-700 border-0 text-[10px]">WorkSafe</Badge>
                                                 )}
                                                 {i.requires_followup && (
-                                                    <Badge className="bg-purple-100 text-purple-700 border-0 text-[10px]">Follow-up</Badge>
+                                                    <Badge className="bg-primary/10 text-primary border-0 text-[10px]">Follow-up</Badge>
                                                 )}
                                             </div>
                                             {preview && (
-                                                <p className="mt-1 text-sm text-slate-600 line-clamp-1">{preview}</p>
+                                                <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{preview}</p>
                                             )}
-                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                                 {i.occurred_at && (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
                                                         {formatDateTime(i.occurred_at)}
                                                     </span>
                                                 )}
-                                                <span className="text-slate-400">{i.shift_id ? 'Shift-linked' : 'Standalone'}</span>
+                                                <span className="text-muted-foreground">{i.shift_id ? 'Shift-linked' : 'Standalone'}</span>
                                                 {i.reported_by?.name && (
-                                                    <span className="text-slate-400">by {i.reported_by.name}</span>
+                                                    <span className="text-muted-foreground">by {i.reported_by.name}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -384,7 +384,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                 <div className="absolute right-2 top-2.5 z-10" onClick={(e) => e.stopPropagation()}>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                                            <button className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors">
                                                 <MoreVertical className="h-4 w-4" />
                                             </button>
                                         </DropdownMenuTrigger>
@@ -418,8 +418,8 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                     {!incidents.length && (
                         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
                             <ShieldAlert className="h-10 w-10 text-slate-300" />
-                            <div className="mt-2 text-sm font-medium text-slate-500">No incidents recorded</div>
-                            <div className="text-xs text-slate-400">
+                            <div className="mt-2 text-sm font-medium text-muted-foreground">No incidents recorded</div>
+                            <div className="text-xs text-muted-foreground">
                                 {can.create ? 'Create your first incident above' : 'No incidents have been logged for this client'}
                             </div>
                         </div>

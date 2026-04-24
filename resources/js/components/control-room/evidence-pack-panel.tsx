@@ -85,13 +85,13 @@ function typeIcon(type: string) {
         case 'document':
             return <FileText className="h-4 w-4 text-amber-500" />;
         case 'cctv_bookmark':
-            return <Video className="h-4 w-4 text-purple-500" />;
+            return <Video className="h-4 w-4 text-primary" />;
         case 'note':
             return <StickyNote className="h-4 w-4 text-green-500" />;
         case 'audio':
             return <Mic className="h-4 w-4 text-rose-500" />;
         case 'door_log':
-            return <FileCode className="h-4 w-4 text-slate-500" />;
+            return <FileCode className="h-4 w-4 text-muted-foreground" />;
         default:
             return <FileText className="h-4 w-4 text-muted-foreground" />;
     }

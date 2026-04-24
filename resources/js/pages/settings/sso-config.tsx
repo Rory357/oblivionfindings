@@ -234,7 +234,7 @@ function MicrosoftTab({ config }: { config: Props['sso_config'] }) {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
-                        <Info className="h-4 w-4 text-violet-600" />
+                        <Info className="h-4 w-4 text-primary" />
                         Required API Permissions
                     </CardTitle>
                 </CardHeader>
@@ -252,7 +252,7 @@ function MicrosoftTab({ config }: { config: Props['sso_config'] }) {
             </Card>
 
             <div className="flex justify-end">
-                <Button className="bg-violet-600 hover:bg-violet-700">
+                <Button className="bg-primary hover:bg-primary">
                     Save Microsoft Settings
                 </Button>
             </div>
@@ -359,7 +359,7 @@ function GoogleTab({ config }: { config: Props['sso_config'] }) {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
-                        <Info className="h-4 w-4 text-violet-600" />
+                        <Info className="h-4 w-4 text-primary" />
                         Required OAuth Scopes
                     </CardTitle>
                 </CardHeader>
@@ -378,7 +378,7 @@ function GoogleTab({ config }: { config: Props['sso_config'] }) {
             </Card>
 
             <div className="flex justify-end">
-                <Button className="bg-violet-600 hover:bg-violet-700">
+                <Button className="bg-primary hover:bg-primary">
                     Save Google Settings
                 </Button>
             </div>
@@ -402,7 +402,7 @@ function ProvisioningTab({ config, roles = [] }: { config: Props['sso_config']; 
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5 text-violet-600" />
+                        <Users className="h-5 w-5 text-primary" />
                         User Provisioning
                     </CardTitle>
                     <CardDescription>
@@ -485,7 +485,7 @@ function ProvisioningTab({ config, roles = [] }: { config: Props['sso_config']; 
             </Card>
 
             <div className="flex justify-end">
-                <Button className="bg-violet-600 hover:bg-violet-700">
+                <Button className="bg-primary hover:bg-primary">
                     Save Provisioning Settings
                 </Button>
             </div>
@@ -583,7 +583,7 @@ function GroupMappingTab({
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-2">
-                                <ShieldCheck className="h-5 w-5 text-violet-600" />
+                                <ShieldCheck className="h-5 w-5 text-primary" />
                                 SSO Group Mapping
                             </CardTitle>
                             <CardDescription>
@@ -606,7 +606,7 @@ function GroupMappingTab({
                             </Button>
                             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                                 <DialogTrigger asChild>
-                                    <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
+                                    <Button size="sm" className="bg-primary hover:bg-primary">
                                         <Plus className="mr-1 h-4 w-4" />
                                         Add Mapping
                                     </Button>
@@ -690,7 +690,7 @@ function GroupMappingTab({
                                             <Button
                                                 type="submit"
                                                 disabled={form.processing}
-                                                className="bg-violet-600 hover:bg-violet-700"
+                                                className="bg-primary hover:bg-primary"
                                             >
                                                 Create Mapping
                                             </Button>
@@ -812,7 +812,7 @@ function UrlsSetupTab() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <ExternalLink className="h-5 w-5 text-violet-600" />
+                        <ExternalLink className="h-5 w-5 text-primary" />
                         Redirect URLs
                     </CardTitle>
                     <CardDescription>
@@ -850,7 +850,7 @@ function UrlsSetupTab() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Info className="h-5 w-5 text-violet-600" />
+                        <Info className="h-5 w-5 text-primary" />
                         Setup Guide
                     </CardTitle>
                 </CardHeader>

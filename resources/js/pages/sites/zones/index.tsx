@@ -98,7 +98,7 @@ export default function SiteZones({ site, zones }: Props) {
                             <LayoutGrid className="w-5 h-5" />
                             Areas & Zones
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <Button onClick={() => setShowForm(true)}>
                         <Plus className="w-4 h-4 mr-1" />
@@ -111,13 +111,13 @@ export default function SiteZones({ site, zones }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{zones.length}</div>
-                            <div className="text-sm text-slate-400">Total Zones</div>
+                            <div className="text-sm text-muted-foreground">Total Zones</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{activeZones.length}</div>
-                            <div className="text-sm text-slate-400">Active</div>
+                            <div className="text-sm text-muted-foreground">Active</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -174,7 +174,7 @@ export default function SiteZones({ site, zones }: Props) {
                     </CardHeader>
                     <CardContent>
                         {activeZones.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <LayoutGrid className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No zones configured yet</p>
                             </div>
@@ -193,7 +193,7 @@ export default function SiteZones({ site, zones }: Props) {
                                                         </Badge>
                                                     )}
                                                     {zone.description && (
-                                                        <div className="text-sm text-slate-400 mt-2">{zone.description}</div>
+                                                        <div className="text-sm text-muted-foreground mt-2">{zone.description}</div>
                                                     )}
                                                 </div>
                                                 <div className="flex gap-1 ml-2">

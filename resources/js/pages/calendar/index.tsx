@@ -121,7 +121,7 @@ function eventTone(
     hasActiveReplacement?: boolean,
 ) {
     if (status === 'cancelled')
-        return 'border-slate-300 bg-slate-100 text-slate-700';
+        return 'border-border bg-muted text-foreground';
     if (status === 'completed')
         return 'border-emerald-200 bg-emerald-50 text-emerald-800';
     if (hasActiveReplacement)

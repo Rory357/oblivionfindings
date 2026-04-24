@@ -279,14 +279,14 @@ export default function Api() {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Key className="h-5 w-5 text-violet-600" />
+                                    <Key className="h-5 w-5 text-primary" />
                                     <div>
                                         <CardTitle>API Keys</CardTitle>
                                         <CardDescription>Generate API keys for external integrations.</CardDescription>
                                     </div>
                                 </div>
                                 {can.manage && (
-                                    <Button dusk="api-generate-open" onClick={() => setShowGenerateKey(true)} className="bg-violet-600 hover:bg-violet-700">
+                                    <Button dusk="api-generate-open" onClick={() => setShowGenerateKey(true)} className="bg-primary hover:bg-primary">
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Generate New Key
                                     </Button>
@@ -351,7 +351,7 @@ export default function Api() {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Webhook className="h-5 w-5 text-violet-600" />
+                                    <Webhook className="h-5 w-5 text-primary" />
                                     <div>
                                         <CardTitle>Webhooks</CardTitle>
                                         <CardDescription>Configure webhook endpoints to receive event notifications.</CardDescription>
@@ -439,7 +439,7 @@ export default function Api() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-2">
-                                <Activity className="h-5 w-5 text-violet-600" />
+                                <Activity className="h-5 w-5 text-primary" />
                                 <div>
                                     <CardTitle>Usage</CardTitle>
                                     <CardDescription>Current API key and webhook totals.</CardDescription>
@@ -449,19 +449,19 @@ export default function Api() {
                         <CardContent>
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-violet-600">{usage.activeKeys}</p>
+                                    <p className="text-2xl font-bold text-primary">{usage.activeKeys}</p>
                                     <p className="text-xs text-muted-foreground">Active Keys</p>
                                 </div>
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-violet-600">{usage.revokedKeys}</p>
+                                    <p className="text-2xl font-bold text-primary">{usage.revokedKeys}</p>
                                     <p className="text-xs text-muted-foreground">Revoked Keys</p>
                                 </div>
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-violet-600">{usage.activeWebhooks}</p>
+                                    <p className="text-2xl font-bold text-primary">{usage.activeWebhooks}</p>
                                     <p className="text-xs text-muted-foreground">Active Webhooks</p>
                                 </div>
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-violet-600">{usage.successfulTests}</p>
+                                    <p className="text-2xl font-bold text-primary">{usage.successfulTests}</p>
                                     <p className="text-xs text-muted-foreground">Successful Tests</p>
                                 </div>
                             </div>
@@ -511,7 +511,7 @@ export default function Api() {
                                         dusk="api-key-generate"
                                         onClick={handleGenerateKey}
                                         disabled={!newKeyName || newKeyScopes.length === 0 || creatingKey}
-                                        className="bg-violet-600 hover:bg-violet-700"
+                                        className="bg-primary hover:bg-primary"
                                     >
                                         Generate Key
                                     </Button>
@@ -584,7 +584,7 @@ export default function Api() {
                                         dusk="api-webhook-add"
                                         onClick={handleAddWebhook}
                                         disabled={!webhookUrl || webhookEvents.length === 0 || creatingWebhook}
-                                        className="bg-violet-600 hover:bg-violet-700"
+                                        className="bg-primary hover:bg-primary"
                                     >
                                         Add Webhook
                                     </Button>

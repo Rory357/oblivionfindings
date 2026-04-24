@@ -146,12 +146,12 @@ export default function HandoverIndex({ handovers: rawHandovers, vehicles, filte
                     <FleetStatCard label="PENDING" value={pendingCount} icon={Clock} color="amber" valueClassName="text-yellow-400" subtitle="Awaiting acceptance" />
                     <FleetStatCard label="ACCEPTED" value={acceptedCount} icon={Check} color="amber" valueClassName="text-green-400" subtitle="Completed handovers" />
                     <FleetStatCard label="DISPUTED" value={disputedCount} icon={XCircle} color="red" valueClassName="text-red-400" subtitle="Requires review" />
-                    <Card className="border bg-purple-50 dark:bg-purple-950/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <Card className="border bg-primary/10 dark:bg-primary/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
                         <CardContent className="flex items-center gap-6 p-4">
                             <ProgressRing value={acceptanceRate} size={80} color={FLEET_COLORS.success} label="Acceptance Rate" />
                             <div>
                                 <p className="text-sm font-medium">Handover Acceptance Rate</p>
-                                <p className="text-xs text-slate-400 mt-1">{acceptedCount} of {totalCount} handovers accepted</p>
+                                <p className="text-xs text-muted-foreground mt-1">{acceptedCount} of {totalCount} handovers accepted</p>
                             </div>
                         </CardContent>
                     </Card>

@@ -73,14 +73,14 @@ function KpiCard({
     const inner = (
         <Card className="hover:shadow-sm transition-shadow">
             <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                     {title}
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
                 <div className="text-3xl font-semibold">{value}</div>
                 {hint ? (
-                    <div className="text-xs text-slate-500">{hint}</div>
+                    <div className="text-xs text-muted-foreground">{hint}</div>
                 ) : null}
             </CardContent>
         </Card>
@@ -232,18 +232,18 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* Recent Alerts */}
                             <div>
-                                <h4 className="text-sm font-medium text-slate-600 mb-2">Recent Alerts</h4>
+                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Recent Alerts</h4>
                                 {controlRoom.recentAlerts.length > 0 ? (
                                     <div className="space-y-2">
                                         {controlRoom.recentAlerts.map((alert) => (
                                             <Link
                                                 key={alert.id}
                                                 href={`/control-room/alerts/${alert.id}`}
-                                                className="flex items-center justify-between p-2 rounded border hover:bg-slate-50 transition-colors"
+                                                className="flex items-center justify-between p-2 rounded border hover:bg-muted transition-colors"
                                             >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-sm font-medium truncate">{alert.alert_type}</div>
-                                                    <div className="text-xs text-slate-500">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {alert.source} &middot; {formatRelativeTime(alert.triggered_at)}
                                                     </div>
                                                 </div>
@@ -254,13 +254,13 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-slate-500 text-center py-4">No open alerts</p>
+                                    <p className="text-sm text-muted-foreground text-center py-4">No open alerts</p>
                                 )}
                             </div>
 
                             {/* Alert Trend */}
                             <div>
-                                <h4 className="text-sm font-medium text-slate-600 mb-2">Alert Trend (14 days)</h4>
+                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Alert Trend (14 days)</h4>
                                 <div style={{ height: 140 }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <AreaChart data={controlRoom.alertTrend}>
@@ -282,7 +282,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                     <Card className="lg:col-span-1">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-600">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
                                 Incidents by severity (30 days)
                             </CardTitle>
                         </CardHeader>
@@ -301,7 +301,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
 
                     <Card className="lg:col-span-2">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-600">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
                                 MAR outcomes trend (14 days)
                             </CardTitle>
                         </CardHeader>
@@ -324,7 +324,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
 
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-600">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
                             Controlled drug discrepancies trend (30 days)
                         </CardTitle>
                     </CardHeader>

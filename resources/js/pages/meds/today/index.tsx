@@ -152,7 +152,7 @@ function MedRow({ med }: { med: MedDue }) {
             ? { label: 'Overdue', className: 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100' }
             : med.status === 'due'
                 ? { label: 'Due', className: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100' }
-                : { label: 'Later', className: 'border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200' };
+                : { label: 'Later', className: 'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground' };
 
     return (
         <li className="flex items-center justify-between gap-3 py-2.5">
@@ -167,7 +167,7 @@ function MedRow({ med }: { med: MedDue }) {
                     {med.is_controlled && (
                         <Badge
                             variant="outline"
-                            className="shrink-0 border-purple-300 text-[10px] uppercase tracking-wide text-purple-700 dark:border-purple-800 dark:text-purple-300"
+                            className="shrink-0 border-primary text-[10px] uppercase tracking-wide text-primary dark:border-primary/30 dark:text-primary/70"
                         >
                             CD
                         </Badge>

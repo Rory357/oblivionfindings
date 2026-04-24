@@ -47,7 +47,7 @@ export default function CreateDataBreach({ staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Report Data Breach</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             GDPR Article 33 - ICO notification required within 72 hours
                         </div>
                     </div>

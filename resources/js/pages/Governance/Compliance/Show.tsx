@@ -98,7 +98,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
       case 'due_soon':
         return 'bg-yellow-100 text-yellow-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -168,8 +168,8 @@ export default function ComplianceShow({ auth, obligation }: Props) {
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <FileText className="w-8 h-8 text-purple-500" />
-                <h1 className="text-2xl font-bold text-gray-900">{obligation.obligation_title}</h1>
+                <FileText className="w-8 h-8 text-primary" />
+                <h1 className="text-2xl font-bold text-foreground">{obligation.obligation_title}</h1>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{getFrameworkLabel(obligation.framework)}</Badge>
@@ -259,11 +259,11 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                   <CardTitle>Description</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 whitespace-pre-wrap">{obligation.description}</p>
+                  <p className="text-foreground whitespace-pre-wrap">{obligation.description}</p>
                   {obligation.notes && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm font-medium text-gray-700">Notes</p>
-                      <p className="text-sm text-gray-600">{obligation.notes}</p>
+                    <div className="mt-4 p-4 bg-muted rounded-lg">
+                      <p className="text-sm font-medium text-foreground">Notes</p>
+                      <p className="text-sm text-muted-foreground">{obligation.notes}</p>
                     </div>
                   )}
                 </CardContent>
@@ -286,7 +286,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                             <FileCheck className="w-6 h-6 text-green-500" />
                             <div>
                               <p className="font-medium">{ev.title}</p>
-                              <div className="flex items-center gap-3 text-sm text-gray-500">
+                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
                                 <Badge variant="outline" className="text-xs capitalize">{ev.evidence_type}</Badge>
                                 <span>by {ev.uploaded_by?.name}</span>
                                 <span>{ev.uploaded_at}</span>
@@ -300,7 +300,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-muted-foreground">
                       <Upload className="w-12 h-12 mx-auto mb-2 opacity-50" />
                       <p>No evidence uploaded yet</p>
                     </div>
@@ -319,12 +319,12 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                       {reminderItems.map((reminder) => (
                         <div key={reminder.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-gray-400" />
+                            <Clock className="w-4 h-4 text-muted-foreground" />
                             <span className="text-sm">{reminder.days_before_due} days before due</span>
                           </div>
                           <Badge className={cn(
                             reminder.status === 'sent' && 'bg-green-100 text-green-800',
-                            reminder.status === 'pending' && 'bg-gray-100 text-gray-800',
+                            reminder.status === 'pending' && 'bg-muted text-foreground',
                           )}>
                             {reminder.status}
                           </Badge>
@@ -370,12 +370,12 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                         {daysRemaining() < 0 ? (
                           <span className="text-red-600">{Math.abs(daysRemaining())} days overdue</span>
                         ) : (
-                          <span className={daysRemaining() <= 7 ? 'text-yellow-600' : 'text-gray-900'}>
+                          <span className={daysRemaining() <= 7 ? 'text-yellow-600' : 'text-foreground'}>
                             {daysRemaining()} days remaining
                           </span>
                         )}
                       </p>
-                      <p className="text-sm text-gray-500 mt-1">Due: {obligation.due_date}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Due: {obligation.due_date}</p>
                     </div>
                   )}
                 </CardContent>
@@ -388,24 +388,24 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500">Owner</p>
+                    <p className="text-sm text-muted-foreground">Owner</p>
                     <p className="font-medium flex items-center gap-2">
                       <User className="w-4 h-4" />
                       {obligation.owner?.name || 'Not assigned'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Frequency</p>
+                    <p className="text-sm text-muted-foreground">Frequency</p>
                     <p className="font-medium capitalize">{obligation.frequency}</p>
                   </div>
                   {obligation.next_due_date && (
                     <div>
-                      <p className="text-sm text-gray-500">Next Due Date</p>
+                      <p className="text-sm text-muted-foreground">Next Due Date</p>
                       <p className="font-medium">{obligation.next_due_date}</p>
                     </div>
                   )}
                   <div>
-                    <p className="text-sm text-gray-500">Evidence</p>
+                    <p className="text-sm text-muted-foreground">Evidence</p>
                     <p className="font-medium">
                       {obligation.evidence_provided ? (
                         <span className="text-green-600 flex items-center gap-1">
@@ -415,13 +415,13 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                       ) : obligation.evidence_required ? (
                         <span className="text-red-600">Required - Not provided</span>
                       ) : (
-                        <span className="text-gray-500">Not required</span>
+                        <span className="text-muted-foreground">Not required</span>
                       )}
                     </p>
                   </div>
                   {obligation.sign_off_required && (
                     <div>
-                      <p className="text-sm text-gray-500">Sign-off</p>
+                      <p className="text-sm text-muted-foreground">Sign-off</p>
                       {obligation.signed_off_at ? (
                         <p className="text-green-600 text-sm">
                           Signed by {obligation.signed_off_by?.name} on {obligation.signed_off_at}

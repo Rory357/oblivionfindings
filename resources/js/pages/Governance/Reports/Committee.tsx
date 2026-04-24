@@ -49,20 +49,20 @@ const statusStyles: Record<string, string> = {
   good: 'bg-green-100 text-green-800 border-green-200',
   warning: 'bg-amber-100 text-amber-800 border-amber-200',
   critical: 'bg-red-100 text-red-800 border-red-200',
-  unknown: 'bg-slate-100 text-slate-800 border-slate-200',
+  unknown: 'bg-muted text-foreground border-border',
 };
 
 const toneStyles: Record<string, string> = {
-  default: 'text-slate-900',
+  default: 'text-foreground',
   warning: 'text-amber-700',
   critical: 'text-red-700',
-  muted: 'text-slate-500',
+  muted: 'text-muted-foreground',
 };
 
 const severityStyle = (score: number) => {
   if (score >= 20) return 'bg-red-600 text-white';
   if (score >= 15) return 'bg-orange-500 text-white';
-  if (score >= 10) return 'bg-amber-400 text-slate-950';
+  if (score >= 10) return 'bg-amber-400 text-foreground';
 
   return 'bg-green-500 text-white';
 };
@@ -81,15 +81,15 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6 space-y-2">
-          <h1 className="text-3xl font-bold text-slate-900">{report.committee.name} Report</h1>
-          <p className="text-sm text-slate-600">{report.committee.description || 'Committee-level assurance, delivery, and decision support.'}</p>
+          <h1 className="text-3xl font-bold text-foreground">{report.committee.name} Report</h1>
+          <p className="text-sm text-muted-foreground">{report.committee.description || 'Committee-level assurance, delivery, and decision support.'}</p>
         </div>
 
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {report.headline.map((metric) => (
             <Card key={metric.label}>
               <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">{metric.label}</p>
+                <p className="text-sm text-muted-foreground">{metric.label}</p>
                 <p className={cn('mt-2 text-3xl font-bold', toneStyles[metric.tone] ?? toneStyles.default)}>{metric.value}</p>
               </CardContent>
             </Card>
@@ -99,7 +99,7 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
         <div className="space-y-8">
           {report.sections.map((section) => (
             <section key={section.key} className="space-y-4">
-              <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
+              <h2 className="text-xl font-semibold text-foreground">{section.title}</h2>
               <div className="grid gap-4 lg:grid-cols-2">
                 {section.cards.map((card) => (
                   <Card key={card.key}>
@@ -115,8 +115,8 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-3">
                         {card.metrics.map((metric) => (
-                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-slate-50 p-3">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">{metric.label}</p>
+                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-muted p-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">{metric.label}</p>
                             <p className={cn('mt-1 text-lg font-semibold', toneStyles[metric.tone] ?? toneStyles.default)}>{metric.value}</p>
                           </div>
                         ))}
@@ -124,7 +124,7 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
                       {card.highlights.length > 0 && (
                         <div className="space-y-2">
                           {card.highlights.slice(0, 3).map((highlight) => (
-                            <p key={highlight} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                            <p key={highlight} className="rounded-lg border border-border px-3 py-2 text-sm text-foreground">
                               {highlight}
                             </p>
                           ))}
@@ -146,14 +146,14 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
           <CardContent className="space-y-3">
             {report.risks.length ? (
               report.risks.map((risk) => (
-                <div key={risk.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div key={risk.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-slate-900">{risk.title}</p>
+                      <p className="font-medium text-foreground">{risk.title}</p>
                       <Badge variant="outline">{risk.reference}</Badge>
                       <Badge variant="outline">{risk.category}</Badge>
                     </div>
-                    {risk.owner && <p className="text-sm text-slate-600">Owner: {risk.owner}</p>}
+                    {risk.owner && <p className="text-sm text-muted-foreground">Owner: {risk.owner}</p>}
                   </div>
                   <div className="flex items-center gap-3">
                     {!risk.within_appetite && (
@@ -164,12 +164,12 @@ export default function CommitteeReport({ auth, report, generatedAt }: Props) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-500">No risks are currently assigned to this committee.</p>
+              <p className="text-sm text-muted-foreground">No risks are currently assigned to this committee.</p>
             )}
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-right text-sm text-slate-400">
+        <p className="mt-6 text-right text-sm text-muted-foreground">
           Generated {new Date(generatedAt).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
         </p>
       </div>

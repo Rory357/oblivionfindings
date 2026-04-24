@@ -173,7 +173,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                             <CalendarIcon className="w-5 h-5" />
                             Site Calendar
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={prevMonth}>
@@ -197,7 +197,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                         {/* Calendar Grid */}
                         <div className="grid grid-cols-7 gap-1">
                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                <div key={day} className="text-center text-sm font-medium text-slate-400 py-2">
+                                <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
                                     {day}
                                 </div>
                             ))}
@@ -215,10 +215,10 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                     <div
                                         key={day}
                                         className={`min-h-[100px] border rounded-lg p-2 ${
-                                            isToday ? 'bg-indigo-500/10 border-indigo-500/30' : 'border'
+                                            isToday ? 'bg-primary/10 border-primary/30' : 'border'
                                         }`}
                                     >
-                                        <div className={`text-sm font-medium mb-1 ${isToday ? 'text-indigo-400' : ''}`}>
+                                        <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : ''}`}>
                                             {day}
                                         </div>
                                         <div className="space-y-1">
@@ -227,7 +227,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                                     key={event.id}
                                                     className={`text-xs p-1 rounded truncate ${
                                                         event.event_type === 'maintenance' ? 'bg-amber-500/20 text-amber-300' :
-                                                        event.event_type === 'inspection' ? 'bg-purple-500/20 text-purple-300' :
+                                                        event.event_type === 'inspection' ? 'bg-primary/20 text-primary/70' :
                                                         event.event_type === 'site_visit' ? 'bg-emerald-500/20 text-emerald-300' :
                                                         'bg-slate-700 text-slate-300'
                                                     }`}
@@ -236,7 +236,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                                 </div>
                                             ))}
                                             {dayEvents.length > 3 && (
-                                                <div className="text-xs text-slate-500">+{dayEvents.length - 3} more</div>
+                                                <div className="text-xs text-muted-foreground">+{dayEvents.length - 3} more</div>
                                             )}
                                         </div>
                                     </div>
@@ -250,24 +250,24 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                 <div className="flex flex-wrap gap-3 text-sm">
                     <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-amber-500/30" />
-                        <span className="text-slate-400">Maintenance</span>
+                        <span className="text-muted-foreground">Maintenance</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-purple-500/30" />
-                        <span className="text-slate-400">Inspection</span>
+                        <div className="w-3 h-3 rounded bg-primary/30" />
+                        <span className="text-muted-foreground">Inspection</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-emerald-500/30" />
-                        <span className="text-slate-400">Site Visit</span>
+                        <span className="text-muted-foreground">Site Visit</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded bg-blue-500/30" />
-                        <span className="text-slate-400">Contractor</span>
+                        <span className="text-muted-foreground">Contractor</span>
                     </div>
                 </div>
 
                 {loading && (
-                    <div className="text-center py-4 text-slate-400">
+                    <div className="text-center py-4 text-muted-foreground">
                         Loading events...
                     </div>
                 )}

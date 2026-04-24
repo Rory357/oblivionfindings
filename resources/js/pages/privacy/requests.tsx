@@ -58,7 +58,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
             case 'overdue':
                 return 'bg-orange-100 text-orange-800 border-orange-200';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -127,7 +127,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by reference or requester name"
                                 value={filters.q || ''}
@@ -136,7 +136,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Request Type</Label>
+                            <Label className="text-xs text-muted-foreground">Request Type</Label>
                             <Select
                                 value={filters.request_type ?? ANY}
                                 onValueChange={(v) => onFilter({ request_type: v === ANY ? null : v })}
@@ -156,7 +156,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -218,12 +218,12 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                                         </Badge>
                                                     )}
                                                     {request.extension_requested && (
-                                                        <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+                                                        <Badge variant="outline" className="border-primary bg-primary/10 text-primary">
                                                             Extended Deadline
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <div className="mt-2 text-xs text-slate-500">
+                                                <div className="mt-2 text-xs text-muted-foreground">
                                                     Requester: {request.subject_name}
                                                     {request.received_at && ` • Received: ${new Date(request.received_at).toLocaleDateString()}`}
                                                     {request.due_date && ` • Due: ${new Date(request.extended_due_date || request.due_date).toLocaleDateString()}`}
@@ -240,7 +240,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                         );
                     })}
                     {!requests.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No data subject requests found.
                         </div>
                     )}

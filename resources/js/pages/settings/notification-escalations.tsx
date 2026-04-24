@@ -103,7 +103,7 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
         icon: Bell,
         label: 'Sent',
         sublabel: 'Notification delivered',
-        colour: 'text-violet-600 bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+        colour: 'text-primary bg-primary/10 dark:bg-primary/30 dark:text-primary border-primary dark:border-primary/30',
     });
 
     if (rule.require_ack) {
@@ -172,7 +172,7 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Layers className="h-4 w-4 text-violet-500" />
+                    <Layers className="h-4 w-4 text-primary" />
                     Escalation Flow
                 </h4>
                 {totalWindow > 0 && (
@@ -191,7 +191,7 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                                 {i > 0 && (
                                     <div className="flex items-center px-0.5">
                                         <div className="h-px w-3 bg-gradient-to-r from-violet-300 to-violet-500 dark:from-violet-700 dark:to-violet-500 sm:w-6" />
-                                        <ArrowRight className="h-3 w-3 text-violet-400" />
+                                        <ArrowRight className="h-3 w-3 text-primary" />
                                         <div className="h-px w-3 bg-gradient-to-r from-violet-500 to-violet-300 dark:from-violet-500 dark:to-violet-700 sm:w-6" />
                                     </div>
                                 )}
@@ -252,10 +252,10 @@ function TierEditor({
     };
 
     return (
-        <div className="relative rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/30 p-4 dark:border-violet-800 dark:bg-violet-950/20">
+        <div className="relative rounded-xl border-2 border-dashed border-primary bg-primary/10/30 p-4 dark:border-primary/30 dark:bg-primary/20">
             <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
                         {index + 1}
                     </div>
                     <span className="text-sm font-semibold text-foreground">Tier {index + 1}</span>
@@ -296,8 +296,8 @@ function TierEditor({
                                     onClick={() => toggleTierGroup(gKey, !isSelected)}
                                     className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-all ${
                                         isSelected
-                                            ? 'border-violet-300 bg-violet-100 text-violet-800 shadow-sm dark:border-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
-                                            : 'border-border bg-background text-muted-foreground hover:border-violet-200 hover:bg-violet-50 dark:hover:border-violet-800 dark:hover:bg-violet-950/30'
+                                            ? 'border-primary bg-primary/10 text-primary shadow-sm dark:border-primary dark:bg-primary/40 dark:text-primary/70'
+                                            : 'border-border bg-background text-muted-foreground hover:border-primary hover:bg-primary/10 dark:hover:border-primary/30 dark:hover:bg-primary/30'
                                     }`}
                                 >
                                     {isSelected && <CheckCircle2 className="mr-1 h-3 w-3" />}
@@ -451,8 +451,8 @@ export default function NotificationEscalations({
                     {/* ── Header ── */}
                     <div>
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
-                                <Shield className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/30">
+                                <Shield className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold tracking-tight text-foreground">Escalation Rules</h1>
@@ -466,13 +466,13 @@ export default function NotificationEscalations({
 
                     {/* ── Stats Row ── */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Card className="border-indigo-200 dark:border-indigo-800">
+                        <Card className="border-primary dark:border-primary/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                                    <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                    <Shield className="h-4 w-4 text-primary dark:text-primary" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{stats.total}</p>
+                                    <p className="text-xl font-bold text-primary dark:text-primary">{stats.total}</p>
                                     <p className="text-xs text-muted-foreground">Total Rules</p>
                                 </div>
                             </CardContent>
@@ -554,7 +554,7 @@ export default function NotificationEscalations({
                                     onClick={() => setFilterMode(fb.mode)}
                                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                         filterMode === fb.mode
-                                            ? 'bg-violet-600 text-white shadow-sm'
+                                            ? 'bg-primary text-white shadow-sm'
                                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                     }`}
                                 >
@@ -570,7 +570,7 @@ export default function NotificationEscalations({
                                 onClick={() => setSortMode('default')}
                                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                     sortMode === 'default'
-                                        ? 'bg-violet-600 text-white shadow-sm'
+                                        ? 'bg-primary text-white shadow-sm'
                                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                 }`}
                             >
@@ -581,7 +581,7 @@ export default function NotificationEscalations({
                                 onClick={() => setSortMode('urgent')}
                                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                     sortMode === 'urgent'
-                                        ? 'bg-violet-600 text-white shadow-sm'
+                                        ? 'bg-primary text-white shadow-sm'
                                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                 }`}
                             >
@@ -611,7 +611,7 @@ export default function NotificationEscalations({
                                 className={`transition-all duration-200 ${
                                     !isEnabled
                                         ? 'opacity-50 grayscale-[30%]'
-                                        : 'border-violet-100 shadow-sm dark:border-violet-900/40'
+                                        : 'border-primary/30 shadow-sm dark:border-primary/30/40'
                                 }`}
                             >
                                 {/* ── Card Header ── */}
@@ -620,12 +620,12 @@ export default function NotificationEscalations({
                                         <div className="flex items-start gap-3">
                                             <div className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${
                                                 isEnabled
-                                                    ? 'bg-violet-100 dark:bg-violet-900/30'
+                                                    ? 'bg-primary/10 dark:bg-primary/30'
                                                     : 'bg-muted'
                                             }`}>
                                                 <AlertTriangle className={`h-5 w-5 ${
                                                     isEnabled
-                                                        ? 'text-violet-600 dark:text-violet-400'
+                                                        ? 'text-primary dark:text-primary'
                                                         : 'text-muted-foreground'
                                                 }`} />
                                             </div>
@@ -669,7 +669,7 @@ export default function NotificationEscalations({
                                                     type="button"
                                                     className="flex w-full items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50"
                                                 >
-                                                    <Timer className="h-4 w-4 text-violet-500" />
+                                                    <Timer className="h-4 w-4 text-primary" />
                                                     Timing & Delivery
                                                     <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${isTimingOpen ? 'rotate-180' : ''}`} />
                                                 </button>
@@ -822,7 +822,7 @@ export default function NotificationEscalations({
                                                     type="button"
                                                     className="flex w-full items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50"
                                                 >
-                                                    <TrendingUp className="h-4 w-4 text-violet-500" />
+                                                    <TrendingUp className="h-4 w-4 text-primary" />
                                                     Escalation Targets
                                                     {(r.escalate_to_role_groups?.length > 0 || tiers.length > 0) && (
                                                         <Badge variant="secondary" className="ml-1 text-[10px]">
@@ -850,8 +850,8 @@ export default function NotificationEscalations({
                                                                         onClick={() => toggleGroup(k, gKey, !isSelected)}
                                                                         className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                                                                             isSelected
-                                                                                ? 'border-violet-300 bg-violet-100 text-violet-800 shadow-sm dark:border-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
-                                                                                : 'border-border bg-background text-muted-foreground hover:border-violet-200 hover:bg-violet-50 dark:hover:border-violet-800 dark:hover:bg-violet-950/30'
+                                                                                ? 'border-primary bg-primary/10 text-primary shadow-sm dark:border-primary dark:bg-primary/40 dark:text-primary/70'
+                                                                                : 'border-border bg-background text-muted-foreground hover:border-primary hover:bg-primary/10 dark:hover:border-primary/30 dark:hover:bg-primary/30'
                                                                         }`}
                                                                     >
                                                                         {isSelected && <CheckCircle2 className="mr-1.5 h-3 w-3" />}
@@ -876,7 +876,7 @@ export default function NotificationEscalations({
                                                                 variant="outline"
                                                                 size="sm"
                                                                 onClick={() => addTier(k)}
-                                                                className="gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/30"
+                                                                className="gap-1.5 border-primary text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary/70 dark:hover:bg-primary/30"
                                                             >
                                                                 <Plus className="h-3.5 w-3.5" />
                                                                 Add Escalation Tier
@@ -952,7 +952,7 @@ export default function NotificationEscalations({
                             <Button
                                 type="submit"
                                 disabled={form.processing}
-                                className="gap-2 bg-violet-600 px-6 hover:bg-violet-700"
+                                className="gap-2 bg-primary px-6 hover:bg-primary"
                             >
                                 <Shield className="h-4 w-4" />
                                 {form.processing ? 'Saving...' : 'Save Escalation Rules'}

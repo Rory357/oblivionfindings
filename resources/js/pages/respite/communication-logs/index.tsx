@@ -37,7 +37,7 @@ export default function CommunicationLogsIndex({ logs, filters, channels }: Prop
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Communication Logs</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Record of all communications related to respite stays.
                         </div>
                     </div>
@@ -99,11 +99,11 @@ export default function CommunicationLogsIndex({ logs, filters, channels }: Prop
                                                     <Badge variant="outline">{log.participants.length} participant{log.participants.length !== 1 ? 's' : ''}</Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(log.occurred_at)}
                                             </div>
                                             {log.summary && (
-                                                <div className="mt-1 text-xs text-slate-500">
+                                                <div className="mt-1 text-xs text-muted-foreground">
                                                     {log.summary.length > 100 ? `${log.summary.substring(0, 100)}...` : log.summary}
                                                 </div>
                                             )}
@@ -117,7 +117,7 @@ export default function CommunicationLogsIndex({ logs, filters, channels }: Prop
                         </Card>
                     ))}
                     {!logs.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No items found.
                         </div>
                     )}

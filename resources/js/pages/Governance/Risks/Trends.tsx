@@ -58,8 +58,8 @@ export default function RiskTrends({ auth, snapshots }: Props) {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Risk Trends</h1>
-                    <p className="text-gray-500 mt-1">Historical risk snapshot analysis</p>
+                    <h1 className="text-3xl font-bold text-foreground">Risk Trends</h1>
+                    <p className="text-muted-foreground mt-1">Historical risk snapshot analysis</p>
                 </div>
 
                 {/* Current Summary */}
@@ -109,14 +109,14 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-purple-200">
+                        <Card className="border-primary">
                             <CardContent className="pt-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-purple-600">Above Appetite</p>
-                                        <p className="text-3xl font-bold text-purple-600">{latest.summary.above_appetite}</p>
+                                        <p className="text-sm text-primary">Above Appetite</p>
+                                        <p className="text-3xl font-bold text-primary">{latest.summary.above_appetite}</p>
                                     </div>
-                                    <TrendingUp className="w-8 h-8 text-purple-500" />
+                                    <TrendingUp className="w-8 h-8 text-primary" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -153,7 +153,7 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                                 })}
                         </div>
                         {displaySnapshots.length > 0 && (
-                            <div className="mt-2 flex justify-between text-xs text-gray-500">
+                            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                                 <span>{formatDate(displaySnapshots[displaySnapshots.length - 1].snapshot_date)}</span>
                                 <span>{formatDate(displaySnapshots[0].snapshot_date)}</span>
                             </div>
@@ -209,8 +209,8 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                     <CardContent>
                         <div className="space-y-3">
                             {displaySnapshots.map((snap) => (
-                                <div key={snap.id} className="flex items-center gap-4 p-3 rounded-lg border hover:bg-gray-50">
-                                    <div className="text-sm font-medium text-gray-600 w-28 shrink-0">
+                                <div key={snap.id} className="flex items-center gap-4 p-3 rounded-lg border hover:bg-muted">
+                                    <div className="text-sm font-medium text-muted-foreground w-28 shrink-0">
                                         {formatDate(snap.snapshot_date)}
                                     </div>
                                     <div className="flex gap-2 flex-wrap">
@@ -219,13 +219,13 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                                         <Badge className={severityColor('medium')}>{snap.summary.medium} Medium</Badge>
                                         <Badge className={severityColor('low')}>{snap.summary.low} Low</Badge>
                                         {snap.summary.above_appetite > 0 && (
-                                            <Badge className="bg-purple-100 text-purple-800">{snap.summary.above_appetite} Above Appetite</Badge>
+                                            <Badge className="bg-primary/10 text-primary">{snap.summary.above_appetite} Above Appetite</Badge>
                                         )}
                                     </div>
                                 </div>
                             ))}
                             {displaySnapshots.length === 0 && (
-                                <div className="py-8 text-center text-sm text-gray-500">No snapshots recorded yet.</div>
+                                <div className="py-8 text-center text-sm text-muted-foreground">No snapshots recorded yet.</div>
                             )}
                         </div>
                     </CardContent>

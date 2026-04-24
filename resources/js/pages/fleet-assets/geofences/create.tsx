@@ -178,7 +178,7 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
                                             className={cn(
                                                 'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
                                                 scope === 'vehicle'
-                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300'
+                                                    ? 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70'
                                                     : 'border-border text-muted-foreground hover:bg-muted/50',
                                             )}
                                         >
@@ -190,7 +190,7 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
                                             className={cn(
                                                 'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
                                                 scope === 'resident'
-                                                    ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300'
+                                                    ? 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70'
                                                     : 'border-border text-muted-foreground hover:bg-muted/50',
                                             )}
                                         >
@@ -227,7 +227,7 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
                                     </div>
                                 </div>
                                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                    <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-purple-600" />
+                                    <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 rounded border-border accent-purple-600" />
                                     Active
                                 </label>
                             </CardContent>
@@ -274,7 +274,7 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
                                             { label: 'Notify Control Room', checked: notifyControlRoom, set: setNotifyControlRoom },
                                         ].map((item) => (
                                             <label key={item.label} className="flex items-center gap-2 text-sm cursor-pointer rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors">
-                                                <input type="checkbox" checked={item.checked} onChange={(e) => item.set(e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-purple-600" />
+                                                <input type="checkbox" checked={item.checked} onChange={(e) => item.set(e.target.checked)} className="h-4 w-4 rounded border-border accent-purple-600" />
                                                 {item.label}
                                             </label>
                                         ))}

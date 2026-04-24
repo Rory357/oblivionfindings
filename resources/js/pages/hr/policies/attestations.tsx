@@ -65,7 +65,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                             <ShieldCheck className="h-5 w-5 text-amber-500" />
                             Policy Attestations
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Track staff acknowledgement and attestation of organisational policies
                         </div>
                     </div>
@@ -83,9 +83,9 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by staff name or policy title..."
                                     value={filters.q || ''}
@@ -130,7 +130,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                                 ))}
                                 {!attestations.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                                             No attestations found.
                                         </TableCell>
                                     </TableRow>

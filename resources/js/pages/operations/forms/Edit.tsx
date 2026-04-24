@@ -247,7 +247,7 @@ export default function CustomFormEdit({ form }: Props) {
                                                         e.target.checked,
                                                     )
                                                 }
-                                                className="h-4 w-4 rounded border-gray-300"
+                                                className="h-4 w-4 rounded border-border"
                                             />
                                             <Label className="text-xs">
                                                 Req
@@ -277,7 +277,7 @@ export default function CustomFormEdit({ form }: Props) {
                                     onChange={(e) =>
                                         setData('is_active', e.target.checked)
                                     }
-                                    className="h-4 w-4 rounded border-gray-300"
+                                    className="h-4 w-4 rounded border-border"
                                 />
                                 <Label
                                     htmlFor="is_active"

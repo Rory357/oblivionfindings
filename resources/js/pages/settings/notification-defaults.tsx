@@ -91,13 +91,13 @@ const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: s
 };
 
 const ROLE_COLORS: string[] = [
-    'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+    'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
     'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
     'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
     'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
     'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
-    'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
+    'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
 ];
 
@@ -338,8 +338,8 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                         <CardHeader className="cursor-pointer select-none">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                                                        <Icon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                                        <Icon className="h-4 w-4 text-primary dark:text-primary" />
                                                     </div>
                                                     <div>
                                                         <CardTitle className="text-base">{mod.label}</CardTitle>
@@ -378,7 +378,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={(e) => { e.stopPropagation(); enableAllForRole(role.id); }}
-                                                                                className="text-[10px] text-violet-600 hover:underline dark:text-violet-400"
+                                                                                className="text-[10px] text-primary hover:underline dark:text-primary"
                                                                             >
                                                                                 All
                                                                             </button>
@@ -513,7 +513,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                         <Button
                             disabled={processing}
                             onClick={() => put('/settings/notifications/roles')}
-                            className="bg-violet-600 hover:bg-violet-700"
+                            className="bg-primary hover:bg-primary"
                         >
                             Save Defaults
                         </Button>

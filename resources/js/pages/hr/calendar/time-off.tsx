@@ -43,8 +43,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 const leaveTypeColors: Record<string, string> = {
     annual: 'bg-blue-200 text-blue-900',
     sick: 'bg-red-200 text-red-900',
-    personal: 'bg-purple-200 text-purple-900',
-    bereavement: 'bg-slate-300 text-slate-900',
+    personal: 'bg-primary/20 text-primary',
+    bereavement: 'bg-slate-300 text-foreground',
     parental: 'bg-pink-200 text-pink-900',
     public_holiday: 'bg-green-200 text-green-900',
     unpaid: 'bg-yellow-200 text-yellow-900',
@@ -89,7 +89,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-lg font-semibold">Time Off Calendar</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             See who is off each day, color-coded by leave type
                         </div>
                     </div>
@@ -111,7 +111,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Department</Label>
+                            <Label className="text-xs text-muted-foreground">Department</Label>
                             <Select
                                 value={filters.department || 'all'}
                                 onValueChange={(val) => onFilter({ department: val === 'all' ? null : val })}
@@ -126,7 +126,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Team</Label>
+                            <Label className="text-xs text-muted-foreground">Team</Label>
                             <Select
                                 value={filters.team || 'all'}
                                 onValueChange={(val) => onFilter({ team: val === 'all' ? null : val })}
@@ -157,7 +157,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                     {Object.entries(leaveTypeColors).map(([type, color]) => (
                         <div key={type} className="flex items-center gap-1.5">
                             <div className={`h-3 w-3 rounded ${color}`} />
-                            <span className="text-xs capitalize text-slate-600">{type.replace('_', ' ')}</span>
+                            <span className="text-xs capitalize text-muted-foreground">{type.replace('_', ' ')}</span>
                         </div>
                     ))}
                 </div>
@@ -168,7 +168,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                         {/* Day headers */}
                         <div className="grid grid-cols-7 border-b">
                             {dayNames.map((name) => (
-                                <div key={name} className="border-r p-2 text-center text-xs font-medium text-slate-500 last:border-r-0">
+                                <div key={name} className="border-r p-2 text-center text-xs font-medium text-muted-foreground last:border-r-0">
                                     {name}
                                 </div>
                             ))}
@@ -180,8 +180,8 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                                 <div
                                     key={idx}
                                     className={`min-h-[100px] border-b border-r p-1.5 last:border-r-0 ${
-                                        !day ? 'bg-slate-50' :
-                                        day.is_weekend ? 'bg-slate-50' :
+                                        !day ? 'bg-muted' :
+                                        day.is_weekend ? 'bg-muted' :
                                         day.date === today ? 'bg-blue-50' :
                                         ''
                                     }`}
@@ -190,8 +190,8 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                                         <>
                                             <div className={`mb-1 text-xs font-medium ${
                                                 day.date === today ? 'text-blue-600' :
-                                                day.is_weekend ? 'text-slate-400' :
-                                                'text-slate-700'
+                                                day.is_weekend ? 'text-muted-foreground' :
+                                                'text-foreground'
                                             }`}>
                                                 {day.day}
                                             </div>
@@ -199,7 +199,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                                                 {day.leave.map((entry) => (
                                                     <div
                                                         key={entry.id}
-                                                        className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${leaveTypeColors[entry.leave_type] ?? 'bg-slate-200 text-slate-800'}`}
+                                                        className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${leaveTypeColors[entry.leave_type] ?? 'bg-muted text-foreground'}`}
                                                         title={`${entry.user_name} - ${entry.leave_type}`}
                                                     >
                                                         {entry.user_name}

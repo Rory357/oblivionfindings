@@ -8,7 +8,7 @@
 /* ------------------------------------------------------------------ */
 
 export const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Draft' },
+    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
     pending_approval: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10', label: 'Pending Approval' },
     published: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Published' },
     closed: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Closed' },

@@ -27,7 +27,7 @@ export default function CommunicationLogsForStay({ stay, logs, channels }: Props
                         <h1 className="text-lg font-semibold">
                             Communication Logs for {stay.client?.first_name} {stay.client?.last_name}
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {formatDateTime(stay.start_date)} &mdash; {formatDateTime(stay.end_date)}
                         </div>
                     </div>
@@ -53,11 +53,11 @@ export default function CommunicationLogsForStay({ stay, logs, channels }: Props
                                                     <Badge variant="outline">{log.participants.length} participant{log.participants.length !== 1 ? 's' : ''}</Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(log.occurred_at)}
                                             </div>
                                             {log.summary && (
-                                                <div className="mt-1 text-xs text-slate-500">
+                                                <div className="mt-1 text-xs text-muted-foreground">
                                                     {log.summary.length > 100 ? `${log.summary.substring(0, 100)}...` : log.summary}
                                                 </div>
                                             )}
@@ -71,7 +71,7 @@ export default function CommunicationLogsForStay({ stay, logs, channels }: Props
                         </Card>
                     ))}
                     {!logs.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No items found.
                         </div>
                     )}

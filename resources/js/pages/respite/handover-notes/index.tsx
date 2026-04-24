@@ -29,7 +29,7 @@ export default function HandoverNotesIndex({ notes, filters }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Handover Notes</h1>
-                        <div className="mt-1 text-sm text-slate-500">Shift handover notes for respite stays.</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Shift handover notes for respite stays.</div>
                     </div>
                     <Link href="/respite/handover-notes/create">
                         <Button size="sm">New Handover Note</Button>
@@ -43,7 +43,7 @@ export default function HandoverNotesIndex({ notes, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Handover Type</Label>
+                            <Label className="text-xs text-muted-foreground">Handover Type</Label>
                             <Select value={filters.handover_type ?? ANY} onValueChange={(v) => onFilter({ handover_type: v === ANY ? null : v })}>
                                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                                 <SelectContent>
@@ -82,8 +82,8 @@ export default function HandoverNotesIndex({ notes, filters }: Props) {
                                                 {!n.acknowledged_at && <Badge className="bg-amber-100 text-amber-800">Unacknowledged</Badge>}
                                                 {n.acknowledged_at && <Badge className="bg-green-100 text-green-800">Acknowledged</Badge>}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500 line-clamp-2">{n.notes}</div>
-                                            <div className="mt-1 text-xs text-slate-400">{formatDateTime(n.created_at)}</div>
+                                            <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{n.notes}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(n.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/handover-notes/${n.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View
@@ -94,7 +94,7 @@ export default function HandoverNotesIndex({ notes, filters }: Props) {
                         </Card>
                     ))}
                     {!notes.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No handover notes found.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No handover notes found.</div>
                     )}
                 </div>
 

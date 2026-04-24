@@ -180,7 +180,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                         type="checkbox"
                                         checked={form.is_anonymous}
                                         onChange={(e) => set('is_anonymous', e.target.checked)}
-                                        className="rounded border-slate-300"
+                                        className="rounded border-border"
                                     />
                                     Anonymous responses
                                 </label>
@@ -291,7 +291,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                                         type="checkbox"
                                                         checked={question.is_required}
                                                         onChange={(e) => updateQuestion(qIndex, 'is_required', e.target.checked)}
-                                                        className="rounded border-slate-300"
+                                                        className="rounded border-border"
                                                     />
                                                     Required
                                                 </label>

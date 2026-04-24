@@ -18,7 +18,7 @@ import {
  */
 const toneClasses: Record<StaffStatusTone, string> = {
     neutral:
-        'border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100',
+        'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground',
     info:
         'border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-100',
     progress:

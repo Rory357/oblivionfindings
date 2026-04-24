@@ -36,7 +36,7 @@ type Props = {
 function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
     return (
         <div className="p-4 rounded-lg border bg-white">
-            <p className="text-sm text-slate-500">{label}</p>
+            <p className="text-sm text-muted-foreground">{label}</p>
             <p className={cn('text-2xl font-bold', color)}>{value}</p>
         </div>
     );
@@ -65,7 +65,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Privacy Compliance Report</h1>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Comprehensive privacy metrics and compliance status
                         </p>
                     </div>
@@ -132,7 +132,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Shield className="h-5 w-5 text-indigo-500" />
+                            <Shield className="h-5 w-5 text-primary" />
                             Data Protection Impact Assessments
                         </CardTitle>
                     </CardHeader>
@@ -165,7 +165,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Scale className="h-5 w-5 text-purple-500" />
+                            <Scale className="h-5 w-5 text-primary" />
                             Legal Holds
                         </CardTitle>
                     </CardHeader>

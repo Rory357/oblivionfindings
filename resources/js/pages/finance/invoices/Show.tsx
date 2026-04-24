@@ -61,12 +61,12 @@ const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
     sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
-    viewed: { label: 'Viewed', className: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300' },
+    viewed: { label: 'Viewed', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
     paid: { label: 'Paid', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
     overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
-    cancelled: { label: 'Cancelled', className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
+    cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' },
 };
 
 export default function InvoiceShow({ auth, invoice }: Props) {
@@ -103,7 +103,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                     <div>
                         <div className="flex items-center gap-3">
                             <h1 className="text-3xl font-bold text-foreground">{invoice.invoice_number}</h1>
-                            <Badge className={statusConfig[invoice.status]?.className ?? 'bg-gray-100 text-gray-800'}>
+                            <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
                                 {statusConfig[invoice.status]?.label ?? invoice.status}
                             </Badge>
                             {isOverdue && (

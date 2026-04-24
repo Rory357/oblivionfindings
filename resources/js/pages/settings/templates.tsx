@@ -63,10 +63,10 @@ interface Props {
 const CATEGORIES = ['All', 'Operations', 'HR', 'Incidents', 'System'] as const;
 
 const CATEGORY_CONFIG: Record<string, { colour: string; bg: string; icon: typeof Briefcase }> = {
-    operations: { colour: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/40', icon: Briefcase },
+    operations: { colour: 'text-primary dark:text-primary', bg: 'bg-primary/10 dark:bg-primary/40', icon: Briefcase },
     hr: { colour: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40', icon: Users },
     incidents: { colour: 'text-red-700 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/40', icon: AlertTriangle },
-    system: { colour: 'text-slate-700 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800/60', icon: Shield },
+    system: { colour: 'text-foreground dark:text-muted-foreground', bg: 'bg-muted dark:bg-muted/60', icon: Shield },
 };
 
 const KEY_DESCRIPTIONS: Record<string, string> = {
@@ -226,7 +226,7 @@ function MergeFieldPills({
                                 key={field}
                                 type="button"
                                 onClick={() => onInsert(field)}
-                                className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 font-mono text-[11px] text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-300 dark:hover:bg-violet-900/50"
+                                className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary transition-colors hover:bg-primary/10 dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70 dark:hover:bg-primary/50"
                             >
                                 {field}
                             </button>
@@ -286,7 +286,7 @@ function TemplateCard({
                                 </Badge>
                             )}
                             {template.is_system && (
-                                <Badge variant="outline" className="text-[10px] text-slate-500">
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground">
                                     System
                                 </Badge>
                             )}
@@ -316,7 +316,7 @@ function TemplateCard({
                                 {template.merge_fields.map((field) => (
                                     <span
                                         key={field}
-                                        className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 font-mono text-[10px] text-violet-600 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-400"
+                                        className="inline-flex rounded-full border border-primary bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary"
                                     >
                                         {`{${field}}`}
                                     </span>
@@ -339,7 +339,7 @@ function TemplateCard({
 
                     {/* Actions */}
                     <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-                        <Button variant="outline" size="sm" onClick={onEdit} className="border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300">
+                        <Button variant="outline" size="sm" onClick={onEdit} className="border-primary text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary/70">
                             <Pencil className="mr-1.5 h-3 w-3" />
                             Edit
                         </Button>
@@ -366,13 +366,13 @@ function TemplateCard({
 function PhoneMockup({ message }: { message: string }) {
     return (
         <div className="mx-auto w-64">
-            <div className="rounded-[2rem] border-4 border-slate-800 bg-slate-100 p-4 dark:border-slate-600 dark:bg-slate-900">
+            <div className="rounded-[2rem] border-4 border-slate-800 bg-muted p-4 dark:border-slate-600 dark:bg-muted">
                 {/* Notch */}
                 <div className="mx-auto mb-3 h-5 w-20 rounded-full bg-slate-800 dark:bg-slate-600" />
                 {/* Screen */}
-                <div className="min-h-[200px] rounded-xl bg-white p-3 dark:bg-slate-800">
+                <div className="min-h-[200px] rounded-xl bg-white p-3 dark:bg-muted">
                     <p className="mb-2 text-center text-[10px] text-muted-foreground">Today 09:00</p>
-                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-violet-600 px-3 py-2 text-xs text-white">
+                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-xs text-white">
                         {message}
                     </div>
                 </div>
@@ -391,7 +391,7 @@ function EmailFrame({ subject, body, headerColour }: { subject: string; body: st
         <div className="overflow-hidden rounded-lg border">
             {/* Colour bar */}
             <div className="h-2" style={{ backgroundColor: headerColour || '#7c3aed' }} />
-            <div className="bg-white p-5 dark:bg-slate-900">
+            <div className="bg-white p-5 dark:bg-muted">
                 {subject && (
                     <p className="mb-3 border-b pb-2 text-sm font-semibold text-foreground">{subject}</p>
                 )}
@@ -610,7 +610,7 @@ function TemplateSettings() {
             </Card>
 
             <div className="flex items-center gap-3">
-                <Button onClick={handleSave} className="bg-violet-600 hover:bg-violet-700">
+                <Button onClick={handleSave} className="bg-primary hover:bg-primary">
                     {saved ? 'Saved!' : 'Save Settings'}
                 </Button>
                 {saved && <span className="text-sm text-emerald-600">Settings saved successfully</span>}
@@ -799,8 +799,8 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
                 {/* Header */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                            <Mail className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                            <Mail className="h-5 w-5 text-primary dark:text-primary" />
                         </div>
                         <div>
                             <h1 className="text-xl font-semibold">Email &amp; SMS Templates</h1>
@@ -813,7 +813,7 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard label="Total Templates" value={templates.length} colour="bg-indigo-600" icon={Hash} />
+                    <StatCard label="Total Templates" value={templates.length} colour="bg-primary" icon={Hash} />
                     <StatCard label="Email Templates" value={emailTemplates.length} colour="bg-blue-600" icon={Mail} />
                     <StatCard label="SMS Templates" value={smsTemplates.length} colour="bg-emerald-600" icon={Smartphone} />
                 </div>
@@ -973,7 +973,7 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
                         <Button
                             onClick={handleSave}
                             disabled={saving}
-                            className="bg-violet-600 hover:bg-violet-700"
+                            className="bg-primary hover:bg-primary"
                         >
                             {saving ? 'Saving...' : 'Save Changes'}
                         </Button>
@@ -998,7 +998,7 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
 
                     {previewLoading ? (
                         <div className="flex items-center justify-center py-12">
-                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
+                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-violet-600" />
                         </div>
                     ) : previewTemplate?.type === 'email' ? (
                         <EmailFrame

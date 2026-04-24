@@ -39,7 +39,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
             case 'rejected':
                 return 'bg-red-100 text-red-800';
             default:
-                return 'bg-slate-100 text-slate-800';
+                return 'bg-muted text-foreground';
         }
     };
 
@@ -131,18 +131,18 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <span className="text-xs text-slate-500">Name</span>
+                                <span className="text-xs text-muted-foreground">Name</span>
                                 <p className="font-medium">{dsr.subject_name}</p>
                             </div>
                             <div>
-                                <span className="text-xs text-slate-500">Email</span>
+                                <span className="text-xs text-muted-foreground">Email</span>
                                 <p className="font-medium">{dsr.subject_email}</p>
                             </div>
                             {isIdentityVerified && (
                                 <div>
-                                    <span className="text-xs text-slate-500">Verified By</span>
+                                    <span className="text-xs text-muted-foreground">Verified By</span>
                                     <p className="font-medium">{dsr.verified_by?.name || 'N/A'}</p>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-muted-foreground">
                                         {formatDate(dsr.identity_verified_at)} via {dsr.verification_method}
                                     </p>
                                 </div>
@@ -153,17 +153,17 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Calendar className="h-5 w-5 text-purple-500" />
+                                <Calendar className="h-5 w-5 text-primary" />
                                 Timeline
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <span className="text-xs text-slate-500">Received</span>
+                                <span className="text-xs text-muted-foreground">Received</span>
                                 <p className="font-medium">{formatDate(dsr.received_at)}</p>
                             </div>
                             <div>
-                                <span className="text-xs text-slate-500">Due Date</span>
+                                <span className="text-xs text-muted-foreground">Due Date</span>
                                 <p className={`font-medium ${isOverdue ? 'text-red-600' : ''}`}>
                                     {formatDate(dsr.extended_due_date || dsr.due_date)}
                                     {dsr.extension_requested && ' (Extended)'}
@@ -171,13 +171,13 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                             </div>
                             {dsr.completed_at && (
                                 <div>
-                                    <span className="text-xs text-slate-500">Completed</span>
+                                    <span className="text-xs text-muted-foreground">Completed</span>
                                     <p className="font-medium">{formatDate(dsr.completed_at)}</p>
                                 </div>
                             )}
                             {dsr.assigned_to && (
                                 <div>
-                                    <span className="text-xs text-slate-500">Assigned To</span>
+                                    <span className="text-xs text-muted-foreground">Assigned To</span>
                                     <p className="font-medium">{dsr.assigned_to.name}</p>
                                 </div>
                             )}
@@ -193,13 +193,13 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                             {dsr.request_details || 'No additional details provided.'}
                         </p>
                         {dsr.completion_notes && (
                             <div className="mt-4 pt-4 border-t">
-                                <span className="text-xs text-slate-500">Completion Notes</span>
-                                <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">Completion Notes</span>
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                     {dsr.completion_notes}
                                 </p>
                             </div>
@@ -207,10 +207,10 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         {dsr.rejection_reason && (
                             <div className="mt-4 pt-4 border-t">
                                 <span className="text-xs text-red-500">Rejection Reason</span>
-                                <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">
+                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                     {dsr.rejection_reason}
                                 </p>
-                                <p className="text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     Legal Basis: {dsr.rejection_legal_basis}
                                 </p>
                             </div>

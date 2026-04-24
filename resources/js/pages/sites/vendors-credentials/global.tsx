@@ -136,7 +136,7 @@ export default function GlobalVendorsCredentials({
                             <Truck className="w-5 h-5" />
                             Vendors & Credentials
                         </h1>
-                        <p className="text-sm text-slate-400">All sites</p>
+                        <p className="text-sm text-muted-foreground">All sites</p>
                     </div>
                 </div>
 
@@ -144,13 +144,13 @@ export default function GlobalVendorsCredentials({
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{filteredVendors.length}</div>
-                            <div className="text-sm text-slate-400">Vendors</div>
+                            <div className="text-sm text-muted-foreground">Vendors</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{filteredCredentials.length}</div>
-                            <div className="text-sm text-slate-400">Credentials</div>
+                            <div className="text-sm text-muted-foreground">Credentials</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-amber-500/5 border-amber-500/20">
@@ -158,7 +158,7 @@ export default function GlobalVendorsCredentials({
                             <div className="text-2xl font-bold text-amber-400">
                                 {filteredCredentials.filter((c) => c.requires_reauth).length}
                             </div>
-                            <div className="text-sm text-slate-400">Re-auth Required</div>
+                            <div className="text-sm text-muted-foreground">Re-auth Required</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -169,7 +169,7 @@ export default function GlobalVendorsCredentials({
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -284,17 +284,17 @@ export default function GlobalVendorsCredentials({
                         <Card>
                             <CardContent className="p-4">
                                 {filteredVendors.length === 0 ? (
-                                    <div className="text-center py-8 text-slate-400">No vendors match your filters.</div>
+                                    <div className="text-center py-8 text-muted-foreground">No vendors match your filters.</div>
                                 ) : (
                                     <div className="space-y-2">
                                         {filteredVendors.map((vendor) => (
                                             <div key={vendor.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
                                                 <div>
                                                     <div className="font-medium">{vendor.company_name}</div>
-                                                    <div className="text-sm text-slate-400">
+                                                    <div className="text-sm text-muted-foreground">
                                                         {vendor.site_name} • {vendor.service_type}
                                                     </div>
-                                                    <div className="text-xs text-slate-500 mt-1">
+                                                    <div className="text-xs text-muted-foreground mt-1">
                                                         {vendor.contact_name ? `${vendor.contact_name} • ` : ''}
                                                         {vendor.email || vendor.phone || vendor.after_hours_phone || 'No contact details'}
                                                     </div>
@@ -306,7 +306,7 @@ export default function GlobalVendorsCredentials({
                                                         </Badge>
                                                     )}
                                                     {!vendor.is_active && (
-                                                        <Badge variant="outline" className="border-slate-500/30 text-slate-400">
+                                                        <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
                                                             Inactive
                                                         </Badge>
                                                     )}
@@ -326,23 +326,23 @@ export default function GlobalVendorsCredentials({
                         <Card>
                             <CardContent className="p-4">
                                 {filteredCredentials.length === 0 ? (
-                                    <div className="text-center py-8 text-slate-400">No credentials match your filters.</div>
+                                    <div className="text-center py-8 text-muted-foreground">No credentials match your filters.</div>
                                 ) : (
                                     <div className="space-y-2">
                                         {filteredCredentials.map((credential) => (
                                             <div key={credential.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
                                                 <div>
                                                     <div className="font-medium">{credential.label}</div>
-                                                    <div className="text-sm text-slate-400">
+                                                    <div className="text-sm text-muted-foreground">
                                                         {credential.site_name} • {credential.credential_type}
                                                         {credential.vendor_name ? ` • ${credential.vendor_name}` : ''}
                                                     </div>
-                                                    <div className="text-xs text-slate-500 mt-1">
+                                                    <div className="text-xs text-muted-foreground mt-1">
                                                         Last rotated: {credential.last_rotated_at ?? '—'}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Badge variant="outline" className="border-slate-500/30 text-slate-400">
+                                                    <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
                                                         {credential.value_preview}
                                                     </Badge>
                                                     {credential.requires_reauth && (

@@ -410,7 +410,7 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800/40"><UserX className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground dark:bg-muted/40"><UserX className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{staffWithoutAssessment.length}</p><p className="text-xs text-muted-foreground">Staff Without Assessment</p></div>
                         </CardContent>
                     </Card>

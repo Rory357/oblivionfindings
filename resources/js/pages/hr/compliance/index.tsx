@@ -245,7 +245,7 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.not_started_count > 0 ? (
-                                                <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                                                <Badge variant="outline" className="border-border bg-muted text-foreground dark:border-border dark:bg-muted dark:text-muted-foreground">
                                                     {staff.not_started_count}
                                                 </Badge>
                                             ) : (

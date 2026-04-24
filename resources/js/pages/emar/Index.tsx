@@ -196,7 +196,7 @@ const statusColor: Record<string, string> = {
     given: 'text-emerald-500',
     refused: 'text-amber-500',
     missed: 'text-red-500',
-    withheld: 'text-slate-500',
+    withheld: 'text-muted-foreground',
     pending: 'text-blue-500',
 };
 
@@ -447,7 +447,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <Card className="mb-6">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <Users className="h-4 w-4 text-indigo-500" />
+                                <Users className="h-4 w-4 text-primary" />
                                 Client Status — Today
                             </CardTitle>
                         </CardHeader>
@@ -468,8 +468,8 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                             className={`group block rounded-lg border p-3 transition-all hover:shadow-md hover:-translate-y-0.5 ${borderClass}`}
                                         >
                                             <div className="flex items-center gap-2 mb-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40">
-                                                    <User className="h-3.5 w-3.5 text-indigo-600" />
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/40">
+                                                    <User className="h-3.5 w-3.5 text-primary" />
                                                 </div>
                                                 <p className="text-sm font-medium truncate">{cs.first_name} {cs.last_name}</p>
                                             </div>
@@ -516,7 +516,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 <div className="space-y-2">
                                     {activeAlertsList.map((alert) => {
                                         const SeverityIcon = severityIcon[alert.severity] ?? Info;
-                                        const iconColor = severityColor[alert.severity] ?? 'text-slate-500';
+                                        const iconColor = severityColor[alert.severity] ?? 'text-muted-foreground';
                                         return (
                                             <div key={alert.id} className="flex items-start gap-3 rounded-lg border p-2.5">
                                                 <SeverityIcon className={`mt-0.5 h-4 w-4 shrink-0 ${iconColor}`} />
@@ -562,7 +562,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 <div className="max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
                                     {recentActivity.map((entry) => {
                                         const StatusIcon = statusIcon[entry.status] ?? Clock;
-                                        const iconClr = statusColor[entry.status] ?? 'text-slate-400';
+                                        const iconClr = statusColor[entry.status] ?? 'text-muted-foreground';
                                         return (
                                             <div key={entry.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/50">
                                                 <StatusIcon className={`h-3.5 w-3.5 shrink-0 ${iconClr}`} />
@@ -585,7 +585,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center py-6 text-center">
-                                    <Clock className="mb-2 h-6 w-6 text-slate-400" />
+                                    <Clock className="mb-2 h-6 w-6 text-muted-foreground" />
                                     <p className="text-sm text-muted-foreground">No recent activity</p>
                                 </div>
                             )}
@@ -597,7 +597,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                 <Card className="mb-6">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                            <ClipboardCheck className="h-4 w-4 text-indigo-500" />
+                            <ClipboardCheck className="h-4 w-4 text-primary" />
                             Compliance Snapshot
                         </CardTitle>
                     </CardHeader>
@@ -648,8 +648,8 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 <span className="text-sm">Generate Today's Rounds</span>
                             </Button>
                             {[
-                                { label: 'Record Administration', href: '/emar/mar', icon: Syringe, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
-                                { label: 'PRN Review', href: '/emar/prn', icon: ClipboardCheck, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+                                { label: 'Record Administration', href: '/emar/mar', icon: Syringe, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
+                                { label: 'PRN Review', href: '/emar/prn', icon: ClipboardCheck, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
                                 { label: 'Stock Check', href: '/emar/stock', icon: Package, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
                                 { label: 'New Prescription', href: '/emar/prescriptions', icon: FileText, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
                                 { label: 'Handover', href: '/emar/handovers', icon: ArrowRightLeft, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
@@ -681,9 +681,9 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                             {[
                                 { title: 'Daily Overview', href: '/emar/daily', icon: Activity, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-                                { title: 'MAR Charts', href: '/emar/mar', icon: Pill, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+                                { title: 'MAR Charts', href: '/emar/mar', icon: Pill, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
                                 { title: 'Controlled Drugs', href: '/emar/controlled', icon: Lock, color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
-                                { title: 'Reports', href: '/emar/reports', icon: TrendingUp, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+                                { title: 'Reports', href: '/emar/reports', icon: TrendingUp, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
                             ].map((item) => {
                                 const Icon = item.icon;
                                 return (

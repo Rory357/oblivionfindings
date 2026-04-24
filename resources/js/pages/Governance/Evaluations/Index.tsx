@@ -27,10 +27,10 @@ interface Props extends PageProps {
 
 export default function EvaluationsIndex({ auth, evaluations }: Props) {
   const getStatusColor = (status: string) => ({
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     active: 'bg-blue-100 text-blue-800',
     closed: 'bg-green-100 text-green-800',
-  }[status] || 'bg-gray-100 text-gray-800');
+  }[status] || 'bg-muted text-foreground');
 
   const getTypeLabel = (type: string) => ({
     board: 'Full Board',
@@ -45,8 +45,8 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Board Evaluations</h1>
-            <p className="text-gray-500 mt-1">Board and committee performance evaluations</p>
+            <h1 className="text-2xl font-bold text-foreground">Board Evaluations</h1>
+            <p className="text-muted-foreground mt-1">Board and committee performance evaluations</p>
           </div>
           <Link href="/governance/evaluations/create">
             <Button><Plus className="w-4 h-4 mr-2" /> New Evaluation</Button>
@@ -67,7 +67,7 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
                       <Badge variant="outline">{getTypeLabel(evaluation.evaluation_type)}</Badge>
                       <Badge className={cn('text-xs', getStatusColor(evaluation.status))}>{evaluation.status}</Badge>
                     </div>
-                    <div className="flex gap-4 mt-2 text-sm text-gray-500">
+                    <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                       <span>Period: {new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - {new Date(evaluation.period_end).toLocaleDateString('en-NZ')}</span>
                       <span>{evaluation.responses_count} response(s)</span>
                       <span>Due: {new Date(evaluation.due_date).toLocaleDateString('en-NZ')}</span>
@@ -78,7 +78,7 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
             </Card>
           ))}
           {evaluations.data.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-gray-500">No evaluations yet.</CardContent></Card>
+            <Card><CardContent className="p-8 text-center text-muted-foreground">No evaluations yet.</CardContent></Card>
           )}
         </div>
       </div>

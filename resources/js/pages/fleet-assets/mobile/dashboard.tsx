@@ -75,7 +75,7 @@ export default function MobileDashboard({
             label: 'My Trips',
             href: '/fleet-assets/trips',
             icon: Route,
-            color: 'bg-purple-500',
+            color: 'bg-primary',
             show: true,
         },
     ].filter((action) => action.show);
@@ -87,14 +87,14 @@ export default function MobileDashboard({
                 {/* Purple gradient header */}
                 <div className="bg-gradient-to-br from-purple-600 to-purple-800 px-4 pb-6 pt-8 text-white">
                     <p
-                        className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-200"
+                        className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70"
                         dusk="fleet-mobile-dashboard-heading"
                     >
                         Mobile Dashboard
                     </p>
-                    <p className="text-sm font-medium text-purple-200">Welcome back,</p>
+                    <p className="text-sm font-medium text-primary/70">Welcome back,</p>
                     <h1 className="text-2xl font-bold">{auth_user?.name ?? 'Driver'}</h1>
-                    <p className="mt-1 text-xs text-purple-300">Oblivion Findings Fleet</p>
+                    <p className="mt-1 text-xs text-primary/70">Oblivion Findings Fleet</p>
                 </div>
 
                 <div className="mx-auto max-w-lg space-y-4 px-4 -mt-3">
@@ -104,7 +104,7 @@ export default function MobileDashboard({
                             <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium text-muted-foreground">Assigned Vehicle</span>
                                 {assigned_vehicle ? (
-                                    <Badge variant="default" className="bg-purple-600">Active</Badge>
+                                    <Badge variant="default" className="bg-primary">Active</Badge>
                                 ) : (
                                     <Badge variant="secondary">None</Badge>
                                 )}
@@ -114,7 +114,7 @@ export default function MobileDashboard({
                                     href={`/fleet-assets/vehicles/${assigned_vehicle.id}`}
                                     className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3 transition-colors hover:bg-muted/50"
                                 >
-                                    <Car className="h-8 w-8 text-purple-600" />
+                                    <Car className="h-8 w-8 text-primary" />
                                     <div>
                                         <p className="font-semibold">{assigned_vehicle.name}</p>
                                         <p className="text-xs text-muted-foreground">{assigned_vehicle.asset_tag}</p>
@@ -126,11 +126,11 @@ export default function MobileDashboard({
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="rounded-lg border p-3 text-center">
-                                    <p className="text-2xl font-bold text-purple-600">{safeBookingsCount}</p>
+                                    <p className="text-2xl font-bold text-primary">{safeBookingsCount}</p>
                                     <p className="text-[10px] text-muted-foreground">Today's Bookings</p>
                                 </div>
                                 <div className="rounded-lg border p-3 text-center">
-                                    <p className="text-2xl font-bold text-purple-600">{safeChecksCount}</p>
+                                    <p className="text-2xl font-bold text-primary">{safeChecksCount}</p>
                                     <p className="text-[10px] text-muted-foreground">Checks Completed</p>
                                 </div>
                             </div>

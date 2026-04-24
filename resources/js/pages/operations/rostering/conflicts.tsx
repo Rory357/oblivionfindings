@@ -619,7 +619,7 @@ export default function RosteringConflicts({
                                                     )}
                                                 </div>
                                             ) : null}
-                                            <div className="mt-2 rounded-lg border bg-slate-50/60 p-3 text-xs text-slate-700">
+                                            <div className="mt-2 rounded-lg border bg-muted/60 p-3 text-xs text-foreground">
                                                 {gap.recommended_fill_action ===
                                                 'fill_existing_open_shift'
                                                     ? 'Demand is already represented by open shifts. Fill one of those shifts rather than creating another.'
@@ -642,7 +642,7 @@ export default function RosteringConflicts({
                                             gap.contributing_shifts.length >
                                                 0 ? (
                                                 <div className="mt-3 space-y-2">
-                                                    <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+                                                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                                         Existing supply
                                                     </div>
                                                     {gap.contributing_shifts.map(
@@ -659,7 +659,7 @@ export default function RosteringConflicts({
                                             {gap.matching_series &&
                                             gap.matching_series.length > 0 ? (
                                                 <div className="mt-3 space-y-2">
-                                                    <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+                                                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                                         Recurring demand links
                                                     </div>
                                                     {gap.matching_series.map(

@@ -42,8 +42,8 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
             case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
             case 'refused': return 'bg-red-100 text-red-800 border-red-200';
             case 'withdrawn': return 'bg-orange-100 text-orange-800 border-orange-200';
-            case 'expired': return 'bg-slate-100 text-slate-800 border-slate-200';
-            default: return 'bg-slate-100 text-slate-800 border-slate-200';
+            case 'expired': return 'bg-muted text-foreground border-border';
+            default: return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -55,7 +55,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Consent Management</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             GDPR-compliant consent tracking with Mental Capacity Act integration
                         </div>
                     </div>
@@ -81,7 +81,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                     <div className="grid gap-4 sm:grid-cols-3">
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Active Consents</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Active Consents</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
@@ -92,7 +92,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Pending Review</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Review</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stats.pending}</div>
@@ -100,7 +100,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Expiring Soon</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Expiring Soon</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search consents"
                                 value={filters.q || ''}
@@ -128,7 +128,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
 
                         {clients.length > 0 && (
                             <div>
-                                <Label className="text-xs text-slate-500">{clientSingular}</Label>
+                                <Label className="text-xs text-muted-foreground">{clientSingular}</Label>
                                 <Select
                                     value={filters.client_id ? String(filters.client_id) : ANY}
                                     onValueChange={(v) => onFilter({ client_id: v === ANY ? null : v })}
@@ -145,7 +145,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                         )}
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -162,7 +162,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
 
                         {consentTypes.length > 0 && (
                             <div>
-                                <Label className="text-xs text-slate-500">Consent Type</Label>
+                                <Label className="text-xs text-muted-foreground">Consent Type</Label>
                                 <Select
                                     value={filters.consent_type_id ? String(filters.consent_type_id) : ANY}
                                     onValueChange={(v) => onFilter({ consent_type_id: v === ANY ? null : v })}
@@ -200,7 +200,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                                                     </Badge>
                                                 )}
                                                 {consent.best_interests_decision && (
-                                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+                                                    <Badge variant="outline" className="border-primary bg-primary/10 text-primary">
                                                         Best Interests Decision
                                                     </Badge>
                                                 )}
@@ -210,7 +210,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Client: {consent.client.first_name} {consent.client.last_name}
                                                 {consent.obtained_at && ` • Obtained: ${new Date(consent.obtained_at).toLocaleDateString()}`}
                                                 {consent.expires_at && ` • Expires: ${new Date(consent.expires_at).toLocaleDateString()}`}
@@ -226,7 +226,7 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
                         </Card>
                     ))}
                     {!consents.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No consent records found.
                         </div>
                     )}

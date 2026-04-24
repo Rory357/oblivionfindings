@@ -84,7 +84,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
 
                 {/* Client Cards Grid */}
                 <div>
-                    <h2 className="mb-3 text-sm font-medium text-slate-700">Client Medication Status</h2>
+                    <h2 className="mb-3 text-sm font-medium text-foreground">Client Medication Status</h2>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {clients.map((c) => (
                             <Card key={c.id} className={`transition-shadow hover:shadow-md ${c.has_critical_alerts || (c.discrepancy_count ?? 0) > 0 ? 'border-red-300' : c.has_alerts ? 'border-amber-300' : ''}`}>
@@ -117,7 +117,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
-                                    <div className="text-xs text-slate-500">Status: {c.status ?? '—'}</div>
+                                    <div className="text-xs text-muted-foreground">Status: {c.status ?? '—'}</div>
                                     <div className="flex flex-wrap items-center gap-2">
                                         {pill(`Due: ${c.counts.due}`, c.counts.due > 0 ? 'warn' : 'ok')}
                                         {pill(`Late: ${c.counts.late}`, c.counts.late > 0 ? 'bad' : 'ok')}
@@ -147,7 +147,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
                             </Card>
                         ))}
                         {!clients.length && (
-                            <div className="col-span-full text-center text-sm text-slate-500">
+                            <div className="col-span-full text-center text-sm text-muted-foreground">
                                 No clients available.
                             </div>
                         )}
@@ -164,7 +164,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="mb-3 text-xs text-slate-600">
+                            <p className="mb-3 text-xs text-muted-foreground">
                                 Real-time overview of medication status, alerts, and compliance metrics.
                             </p>
                             <Button size="sm" variant="outline" className="w-full" asChild>
@@ -183,7 +183,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="mb-3 text-xs text-slate-600">
+                            <p className="mb-3 text-xs text-muted-foreground">
                                 Generate MAR exports, PRN usage reports, and compliance reports.
                             </p>
                             <Button size="sm" variant="outline" className="w-full" asChild>
@@ -202,7 +202,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="mb-3 text-xs text-slate-600">
+                            <p className="mb-3 text-xs text-muted-foreground">
                                 Audit logs, controlled drug register, and medication safety checks.
                             </p>
                             <Button size="sm" variant="outline" className="w-full" asChild>

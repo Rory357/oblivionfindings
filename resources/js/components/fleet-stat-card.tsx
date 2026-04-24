@@ -5,12 +5,12 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const COLOR_MAP: Record<string, { bg: string; text: string; iconBg: string }> = {
-    purple: { bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-300', iconBg: 'bg-purple-100 dark:bg-purple-900/40' },
+    purple: { bg: 'bg-primary/10 dark:bg-primary/30', text: 'text-primary dark:text-primary/70', iconBg: 'bg-primary/10 dark:bg-primary/40' },
     blue: { bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-300', iconBg: 'bg-blue-100 dark:bg-blue-900/40' },
     amber: { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-700 dark:text-amber-300', iconBg: 'bg-amber-100 dark:bg-amber-900/40' },
     cyan: { bg: 'bg-cyan-50 dark:bg-cyan-950/30', text: 'text-cyan-700 dark:text-cyan-300', iconBg: 'bg-cyan-100 dark:bg-cyan-900/40' },
     red: { bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-700 dark:text-red-300', iconBg: 'bg-red-100 dark:bg-red-900/40' },
-    slate: { bg: 'bg-slate-50 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', iconBg: 'bg-slate-100 dark:bg-slate-800/40' },
+    slate: { bg: 'bg-muted dark:bg-muted/30', text: 'text-foreground dark:text-muted-foreground', iconBg: 'bg-muted dark:bg-muted/40' },
 };
 
 const SPARKLINE_COLOR_MAP: Record<string, string> = {

@@ -38,15 +38,15 @@ import { useState } from 'react';
 const STATUS_STYLES: Record<string, { bg: string; icon: typeof CheckCircle2 }> = {
     given: { bg: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
     refused: { bg: 'bg-red-100 text-red-700', icon: XCircle },
-    withdrawn: { bg: 'bg-slate-100 text-slate-600', icon: XCircle },
+    withdrawn: { bg: 'bg-muted text-muted-foreground', icon: XCircle },
     expired: { bg: 'bg-amber-100 text-amber-700', icon: Clock },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
     medical: 'bg-red-50 border-red-200',
-    care: 'bg-violet-50 border-violet-200',
+    care: 'bg-primary/10 border-primary',
     communication: 'bg-blue-50 border-blue-200',
-    data_protection: 'bg-indigo-50 border-indigo-200',
+    data_protection: 'bg-primary/10 border-primary',
     safety: 'bg-amber-50 border-amber-200',
     activities: 'bg-emerald-50 border-emerald-200',
     safeguarding: 'bg-orange-50 border-orange-200',
@@ -116,7 +116,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                 description={`Manage consent records for ${name}.`}
                 backHref={`/operations/clients/${client.id}`}
                 actions={
-                    <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
+                    <Button className="gap-1.5 bg-primary hover:bg-primary" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
                         <Plus className="h-4 w-4" /> Record Consent
                     </Button>
                 }
@@ -135,11 +135,11 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                     {[
-                        { label: 'Total', value: s.total, color: 'text-violet-700', bg: 'from-violet-50 to-purple-50' },
+                        { label: 'Total', value: s.total, color: 'text-primary', bg: 'from-violet-50 to-purple-50' },
                         { label: 'Active', value: s.active, color: 'text-emerald-700', bg: 'from-emerald-50 to-green-50' },
-                        { label: 'Expiring', value: s.expiring_soon, color: s.expiring_soon > 0 ? 'text-amber-700' : 'text-slate-400', bg: 'from-amber-50 to-yellow-50' },
-                        { label: 'Expired', value: s.expired, color: s.expired > 0 ? 'text-red-700' : 'text-slate-400', bg: 'from-red-50 to-rose-50' },
-                        { label: 'Withdrawn', value: s.withdrawn, color: 'text-slate-600', bg: 'from-slate-50 to-slate-100' },
+                        { label: 'Expiring', value: s.expiring_soon, color: s.expiring_soon > 0 ? 'text-amber-700' : 'text-muted-foreground', bg: 'from-amber-50 to-yellow-50' },
+                        { label: 'Expired', value: s.expired, color: s.expired > 0 ? 'text-red-700' : 'text-muted-foreground', bg: 'from-red-50 to-rose-50' },
+                        { label: 'Withdrawn', value: s.withdrawn, color: 'text-muted-foreground', bg: 'from-slate-50 to-slate-100' },
                     ].map(st => (
                         <div key={st.label} className={`rounded-xl border bg-gradient-to-br ${st.bg} p-3 text-center`}>
                             <div className={`text-xl font-bold ${st.color}`}>{st.value}</div>
@@ -152,12 +152,12 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                 {consents.length === 0 ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                <ShieldCheck className="h-8 w-8 text-violet-400" />
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                <ShieldCheck className="h-8 w-8 text-primary" />
                             </div>
                             <p className="font-medium">No Consent Records</p>
                             <p className="mt-1 text-sm text-muted-foreground">Record the first consent for {client.first_name}.</p>
-                            <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
+                            <Button className="mt-4 gap-1.5 bg-primary hover:bg-primary" size="sm" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
                                 <Plus className="h-3.5 w-3.5" /> Record Consent
                             </Button>
                         </CardContent>
@@ -166,7 +166,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                     Object.entries(grouped).map(([cat, items]) => (
                         <div key={cat}>
                             <div className="mb-2 flex items-center gap-2">
-                                <FileCheck className="h-4 w-4 text-violet-500" />
+                                <FileCheck className="h-4 w-4 text-primary" />
                                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cat.replace(/_/g, ' ')}</span>
                                 <Badge variant="secondary" className="text-[10px]">{items.length}</Badge>
                             </div>
@@ -175,7 +175,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                                     const displayStatus = c.is_expired ? 'expired' : c.status;
                                     const style = STATUS_STYLES[displayStatus] ?? STATUS_STYLES.given;
                                     const StatusIcon = style.icon;
-                                    const catColor = CATEGORY_COLORS[cat] ?? 'bg-slate-50 border-slate-200';
+                                    const catColor = CATEGORY_COLORS[cat] ?? 'bg-muted border-border';
                                     return (
                                         <Card key={c.id} className={`overflow-hidden border ${catColor}`}>
                                             <CardContent className="p-4">
@@ -188,7 +188,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-sm font-semibold">{c.consent_type?.name ?? c.consent_type_name ?? 'Consent'}</span>
                                                                 <Badge className={`border-0 text-[10px] capitalize ${style.bg}`}>{displayStatus}</Badge>
-                                                                {c.capacity_assessed && <Badge className="border-0 bg-purple-100 text-purple-700 text-[10px]">Capacity Assessed</Badge>}
+                                                                {c.capacity_assessed && <Badge className="border-0 bg-primary/10 text-primary text-[10px]">Capacity Assessed</Badge>}
                                                                 {c.is_expiring_soon && !c.is_expired && <Badge className="border-0 bg-amber-100 text-amber-700 text-[10px] animate-pulse">Expiring Soon</Badge>}
                                                             </div>
                                                             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
@@ -200,7 +200,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            {c.conditions && <p className="mt-1.5 text-xs text-slate-600">{typeof c.conditions === 'string' ? c.conditions : JSON.stringify(c.conditions)}</p>}
+                                                            {c.conditions && <p className="mt-1.5 text-xs text-muted-foreground">{typeof c.conditions === 'string' ? c.conditions : JSON.stringify(c.conditions)}</p>}
                                                             {c.withdrawal_reason && <p className="mt-1.5 text-xs text-red-600">Withdrawn: {c.withdrawal_reason}</p>}
                                                         </div>
                                                     </div>
@@ -288,11 +288,11 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                         {/* Signed Document Upload */}
                         <div className="space-y-1.5">
                             <Label>Signed Document</Label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/50 p-4 transition-colors hover:bg-violet-50">
-                                <Upload className="h-5 w-5 text-violet-400" />
+                            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-primary bg-primary/10/50 p-4 transition-colors hover:bg-primary/10">
+                                <Upload className="h-5 w-5 text-primary" />
                                 <div>
-                                    <p className="text-sm font-medium text-violet-700">{consentFile ? consentFile.name : 'Click to upload signed consent form'}</p>
-                                    <p className="text-[10px] text-violet-500">PDF, Image, or scanned document</p>
+                                    <p className="text-sm font-medium text-primary">{consentFile ? consentFile.name : 'Click to upload signed consent form'}</p>
+                                    <p className="text-[10px] text-primary">PDF, Image, or scanned document</p>
                                 </div>
                                 <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => setConsentFile(e.target.files?.[0] ?? null)} />
                             </label>
@@ -300,7 +300,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowRecord(false)}>Cancel</Button>
-                        <Button className="bg-violet-600 hover:bg-violet-700" onClick={submitConsent} disabled={!formData.consent_type_id}>Record Consent</Button>
+                        <Button className="bg-primary hover:bg-primary" onClick={submitConsent} disabled={!formData.consent_type_id}>Record Consent</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

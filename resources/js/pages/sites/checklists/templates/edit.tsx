@@ -151,7 +151,7 @@ export default function EditTemplate({ template }: Props) {
                                 <div>
                                     <Label>Template Key</Label>
                                     <Input value={template.key} disabled className="bg-muted" />
-                                    <p className="text-xs text-slate-400 mt-1">Key cannot be changed</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Key cannot be changed</p>
                                 </div>
                                 <div>
                                     <Label>Template Name *</Label>
@@ -329,7 +329,7 @@ export default function EditTemplate({ template }: Props) {
                         {/* Items List */}
                         <div className="space-y-2">
                             {template.items.length === 0 ? (
-                                <div className="text-center py-8 text-slate-400">
+                                <div className="text-center py-8 text-muted-foreground">
                                     <FileQuestion className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                     <p>No items in this checklist yet</p>
                                     <p className="text-sm mt-1">Add questions or items to check</p>
@@ -342,12 +342,12 @@ export default function EditTemplate({ template }: Props) {
                                             key={item.id}
                                             className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50"
                                         >
-                                            <div className="mt-1 text-slate-500">
+                                            <div className="mt-1 text-muted-foreground">
                                                 <GripVertical className="w-4 h-4" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-start gap-2">
-                                                    <span className="text-sm font-mono text-slate-500">{index + 1}.</span>
+                                                    <span className="text-sm font-mono text-muted-foreground">{index + 1}.</span>
                                                     <div className="flex-1">
                                                         <p className="font-medium">{item.question}</p>
                                                         <div className="flex flex-wrap gap-2 mt-1">
@@ -355,7 +355,7 @@ export default function EditTemplate({ template }: Props) {
                                                                 {responseTypeLabels[item.response_type]}
                                                             </Badge>
                                                             {item.is_required && (
-                                                                <Badge className="text-xs bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                                                                <Badge className="text-xs bg-primary/20 text-primary/70 border-primary/30">
                                                                     Required
                                                                 </Badge>
                                                             )}
@@ -366,7 +366,7 @@ export default function EditTemplate({ template }: Props) {
                                                             )}
                                                         </div>
                                                         {item.guidance && (
-                                                            <p className="text-sm text-slate-400 mt-1">{item.guidance}</p>
+                                                            <p className="text-sm text-muted-foreground mt-1">{item.guidance}</p>
                                                         )}
                                                     </div>
                                                 </div>

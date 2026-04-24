@@ -58,7 +58,7 @@ function actionColor(action: string): string {
         case 'rejected':
             return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
         default:
-            return 'bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300';
+            return 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground';
     }
 }
 

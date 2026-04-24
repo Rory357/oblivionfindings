@@ -75,7 +75,7 @@ const CHECKLIST_SECTIONS = [
     },
     {
         section: 'Interior',
-        color: 'bg-purple-600',
+        color: 'bg-primary',
         items: [
             { key: 'seatbelts', label: 'Seatbelts (functional)' },
             { key: 'horn', label: 'Horn' },
@@ -221,7 +221,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                         </div>
                         <div className="h-2 w-full rounded-full bg-muted">
                             <div
-                                className="h-full rounded-full bg-purple-600 transition-all duration-300"
+                                className="h-full rounded-full bg-primary transition-all duration-300"
                                 style={{ width: '100%' }}
                             />
                         </div>
@@ -336,8 +336,8 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                             className={cn(
                                                                 "rounded-lg border-2 py-3 text-sm font-medium transition-all",
                                                                 val?.result === 'pass'
-                                                                    ? "border-purple-600 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-500"
-                                                                    : "border-transparent bg-muted hover:border-purple-300"
+                                                                    ? "border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary dark:border-primary"
+                                                                    : "border-transparent bg-muted hover:border-primary"
                                                             )}
                                                         >
                                                             <CheckCircle className="mx-auto mb-1 h-4 w-4" />
@@ -362,8 +362,8 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                             className={cn(
                                                                 "rounded-lg border-2 py-3 text-sm font-medium transition-all",
                                                                 val?.result === 'na'
-                                                                    ? "border-slate-600 bg-slate-50 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 dark:border-slate-500"
-                                                                    : "border-transparent bg-muted hover:border-slate-300"
+                                                                    ? "border-slate-600 bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-slate-500"
+                                                                    : "border-transparent bg-muted hover:border-border"
                                                             )}
                                                         >
                                                             <MinusCircle className="mx-auto mb-1 h-4 w-4" />

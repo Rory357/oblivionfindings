@@ -800,7 +800,7 @@ export default function ShiftShow({
                                     <Badge variant="outline" className={
                                         handoverSummary.status === 'acknowledged' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
                                         handoverSummary.status === 'submitted' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
-                                        'border-slate-500/30 text-slate-400 bg-slate-500/10'
+                                        'border-slate-500/30 text-muted-foreground bg-slate-500/10'
                                     }>
                                         {handoverSummary.status.charAt(0).toUpperCase() + handoverSummary.status.slice(1)}
                                     </Badge>

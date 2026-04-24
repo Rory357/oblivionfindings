@@ -326,9 +326,9 @@ export default function AssetShow({
                 {/* Header Banner Card */}
                 <div className={cn(
                     'rounded-lg border px-5 py-4',
-                    asset.status === 'active' ? 'bg-purple-50 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-200' :
+                    asset.status === 'active' ? 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70' :
                     asset.status === 'out_of_service' ? 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200' :
-                    'bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-950/30 dark:border-slate-800 dark:text-slate-200'
+                    'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground'
                 )}>
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -945,7 +945,7 @@ export default function AssetShow({
                                                     className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <Cpu className={`h-5 w-5 ${device.status === 'active' ? 'text-green-500' : 'text-gray-400'}`} />
+                                                        <Cpu className={`h-5 w-5 ${device.status === 'active' ? 'text-green-500' : 'text-muted-foreground'}`} />
                                                         <div>
                                                             <div className="font-medium">{device.name ?? device.vendor ?? 'Device'}</div>
                                                             <div className="text-xs text-muted-foreground font-mono">

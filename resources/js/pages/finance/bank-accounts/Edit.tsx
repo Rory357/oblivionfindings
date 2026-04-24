@@ -59,8 +59,8 @@ export default function BankAccountEdit({ bankAccount, glAccounts }: Props) {
 
             <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Edit Bank Account</h1>
-                    <p className="text-gray-500 mt-1">Update details for {bankAccount.name}</p>
+                    <h1 className="text-3xl font-bold text-foreground">Edit Bank Account</h1>
+                    <p className="text-muted-foreground mt-1">Update details for {bankAccount.name}</p>
                 </div>
 
                 <Card>

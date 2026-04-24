@@ -26,16 +26,16 @@ const formatNZD = (amount: string | number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
     approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
-    sent: { label: 'Sent', className: 'bg-indigo-100 text-indigo-800' },
+    sent: { label: 'Sent', className: 'bg-primary/10 text-primary' },
     partially_received: { label: 'Partially Received', className: 'bg-yellow-100 text-yellow-800' },
     received: { label: 'Received', className: 'bg-green-100 text-green-800' },
     cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
 };
 
 function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] ?? { label: status, className: 'bg-gray-100 text-gray-800' };
+    const config = statusConfig[status] ?? { label: status, className: 'bg-muted text-foreground' };
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>{config.label}</span>;
 }
 

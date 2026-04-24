@@ -63,7 +63,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                         <h1 className="text-lg font-semibold">
                             Evidence Pack for {stay.client?.first_name} {stay.client?.last_name}
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {formatDateTime(stay.start_date)} &mdash; {formatDateTime(stay.end_date)}
                         </div>
                     </div>
@@ -72,7 +72,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
 
                 {!pack ? (
                     <div className="space-y-4">
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No evidence pack exists for this stay.
                         </div>
                         <div className="flex justify-center">
@@ -90,7 +90,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                             <CardHeader>
                                 <CardTitle className="text-base">Pack Details</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2 text-sm text-slate-600">
+                            <CardContent className="space-y-2 text-sm text-muted-foreground">
                                 <div className="font-medium">{pack.title || `Evidence Pack #${pack.id}`}</div>
                                 {pack.description && <div className="whitespace-pre-wrap">{pack.description}</div>}
                                 <div className="flex flex-wrap gap-2">
@@ -121,10 +121,10 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                                                         <span className="font-medium">{item.title}</span>
                                                     </div>
                                                     {item.description && (
-                                                        <div className="mt-1 text-xs text-slate-500">{item.description}</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
                                                     )}
                                                     {item.added_at && (
-                                                        <div className="mt-1 text-xs text-slate-400">{formatDateTime(item.added_at)}</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(item.added_at)}</div>
                                                     )}
                                                 </div>
                                                 {!isSealed && (
@@ -140,7 +140,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="py-4 text-center text-sm text-slate-500">No items in this pack.</div>
+                                    <div className="py-4 text-center text-sm text-muted-foreground">No items in this pack.</div>
                                 )}
                             </CardContent>
                         </Card>

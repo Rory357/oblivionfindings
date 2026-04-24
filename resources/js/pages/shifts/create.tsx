@@ -153,7 +153,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                         </option>
                                     ))}
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 If left blank, the shift will inherit the selected client’s service context (if set).
                             </div>
                         </div>
@@ -172,7 +172,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                     </option>
                                 ))}
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 Leave blank to create an open shift that can be assigned later from the Rostering module.
                             </div>
                         </div>
@@ -243,7 +243,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="text-sm font-medium">Repeat weekly</div>
-                                    <div className="text-xs text-slate-500">Create a recurring series (weekly) until an end date.</div>
+                                    <div className="text-xs text-muted-foreground">Create a recurring series (weekly) until an end date.</div>
                                 </div>
                                 <input
                                     type="checkbox"
@@ -262,7 +262,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                                     type="button"
                                                     key={d}
                                                     onClick={() => toggleWeekday(d)}
-                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : ''}`}
+                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-slate-900 text-white dark:bg-white dark:text-foreground' : ''}`}
                                                 >
                                                     {d.toUpperCase()}
                                                 </button>
@@ -277,7 +277,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                             value={form.data.repeat_end_date}
                                             onChange={(e) => form.setData('repeat_end_date', e.target.value)}
                                         />
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             Tip: starts/ends time are taken from the Start/End fields above.
                                         </div>
                                     </div>

@@ -48,14 +48,14 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
       not_due: 'bg-blue-100 text-blue-800',
       due_soon: 'bg-yellow-100 text-yellow-800',
       overdue: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getFrameworkColor = (framework: string) => {
     const colors: Record<string, string> = {
       charities: 'bg-blue-500',
       nga_paerewa: 'bg-green-500',
-      privacy_act: 'bg-purple-500',
+      privacy_act: 'bg-primary',
       hswa: 'bg-orange-500',
     };
     return colors[framework] || 'bg-gray-500';
@@ -85,8 +85,8 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Compliance</h1>
-              <p className="text-gray-500 mt-1">Track regulatory obligations and deadlines</p>
+              <h1 className="text-3xl font-bold text-foreground">Compliance</h1>
+              <p className="text-muted-foreground mt-1">Track regulatory obligations and deadlines</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" asChild>
@@ -106,7 +106,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Overdue</p>
+                    <p className="text-sm text-muted-foreground">Overdue</p>
                     <p className="text-3xl font-bold text-red-600">{summary.total_overdue}</p>
                   </div>
                   <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -117,7 +117,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Due Soon (30d)</p>
+                    <p className="text-sm text-muted-foreground">Due Soon (30d)</p>
                     <p className="text-3xl font-bold text-yellow-600">{summary.total_due_soon}</p>
                   </div>
                   <Clock className="w-8 h-8 text-yellow-500" />
@@ -128,7 +128,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Next 30 Days</p>
+                    <p className="text-sm text-muted-foreground">Next 30 Days</p>
                     <p className="text-3xl font-bold text-blue-600">{summary.next_30_days.length}</p>
                   </div>
                   <Calendar className="w-8 h-8 text-blue-500" />
@@ -139,7 +139,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Compliance Rate</p>
+                    <p className="text-sm text-muted-foreground">Compliance Rate</p>
                     <p className="text-3xl font-bold text-green-600">
                       {(() => {
                         const total = Object.values(summary.by_framework).reduce((a, f) => a + f.total, 0);
@@ -167,7 +167,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">{data.complete} of {data.total} complete</span>
+                        <span className="text-muted-foreground">{data.complete} of {data.total} complete</span>
                         <span className="font-medium">{Math.round(completionRate)}%</span>
                       </div>
                       <Progress value={completionRate} />
@@ -206,7 +206,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                       <div className="flex items-center gap-2 mb-1">
                         <Link
                           href={showCompliance.url({ obligation: obligation.id })}
-                          className="font-semibold text-gray-900 hover:text-blue-600"
+                          className="font-semibold text-foreground hover:text-blue-600"
                         >
                           {obligation.obligation_title}
                         </Link>
@@ -217,7 +217,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span>{frameworks.find(f => f.value === obligation.framework)?.label}</span>
                         <span>•</span>
                         <span>Owner: {obligation.owner?.name || 'Unassigned'}</span>
@@ -228,7 +228,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                         <Badge className={cn(getStatusColor(obligation.status))}>
                           {obligation.status.replace('_', ' ')}
                         </Badge>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {formatDate(obligation.due_date)}
                         </p>
                       </div>

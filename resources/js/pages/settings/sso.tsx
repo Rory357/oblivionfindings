@@ -92,11 +92,11 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             {msConfigured ? (
                                                 <Badge className="bg-emerald-100 text-emerald-700 text-xs">Configured</Badge>
                                             ) : (
-                                                <Badge className="bg-slate-100 text-slate-500 text-xs">Not Configured</Badge>
+                                                <Badge className="bg-muted text-muted-foreground text-xs">Not Configured</Badge>
                                             )}
                                         </div>
                                     </div>
-                                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${msConfigured ? 'bg-[#00a4ef]/10' : 'bg-slate-100'}`}>
+                                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${msConfigured ? 'bg-[#00a4ef]/10' : 'bg-muted'}`}>
                                         <MicrosoftIcon />
                                     </div>
                                 </div>
@@ -111,11 +111,11 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             {gConfigured ? (
                                                 <Badge className="bg-emerald-100 text-emerald-700 text-xs">Configured</Badge>
                                             ) : (
-                                                <Badge className="bg-slate-100 text-slate-500 text-xs">Not Configured</Badge>
+                                                <Badge className="bg-muted text-muted-foreground text-xs">Not Configured</Badge>
                                             )}
                                         </div>
                                     </div>
-                                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${gConfigured ? 'bg-[#4285F4]/10' : 'bg-slate-100'}`}>
+                                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${gConfigured ? 'bg-[#4285F4]/10' : 'bg-muted'}`}>
                                         <GoogleIcon />
                                     </div>
                                 </div>
@@ -127,12 +127,12 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Group Mappings</p>
                                         <div className="mt-1 flex items-center gap-2">
-                                            <span className="text-lg font-bold text-violet-700">{group_mapping_count}</span>
+                                            <span className="text-lg font-bold text-primary">{group_mapping_count}</span>
                                             <span className="text-xs text-muted-foreground">active</span>
                                         </div>
                                     </div>
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100">
-                                        <Users className="h-5 w-5 text-violet-600" />
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                                        <Users className="h-5 w-5 text-primary" />
                                     </div>
                                 </div>
                             </CardContent>
@@ -209,7 +209,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                         </div>
                                         <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">Configure these in your Azure App Registration &rarr; API permissions</p>
                                     </div>
-                                    <Button className="bg-violet-600 hover:bg-violet-700">Save Microsoft Settings</Button>
+                                    <Button className="bg-primary hover:bg-primary">Save Microsoft Settings</Button>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -263,7 +263,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                         </div>
                                         <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Configure these in Google Cloud Console &rarr; OAuth consent screen</p>
                                     </div>
-                                    <Button className="bg-violet-600 hover:bg-violet-700">Save Google Settings</Button>
+                                    <Button className="bg-primary hover:bg-primary">Save Google Settings</Button>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -273,7 +273,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <ShieldCheck className="h-5 w-5 text-violet-600" />
+                                        <ShieldCheck className="h-5 w-5 text-primary" />
                                         Provisioning &amp; Security
                                     </CardTitle>
                                     <CardDescription>Control how new users are created via SSO</CardDescription>
@@ -300,7 +300,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                         </div>
                                         <Switch checked={groupSync} onCheckedChange={setGroupSync} />
                                     </div>
-                                    <Button className="mt-4 bg-violet-600 hover:bg-violet-700">Save Provisioning Settings</Button>
+                                    <Button className="mt-4 bg-primary hover:bg-primary">Save Provisioning Settings</Button>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -312,12 +312,12 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <CardTitle className="flex items-center gap-2">
-                                                <Users className="h-5 w-5 text-violet-600" />
+                                                <Users className="h-5 w-5 text-primary" />
                                                 Security Group Mapping
                                             </CardTitle>
                                             <CardDescription>Map Azure AD or Google Workspace security groups to application roles</CardDescription>
                                         </div>
-                                        <Button asChild className="bg-violet-600 hover:bg-violet-700">
+                                        <Button asChild className="bg-primary hover:bg-primary">
                                             <Link href="/settings/sso-groups">Open Full Manager</Link>
                                         </Button>
                                     </div>
@@ -337,11 +337,11 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             </Button>
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-violet-50 p-4 text-sm dark:bg-violet-950/20">
-                                        <p className="flex items-center gap-2 font-medium text-violet-800 dark:text-violet-300">
+                                    <div className="rounded-lg bg-primary/10 p-4 text-sm dark:bg-primary/20">
+                                        <p className="flex items-center gap-2 font-medium text-primary dark:text-primary/70">
                                             <Info className="h-4 w-4" /> How it works
                                         </p>
-                                        <ul className="mt-2 space-y-1 text-xs text-violet-700 dark:text-violet-400 list-disc list-inside">
+                                        <ul className="mt-2 space-y-1 text-xs text-primary dark:text-primary list-disc list-inside">
                                             <li>Create mappings between external security groups and app roles</li>
                                             <li>When a user signs in via SSO, their groups are checked</li>
                                             <li>Roles are auto-assigned or removed based on your mappings</li>
@@ -357,7 +357,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <Globe className="h-5 w-5 text-violet-600" />
+                                        <Globe className="h-5 w-5 text-primary" />
                                         SSO URLs &amp; Setup
                                     </CardTitle>
                                     <CardDescription>Redirect URIs to configure in your identity provider</CardDescription>

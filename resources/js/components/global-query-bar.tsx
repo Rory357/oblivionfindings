@@ -165,7 +165,7 @@ export default function GlobalQueryBar() {
                     type="button"
                     variant="outline"
                     className={cn(
-                        'hidden h-9 w-[320px] justify-start gap-2 px-3 text-sm text-slate-500 lg:flex',
+                        'hidden h-9 w-[320px] justify-start gap-2 px-3 text-sm text-muted-foreground lg:flex',
                         !canAsk && 'opacity-60',
                     )}
                     disabled={!canAsk}
@@ -247,7 +247,7 @@ export default function GlobalQueryBar() {
                                 {sources.length > 0 && (
                                     <>
                                         <Separator />
-                                        <div className="text-xs font-medium text-slate-500">
+                                        <div className="text-xs font-medium text-muted-foreground">
                                             Sources
                                         </div>
                                         <div className="space-y-2">
@@ -256,7 +256,7 @@ export default function GlobalQueryBar() {
                                                     key={idx}
                                                     className="rounded-md border p-2 text-xs"
                                                 >
-                                                    <div className="text-slate-500">
+                                                    <div className="text-muted-foreground">
                                                         {(s.filename ||
                                                             s.file_id) ??
                                                             'Source'}

@@ -92,9 +92,9 @@ export default function RespiteProcedureCreate() {
                                     }}
                                     rows={8}
                                 />
-                                <div className="mt-2 text-xs text-slate-500">
+                                <div className="mt-2 text-xs text-muted-foreground">
                                     Example:
-                                    <pre className="mt-1 rounded-md border bg-slate-50 p-2 text-xs">
+                                    <pre className="mt-1 rounded-md border bg-muted p-2 text-xs">
                                         {JSON.stringify(example, null, 2)}
                                     </pre>
                                 </div>

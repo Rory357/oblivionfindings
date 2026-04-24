@@ -196,18 +196,18 @@ function formatDateTime(d: string | null): string {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-700 border-slate-200',
+    draft: 'bg-muted text-foreground border-border',
     pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
     active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    under_review: 'bg-violet-50 text-violet-700 border-violet-200',
+    under_review: 'bg-primary/10 text-primary border-primary',
     renewed: 'bg-blue-50 text-blue-700 border-blue-200',
-    expired: 'bg-slate-100 text-slate-500 border-slate-200',
+    expired: 'bg-muted text-muted-foreground border-border',
     terminated: 'bg-red-50 text-red-700 border-red-200',
     suspended: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
 function statusBadge(status: string) {
-    const cls = STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-600 border-slate-200';
+    const cls = STATUS_COLORS[status] ?? 'bg-muted text-muted-foreground border-border';
     return (
         <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${cls}`}>
             {status.replace(/_/g, ' ')}
@@ -235,7 +235,7 @@ function StatusTimeline({ status }: { status: string }) {
         <Card>
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                    <Milestone className="h-4 w-4 text-violet-500" />
+                    <Milestone className="h-4 w-4 text-primary" />
                     Agreement Lifecycle
                 </CardTitle>
             </CardHeader>
@@ -245,11 +245,11 @@ function StatusTimeline({ status }: { status: string }) {
                         const isCurrent = step.key === status;
                         const isPast = currentIdx >= 0 && idx < currentIdx;
 
-                        let dotCls = 'bg-slate-200 text-slate-400 border-slate-300';
-                        if (isCurrent) dotCls = 'bg-violet-500 text-white border-violet-600 ring-2 ring-violet-200';
+                        let dotCls = 'bg-muted text-muted-foreground border-border';
+                        if (isCurrent) dotCls = 'bg-primary text-white border-primary ring-2 ring-ring';
                         else if (isPast) dotCls = 'bg-emerald-500 text-white border-emerald-600';
 
-                        let lineCls = 'bg-slate-200';
+                        let lineCls = 'bg-muted';
                         if (isPast || (currentIdx >= 0 && idx < currentIdx)) lineCls = 'bg-emerald-400';
 
                         return (
@@ -259,9 +259,9 @@ function StatusTimeline({ status }: { status: string }) {
                                     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${dotCls}`}>
                                         {isPast ? <CheckCircle2 className="h-4 w-4" /> : idx + 1}
                                     </div>
-                                    {idx < TIMELINE_STEPS.length - 1 && <div className={`h-0.5 flex-1 ${idx < currentIdx ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+                                    {idx < TIMELINE_STEPS.length - 1 && <div className={`h-0.5 flex-1 ${idx < currentIdx ? 'bg-emerald-400' : 'bg-muted'}`} />}
                                 </div>
-                                <span className={`mt-1.5 text-center text-[10px] leading-tight ${isCurrent ? 'font-semibold text-violet-700' : isPast ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                <span className={`mt-1.5 text-center text-[10px] leading-tight ${isCurrent ? 'font-semibold text-primary' : isPast ? 'text-emerald-600' : 'text-muted-foreground'}`}>
                                     {step.label}
                                 </span>
                             </div>
@@ -271,7 +271,7 @@ function StatusTimeline({ status }: { status: string }) {
 
                 {isTerminal && (
                     <div className="mt-3 flex items-center justify-center gap-2">
-                        <div className={`rounded-full px-3 py-1 text-xs font-medium ${status === 'terminated' ? 'bg-red-100 text-red-700' : status === 'suspended' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                        <div className={`rounded-full px-3 py-1 text-xs font-medium ${status === 'terminated' ? 'bg-red-100 text-red-700' : status === 'suspended' ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
                             {status === 'terminated' && <XCircle className="mr-1 inline h-3 w-3" />}
                             {status === 'suspended' && <Pause className="mr-1 inline h-3 w-3" />}
                             {status === 'expired' && <Clock className="mr-1 inline h-3 w-3" />}
@@ -661,10 +661,10 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
     const milestoneDates = [
         { label: 'NASC Assessment', value: ag.nasc_assessment_date, icon: <FileText className="h-4 w-4 text-blue-500" /> },
         { label: 'Funding Approved', value: ag.funding_approved_date, icon: <DollarSign className="h-4 w-4 text-emerald-500" /> },
-        { label: 'Signed', value: ag.signed_date, icon: <ShieldCheck className="h-4 w-4 text-violet-500" /> },
+        { label: 'Signed', value: ag.signed_date, icon: <ShieldCheck className="h-4 w-4 text-primary" /> },
         { label: 'First Service', value: ag.first_service_date, icon: <Play className="h-4 w-4 text-teal-500" /> },
         { label: 'Review Due', value: ag.review_due_date, icon: <Clock className="h-4 w-4 text-amber-500" /> },
-        { label: 'Renewal', value: ag.renewal_date, icon: <RefreshCw className="h-4 w-4 text-indigo-500" /> },
+        { label: 'Renewal', value: ag.renewal_date, icon: <RefreshCw className="h-4 w-4 text-primary" /> },
     ];
 
     return (
@@ -728,7 +728,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                 <Card className="mt-4">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                            <CalendarDays className="h-4 w-4 text-violet-500" />
+                            <CalendarDays className="h-4 w-4 text-primary" />
                             Milestone Dates
                         </CardTitle>
                     </CardHeader>
@@ -811,7 +811,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                     <Card className="mt-4">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <Landmark className="h-4 w-4 text-indigo-500" />
+                                <Landmark className="h-4 w-4 text-primary" />
                                 Funding Details
                             </CardTitle>
                         </CardHeader>
@@ -821,16 +821,16 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                 <div className="space-y-3 sm:col-span-2">
                                     <div className="flex flex-wrap items-center gap-2">
                                         {ag.funding_type && (
-                                            <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                                            <span className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                                                 {FUNDING_TYPE_LABELS[ag.funding_type] ?? ag.funding_type}
                                             </span>
                                         )}
                                         {ag.service_level && (
-                                            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                                            <span className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                                                 {SERVICE_LEVEL_LABELS[ag.service_level] ?? ag.service_level}
                                             </span>
                                         )}
-                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ag.gst_inclusive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ag.gst_inclusive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-border bg-muted text-muted-foreground'}`}>
                                             {ag.gst_inclusive ? 'GST Inclusive' : 'GST Exclusive'}
                                         </span>
                                     </div>
@@ -928,7 +928,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                         <span>{formatCurrency(bs.budget_used)} used</span>
                                         <span>{formatCurrency(bs.total_budget)} total</span>
                                     </div>
-                                    <div className="h-2.5 w-full rounded-full bg-slate-100">
+                                    <div className="h-2.5 w-full rounded-full bg-muted">
                                         <div
                                             className={`h-2.5 rounded-full transition-all ${utilPct > 90 ? 'bg-red-500' : utilPct > 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                                             style={{ width: `${Math.min(utilPct, 100)}%` }}
@@ -974,7 +974,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <FileText className="h-4 w-4 text-violet-500" />
+                                    <FileText className="h-4 w-4 text-primary" />
                                     Line Items ({ag.line_items?.length ?? 0})
                                 </CardTitle>
                                 <Button size="sm" variant="outline" onClick={() => { setEditingLineItem(null); setLineItemDialogOpen(true); }}>
@@ -999,12 +999,12 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                             {formatCurrency(item.unit_price)}/{item.unit}
                                                             {item.quantity != null && <span className="ml-1">x {item.quantity}</span>}
                                                             {item.category && <span className="ml-2 text-blue-500">{item.category}</span>}
-                                                            {item.ndis_line_item_code && <span className="ml-2 text-violet-500">#{item.ndis_line_item_code}</span>}
+                                                            {item.ndis_line_item_code && <span className="ml-2 text-primary">#{item.ndis_line_item_code}</span>}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-start gap-2">
                                                         <div className="text-right">
-                                                            <div className={`text-sm font-semibold tabular-nums ${itemPct > 90 ? 'text-red-600' : itemPct > 70 ? 'text-amber-600' : 'text-slate-900'}`}>{itemPct}%</div>
+                                                            <div className={`text-sm font-semibold tabular-nums ${itemPct > 90 ? 'text-red-600' : itemPct > 70 ? 'text-amber-600' : 'text-foreground'}`}>{itemPct}%</div>
                                                             <div className="text-[10px] text-muted-foreground">{formatCurrency(item.budget_used)} / {formatCurrency(item.budget_allocated)}</div>
                                                         </div>
                                                         <div className="flex gap-1">
@@ -1017,7 +1017,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                                <div className="h-1.5 w-full rounded-full bg-muted">
                                                     <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(itemPct, 100)}%` }} />
                                                 </div>
                                             </div>
@@ -1084,7 +1084,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                 <Card className="mt-4">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                            <History className="h-4 w-4 text-violet-500" />
+                            <History className="h-4 w-4 text-primary" />
                             Status Audit Trail
                         </CardTitle>
                     </CardHeader>
@@ -1095,8 +1095,8 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                             <div className="space-y-3">
                                 {ag.status_changes.map((sc) => (
                                     <div key={sc.id} className="flex items-start gap-3 rounded-lg border bg-muted/20 p-3">
-                                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100">
-                                            <ArrowRight className="h-4 w-4 text-violet-600" />
+                                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                            <ArrowRight className="h-4 w-4 text-primary" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -1132,7 +1132,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                     <Card className="mt-4">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <PenLine className="h-4 w-4 text-violet-500" />
+                                <PenLine className="h-4 w-4 text-primary" />
                                 Signatories & Contacts
                             </CardTitle>
                         </CardHeader>
@@ -1175,7 +1175,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                 <Card className="mt-4">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                            <Link2 className="h-4 w-4 text-violet-500" />
+                            <Link2 className="h-4 w-4 text-primary" />
                             Related Records
                         </CardTitle>
                     </CardHeader>
@@ -1184,7 +1184,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                             {/* Funding Claims */}
                             <div className="rounded-lg border p-4">
                                 <div className="flex items-center gap-2">
-                                    <Receipt className="h-4 w-4 text-indigo-500" />
+                                    <Receipt className="h-4 w-4 text-primary" />
                                     <h4 className="text-sm font-semibold">Funding Claims</h4>
                                 </div>
                                 <p className="mt-2 text-2xl font-bold tabular-nums">{ag.funding_claims_count ?? 0}</p>
@@ -1195,7 +1195,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                             <ExternalLink className="mr-1 h-3 w-3" /> View Claims
                                         </Link>
                                     </Button>
-                                    <Button asChild size="sm" className="h-7 bg-indigo-600 text-xs hover:bg-indigo-700">
+                                    <Button asChild size="sm" className="h-7 bg-primary text-xs hover:bg-primary">
                                         <Link href={`/operations/funding/claims/create?agreement_id=${ag.id}`}>
                                             <Plus className="mr-1 h-3 w-3" /> Create Claim
                                         </Link>
@@ -1206,7 +1206,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                             {/* Linked Shifts */}
                             <div className="rounded-lg border border-dashed p-4">
                                 <div className="flex items-center gap-2">
-                                    <Timer className="h-4 w-4 text-slate-400" />
+                                    <Timer className="h-4 w-4 text-muted-foreground" />
                                     <h4 className="text-sm font-semibold text-muted-foreground">Linked Shifts</h4>
                                 </div>
                                 <p className="mt-2 text-xs text-muted-foreground">

@@ -17,11 +17,11 @@ type Props = {
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-slate-100 text-slate-800',
+    pending: 'bg-muted text-foreground',
     in_progress: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
     failed: 'bg-red-100 text-red-800',
-    cancelled: 'bg-slate-100 text-slate-600',
+    cancelled: 'bg-muted text-muted-foreground',
     escalated: 'bg-orange-100 text-orange-800',
 };
 
@@ -41,7 +41,7 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{run.template?.name || 'Procedure Run'}</h1>
-                        <div className="mt-1 text-sm text-slate-500">Run #{run.id}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Run #{run.id}</div>
                     </div>
                     <Link href="/respite/procedure-runs" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                         Back to list
@@ -53,7 +53,7 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Run Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-slate-600">
+                    <CardContent className="space-y-3 text-sm text-muted-foreground">
                         <div className="flex flex-wrap gap-2">
                             <Badge className={statusColors[run.status] || ''}>{run.status?.replace(/_/g, ' ')}</Badge>
                         </div>
@@ -83,14 +83,14 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                                         {step.completed ? (
                                             <span className="text-green-600">&#10003;</span>
                                         ) : (
-                                            <span className="text-slate-400">&#9675;</span>
+                                            <span className="text-muted-foreground">&#9675;</span>
                                         )}
-                                        <span className={step.completed ? 'text-slate-600' : 'text-slate-800'}>{step.name || `Step ${idx + 1}`}</span>
+                                        <span className={step.completed ? 'text-muted-foreground' : 'text-foreground'}>{step.name || `Step ${idx + 1}`}</span>
                                     </li>
                                 ))}
                             </ul>
                         ) : (
-                            <div className="text-sm text-slate-500">No step information available.</div>
+                            <div className="text-sm text-muted-foreground">No step information available.</div>
                         )}
                     </CardContent>
                 </Card>

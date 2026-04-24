@@ -68,8 +68,8 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Governance Documents</h1>
-            <p className="text-gray-500 mt-1">Board documents, templates, and archives</p>
+            <h1 className="text-2xl font-bold text-foreground">Governance Documents</h1>
+            <p className="text-muted-foreground mt-1">Board documents, templates, and archives</p>
           </div>
           <Button onClick={() => setShowUpload(!showUpload)}>
             <Upload className="w-4 h-4 mr-2" /> Upload Document
@@ -123,7 +123,7 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
                       <Badge variant="outline" className="text-xs">{getCategoryLabel(doc.category)}</Badge>
                       {doc.is_confidential && <Badge className="bg-red-100 text-red-800 text-xs">Confidential</Badge>}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-muted-foreground">
                       {doc.file_name} &middot; {formatBytes(doc.file_size)} &middot; v{doc.version} &middot; {new Date(doc.updated_at).toLocaleDateString('en-NZ')}
                     </div>
                   </div>
@@ -137,7 +137,7 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
             </Card>
           ))}
           {documents.data.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-gray-500">No documents uploaded yet.</CardContent></Card>
+            <Card><CardContent className="p-8 text-center text-muted-foreground">No documents uploaded yet.</CardContent></Card>
           )}
         </div>
       </div>

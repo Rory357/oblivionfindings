@@ -176,11 +176,11 @@ export default function TransportPreCheck({
                     {/* Left: Checklist */}
                     <div className="space-y-4">
                         {/* Resident Info Card */}
-                        <Card className="border bg-purple-50 dark:bg-purple-950/30">
+                        <Card className="border bg-primary/10 dark:bg-primary/30">
                             <CardContent className="p-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/40">
-                                        <User className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/40">
+                                        <User className="h-6 w-6 text-primary dark:text-primary" />
                                     </div>
                                     <div>
                                         <p className="text-lg font-semibold">{t.resident_name ?? '---'}</p>

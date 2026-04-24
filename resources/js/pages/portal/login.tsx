@@ -20,11 +20,11 @@ export default function PortalLogin() {
     return (
         <>
             <Head title="Portal Login" />
-            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+            <div className="flex min-h-screen items-center justify-center bg-muted px-4">
                 <div className="w-full max-w-md">
                     {/* Branding */}
                     <div className="mb-8 text-center">
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Oblivion Findings</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Oblivion Findings</h1>
                         <p className="text-muted-foreground mt-1 text-sm">Client & Family Portal</p>
                     </div>
 
@@ -80,7 +80,7 @@ export default function PortalLogin() {
                                 </div>
                                 <Button
                                     type="submit"
-                                    className="w-full bg-violet-600 hover:bg-violet-700"
+                                    className="w-full bg-primary hover:bg-primary"
                                     disabled={form.processing}
                                 >
                                     Sign in
@@ -93,7 +93,7 @@ export default function PortalLogin() {
                                     <div className="w-full border-t" />
                                 </div>
                                 <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-white px-2 text-slate-500">or continue with</span>
+                                    <span className="bg-white px-2 text-muted-foreground">or continue with</span>
                                 </div>
                             </div>
 

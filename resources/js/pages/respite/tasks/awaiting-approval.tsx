@@ -13,7 +13,7 @@ type Props = {
 };
 
 const priorityColors: Record<string, string> = {
-    low: 'bg-slate-100 text-slate-800',
+    low: 'bg-muted text-foreground',
     medium: 'bg-blue-100 text-blue-800',
     high: 'bg-orange-100 text-orange-800',
     urgent: 'bg-red-100 text-red-800',
@@ -29,7 +29,7 @@ export default function TasksAwaitingApproval({ tasks }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Tasks Awaiting Approval</h1>
-                    <div className="mt-1 text-sm text-slate-500">Tasks submitted for your approval.</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Tasks submitted for your approval.</div>
                 </div>
                 <RespiteSubnav />
 
@@ -46,10 +46,10 @@ export default function TasksAwaitingApproval({ tasks }: Props) {
                                                 <Badge className="bg-amber-100 text-amber-800">Awaiting Approval</Badge>
                                             </div>
                                             {t.assigned_to && (
-                                                <div className="mt-2 text-xs text-slate-500">Submitted by: {t.assigned_to?.name}</div>
+                                                <div className="mt-2 text-xs text-muted-foreground">Submitted by: {t.assigned_to?.name}</div>
                                             )}
                                             {t.due_at && (
-                                                <div className="mt-1 text-xs text-slate-500">Due: {formatDateTime(t.due_at)}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">Due: {formatDateTime(t.due_at)}</div>
                                             )}
                                         </div>
                                         <Link href={`/respite/tasks/${t.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
@@ -77,7 +77,7 @@ export default function TasksAwaitingApproval({ tasks }: Props) {
                         </Card>
                     ))}
                     {!tasks.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No tasks awaiting approval.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No tasks awaiting approval.</div>
                     )}
                 </div>
 

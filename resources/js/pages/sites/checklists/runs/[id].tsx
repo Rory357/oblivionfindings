@@ -263,8 +263,8 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                 </>
                             ) : (
                                 <>
-                                    <Camera className="w-8 h-8 text-slate-400" />
-                                    <span className="text-sm text-slate-400">Click to upload photo</span>
+                                    <Camera className="w-8 h-8 text-muted-foreground" />
+                                    <span className="text-sm text-muted-foreground">Click to upload photo</span>
                                 </>
                             )}
                             <input
@@ -310,7 +310,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                             <ClipboardCheck className="w-5 h-5" />
                             {template.name}
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                 </div>
 
@@ -336,7 +336,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                 <div className="font-medium text-red-400">
                                     {failedItems.length} item(s) marked as failed
                                 </div>
-                                <div className="text-sm text-slate-400">
+                                <div className="text-sm text-muted-foreground">
                                     Failed items may require hazard creation
                                 </div>
                             </div>
@@ -374,7 +374,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                                     )}
                                                 </div>
                                                 {item.guidance && (
-                                                    <div className="text-sm text-slate-400 mt-1">
+                                                    <div className="text-sm text-muted-foreground mt-1">
                                                         {item.guidance}
                                                     </div>
                                                 )}
@@ -389,7 +389,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-auto p-0 text-slate-400 hover:text-slate-200"
+                                                        className="h-auto p-0 text-muted-foreground hover:text-slate-200"
                                                     >
                                                         {isNotesExpanded ? (
                                                             <ChevronUp className="w-4 h-4 mr-1" />

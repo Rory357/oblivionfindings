@@ -85,13 +85,13 @@ function getInitials(name: string): string {
 
 const AVATAR_COLORS = [
     'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-    'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+    'bg-primary/15 text-primary dark:text-primary/70',
     'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
     'bg-amber-500/15 text-amber-700 dark:text-amber-300',
     'bg-pink-500/15 text-pink-700 dark:text-pink-300',
     'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
     'bg-rose-500/15 text-rose-700 dark:text-rose-300',
-    'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+    'bg-primary/15 text-primary dark:text-primary/70',
 ];
 
 function getAvatarColor(id: number): string {
@@ -101,7 +101,7 @@ function getAvatarColor(id: number): string {
 const TYPE_STYLES: Record<string, string> = {
     full_time: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30',
     part_time: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
-    casual: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
+    casual: 'bg-primary/10 text-primary border-primary dark:bg-primary/10 dark:text-primary/70 dark:border-primary/30',
     fixed_term: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/30',
     contractor: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
 };
@@ -109,7 +109,7 @@ const TYPE_STYLES: Record<string, string> = {
 const TYPE_BAR_COLORS: Record<string, string> = {
     full_time: 'bg-blue-500',
     part_time: 'bg-amber-500',
-    casual: 'bg-purple-500',
+    casual: 'bg-primary',
     fixed_term: 'bg-cyan-500',
     contractor: 'bg-orange-500',
 };
@@ -415,7 +415,7 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                                                     className={
                                                         p.is_active
                                                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                                            : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-400'
+                                                            : 'border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground'
                                                     }
                                                 >
                                                     {p.is_active ? 'Active' : 'Inactive'}

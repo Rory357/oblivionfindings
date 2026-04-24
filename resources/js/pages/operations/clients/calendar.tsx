@@ -39,7 +39,7 @@ const categories = [
     { dot: 'bg-blue-500', label: 'Shifts', icon: CalendarDays, bg: 'bg-blue-50 dark:bg-blue-950/40' },
     { dot: 'bg-green-500', label: 'Family Visits', icon: Users, bg: 'bg-green-50 dark:bg-green-950/40' },
     { dot: 'bg-amber-500', label: 'GP Visits', icon: Stethoscope, bg: 'bg-amber-50 dark:bg-amber-950/40' },
-    { dot: 'bg-purple-500', label: 'Specialist', icon: Heart, bg: 'bg-purple-50 dark:bg-purple-950/40' },
+    { dot: 'bg-primary', label: 'Specialist', icon: Heart, bg: 'bg-primary/10 dark:bg-primary/40' },
     { dot: 'bg-pink-500', label: 'Therapy', icon: Heart, bg: 'bg-pink-50 dark:bg-pink-950/40' },
     { dot: 'bg-cyan-500', label: 'Activities', icon: Calendar, bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
 ];

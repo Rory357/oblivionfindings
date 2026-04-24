@@ -172,7 +172,7 @@ function statusBadgeClass(status: string): string {
         case 'scheduled':
             return 'border-blue-500/30 text-blue-400 bg-blue-500/10';
         default:
-            return 'border-slate-500/30 text-slate-400';
+            return 'border-slate-500/30 text-muted-foreground';
     }
 }
 
@@ -187,7 +187,7 @@ function riskBadgeClass(rating?: string): string {
         case 'low':
             return 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10';
         default:
-            return 'border-slate-500/30 text-slate-400';
+            return 'border-slate-500/30 text-muted-foreground';
     }
 }
 
@@ -438,12 +438,12 @@ export default function SiteComplianceIndex({
                             <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="flex items-center gap-2">
-                                        <Shield className="h-5 w-5 text-violet-400" />
+                                        <Shield className="h-5 w-5 text-primary" />
                                         Certifications & Accreditations
                                     </CardTitle>
                                     <Button
                                         size="sm"
-                                        className="bg-violet-600 hover:bg-violet-700"
+                                        className="bg-primary hover:bg-primary"
                                         onClick={() => setShowAddCert(true)}
                                     >
                                         <Plus className="mr-1 h-4 w-4" />
@@ -490,7 +490,7 @@ export default function SiteComplianceIndex({
                                                             </span>
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-violet-500/30 bg-violet-500/10 text-violet-400"
+                                                                className="border-primary/30 bg-primary/10 text-primary"
                                                             >
                                                                 {certTypeLabel(cert.certification_type)}
                                                             </Badge>
@@ -597,7 +597,7 @@ export default function SiteComplianceIndex({
                             <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="flex items-center gap-2">
-                                        <FileCheck className="h-5 w-5 text-violet-400" />
+                                        <FileCheck className="h-5 w-5 text-primary" />
                                         Compliance Checks
                                     </CardTitle>
                                     <Button
@@ -628,7 +628,7 @@ export default function SiteComplianceIndex({
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <Badge
                                                         variant="outline"
-                                                        className="border-violet-500/30 bg-violet-500/10 text-violet-400"
+                                                        className="border-primary/30 bg-primary/10 text-primary"
                                                     >
                                                         {certTypeLabel(check.check_type)}
                                                     </Badge>
@@ -855,7 +855,7 @@ export default function SiteComplianceIndex({
                                 Cancel
                             </Button>
                             <Button
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                                 onClick={handleSaveCert}
                             >
                                 Save Certification
@@ -924,7 +924,7 @@ export default function SiteComplianceIndex({
                                 Cancel
                             </Button>
                             <Button
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                                 onClick={handleScheduleCheck}
                             >
                                 Schedule Check

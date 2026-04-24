@@ -50,7 +50,7 @@ export default function PrivacyDashboard({
             case 'rejected':
                 return 'bg-red-100 text-red-800';
             default:
-                return 'bg-slate-100 text-slate-800';
+                return 'bg-muted text-foreground';
         }
     };
 
@@ -84,7 +84,7 @@ export default function PrivacyDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{dsrStats.pending}</div>
-                                <p className="text-xs text-slate-500">pending requests</p>
+                                <p className="text-xs text-muted-foreground">pending requests</p>
                                 {dsrStats.overdue > 0 && (
                                     <div className="mt-2 flex items-center gap-1 text-xs text-red-600">
                                         <AlertTriangle className="h-3 w-3" />
@@ -105,7 +105,7 @@ export default function PrivacyDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{breachStats.open}</div>
-                                <p className="text-xs text-slate-500">open incidents</p>
+                                <p className="text-xs text-muted-foreground">open incidents</p>
                                 {breachStats.requiring_notification > 0 && (
                                     <div className="mt-2 flex items-center gap-1 text-xs text-orange-600">
                                         <Clock className="h-3 w-3" />
@@ -120,13 +120,13 @@ export default function PrivacyDashboard({
                         <Card className="transition-shadow hover:shadow-md">
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <Scale className="h-4 w-4 text-purple-500" />
+                                    <Scale className="h-4 w-4 text-primary" />
                                     Legal Holds
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{activeHolds}</div>
-                                <p className="text-xs text-slate-500">active holds</p>
+                                <p className="text-xs text-muted-foreground">active holds</p>
                             </CardContent>
                         </Card>
                     </Link>
@@ -141,7 +141,7 @@ export default function PrivacyDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{dpiaStats.pending_review}</div>
-                                <p className="text-xs text-slate-500">pending review</p>
+                                <p className="text-xs text-muted-foreground">pending review</p>
                                 {dpiaStats.high_risk > 0 && (
                                     <div className="mt-2 flex items-center gap-1 text-xs text-red-600">
                                         <AlertTriangle className="h-3 w-3" />
@@ -165,21 +165,21 @@ export default function PrivacyDashboard({
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="rounded-lg bg-slate-50 p-4">
+                                <div className="rounded-lg bg-muted p-4">
                                     <div className="text-2xl font-bold">{dsrStats.total}</div>
-                                    <p className="text-xs text-slate-500">Total Requests</p>
+                                    <p className="text-xs text-muted-foreground">Total Requests</p>
                                 </div>
                                 <div className="rounded-lg bg-yellow-50 p-4">
                                     <div className="text-2xl font-bold text-yellow-700">{dsrStats.pending}</div>
-                                    <p className="text-xs text-slate-500">Pending</p>
+                                    <p className="text-xs text-muted-foreground">Pending</p>
                                 </div>
                                 <div className="rounded-lg bg-red-50 p-4">
                                     <div className="text-2xl font-bold text-red-700">{dsrStats.overdue}</div>
-                                    <p className="text-xs text-slate-500">Overdue</p>
+                                    <p className="text-xs text-muted-foreground">Overdue</p>
                                 </div>
                                 <div className="rounded-lg bg-green-50 p-4">
                                     <div className="text-2xl font-bold text-green-700">{dsrStats.completed_this_month}</div>
-                                    <p className="text-xs text-slate-500">Completed This Month</p>
+                                    <p className="text-xs text-muted-foreground">Completed This Month</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -205,12 +205,12 @@ export default function PrivacyDashboard({
                                         <Link
                                             key={request.id}
                                             href={`/privacy/requests/${request.id}`}
-                                            className="block rounded-lg border p-3 transition-colors hover:bg-slate-50"
+                                            className="block rounded-lg border p-3 transition-colors hover:bg-muted"
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
                                                     <div className="font-medium text-sm">{request.reference_number}</div>
-                                                    <div className="text-xs text-slate-500 mt-1">
+                                                    <div className="text-xs text-muted-foreground mt-1">
                                                         {request.request_type?.replace(/_/g, ' ')}
                                                     </div>
                                                 </div>
@@ -221,7 +221,7 @@ export default function PrivacyDashboard({
                                         </Link>
                                     ))
                                 ) : (
-                                    <div className="text-center text-sm text-slate-500 py-4">
+                                    <div className="text-center text-sm text-muted-foreground py-4">
                                         No recent requests
                                     </div>
                                 )}
@@ -236,7 +236,7 @@ export default function PrivacyDashboard({
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base">
                                 <span className="flex items-center gap-2">
-                                    <Lock className="h-5 w-5 text-purple-500" />
+                                    <Lock className="h-5 w-5 text-primary" />
                                     Data Retention Policies
                                 </span>
                                 <Link href="/privacy/retention" className="text-xs text-blue-600 hover:underline">
@@ -246,13 +246,13 @@ export default function PrivacyDashboard({
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="rounded-lg bg-slate-50 p-4">
+                                <div className="rounded-lg bg-muted p-4">
                                     <div className="text-2xl font-bold">{retentionStats.total_policies}</div>
-                                    <p className="text-xs text-slate-500">Total Policies</p>
+                                    <p className="text-xs text-muted-foreground">Total Policies</p>
                                 </div>
                                 <div className="rounded-lg bg-green-50 p-4">
                                     <div className="text-2xl font-bold text-green-700">{retentionStats.active_policies}</div>
-                                    <p className="text-xs text-slate-500">Active</p>
+                                    <p className="text-xs text-muted-foreground">Active</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -267,15 +267,15 @@ export default function PrivacyDashboard({
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                                <div className="flex items-center justify-between rounded-lg bg-muted p-3">
                                     <span className="text-sm">Privacy Impact Assessments</span>
                                     <span className="font-semibold">{dpiaStats.total}</span>
                                 </div>
-                                <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                                <div className="flex items-center justify-between rounded-lg bg-muted p-3">
                                     <span className="text-sm">Data Breach Records</span>
                                     <span className="font-semibold">{breachStats.total}</span>
                                 </div>
-                                <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+                                <div className="flex items-center justify-between rounded-lg bg-muted p-3">
                                     <span className="text-sm">Active Legal Holds</span>
                                     <span className="font-semibold">{activeHolds}</span>
                                 </div>

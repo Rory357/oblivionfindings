@@ -95,7 +95,7 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New Risk Plan Activation</h1>
-                    <div className="mt-1 text-sm text-slate-500">Activate a risk plan for a respite stay.</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Activate a risk plan for a respite stay.</div>
                 </div>
                 <RespiteSubnav />
 

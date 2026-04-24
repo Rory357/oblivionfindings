@@ -35,7 +35,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Draft' },
+    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
     active: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Active' },
     closed: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Closed' },
 };

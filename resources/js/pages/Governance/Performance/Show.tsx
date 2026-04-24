@@ -93,13 +93,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'board_review':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-primary/10 text-primary';
       case 'peer_review':
         return 'bg-blue-100 text-blue-800';
       case 'self_review':
         return 'bg-yellow-100 text-yellow-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -125,7 +125,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
       case 'unsatisfactory':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -140,7 +140,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
       case 'in_progress':
         return 'bg-blue-100 text-blue-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -195,10 +195,10 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <Award className="w-8 h-8 text-purple-500" />
+                <Award className="w-8 h-8 text-primary" />
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Performance Review</h1>
-                  <p className="text-gray-500">{review.reviewee.name} - {review.review_cycle}</p>
+                  <h1 className="text-2xl font-bold text-foreground">Performance Review</h1>
+                  <p className="text-muted-foreground">{review.reviewee.name} - {review.review_cycle}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
@@ -222,30 +222,30 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Period</p>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Period</p>
                   <p className="font-medium">{review.period_start} to {review.period_end}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Overall Progress</p>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Overall Progress</p>
                   <div className="flex items-center gap-2">
                     <Progress value={calculateOverallProgress()} className="flex-1" />
                     <span className="font-medium">{calculateOverallProgress()}%</span>
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">Goals</p>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Goals</p>
                   <p className="font-medium">{review.goals.length} defined</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">KPIs</p>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">KPIs</p>
                   <p className="font-medium">{review.kpis.length} tracked</p>
                 </div>
               </div>
               {review.board_decision && (
-                <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-sm font-medium text-purple-800">Board Decision</p>
-                  <p className="text-purple-700 capitalize">{review.board_decision.replace('_', ' ')}</p>
+                <div className="mt-4 p-4 bg-primary/10 border border-primary rounded-lg">
+                  <p className="text-sm font-medium text-primary">Board Decision</p>
+                  <p className="text-primary capitalize">{review.board_decision.replace('_', ' ')}</p>
                 </div>
               )}
             </CardContent>
@@ -277,7 +277,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                             </Badge>
                           </div>
                           <div className="mt-3">
-                            <div className="flex items-center justify-between text-sm text-gray-500 mb-1">
+                            <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
                               <span>Progress</span>
                               <span>{goal.actual_score || 0} / {goal.target_score} (Weight: {goal.weight}%)</span>
                             </div>
@@ -290,13 +290,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                             />
                           </div>
                           {goal.evidence_summary && (
-                            <p className="mt-2 text-sm text-gray-600">{goal.evidence_summary}</p>
+                            <p className="mt-2 text-sm text-muted-foreground">{goal.evidence_summary}</p>
                           )}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-sm">No goals defined for this review.</p>
+                    <p className="text-muted-foreground text-sm">No goals defined for this review.</p>
                   )}
                 </CardContent>
               </Card>
@@ -316,7 +316,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                         <div key={kpi.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <p className="font-medium">{kpi.kpi_name}</p>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                               Target: {kpi.target_value} {kpi.unit}
                               {kpi.is_automated && <Badge variant="outline" className="ml-2 text-xs">Auto</Badge>}
                             </p>
@@ -325,7 +325,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                             <p className="text-xl font-bold">
                               {kpi.actual_value !== null ? kpi.actual_value : '-'}
                             </p>
-                            <p className="text-xs text-gray-500">{kpi.unit}</p>
+                            <p className="text-xs text-muted-foreground">{kpi.unit}</p>
                           </div>
                         </div>
                       ))}
@@ -346,13 +346,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center',
-                      review.self_assessment_submitted_at ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                      review.self_assessment_submitted_at ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'
                     )}>
                       <User className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">Self Assessment</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                       {review.self_assessment_submitted_at || 'Pending'}
                       </p>
                     </div>
@@ -362,13 +362,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                       'w-8 h-8 rounded-full flex items-center justify-center',
                       review.status === 'board_review' || review.status === 'completed'
                         ? 'bg-green-100 text-green-600'
-                        : 'bg-gray-100 text-gray-400'
+                        : 'bg-muted text-muted-foreground'
                     )}>
                       <Star className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">Board Assessment</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                       {review.status === 'board_review' || review.status === 'completed' ? 'Submitted' : 'Pending'}
                       </p>
                     </div>
@@ -376,13 +376,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center',
-                      review.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                      review.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'
                     )}>
                       <Award className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">Completed</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {review.status === 'completed' ? 'Done' : 'Pending'}
                       </p>
                     </div>
@@ -481,7 +481,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                     <div>
                       <Badge variant="outline" className="mb-2">{getPillarLabel(goal.pillar)}</Badge>
                       <p className="font-medium">{goal.goal_description}</p>
-                      <p className="text-sm text-gray-500">Target: {goal.target_score}</p>
+                      <p className="text-sm text-muted-foreground">Target: {goal.target_score}</p>
                     </div>
                     <div className="w-24">
                       <Label className="text-xs">Score (1-5)</Label>

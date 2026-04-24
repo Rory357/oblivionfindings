@@ -255,11 +255,11 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
             <PageShell>
                 {/* Onboarding Banner */}
                 {fromOnboarding && (
-                    <div className="mb-4 flex items-start gap-3 rounded-lg border border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-800 dark:bg-indigo-950/30">
-                        <Info className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                    <div className="mb-4 flex items-start gap-3 rounded-lg border border-primary bg-primary/10 p-4 dark:border-primary/30 dark:bg-primary/30">
+                        <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary dark:text-primary" />
                         <div>
-                            <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Onboarding in Progress</p>
-                            <p className="mt-0.5 text-xs text-indigo-700 dark:text-indigo-300">
+                            <p className="text-sm font-medium text-primary dark:text-primary/70">Onboarding in Progress</p>
+                            <p className="mt-0.5 text-xs text-primary dark:text-primary/70">
                                 This care plan is being created as part of the onboarding process. The onboarding step will be auto-completed.
                             </p>
                         </div>
@@ -271,7 +271,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={ClipboardList}
-                            iconBg="bg-indigo-100 text-indigo-600"
+                            iconBg="bg-primary/10 text-primary"
                             title="Plan Details"
                             description="Basic information about this care plan."
                         />
@@ -429,7 +429,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={Sparkles}
-                            iconBg="bg-violet-100 text-violet-600"
+                            iconBg="bg-primary/10 text-primary"
                             title="Quick Start Template"
                             description="Choose a template to pre-fill support needs and strategies, or start from scratch."
                         />
@@ -440,9 +440,9 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                         key={key}
                                         type="button"
                                         onClick={() => applyTemplate(key)}
-                                        className="group rounded-lg border-2 border-slate-200 p-4 text-left transition-all hover:border-violet-400 hover:bg-violet-50/50 hover:shadow-sm"
+                                        className="group rounded-lg border-2 border-border p-4 text-left transition-all hover:border-primary hover:bg-primary/10/50 hover:shadow-sm"
                                     >
-                                        <div className="text-sm font-semibold text-slate-800 group-hover:text-violet-700">{template.title}</div>
+                                        <div className="text-sm font-semibold text-foreground group-hover:text-primary">{template.title}</div>
                                         <p className="mt-1 text-xs text-muted-foreground">{template.description}</p>
                                     </button>
                                 ))}
@@ -470,13 +470,13 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                             onClick={() => toggleSupportNeed(option.key)}
                                             className={`flex items-center gap-2.5 rounded-lg border-2 p-3 text-left text-sm font-medium transition-all ${
                                                 active
-                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
-                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                    ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                                                    : 'border-border bg-white text-muted-foreground hover:border-border hover:bg-muted'
                                             }`}
                                         >
                                             <div
                                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
-                                                    active ? 'bg-indigo-500 text-white' : 'border border-slate-300 bg-white text-slate-400'
+                                                    active ? 'bg-primary text-white' : 'border border-border bg-white text-muted-foreground'
                                                 }`}
                                             >
                                                 {active ? <Check className="h-3.5 w-3.5" /> : <IconComp className="h-3.5 w-3.5" />}
@@ -499,7 +499,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                         />
                         <CardContent>
                             <Textarea
-                                className="min-h-[120px] bg-slate-50/50"
+                                className="min-h-[120px] bg-muted/50"
                                 value={data.content.risk_factors}
                                 onChange={(e) => setContentField('risk_factors', e.target.value)}
                                 placeholder="Describe any known risk factors, triggers, or safety concerns..."
@@ -517,7 +517,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                         />
                         <CardContent>
                             <Textarea
-                                className="min-h-[120px] bg-slate-50/50"
+                                className="min-h-[120px] bg-muted/50"
                                 value={data.content.support_strategies}
                                 onChange={(e) => setContentField('support_strategies', e.target.value)}
                                 placeholder="Describe the support strategies and approaches to be used..."
@@ -535,7 +535,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                         />
                         <CardContent>
                             <Textarea
-                                className="min-h-[120px] bg-slate-50/50"
+                                className="min-h-[120px] bg-muted/50"
                                 value={data.content.communication_preferences}
                                 onChange={(e) => setContentField('communication_preferences', e.target.value)}
                                 placeholder="Describe communication preferences, methods, and any assistive technology used..."
@@ -573,7 +573,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     </Card>
 
                     {/* ─── Submit ─── */}
-                    <div className="flex items-center justify-between rounded-lg border bg-slate-50 p-4">
+                    <div className="flex items-center justify-between rounded-lg border bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
                             {data.status === 'draft' ? 'This plan will be saved as a draft.' : 'This plan will be created and set to active.'}
                         </p>

@@ -51,7 +51,7 @@ export default function SubstanceCreate() {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Add Substance</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Register a new hazardous substance in the chemical register
                         </div>
                     </div>

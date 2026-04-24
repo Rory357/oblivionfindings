@@ -42,7 +42,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const processTypeConfig: Record<string, { className: string }> = {
     leave: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
     expense: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
-    timesheet: { className: 'border-purple-500/30 text-purple-400 bg-purple-500/10' },
+    timesheet: { className: 'border-primary/30 text-primary bg-primary/10' },
     document: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
 };
 

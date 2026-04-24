@@ -88,7 +88,7 @@ export default function EditDPIA({ dpia, staff: _staff }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Edit DPIA</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Outcome: {dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}
                     </div>
                 </div>

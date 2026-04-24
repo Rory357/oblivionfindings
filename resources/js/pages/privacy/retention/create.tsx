@@ -41,7 +41,7 @@ export default function CreateRetentionPolicy() {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">New Data Retention Policy</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Define retention periods for data types
                         </div>
                     </div>
@@ -51,7 +51,7 @@ export default function CreateRetentionPolicy() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Database className="h-5 w-5 text-purple-500" />
+                                <Database className="h-5 w-5 text-primary" />
                                 Policy Details
                             </CardTitle>
                         </CardHeader>

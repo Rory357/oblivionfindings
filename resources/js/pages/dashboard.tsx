@@ -350,8 +350,8 @@ function ManagerDashboard({ props }: { props: Props }) {
                     <Card className="transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/40">
-                                    <Pill className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                    <Pill className="h-3.5 w-3.5 text-primary dark:text-primary" />
                                 </div>
                                 Medications (eMAR)
                             </CardTitle>

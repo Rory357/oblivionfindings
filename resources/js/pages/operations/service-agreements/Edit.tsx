@@ -53,18 +53,18 @@ function SectionHeader({ icon: Icon, iconBg, title, description }: { icon: Lucid
 /* ---------- Status helpers ---------- */
 
 const STATUS_COLORS: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-700 border-slate-200',
+    draft: 'bg-muted text-foreground border-border',
     pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
     active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    under_review: 'bg-violet-50 text-violet-700 border-violet-200',
+    under_review: 'bg-primary/10 text-primary border-primary',
     renewed: 'bg-blue-50 text-blue-700 border-blue-200',
-    expired: 'bg-slate-100 text-slate-500 border-slate-200',
+    expired: 'bg-muted text-muted-foreground border-border',
     terminated: 'bg-red-50 text-red-700 border-red-200',
     suspended: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
 function statusBadge(status: string) {
-    const cls = STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-600 border-slate-200';
+    const cls = STATUS_COLORS[status] ?? 'bg-muted text-muted-foreground border-border';
     return (
         <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${cls}`}>
             {status.replace(/_/g, ' ')}
@@ -252,7 +252,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={ClipboardList}
-                                iconBg="bg-violet-100 text-violet-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="Agreement Details"
                                 description="Core information about this service agreement."
                             />
@@ -348,7 +348,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={CalendarClock}
-                                iconBg="bg-indigo-100 text-indigo-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="Dates & Milestones"
                                 description="Key dates throughout the agreement lifecycle."
                             />
@@ -457,7 +457,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Landmark}
-                                iconBg="bg-indigo-100 text-indigo-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="NZ Funding Details"
                                 description="Whaikaha / DSS funding type and service level details."
                             />
@@ -552,7 +552,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={PenLine}
-                                iconBg="bg-violet-100 text-violet-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="Signatories & Contacts"
                                 description="Agreement signatories and funder contact details."
                             />
@@ -598,7 +598,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                 <div className="space-y-1.5">
                                     <Label>Terms & Conditions</Label>
                                     <Textarea
-                                        className="min-h-[100px] bg-slate-50/50"
+                                        className="min-h-[100px] bg-muted/50"
                                         value={data.terms}
                                         onChange={(e) => setData('terms', e.target.value)}
                                         placeholder="Enter the terms and conditions of this agreement..."
@@ -607,7 +607,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                 <div className="space-y-1.5">
                                     <Label>Notes</Label>
                                     <Textarea
-                                        className="min-h-[80px] bg-slate-50/50"
+                                        className="min-h-[80px] bg-muted/50"
                                         value={data.notes}
                                         onChange={(e) => setData('notes', e.target.value)}
                                         placeholder="Any additional notes or context..."
@@ -629,19 +629,19 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                             <div
                                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
                                     dragOver
-                                        ? 'border-violet-500 bg-violet-100/50'
-                                        : 'border-violet-300 bg-violet-50/50 hover:bg-violet-50'
+                                        ? 'border-primary bg-primary/10/50'
+                                        : 'border-primary bg-primary/10/50 hover:bg-primary/10'
                                 }`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                                 onDragLeave={() => setDragOver(false)}
                                 onDrop={handleFileDrop}
                                 onClick={() => document.getElementById('doc-upload')?.click()}
                             >
-                                <Upload className="mb-2 h-8 w-8 text-violet-400" />
-                                <p className="text-sm font-medium text-violet-700">
+                                <Upload className="mb-2 h-8 w-8 text-primary" />
+                                <p className="text-sm font-medium text-primary">
                                     {dragOver ? 'Drop files here' : 'Click or drag files to upload'}
                                 </p>
-                                <p className="mt-1 text-xs text-violet-500">PDF, Word document, or scanned image</p>
+                                <p className="mt-1 text-xs text-primary">PDF, Word document, or scanned image</p>
                                 <input
                                     id="doc-upload"
                                     type="file"
@@ -734,7 +734,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                     )}
 
                     {/* Submit Row */}
-                    <div className="flex items-center justify-between rounded-xl border bg-slate-50 p-4">
+                    <div className="flex items-center justify-between rounded-xl border bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
                             Changes will be saved to this agreement.
                         </p>
@@ -746,7 +746,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={processing} className="bg-violet-600 hover:bg-violet-700">
+                            <Button type="submit" disabled={processing} className="bg-primary hover:bg-primary">
                                 {processing ? 'Saving...' : 'Save Changes'}
                             </Button>
                         </div>

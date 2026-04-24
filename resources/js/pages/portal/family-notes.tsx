@@ -75,12 +75,12 @@ const NOTE_TYPES = [
         key: 'reminder',
         label: 'Reminder',
         emoji: '⏰',
-        color: 'bg-purple-100 text-purple-700 border-purple-200',
+        color: 'bg-primary/10 text-primary border-primary',
     },
 ];
 
 const PRIORITIES = [
-    { key: 'low', label: 'Low', color: 'bg-slate-100 text-slate-600' },
+    { key: 'low', label: 'Low', color: 'bg-muted text-muted-foreground' },
     { key: 'normal', label: 'Normal', color: 'bg-blue-100 text-blue-700' },
     { key: 'high', label: 'High', color: 'bg-orange-100 text-orange-700' },
     { key: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-700' },
@@ -90,7 +90,7 @@ const STATUS_COLORS: Record<string, string> = {
     open: 'bg-blue-100 text-blue-700',
     in_progress: 'bg-amber-100 text-amber-700',
     completed: 'bg-emerald-100 text-emerald-700',
-    cancelled: 'bg-gray-100 text-gray-600',
+    cancelled: 'bg-muted text-muted-foreground',
 };
 
 const NOTE_TYPE_MAP = Object.fromEntries(NOTE_TYPES.map((t) => [t.key, t]));
@@ -197,7 +197,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                         className={`rounded-xl border p-3 text-center ${stats.overdue > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20' : ''}`}
                     >
                         <div
-                            className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-700' : 'text-slate-400'}`}
+                            className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-700' : 'text-muted-foreground'}`}
                         >
                             {stats.overdue}
                         </div>
@@ -467,7 +467,7 @@ function NoteCard({
                         )}
 
                         {note.assigned_shift && (
-                            <div className="mt-2 rounded-lg border border-violet-200 bg-violet-50/60 p-2 text-xs text-violet-700">
+                            <div className="mt-2 rounded-lg border border-primary bg-primary/10/60 p-2 text-xs text-primary">
                                 <p className="font-medium">
                                     Assigned to{' '}
                                     {formatShiftType(
@@ -478,7 +478,7 @@ function NoteCard({
                                         ? ` on ${new Date(note.assigned_shift.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}`
                                         : ''}
                                 </p>
-                                <p className="mt-0.5 text-violet-600">
+                                <p className="mt-0.5 text-primary">
                                     {note.assigned_shift.staff_name ??
                                         'Unassigned'}
                                     {note.assigned_shift.service_context
@@ -492,7 +492,7 @@ function NoteCard({
                         )}
 
                         {!note.assigned_shift && note.assigned_shift_date && (
-                            <p className="mt-1 text-xs text-violet-600">
+                            <p className="mt-1 text-xs text-primary">
                                 📋 Assigned to shift on{' '}
                                 {note.assigned_shift_date}
                             </p>

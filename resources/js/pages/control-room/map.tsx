@@ -646,7 +646,7 @@ export default function ControlRoomMap({
                                         <span>Vehicle - Offline</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="inline-block h-3 w-3 rounded-full bg-purple-500" />
+                                        <span className="inline-block h-3 w-3 rounded-full bg-primary" />
                                         <span>Resident Tracker</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -662,7 +662,7 @@ export default function ControlRoomMap({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span
-                                            className="inline-block h-3 w-6 rounded border border-indigo-400 bg-indigo-100 opacity-60"
+                                            className="inline-block h-3 w-6 rounded border border-primary bg-primary/10 opacity-60"
                                             style={{ borderStyle: 'dashed' }}
                                         />
                                         <span>Geofence</span>
@@ -700,7 +700,7 @@ export default function ControlRoomMap({
                                             <span
                                                 className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
                                                     d.type === 'personal_tracker'
-                                                        ? 'bg-purple-500'
+                                                        ? 'bg-primary'
                                                         : d.status === 'online'
                                                           ? isRecentlySeen(d.last_seen_at, 5)
                                                               ? 'bg-blue-500'

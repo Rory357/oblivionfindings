@@ -48,7 +48,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New Communication Log</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Record a communication related to a respite stay.
                     </div>
                 </div>

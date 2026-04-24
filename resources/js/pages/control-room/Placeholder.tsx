@@ -7,8 +7,8 @@ export default function ControlRoomPlaceholder({ feature = 'Feature' }: { featur
         <AppLayout>
             <Head title={`${feature} — Control Room`} />
             <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-                <div className="rounded-full bg-violet-100 p-6">
-                    <Construction className="h-12 w-12 text-violet-600" />
+                <div className="rounded-full bg-primary/10 p-6">
+                    <Construction className="h-12 w-12 text-primary" />
                 </div>
                 <h2 className="mt-6 text-2xl font-semibold">{feature}</h2>
                 <p className="mt-2 max-w-md text-muted-foreground">

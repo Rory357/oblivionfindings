@@ -82,7 +82,7 @@ const typeLabels: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-    whanau: 'border-purple-500/30 text-purple-300 bg-purple-500/10',
+    whanau: 'border-primary/30 text-primary/70 bg-primary/10',
     client: 'border-blue-500/30 text-blue-300 bg-blue-500/10',
     staff: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10',
     external: 'border-slate-500/30 text-slate-300 bg-slate-500/10',
@@ -101,7 +101,7 @@ const statusLabels: Record<string, string> = {
 const statusColors: Record<string, string> = {
     new: 'border-blue-500/30 text-blue-300 bg-blue-500/10',
     acknowledged: 'border-amber-500/30 text-amber-300 bg-amber-500/10',
-    in_progress: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10',
+    in_progress: 'border-primary/30 text-primary/70 bg-primary/10',
     resolved: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10',
     closed: 'border-slate-500/30 text-slate-300 bg-slate-500/10',
 };
@@ -124,7 +124,7 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
     return (
         <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} className={`${cls} ${i <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-600'}`} />
+                <Star key={i} className={`${cls} ${i <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
             ))}
         </div>
     );
@@ -135,7 +135,7 @@ function StarRatingInput({ value, onChange }: { value: number; onChange: (v: num
         <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((i) => (
                 <button key={i} type="button" onClick={() => onChange(i)} className="p-0.5 hover:scale-110 transition-transform">
-                    <Star className={`w-6 h-6 ${i <= value ? 'fill-amber-400 text-amber-400' : 'text-slate-600 hover:text-slate-400'}`} />
+                    <Star className={`w-6 h-6 ${i <= value ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground hover:text-muted-foreground'}`} />
                 </button>
             ))}
         </div>
@@ -304,7 +304,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.total}</div>
-                                    <div className="text-sm text-slate-400">Total Feedback</div>
+                                    <div className="text-sm text-muted-foreground">Total Feedback</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -320,7 +320,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                         <span className="text-2xl font-bold">{stats.average_rating ?? '—'}</span>
                                         {stats.average_rating && <StarRating rating={Math.round(stats.average_rating)} />}
                                     </div>
-                                    <div className="text-sm text-slate-400">Average Rating</div>
+                                    <div className="text-sm text-muted-foreground">Average Rating</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -333,7 +333,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.open}</div>
-                                    <div className="text-sm text-slate-400">Open Items</div>
+                                    <div className="text-sm text-muted-foreground">Open Items</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -346,7 +346,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.response_rate}%</div>
-                                    <div className="text-sm text-slate-400">Response Rate</div>
+                                    <div className="text-sm text-muted-foreground">Response Rate</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -358,7 +358,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                     <CardContent className="pt-6">
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="min-w-[140px]">
-                                <Label className="text-xs text-slate-400">Type</Label>
+                                <Label className="text-xs text-muted-foreground">Type</Label>
                                 <Select value={filters.type || ALL_SENTINEL} onValueChange={(v) => applyFilter('type', v)}>
                                     <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
                                     <SelectContent>
@@ -370,7 +370,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                 </Select>
                             </div>
                             <div className="min-w-[140px]">
-                                <Label className="text-xs text-slate-400">Status</Label>
+                                <Label className="text-xs text-muted-foreground">Status</Label>
                                 <Select value={filters.status || ALL_SENTINEL} onValueChange={(v) => applyFilter('status', v)}>
                                     <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
                                     <SelectContent>
@@ -382,7 +382,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                 </Select>
                             </div>
                             <div className="min-w-[120px]">
-                                <Label className="text-xs text-slate-400">Rating</Label>
+                                <Label className="text-xs text-muted-foreground">Rating</Label>
                                 <Select value={filters.rating || ALL_SENTINEL} onValueChange={(v) => applyFilter('rating', v)}>
                                     <SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                                     <SelectContent>
@@ -394,11 +394,11 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                 </Select>
                             </div>
                             <div>
-                                <Label className="text-xs text-slate-400">From</Label>
+                                <Label className="text-xs text-muted-foreground">From</Label>
                                 <Input type="date" value={filters.from || ''} onChange={(e) => applyFilter('from', e.target.value)} className="w-[150px]" />
                             </div>
                             <div>
-                                <Label className="text-xs text-slate-400">To</Label>
+                                <Label className="text-xs text-muted-foreground">To</Label>
                                 <Input type="date" value={filters.to || ''} onChange={(e) => applyFilter('to', e.target.value)} className="w-[150px]" />
                             </div>
                             {(filters.type || filters.status || filters.rating || filters.from || filters.to) && (
@@ -413,9 +413,9 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                     {feedback.data.length === 0 ? (
                         <Card>
                             <CardContent className="py-12 text-center">
-                                <MessageSquare className="w-12 h-12 mx-auto mb-3 text-slate-500 opacity-50" />
-                                <p className="text-slate-400">No feedback found</p>
-                                <p className="text-sm text-slate-500 mt-1">Submit feedback to start tracking quality and engagement</p>
+                                <MessageSquare className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                                <p className="text-muted-foreground">No feedback found</p>
+                                <p className="text-sm text-muted-foreground mt-1">Submit feedback to start tracking quality and engagement</p>
                             </CardContent>
                         </Card>
                     ) : (
@@ -430,7 +430,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                             </Badge>
                                             {item.rating && <StarRating rating={item.rating} />}
                                             {item.category && (
-                                                <Badge variant="outline" className="text-xs border-slate-500/30 text-slate-400">
+                                                <Badge variant="outline" className="text-xs border-slate-500/30 text-muted-foreground">
                                                     {categoryLabels[item.category] || item.category}
                                                 </Badge>
                                             )}
@@ -442,7 +442,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                             <Select value={item.status} onValueChange={(v) => updateStatus(item.id, v)}>
                                                 <SelectTrigger className="h-7 w-7 p-0 border-0 [&>svg]:hidden">
                                                     <span className="sr-only">Change status</span>
-                                                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {Object.entries(statusLabels).map(([val, label]) => (
@@ -457,7 +457,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                     <p className="text-sm text-slate-200 whitespace-pre-wrap">{item.content}</p>
 
                                     {/* Submitted by */}
-                                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                         {item.is_anonymous ? (
                                             <span className="flex items-center gap-1">
                                                 <User className="w-3 h-3" /> Anonymous
@@ -475,7 +475,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                     {/* Response section */}
                                     {item.response && (
                                         <div className="rounded-lg bg-muted/50 p-3 border-l-2 border-emerald-500/50">
-                                            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                                                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                                                 Response from {item.responded_by?.name || 'Staff'}
                                                 {item.responded_at && (

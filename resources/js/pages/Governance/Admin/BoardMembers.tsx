@@ -59,7 +59,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
       <Head title="Manage Board Members" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Board Member Management</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-6">Board Member Management</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Add New Board Member */}
@@ -105,7 +105,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
                   <Label>Term Start</Label>
                   <input
                     type="date"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-md border border-border px-3 py-2"
                     value={data.term_start}
                     onChange={(e) => setData('term_start', e.target.value)}
                   />
@@ -115,7 +115,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
                   <Label>Term End</Label>
                   <input
                     type="date"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-md border border-border px-3 py-2"
                     value={data.term_end}
                     onChange={(e) => setData('term_end', e.target.value)}
                   />
@@ -150,7 +150,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
                       <TableCell>
                         <div>
                           <p className="font-medium">{member.user.name}</p>
-                          <p className="text-sm text-gray-500">{member.user.email}</p>
+                          <p className="text-sm text-muted-foreground">{member.user.email}</p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -167,7 +167,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
                         {member.is_active ? (
                           <Badge className="bg-green-100 text-green-800">Active</Badge>
                         ) : (
-                          <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>
+                          <Badge className="bg-muted text-foreground">Inactive</Badge>
                         )}
                       </TableCell>
                       <TableCell>

@@ -101,10 +101,10 @@ interface Props {
 // --- Helpers ---
 
 const noteTypeColors: Record<string, string> = {
-    note: 'bg-gray-100 text-gray-700 border-gray-200',
+    note: 'bg-muted text-foreground border-border',
     action: 'bg-blue-100 text-blue-700 border-blue-200',
     escalation: 'bg-orange-100 text-orange-700 border-orange-200',
-    decision: 'bg-purple-100 text-purple-700 border-purple-200',
+    decision: 'bg-primary/10 text-primary border-primary',
     handover: 'bg-green-100 text-green-700 border-green-200',
 };
 
@@ -498,7 +498,7 @@ export default function ControlRoomShifts({
                                                                                 .checked,
                                                                         )
                                                                     }
-                                                                    className="rounded border-gray-300"
+                                                                    className="rounded border-border"
                                                                 />
                                                                 Pin note
                                                             </label>
@@ -514,7 +514,7 @@ export default function ControlRoomShifts({
                                                                                 .checked,
                                                                         )
                                                                     }
-                                                                    className="rounded border-gray-300"
+                                                                    className="rounded border-border"
                                                                 />
                                                                 Requires follow-up
                                                             </label>

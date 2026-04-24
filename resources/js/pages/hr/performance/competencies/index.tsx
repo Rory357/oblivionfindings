@@ -72,7 +72,7 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Competency Framework</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Define and manage organisational competencies
                         </div>
                     </div>
@@ -109,13 +109,13 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                             <span className="mt-1.5 block text-2xl font-bold text-blue-900">{competencies.length}</span>
                         </CardContent>
                     </Card>
-                    <Card className="border-l-4 border-l-purple-500 bg-purple-50/40">
+                    <Card className="border-l-4 border-l-purple-500 bg-primary/10/40">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-purple-700">Categories</p>
-                                <div className="rounded-full bg-purple-100 p-1.5"><Target className="h-4 w-4 text-purple-600" /></div>
+                                <p className="text-xs font-medium text-primary">Categories</p>
+                                <div className="rounded-full bg-primary/10 p-1.5"><Target className="h-4 w-4 text-primary" /></div>
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-purple-900">{categories.length}</span>
+                            <span className="mt-1.5 block text-2xl font-bold text-primary">{categories.length}</span>
                         </CardContent>
                     </Card>
                     <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
@@ -163,7 +163,7 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
 
                 {categories.length === 0 ? (
                     <Card>
-                        <CardContent className="py-8 text-center text-slate-400">
+                        <CardContent className="py-8 text-center text-muted-foreground">
                             No competencies defined yet. {can.manage ? 'Click "Add Competency" to begin.' : ''}
                         </CardContent>
                     </Card>
@@ -189,7 +189,7 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                                         {grouped[category].map((comp) => (
                                             <TableRow key={comp.id}>
                                                 <TableCell className="font-medium">{comp.name}</TableCell>
-                                                <TableCell className="text-sm text-slate-500">{comp.description || '-'}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{comp.description || '-'}</TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
                                                         {comp.proficiency_levels?.map((level, i) => (
@@ -218,10 +218,10 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                                     <Link
                                         key={s.id}
                                         href={`/hr/performance/competencies/profile/${s.id}`}
-                                        className="rounded-lg border p-3 text-sm hover:bg-slate-50 transition-colors"
+                                        className="rounded-lg border p-3 text-sm hover:bg-muted transition-colors"
                                     >
                                         <div className="font-medium">{s.name}</div>
-                                        <div className="text-xs text-slate-400">{s.email}</div>
+                                        <div className="text-xs text-muted-foreground">{s.email}</div>
                                     </Link>
                                 ))}
                             </div>

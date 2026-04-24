@@ -227,8 +227,8 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                     {/* Device Info */}
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                                <Radio className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted dark:bg-muted">
+                                <Radio className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Device</p>
@@ -281,8 +281,8 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                     {/* Consent */}
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
-                                <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
+                                <Shield className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Consent</p>
@@ -443,8 +443,8 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                                 <div className="max-h-[300px] overflow-y-auto divide-y rounded-md border">
                                     {historyLocations.map((loc, i) => (
                                         <div key={i} className="flex items-start gap-3 px-4 py-3">
-                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
-                                                <MapPin className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
+                                                <MapPin className="h-3.5 w-3.5 text-primary dark:text-primary" />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs text-muted-foreground">

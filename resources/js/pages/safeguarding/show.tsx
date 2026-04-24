@@ -178,20 +178,20 @@ const severityColor = (severity: string) => {
         medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
         low: 'bg-blue-100 text-blue-800 border-blue-200',
     };
-    return map[severity] ?? 'bg-slate-100 text-slate-800 border-slate-200';
+    return map[severity] ?? 'bg-muted text-foreground border-border';
 };
 
 const statusColor = (status: string) => {
     const map: Record<string, string> = {
         closed: 'bg-green-100 text-green-800 border-green-200',
-        investigating: 'bg-purple-100 text-purple-800 border-purple-200',
+        investigating: 'bg-primary/10 text-primary border-primary',
         triaged: 'bg-blue-100 text-blue-800 border-blue-200',
-        reported: 'bg-slate-100 text-slate-800 border-slate-200',
-        action_plan: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+        reported: 'bg-muted text-foreground border-border',
+        action_plan: 'bg-primary/10 text-primary border-primary',
         monitoring: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-        referred_external: 'bg-purple-100 text-purple-800 border-purple-200',
+        referred_external: 'bg-primary/10 text-primary border-primary',
     };
-    return map[status] ?? 'bg-slate-100 text-slate-800 border-slate-200';
+    return map[status] ?? 'bg-muted text-foreground border-border';
 };
 
 const riskColor = (level: string) => {
@@ -201,32 +201,32 @@ const riskColor = (level: string) => {
         medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
         low: 'bg-green-100 text-green-800 border-green-200',
     };
-    return map[level] ?? 'bg-slate-100 text-slate-800 border-slate-200';
+    return map[level] ?? 'bg-muted text-foreground border-border';
 };
 
 const actionStatusColor = (status: string) => {
     const map: Record<string, string> = {
         completed: 'bg-green-100 text-green-800 border-green-200',
         in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
-        pending: 'bg-slate-100 text-slate-800 border-slate-200',
+        pending: 'bg-muted text-foreground border-border',
         cancelled: 'bg-red-100 text-red-800 border-red-200',
         overdue: 'bg-red-100 text-red-800 border-red-200',
     };
-    return map[status] ?? 'bg-slate-100 text-slate-800 border-slate-200';
+    return map[status] ?? 'bg-muted text-foreground border-border';
 };
 
 const investigationStatusColor = (status: string) => {
     const map: Record<string, string> = {
         completed: 'bg-green-100 text-green-800 border-green-200',
         in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
-        planned: 'bg-slate-100 text-slate-800 border-slate-200',
+        planned: 'bg-muted text-foreground border-border',
         paused: 'bg-amber-100 text-amber-800 border-amber-200',
         abandoned: 'bg-red-100 text-red-800 border-red-200',
-        pending: 'bg-slate-100 text-slate-800 border-slate-200',
+        pending: 'bg-muted text-foreground border-border',
         cancelled: 'bg-red-100 text-red-800 border-red-200',
         on_hold: 'bg-amber-100 text-amber-800 border-amber-200',
     };
-    return map[status] ?? 'bg-slate-100 text-slate-800 border-slate-200';
+    return map[status] ?? 'bg-muted text-foreground border-border';
 };
 
 const displayName = (
@@ -470,7 +470,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                             {concern.requires_external_referral && (
                                 <Badge
                                     variant="outline"
-                                    className="border-purple-200 bg-purple-50 text-purple-700"
+                                    className="border-primary bg-primary/10 text-primary"
                                 >
                                     <ExternalLink className="mr-1 h-3 w-3" />
                                     External Referral Required
@@ -529,7 +529,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                     <Card className="lg:col-span-2">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Shield className="h-5 w-5 text-purple-500" />
+                                <Shield className="h-5 w-5 text-primary" />
                                 Concern Details
                             </CardTitle>
                         </CardHeader>
@@ -681,7 +681,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                                     {label(ra.overall_risk_level ?? 'unknown')}
                                                 </Badge>
                                                 {ra.multi_agency_required && (
-                                                    <Badge variant="outline" className="border-purple-200 text-purple-700">
+                                                    <Badge variant="outline" className="border-primary text-primary">
                                                         Multi-agency
                                                     </Badge>
                                                 )}
@@ -735,7 +735,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Search className="h-5 w-5 text-purple-500" />
+                            <Search className="h-5 w-5 text-primary" />
                             Investigations
                             <Badge variant="secondary" className="ml-1">
                                 {concern.investigations?.length ?? 0}
@@ -925,7 +925,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <ExternalLink className="h-5 w-5 text-indigo-500" />
+                            <ExternalLink className="h-5 w-5 text-primary" />
                             External Reports
                             <Badge variant="secondary" className="ml-1">
                                 {concern.externalReports?.length ?? 0}

@@ -45,7 +45,7 @@ const typeLabels: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-    boardroom: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    boardroom: 'bg-primary/20 text-primary/70 border-primary/30',
     training_room: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
     meeting_room: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     other: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
@@ -126,7 +126,7 @@ export default function SiteResources({ site, resources }: Props) {
                             <DoorOpen className="w-5 h-5" />
                             Rooms & Resources
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <Button onClick={() => setShowForm(true)}>
                         <Plus className="w-4 h-4 mr-1" />
@@ -139,13 +139,13 @@ export default function SiteResources({ site, resources }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{resources.length}</div>
-                            <div className="text-sm text-slate-400">Total Resources</div>
+                            <div className="text-sm text-muted-foreground">Total Resources</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{activeResources.length}</div>
-                            <div className="text-sm text-slate-400">Active</div>
+                            <div className="text-sm text-muted-foreground">Active</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-blue-500/5 border-blue-500/20">
@@ -153,7 +153,7 @@ export default function SiteResources({ site, resources }: Props) {
                             <div className="text-2xl font-bold text-blue-400">
                                 {activeResources.filter(r => r.is_bookable).length}
                             </div>
-                            <div className="text-sm text-slate-400">Bookable</div>
+                            <div className="text-sm text-muted-foreground">Bookable</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -235,7 +235,7 @@ export default function SiteResources({ site, resources }: Props) {
                     </CardHeader>
                     <CardContent>
                         {activeResources.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <DoorOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No resources configured yet</p>
                             </div>
@@ -250,7 +250,7 @@ export default function SiteResources({ site, resources }: Props) {
                                                     <Badge className={`mt-2 ${typeColors[resource.resource_type]}`}>
                                                         {typeLabels[resource.resource_type]}
                                                     </Badge>
-                                                    <div className="flex items-center gap-3 mt-2 text-sm text-slate-400">
+                                                    <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
                                                         {resource.capacity && (
                                                             <span className="flex items-center gap-1">
                                                                 <Users className="w-3.5 h-3.5" />

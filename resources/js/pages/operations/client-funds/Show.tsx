@@ -73,7 +73,7 @@ export default function ClientFundShow({ fund }: Props) {
                     <div className="space-y-4">
                         <Card>
                             <CardContent className="flex flex-wrap items-center gap-4 p-5">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
                                     <Wallet className="h-6 w-6" />
                                 </div>
                                 <div className="min-w-0 flex-1">

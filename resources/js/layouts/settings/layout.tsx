@@ -157,14 +157,14 @@ function NavContent({ currentPath, can }: { currentPath: string; can: Record<str
                                         'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
                                         'hover:bg-muted/50',
                                         isActive
-                                            ? 'border-l-2 border-violet-600 bg-violet-50 font-medium text-violet-700'
+                                            ? 'border-l-2 border-primary bg-primary/10 font-medium text-primary'
                                             : 'text-foreground/80',
                                     )}
                                 >
                                     <Icon
                                         className={cn(
                                             'h-4 w-4 shrink-0',
-                                            isActive ? 'text-violet-600' : 'text-muted-foreground',
+                                            isActive ? 'text-primary' : 'text-muted-foreground',
                                         )}
                                     />
                                     {item.title}

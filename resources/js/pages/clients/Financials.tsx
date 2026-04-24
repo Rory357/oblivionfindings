@@ -238,8 +238,8 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
 function CostRow({ label, amount, bold, muted, highlight }: { label: string; amount: string; bold?: boolean; muted?: boolean; highlight?: boolean }) {
     return (
         <div className={`flex items-center justify-between ${bold ? 'font-semibold' : ''} ${muted ? 'text-muted-foreground' : ''}`}>
-            <span className={`text-sm ${highlight ? 'text-purple-700 dark:text-purple-300' : ''}`}>{label}</span>
-            <span className={`tabular-nums text-sm ${highlight ? 'text-purple-700 dark:text-purple-300' : ''}`}>{$(amount)}</span>
+            <span className={`text-sm ${highlight ? 'text-primary dark:text-primary/70' : ''}`}>{label}</span>
+            <span className={`tabular-nums text-sm ${highlight ? 'text-primary dark:text-primary/70' : ''}`}>{$(amount)}</span>
         </div>
     );
 }

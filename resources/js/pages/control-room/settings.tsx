@@ -150,7 +150,7 @@ const sourceOptions = ['fleet', 'compliance', 'medication', 'incident', 'device'
 const roleOptions = ['control_room_operator', 'control_room_supervisor', 'site_manager', 'clinical_lead', 'on_call_manager'] as const;
 
 const severityColors: Record<string, string> = {
-    low: 'bg-gray-100 text-gray-700',
+    low: 'bg-muted text-foreground',
     medium: 'bg-yellow-100 text-yellow-800',
     high: 'bg-orange-100 text-orange-800',
     critical: 'bg-red-100 text-red-800',
@@ -158,14 +158,14 @@ const severityColors: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
-    inactive: 'bg-gray-100 text-gray-600',
+    inactive: 'bg-muted text-muted-foreground',
     maintenance: 'bg-yellow-100 text-yellow-800',
 };
 
 const windowStatusColors: Record<string, string> = {
     scheduled: 'bg-blue-100 text-blue-800',
     active: 'bg-green-100 text-green-800',
-    completed: 'bg-gray-100 text-gray-600',
+    completed: 'bg-muted text-muted-foreground',
     cancelled: 'bg-red-100 text-red-800',
 };
 

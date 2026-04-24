@@ -41,6 +41,22 @@ class User extends Authenticatable
         'timezone',
         'date_format',
         'time_format',
+
+        // Appearance preferences (Phase 2)
+        'theme',
+        'accent_colour',
+        'font_size',
+        'sidebar_density',
+        'reduce_motion',
+        'first_day_of_week',
+        'landing_route_preference',
+
+        // Notification delivery preferences (Phase 2)
+        'dnd_enabled',
+        'dnd_until',
+        'desktop_notifications_enabled',
+        'notification_sounds_enabled',
+        'email_digest_frequency',
     ];
 
     /**
@@ -71,6 +87,12 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
             'last_seen_at' => 'datetime',
+            'reduce_motion' => 'boolean',
+            'font_size' => 'integer',
+            'dnd_enabled' => 'boolean',
+            'dnd_until' => 'datetime',
+            'desktop_notifications_enabled' => 'boolean',
+            'notification_sounds_enabled' => 'boolean',
         ];
     }
 

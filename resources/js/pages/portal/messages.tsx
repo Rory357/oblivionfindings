@@ -272,7 +272,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                     {supportWorkers.map(worker => (
                                         <button key={worker.id} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent" onClick={() => startNewChat(worker.id)}>
                                             <div className="relative shrink-0">
-                                                <Avatar className="h-8 w-8"><AvatarFallback className="bg-slate-100 text-[10px] text-slate-700">{getInitials(worker.name)}</AvatarFallback></Avatar>
+                                                <Avatar className="h-8 w-8"><AvatarFallback className="bg-muted text-[10px] text-foreground">{getInitials(worker.name)}</AvatarFallback></Avatar>
                                                 <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={worker.presence ?? 'offline'} /></span>
                                             </div>
                                             <div className="min-w-0">
@@ -373,7 +373,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                         <div key={msg.id} data-msg-id={msg.id} className={`group flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-4' : 'mt-0.5'}`}
                                             onContextMenu={(e) => handleMessageRightClick(e, msg)}>
                                             {!isMe && showAvatar ? (
-                                                <Avatar className="mt-1 h-7 w-7 shrink-0"><AvatarFallback className="bg-slate-100 text-[10px] text-slate-600">{getInitials(msg.sender?.name ?? '?')}</AvatarFallback></Avatar>
+                                                <Avatar className="mt-1 h-7 w-7 shrink-0"><AvatarFallback className="bg-muted text-[10px] text-muted-foreground">{getInitials(msg.sender?.name ?? '?')}</AvatarFallback></Avatar>
                                             ) : !isMe ? <div className="w-7 shrink-0" /> : null}
                                             <div className={`max-w-[75%]`}>
                                                 {showAvatar && !isMe && (

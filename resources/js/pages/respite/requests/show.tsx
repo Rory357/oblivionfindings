@@ -39,7 +39,7 @@ export default function RespiteRequestShow({ request, booking }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Request Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-slate-600 space-y-2">
+                    <CardContent className="text-sm text-muted-foreground space-y-2">
                         <div>Requested: {formatDateTime(request.requested_start)} → {formatDateTime(request.requested_end)}</div>
                         <div>Funding: {request.funding_reference || 'Not set'}</div>
                         <div>Notes: {request.preference_notes || 'None'}</div>
@@ -50,7 +50,7 @@ export default function RespiteRequestShow({ request, booking }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Linked Booking</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-slate-600 space-y-2">
+                    <CardContent className="text-sm text-muted-foreground space-y-2">
                         {booking ? (
                             <>
                                 <div>Booking #{booking.id}</div>

@@ -39,7 +39,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             <FileText className="w-5 h-5" />
                             Site Reports
                         </h1>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-muted-foreground">
                             Reporting packs for Houses, Facilities, and Head Office
                         </p>
                     </div>
@@ -61,7 +61,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                                 Quality home checks, bedroom occupancy, hazard trends, and maintenance reports.
                             </p>
                             <ul className="text-sm space-y-1 text-slate-300">
@@ -92,7 +92,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                                 Equipment-focused safety reports, zone utilization, and facility compliance.
                             </p>
                             <ul className="text-sm space-y-1 text-slate-300">
@@ -123,7 +123,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                                 Room booking utilization, safety compliance, and IT asset reports.
                             </p>
                             <ul className="text-sm space-y-1 text-slate-300">
@@ -150,19 +150,19 @@ export default function SiteReportsIndex({ sites }: Props) {
                         <div className="grid gap-4 sm:grid-cols-4">
                             <div className="text-center">
                                 <div className="text-2xl font-bold">{sites.length}</div>
-                                <div className="text-sm text-slate-400">Total Sites</div>
+                                <div className="text-sm text-muted-foreground">Total Sites</div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-emerald-400">{houseCount}</div>
-                                <div className="text-sm text-slate-400">Houses</div>
+                                <div className="text-sm text-muted-foreground">Houses</div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-amber-400">{facilityCount}</div>
-                                <div className="text-sm text-slate-400">Facilities</div>
+                                <div className="text-sm text-muted-foreground">Facilities</div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-blue-400">{officeCount}</div>
-                                <div className="text-sm text-slate-400">Head Offices</div>
+                                <div className="text-sm text-muted-foreground">Head Offices</div>
                             </div>
                         </div>
                     </CardContent>

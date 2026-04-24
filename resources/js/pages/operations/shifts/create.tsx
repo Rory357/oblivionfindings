@@ -547,7 +547,7 @@ export default function ShiftCreate({
                             </select>
                             {defaultSiteId &&
                             !coverageContext?.preferred_client_id ? (
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground">
                                     The current shift schema still needs a
                                     planning client, but this cover shift is
                                     anchored to the site demand window first.
@@ -589,7 +589,7 @@ export default function ShiftCreate({
                                         </option>
                                     ))}
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 If left blank, the shift will inherit the
                                 selected client’s service context (if set).
                             </div>
@@ -613,7 +613,7 @@ export default function ShiftCreate({
                                     </option>
                                 ))}
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 Leave blank to create an open shift that can be
                                 assigned later from the Rostering module.
                             </div>
@@ -722,7 +722,7 @@ export default function ShiftCreate({
                                 </label>
                             </div>
 
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 These fields feed payroll, reporting, and roster
                                 context. Set them at creation so the shift
                                 carries the right operational meaning.
@@ -830,7 +830,7 @@ export default function ShiftCreate({
                                 <option value="draft">draft</option>
                                 <option value="scheduled">scheduled</option>
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 Use draft for uncovered planning shifts. Start,
                                 complete, and cancel actions happen from the
                                 live shift workflow.
@@ -896,7 +896,7 @@ export default function ShiftCreate({
                                     <div className="text-sm font-medium">
                                         Repeat weekly
                                     </div>
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-muted-foreground">
                                         Create a recurring series (weekly) until
                                         an end date.
                                     </div>
@@ -935,7 +935,7 @@ export default function ShiftCreate({
                                                     onClick={() =>
                                                         toggleWeekday(d)
                                                     }
-                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : ''}`}
+                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-slate-900 text-white dark:bg-white dark:text-foreground' : ''}`}
                                                 >
                                                     {d.toUpperCase()}
                                                 </button>
@@ -955,7 +955,7 @@ export default function ShiftCreate({
                                                 )
                                             }
                                         />
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             Tip: starts/ends time are taken from
                                             the Start/End fields above.
                                         </div>

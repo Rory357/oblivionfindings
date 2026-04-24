@@ -50,7 +50,7 @@ const formatHours = (hours: number) => {
 };
 
 const getUsageColor = (remaining: number, entitlement: number) => {
-    if (entitlement === 0) return 'text-slate-500';
+    if (entitlement === 0) return 'text-muted-foreground';
     const pct = (remaining / entitlement) * 100;
     if (pct <= 10) return 'text-red-600 font-semibold';
     if (pct <= 25) return 'text-orange-600';
@@ -74,7 +74,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Leave Balances</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Staff leave entitlements and usage for {year}
                         </div>
                     </div>
@@ -86,7 +86,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Year</Label>
+                            <Label className="text-xs text-muted-foreground">Year</Label>
                             <Select
                                 value={String(filters.year || year)}
                                 onValueChange={(v) => onFilter({ year: v })}
@@ -101,9 +101,9 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                         </div>
 
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by staff name or email..."
                                     value={filters.q || ''}
@@ -133,7 +133,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                                     <TableRow key={balance.id}>
                                         <TableCell>
                                             <div className="font-medium">{balance.user.name}</div>
-                                            <div className="text-xs text-slate-500">{balance.user.email}</div>
+                                            <div className="text-xs text-muted-foreground">{balance.user.email}</div>
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className="capitalize">
@@ -152,7 +152,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                                                     {formatHours(balance.pending_hours)}
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-400">0h</span>
+                                                <span className="text-muted-foreground">0h</span>
                                             )}
                                         </TableCell>
                                         <TableCell className={`text-right ${getUsageColor(balance.remaining_hours, balance.entitlement_hours)}`}>
@@ -162,7 +162,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                                 ))}
                                 {!balances.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                                             No leave balances found.
                                         </TableCell>
                                     </TableRow>

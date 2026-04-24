@@ -114,7 +114,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                             <ClipboardCheck className="w-5 h-5" />
                             Checklists & Walkthroughs
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="secondary" asChild>
@@ -137,9 +137,9 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                             <div>
                                 <Label>Template *</Label>
                                 {availableTemplates.length === 0 ? (
-                                    <p className="text-sm text-slate-400 mt-1">
+                                    <p className="text-sm text-muted-foreground mt-1">
                                         All available templates are already assigned.{' '}
-                                        <Link href="/sites/checklists/templates/create" className="text-indigo-400 hover:underline">
+                                        <Link href="/sites/checklists/templates/create" className="text-primary hover:underline">
                                             Create a new template
                                         </Link>
                                     </p>
@@ -196,12 +196,12 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                 <div className="space-y-3">
                     {assignments.length === 0 ? (
                         <Card>
-                            <CardContent className="py-8 text-center text-slate-400">
+                            <CardContent className="py-8 text-center text-muted-foreground">
                                 <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No checklists scheduled for this site</p>
                                 <p className="text-sm mt-1">
                                     Click "Assign Checklist" to add one, or{' '}
-                                    <Link href="/sites/checklists/templates" className="text-indigo-400 hover:underline">
+                                    <Link href="/sites/checklists/templates" className="text-primary hover:underline">
                                         manage templates
                                     </Link>
                                 </p>
@@ -218,9 +218,9 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                                                 <Badge variant="outline">{frequencyLabels[assignment.frequency] || assignment.frequency}</Badge>
                                             </div>
                                             {assignment.template.description && (
-                                                <p className="text-sm text-slate-400 mb-2">{assignment.template.description}</p>
+                                                <p className="text-sm text-muted-foreground mb-2">{assignment.template.description}</p>
                                             )}
-                                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                                 {assignment.assignedTo && (
                                                     <span>Assigned to: {assignment.assignedTo.name}</span>
                                                 )}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Notifications\DeliverBroadcastCommunicationJob;
 use App\Models\ControlRoom\Communication;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -111,10 +112,12 @@ class ControlRoomBroadcastController extends Controller
             'target_roles.*' => ['string', Rule::in(['admin', 'coordinator', 'support_worker', 'shift_lead', 'nurse'])],
             'send_to_all' => ['nullable', 'boolean'],
             'template' => ['nullable', 'string', 'max:255'],
+            'force_delivery' => ['nullable', 'boolean'],
         ]);
 
         $sendToAll = $validated['send_to_all'] ?? false;
         $targetRoles = $validated['target_roles'] ?? [];
+        $forceDelivery = (bool) ($validated['force_delivery'] ?? false);
 
         // Resolve target users
         $usersQuery = User::staff();
@@ -153,6 +156,7 @@ class ControlRoomBroadcastController extends Controller
                     'content' => $validated['content'],
                     'template_used' => $validated['template'] ?? null,
                     'status' => 'pending',
+                    'force_delivery' => $forceDelivery,
                     'sent_at' => $now,
                     'initiated_by_user_id' => $user->id,
                     'created_at' => $now,
@@ -161,22 +165,30 @@ class ControlRoomBroadcastController extends Controller
             }
         }
 
-        // Bulk insert in chunks
+        // Bulk insert in chunks, then dispatch a delivery job for each row.
+        // We query the freshly-inserted IDs instead of relying on insertGetId()
+        // because bulk insert doesn't return IDs reliably across DB drivers.
         foreach (array_chunk($records, 500) as $chunk) {
             Communication::insert($chunk);
         }
+
+        Communication::query()
+            ->where('broadcast_group_id', $broadcastGroupId)
+            ->pluck('id')
+            ->each(fn ($id) => DeliverBroadcastCommunicationJob::dispatch((int) $id));
 
         AuditLogger::log('controlRoom.broadcast.sent', null, [
             'broadcast_group_id' => $broadcastGroupId,
             'channels' => $channels,
             'target_roles' => $targetRoles,
             'send_to_all' => $sendToAll,
+            'force_delivery' => $forceDelivery,
             'recipient_count' => $targetUsers->count(),
             'total_messages' => count($records),
         ]);
 
         return redirect()->route('control-room.broadcast.index')
-            ->with('success', "Broadcast sent to {$targetUsers->count()} recipients via ".count($channels).' channel(s).');
+            ->with('success', "Broadcast queued for {$targetUsers->count()} recipients via ".count($channels).' channel(s).');
     }
 
     /**

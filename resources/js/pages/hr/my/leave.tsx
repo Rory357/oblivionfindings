@@ -64,7 +64,7 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         label: 'Declined',
     },
     cancelled: {
-        className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
         label: 'Cancelled',
     },
 };

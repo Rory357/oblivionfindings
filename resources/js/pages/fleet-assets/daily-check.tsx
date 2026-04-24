@@ -101,13 +101,13 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-purple-600">
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
                                     <CheckCircle className="h-4 w-4" />
                                     Checked Today
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold text-purple-600">{summary.checked}</div>
+                                <div className="text-3xl font-bold text-primary">{summary.checked}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -132,7 +132,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                     </div>
                     <div className="h-3 w-full rounded-full bg-muted">
                         <div
-                            className="h-full rounded-full transition-all bg-purple-600"
+                            className="h-full rounded-full transition-all bg-primary"
                             style={{ width: `${checkedPercentage}%` }}
                         />
                     </div>
@@ -147,7 +147,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                 className={`transition-colors ${
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
-                                            ? 'border-purple-500/30 bg-purple-50/30 dark:bg-purple-950/10'
+                                            ? 'border-primary/30 bg-primary/10/30 dark:bg-primary/10'
                                             : 'border-orange-500/30 bg-orange-50/30 dark:bg-orange-950/10'
                                         : 'border-red-500/30 bg-red-50/30 dark:bg-red-950/10'
                                 }`}
@@ -157,7 +157,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                         <div className="flex items-center gap-3 min-w-0">
                                             {vehicle.checked_today ? (
                                                 vehicle.check_result === 'good' ? (
-                                                    <CheckCircle className="h-5 w-5 text-purple-600 shrink-0" />
+                                                    <CheckCircle className="h-5 w-5 text-primary shrink-0" />
                                                 ) : (
                                                     <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
                                                 )
@@ -214,7 +214,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                                 <Button
                                                     onClick={() => handleSubmit(vehicle.id, 'good')}
                                                     disabled={submitting === vehicle.id}
-                                                    className="bg-purple-600 hover:bg-purple-700"
+                                                    className="bg-primary hover:bg-primary"
                                                 >
                                                     <CheckCircle className="mr-1.5 h-4 w-4" />
                                                     Good

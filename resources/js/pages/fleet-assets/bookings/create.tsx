@@ -135,8 +135,8 @@ function AvailabilityCalendar({ bookings, selectedStart, selectedEnd }: {
                     return (
                         <div key={i} className={cn(
                             'h-8 flex items-center justify-center text-xs rounded-md relative transition-colors',
-                            cell.isToday && 'font-bold ring-1 ring-purple-400',
-                            cell.isSelected && 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
+                            cell.isToday && 'font-bold ring-1 ring-ring',
+                            cell.isSelected && 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
                             hasBooking && !cell.isSelected && 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
                             !hasBooking && !cell.isSelected && 'hover:bg-muted/50',
                         )} title={hasBooking ? cell.bookings.map(b => `${b.purpose} (${b.user_name})`).join(', ') : ''}>
@@ -147,9 +147,9 @@ function AvailabilityCalendar({ bookings, selectedStart, selectedEnd }: {
                 })}
             </div>
             <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-purple-500" /> Your selection</span>
+                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary" /> Your selection</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Booked</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-white ring-1 ring-purple-400" /> Today</span>
+                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-white ring-1 ring-ring" /> Today</span>
             </div>
         </div>
     );
@@ -460,7 +460,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Calendar className="h-4 w-4 text-purple-500" />
+                                    <Calendar className="h-4 w-4 text-primary" />
                                     Vehicle Availability
                                 </CardTitle>
                             </CardHeader>

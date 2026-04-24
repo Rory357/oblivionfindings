@@ -148,7 +148,7 @@ function statusBadge(total: number, delivered: number, failed: number) {
         return <Badge variant="destructive">Partial Failure</Badge>;
     }
     if (delivered === total) {
-        return <Badge className="bg-green-600 text-white hover:bg-green-700">Delivered</Badge>;
+        return <Badge className="bg-status-success text-status-success-foreground hover:bg-status-success/90">Delivered</Badge>;
     }
     return <Badge variant="secondary">Sending</Badge>;
 }
@@ -165,6 +165,7 @@ export default function ControlRoomBroadcast({
     const [channels, setChannels] = useState<string[]>(['in_app']);
     const [targetRoles, setTargetRoles] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
+    const [forceDelivery, setForceDelivery] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const handleTemplateChange = (value: string) => {
@@ -208,6 +209,7 @@ export default function ControlRoomBroadcast({
                 target_roles: sendToAll ? [] : targetRoles,
                 send_to_all: sendToAll,
                 template: template !== 'custom' ? template : null,
+                force_delivery: forceDelivery,
             },
             {
                 onFinish: () => {
@@ -217,6 +219,7 @@ export default function ControlRoomBroadcast({
                     setChannels(['in_app']);
                     setTargetRoles([]);
                     setSendToAll(false);
+                    setForceDelivery(false);
                 },
             },
         );
@@ -319,6 +322,26 @@ export default function ControlRoomBroadcast({
                                     <Label htmlFor="send-to-all" className="cursor-pointer">
                                         Send to All Staff ({totalStaff} members)
                                     </Label>
+                                </div>
+
+                                {/* Force delivery — bypasses per-user notification prefs (DND, disabled channels) */}
+                                <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/30 px-4 py-3">
+                                    <Switch
+                                        id="force-delivery"
+                                        checked={forceDelivery}
+                                        onCheckedChange={setForceDelivery}
+                                    />
+                                    <div className="flex-1">
+                                        <Label
+                                            htmlFor="force-delivery"
+                                            className="cursor-pointer text-sm font-medium text-status-critical"
+                                        >
+                                            Force delivery (emergency)
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            Overrides recipients' Do Not Disturb and channel preferences. Use only for genuine emergencies (fire, lockdown, evacuation).
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {/* Target Roles (hidden when send to all) */}
@@ -480,13 +503,13 @@ export default function ControlRoomBroadcast({
                                                         </span>
                                                     </td>
                                                     <td className="py-3 pr-4 text-right">
-                                                        <span className="flex items-center justify-end gap-1 text-green-600">
+                                                        <span className="flex items-center justify-end gap-1 text-status-success">
                                                             <CheckCircle className="h-3.5 w-3.5" />
                                                             {broadcast.delivered_count}
                                                         </span>
                                                     </td>
                                                     <td className="py-3 pr-4 text-right">
-                                                        <span className={`flex items-center justify-end gap-1 ${broadcast.failed_count > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                                        <span className={`flex items-center justify-end gap-1 ${broadcast.failed_count > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>
                                                             <XCircle className="h-3.5 w-3.5" />
                                                             {broadcast.failed_count}
                                                         </span>

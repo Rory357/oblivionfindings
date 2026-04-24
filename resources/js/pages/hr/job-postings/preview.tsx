@@ -82,7 +82,7 @@ export default function PreviewJobPosting({ posting }: Props) {
                                     <Badge variant="outline" className="gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10"><Wifi className="h-3 w-3" /> Remote</Badge>
                                 )}
                                 {posting.is_internal && (
-                                    <Badge variant="outline" className="gap-1 border-purple-500/30 text-purple-400 bg-purple-500/10"><Lock className="h-3 w-3" /> Internal</Badge>
+                                    <Badge variant="outline" className="gap-1 border-primary/30 text-primary bg-primary/10"><Lock className="h-3 w-3" /> Internal</Badge>
                                 )}
                             </div>
                             {posting.salary_range && (

@@ -287,7 +287,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                 >
                                     <div className="relative shrink-0">
                                         <Avatar className="h-9 w-9">
-                                            <AvatarFallback className={`text-xs ${conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>
+                                            <AvatarFallback className={`text-xs ${conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? 'bg-primary/10 text-primary' : 'bg-muted text-foreground'}`}>
                                                 {conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? <Users className="h-4 w-4" /> : getInitials(name)}
                                             </AvatarFallback>
                                         </Avatar>
@@ -351,7 +351,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                     >
                                         <div className="relative">
                                             <Avatar className="h-9 w-9">
-                                                <AvatarFallback className="bg-slate-100 text-xs text-slate-700">{getInitials(user.name)}</AvatarFallback>
+                                                <AvatarFallback className="bg-muted text-xs text-foreground">{getInitials(user.name)}</AvatarFallback>
                                             </Avatar>
                                             <div className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={user.presence_status} /></div>
                                         </div>
@@ -375,7 +375,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                             <div className="flex items-center gap-3 border-b px-4 py-3">
                                 <div className="relative">
                                     <Avatar className="h-8 w-8">
-                                        <AvatarFallback className="bg-indigo-100 text-xs text-indigo-700">
+                                        <AvatarFallback className="bg-primary/10 text-xs text-primary">
                                             {activeConversation.conversation_type === 'group' ? <Hash className="h-4 w-4" /> : getInitials(getConversationName(activeConversation, currentUserId))}
                                         </AvatarFallback>
                                     </Avatar>
@@ -438,7 +438,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                             onContextMenu={(e) => handleMsgRightClick(e, msg)}>
                                             {!isMe && showAvatar ? (
                                                 <Avatar className="mt-1 h-7 w-7 shrink-0">
-                                                    <AvatarFallback className="bg-slate-100 text-[10px] text-slate-600">{getInitials(msg.sender?.name ?? '?')}</AvatarFallback>
+                                                    <AvatarFallback className="bg-muted text-[10px] text-muted-foreground">{getInitials(msg.sender?.name ?? '?')}</AvatarFallback>
                                                 </Avatar>
                                             ) : !isMe ? <div className="w-7 shrink-0" /> : null}
                                             <div className={`max-w-[70%]`}>
@@ -446,7 +446,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                     <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">{msg.sender?.name}</p>
                                                 )}
                                                 {msg.is_deleted ? (
-                                                    <div className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm italic ${isMe ? 'bg-indigo-600/30 text-white/60' : 'bg-muted/60 text-muted-foreground'}`}>
+                                                    <div className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm italic ${isMe ? 'bg-primary/30 text-white/60' : 'bg-muted/60 text-muted-foreground'}`}>
                                                         <Trash2 className="h-3 w-3" /><span>This message was deleted</span>
                                                     </div>
                                                 ) : (() => {
@@ -455,10 +455,10 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                     const quoteLine = parts ? parts[0].replace(/^> /, '') : null;
                                                     const mainText = parts ? parts.slice(1).join('\n\n') : msg.content;
                                                     return (
-                                                        <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-indigo-600 text-white' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
+                                                        <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-primary text-white' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
                                                             {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
                                                             {quoteLine && (
-                                                                <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-white/40 bg-white/10' : 'border-l-indigo-400 bg-indigo-50'}`}>
+                                                                <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-white/40 bg-white/10' : 'border-l-indigo-400 bg-primary/10'}`}>
                                                                     <p className="opacity-70 truncate">{quoteLine}</p>
                                                                 </div>
                                                             )}
@@ -506,9 +506,9 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
 
                             {/* Reply preview */}
                             {replyingTo && (
-                                <div className="flex items-center gap-2 border-t border-l-4 border-l-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/10 px-4 py-2">
+                                <div className="flex items-center gap-2 border-t border-l-4 border-l-indigo-500 bg-primary/10/50 dark:bg-primary/10 px-4 py-2">
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-semibold text-indigo-600">Replying to {replyingTo.senderName}</p>
+                                        <p className="text-[10px] font-semibold text-primary">Replying to {replyingTo.senderName}</p>
                                         <p className="truncate text-xs text-muted-foreground">{replyingTo.content}</p>
                                     </div>
                                     <button onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -532,7 +532,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                         onChange={(e) => setMessageText(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                                         autoFocus />
-                                    <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                                    <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary disabled:opacity-50"
                                         disabled={!messageText.trim()} onClick={sendMessage}>
                                         <Send className="h-4 w-4" />
                                     </button>
@@ -542,8 +542,8 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                     ) : (
                         /* No Chat Selected */
                         <div className="flex flex-1 flex-col items-center justify-center text-center">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-100 dark:bg-indigo-900/30">
-                                <MessageSquareText className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 dark:bg-primary/30">
+                                <MessageSquareText className="h-8 w-8 text-primary dark:text-primary" />
                             </div>
                             <h2 className="mt-4 text-lg font-semibold">Welcome to Chat</h2>
                             <p className="mt-1 max-w-sm text-sm text-muted-foreground">

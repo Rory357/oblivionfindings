@@ -16,12 +16,12 @@ const statusColors: Record<string, string> = {
     pending_review: 'bg-amber-100 text-amber-800',
     active: 'bg-green-100 text-green-800',
     modified: 'bg-blue-100 text-blue-800',
-    suspended: 'bg-slate-100 text-slate-600',
-    completed: 'bg-slate-100 text-slate-800',
+    suspended: 'bg-muted text-muted-foreground',
+    completed: 'bg-muted text-foreground',
 };
 
 const typeColors: Record<string, string> = {
-    behaviour: 'bg-purple-100 text-purple-800',
+    behaviour: 'bg-primary/10 text-primary',
     safety: 'bg-red-100 text-red-800',
     medical: 'bg-blue-100 text-blue-800',
     mobility: 'bg-orange-100 text-orange-800',
@@ -39,7 +39,7 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                         <h1 className="text-lg font-semibold">
                             Risk Plans for {stay.client?.first_name} {stay.client?.last_name}
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Stay #{stay.id} — {formatDateTime(stay.check_in)} to {formatDateTime(stay.check_out)}
                         </div>
                     </div>
@@ -61,7 +61,7 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                                                 <Badge className={typeColors[a.plan_type] || ''}>{a.plan_type?.replace(/_/g, ' ')}</Badge>
                                                 <Badge className={statusColors[a.status] || ''}>{a.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
-                                            <div className="mt-1 text-xs text-slate-400">{formatDateTime(a.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(a.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View
@@ -72,7 +72,7 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                         </Card>
                     ))}
                     {!activations.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No risk plan activations for this stay.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No risk plan activations for this stay.</div>
                     )}
                 </div>
             </div>

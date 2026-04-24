@@ -42,6 +42,31 @@ export default [
             'react-hooks/preserve-manual-memoization': 'off',
 
             'no-empty': 'off',
+
+            // Guardrail: discourage new raw Tailwind colour classes. The app uses
+            // semantic tokens (bg-primary, text-status-success, etc.) so that
+            // Branding changes propagate. Hardcoded colour shades like bg-violet-600
+            // or text-emerald-500 bypass the token system.
+            //
+            // Severity is 'warn' so developers can still commit pragmatic
+            // exceptions (e.g. chart/map gradients, the recruitment pipeline) —
+            // CI treats warnings as advisory. Use /* eslint-disable-next-line */
+            // with a comment explaining why on intentional exceptions.
+            'no-restricted-syntax': [
+                'warn',
+                {
+                    selector:
+                        "JSXAttribute[name.name='className'] Literal[value=/\\b(bg|text|border|ring|from|to|via)-(violet|indigo|purple|fuchsia|emerald|green|lime|red|rose|pink|amber|yellow|orange|blue|sky|cyan|teal|slate|zinc|neutral|stone|gray)-\\d+\\b/]",
+                    message:
+                        "Use semantic tokens (bg-primary, text-status-success, bg-category-hr) instead of raw Tailwind colour classes. See docs/DESIGN_TOKENS.md.",
+                },
+                {
+                    selector:
+                        "TemplateElement[value.raw=/\\b(bg|text|border|ring)-(violet|indigo|purple|fuchsia|emerald|green|lime|red|rose|pink|amber|yellow|orange|blue|sky|cyan|teal|slate|zinc|neutral|stone|gray)-\\d+\\b/]",
+                    message:
+                        "Use semantic tokens (bg-primary, text-status-success, bg-category-hr) instead of raw Tailwind colour classes. See docs/DESIGN_TOKENS.md.",
+                },
+            ],
         },
         settings: {
             react: {

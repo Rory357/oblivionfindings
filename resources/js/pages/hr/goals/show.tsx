@@ -102,7 +102,7 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 const statusColours: Record<string, string> = {
-    not_started: 'bg-slate-100 text-slate-800 border-slate-200',
+    not_started: 'bg-muted text-foreground border-border',
     in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
     completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     cancelled: 'bg-red-100 text-red-800 border-red-200',
@@ -116,7 +116,7 @@ const statusBadgeWhite: Record<string, string> = {
 };
 
 const priorityColours: Record<string, string> = {
-    low: 'bg-slate-100 text-slate-700',
+    low: 'bg-muted text-foreground',
     medium: 'bg-yellow-100 text-yellow-800',
     high: 'bg-red-100 text-red-800',
     critical: 'bg-red-200 text-red-900',
@@ -484,7 +484,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
                                                             <h3 className="text-sm font-semibold">{kr.title}</h3>
-                                                            <Badge className={statusColours[kr.status] ?? 'bg-slate-100 text-slate-800'}>
+                                                            <Badge className={statusColours[kr.status] ?? 'bg-muted text-foreground'}>
                                                                 {capitalize(kr.status)}
                                                             </Badge>
                                                         </div>
@@ -495,7 +495,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                                 <span>{kr.current_value} / {kr.target_value} {kr.unit ?? ''}</span>
                                                                 <span>{kr.progress_percentage}%</span>
                                                             </div>
-                                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                                                                 <div
                                                                     className={`h-full rounded-full transition-all ${progressBarColour(kr.progress_percentage)}`}
                                                                     style={{ width: `${Math.min(kr.progress_percentage, 100)}%` }}
@@ -637,11 +637,11 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     <div className="mt-3">
                                                         <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                                                             <span>{child.progress_percentage}%</span>
-                                                            <Badge className={`text-[10px] px-1.5 py-0 ${statusColours[child.status] ?? 'bg-slate-100 text-slate-800'}`}>
+                                                            <Badge className={`text-[10px] px-1.5 py-0 ${statusColours[child.status] ?? 'bg-muted text-foreground'}`}>
                                                                 {capitalize(child.status)}
                                                             </Badge>
                                                         </div>
-                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                                             <div
                                                                 className={`h-full rounded-full transition-all ${progressBarColour(child.progress_percentage)}`}
                                                                 style={{ width: `${Math.min(child.progress_percentage, 100)}%` }}
@@ -661,7 +661,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     </div>
 
                                                     <div className="mt-2">
-                                                        <Badge className={`text-[10px] px-1.5 py-0 ${priorityColours[child.priority] ?? 'bg-slate-100 text-slate-700'}`}>
+                                                        <Badge className={`text-[10px] px-1.5 py-0 ${priorityColours[child.priority] ?? 'bg-muted text-foreground'}`}>
                                                             {capitalize(child.priority)}
                                                         </Badge>
                                                     </div>
@@ -853,7 +853,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                     max="100"
                                     value={progressForm.progress_percentage}
                                     onChange={(e) => setProgressForm((p) => ({ ...p, progress_percentage: e.target.value }))}
-                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-slate-200 accent-primary"
+                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
                                 />
                                 <span className="w-12 text-right text-sm font-medium">{progressForm.progress_percentage}%</span>
                             </div>

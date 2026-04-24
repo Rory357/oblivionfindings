@@ -79,13 +79,13 @@ function KpiCard({
     variant?: 'default' | 'warning' | 'danger' | 'success';
 }) {
     const colorMap = {
-        default: 'from-slate-50 to-slate-100 text-slate-600',
+        default: 'from-slate-50 to-slate-100 text-muted-foreground',
         warning: 'from-amber-50 to-orange-50 text-amber-600',
         danger: 'from-red-50 to-rose-50 text-red-600',
         success: 'from-emerald-50 to-green-50 text-emerald-600',
     };
     const iconColorMap = {
-        default: 'text-slate-500',
+        default: 'text-muted-foreground',
         warning: 'text-amber-500',
         danger: 'text-red-500',
         success: 'text-emerald-500',
@@ -122,7 +122,7 @@ const severityColor: Record<string, string> = {
     critical: 'bg-red-100 text-red-700 border-red-200',
     high: 'bg-orange-100 text-orange-700 border-orange-200',
     medium: 'bg-amber-100 text-amber-700 border-amber-200',
-    low: 'bg-slate-100 text-slate-600 border-slate-200',
+    low: 'bg-muted text-muted-foreground border-border',
 };
 
 export default function HealthClinicalDashboard({
@@ -335,7 +335,7 @@ export default function HealthClinicalDashboard({
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <ClipboardList className="h-4 w-4 text-violet-500" />
+                            <ClipboardList className="h-4 w-4 text-primary" />
                             Recent Observations
                         </CardTitle>
                     </CardHeader>

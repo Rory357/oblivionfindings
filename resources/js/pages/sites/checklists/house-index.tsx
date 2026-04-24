@@ -293,7 +293,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                             <ClipboardCheck className="w-5 h-5" />
                             Daily Checklists
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     {canManage && (
                         <Button onClick={() => setCreateTemplateOpen(true)}>
@@ -311,7 +311,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                     </h2>
                     {templates.length === 0 ? (
                         <Card>
-                            <CardContent className="py-8 text-center text-slate-400">
+                            <CardContent className="py-8 text-center text-muted-foreground">
                                 <LayoutTemplate className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No checklist templates available</p>
                                 {canManage && (
@@ -328,7 +328,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-medium truncate">{template.name}</h3>
                                                 {template.description && (
-                                                    <p className="text-sm text-slate-400 mt-1 line-clamp-2">
+                                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                                         {template.description}
                                                     </p>
                                                 )}
@@ -339,7 +339,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                 {frequencyLabels[template.frequency] || template.frequency}
                                             </Badge>
                                             {template.site_id ? (
-                                                <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                                                <Badge className="bg-primary/20 text-primary/70 border-primary/30">
                                                     Site-specific
                                                 </Badge>
                                             ) : (
@@ -347,7 +347,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                     Global
                                                 </Badge>
                                             )}
-                                            <span className="text-xs text-slate-500 flex items-center gap-1">
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
                                                 <ListChecks className="w-3 h-3" />
                                                 {template.items.length} items
                                             </span>
@@ -379,7 +379,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                     <Card>
                         <CardContent className="p-0">
                             {runs.length === 0 ? (
-                                <div className="text-center py-8 text-slate-400">
+                                <div className="text-center py-8 text-muted-foreground">
                                     <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                     <p>No checklist runs yet</p>
                                     <p className="text-sm mt-1">Start a run from one of the templates above</p>
@@ -425,7 +425,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                                 style={{ width: `${run.completion_percentage}%` }}
                                                             />
                                                         </div>
-                                                        <span className="text-sm text-slate-400">
+                                                        <span className="text-sm text-muted-foreground">
                                                             {run.completion_percentage}%
                                                         </span>
                                                     </div>
@@ -437,7 +437,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                             {run.damages_count}
                                                         </Badge>
                                                     ) : (
-                                                        <span className="text-sm text-slate-500">-</span>
+                                                        <span className="text-sm text-muted-foreground">-</span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
@@ -541,7 +541,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                     </Button>
                                 </div>
                                 {templateForm.data.items.length === 0 ? (
-                                    <p className="text-sm text-slate-400 text-center py-4 border rounded-lg border-dashed">
+                                    <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg border-dashed">
                                         No items added yet. Click "Add Item" to start building your checklist.
                                     </p>
                                 ) : (
@@ -628,12 +628,12 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                         </DialogHeader>
                         <div className="space-y-4">
                             {!activeRunTemplate ? (
-                                <div className="text-center py-6 text-slate-400">
+                                <div className="text-center py-6 text-muted-foreground">
                                     <ClipboardCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
                                     <p>Template details not available.</p>
                                 </div>
                             ) : activeRunTemplate.items.length === 0 ? (
-                                <div className="text-center py-6 text-slate-400">
+                                <div className="text-center py-6 text-muted-foreground">
                                     <ClipboardCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
                                     <p>This checklist has no items to complete.</p>
                                     <p className="text-sm mt-1">You can still mark this run as complete.</p>
@@ -644,7 +644,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                     .map((item, idx) => (
                                         <div key={item.id} className="p-3 rounded-lg border space-y-2">
                                             <div className="flex items-start gap-2">
-                                                <span className="text-xs text-slate-500 font-mono mt-0.5">{idx + 1}.</span>
+                                                <span className="text-xs text-muted-foreground font-mono mt-0.5">{idx + 1}.</span>
                                                 <div className="flex-1">
                                                     <Label className="font-medium">
                                                         {item.question}
@@ -867,7 +867,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                 {viewingRun?.template.name}
                             </DialogTitle>
                             {viewingRun && (
-                                <p className="text-sm text-slate-400">
+                                <p className="text-sm text-muted-foreground">
                                     Completed by {viewingRun.completed_by?.name || 'Unknown'} on{' '}
                                     {viewingRun.completed_at
                                         ? new Date(viewingRun.completed_at).toLocaleDateString()
@@ -882,7 +882,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                     .map((resp, idx) => (
                                         <div key={resp.id} className="p-3 rounded-lg border space-y-1">
                                             <div className="flex items-start gap-2">
-                                                <span className="text-xs text-slate-500 font-mono mt-0.5">{idx + 1}.</span>
+                                                <span className="text-xs text-muted-foreground font-mono mt-0.5">{idx + 1}.</span>
                                                 <div className="flex-1">
                                                     <p className="text-sm font-medium">
                                                         {resp.template_item?.question || `Item #${resp.template_item_id}`}
@@ -908,16 +908,16 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                             : resp.response_value}
                                                     </Badge>
                                                 ) : (
-                                                    <span className="text-sm text-slate-500">No response</span>
+                                                    <span className="text-sm text-muted-foreground">No response</span>
                                                 )}
                                                 {resp.notes && (
-                                                    <p className="text-xs text-slate-400 mt-1">Note: {resp.notes}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">Note: {resp.notes}</p>
                                                 )}
                                             </div>
                                         </div>
                                     ))
                             ) : (
-                                <div className="text-center py-6 text-slate-400">
+                                <div className="text-center py-6 text-muted-foreground">
                                     <ClipboardCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
                                     <p>No responses recorded for this run.</p>
                                 </div>

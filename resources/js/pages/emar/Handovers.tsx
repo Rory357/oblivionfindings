@@ -909,7 +909,7 @@ export default function Handovers({ handovers, shifts }: Props) {
                                     <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
-                                                <ClipboardList className="h-4 w-4 text-slate-500" />
+                                                <ClipboardList className="h-4 w-4 text-muted-foreground" />
                                                 <div className="font-medium">
                                                     Medication notes
                                                 </div>
@@ -921,7 +921,7 @@ export default function Handovers({ handovers, shifts }: Props) {
 
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
-                                                <Pill className="h-4 w-4 text-slate-500" />
+                                                <Pill className="h-4 w-4 text-muted-foreground" />
                                                 <div className="font-medium">
                                                     Client presentation
                                                 </div>

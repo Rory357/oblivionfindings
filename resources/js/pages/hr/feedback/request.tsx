@@ -36,7 +36,7 @@ const reviewTypeLabels: Record<string, { label: string; desc: string }> = {
     self: { label: 'Self Assessment', desc: 'Self-reflection on own performance' },
 };
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
+const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-primary'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 function slugify(text: string) { return text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 100); }
@@ -126,7 +126,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                         <CardHeader className="border-b bg-gradient-to-r from-indigo-50 to-transparent pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-bold text-white">1</div>
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">1</div>
                                     Question Template
                                 </CardTitle>
                                 <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setShowCreateTemplate(true)}>
@@ -138,19 +138,19 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {templates.map(t => (
                                     <button key={t.id} type="button" onClick={() => form.setData('template_id', String(t.id))}
-                                        className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${String(t.id) === form.data.template_id ? 'border-indigo-400 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-200' : 'hover:bg-muted/50 hover:border-muted-foreground/20'}`}>
-                                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${String(t.id) === form.data.template_id ? 'bg-indigo-100' : 'bg-slate-100'}`}>
-                                            <FileText className={`h-4 w-4 ${String(t.id) === form.data.template_id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                                        className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${String(t.id) === form.data.template_id ? 'border-primary bg-primary/10/50 shadow-sm ring-1 ring-ring' : 'hover:bg-muted/50 hover:border-muted-foreground/20'}`}>
+                                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${String(t.id) === form.data.template_id ? 'bg-primary/10' : 'bg-muted'}`}>
+                                            <FileText className={`h-4 w-4 ${String(t.id) === form.data.template_id ? 'text-primary' : 'text-muted-foreground'}`} />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5">
                                                 <p className="text-sm font-semibold truncate">{t.name}</p>
-                                                {t.is_default && <Badge className="border-0 bg-indigo-100 text-[8px] text-indigo-600">Default</Badge>}
+                                                {t.is_default && <Badge className="border-0 bg-primary/10 text-[8px] text-primary">Default</Badge>}
                                             </div>
                                             {t.description && <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">{t.description}</p>}
                                             <p className="mt-1 text-[10px] text-muted-foreground">{t.questions.length} question{t.questions.length !== 1 ? 's' : ''}</p>
                                         </div>
-                                        {String(t.id) === form.data.template_id && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />}
+                                        {String(t.id) === form.data.template_id && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
                                     </button>
                                 ))}
                             </div>
@@ -167,7 +167,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                     <Card className="overflow-hidden">
                         <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-[11px] font-bold text-white">2</div>
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">2</div>
                                 Select Employee & Review Type
                             </CardTitle>
                         </CardHeader>
@@ -302,7 +302,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                         </div>
                         <div className="flex gap-2">
                             <Button type="button" variant="outline" onClick={() => router.get('/hr/feedback')}>Cancel</Button>
-                            <Button type="submit" className="gap-1.5 bg-violet-600 hover:bg-violet-700" disabled={form.processing}>
+                            <Button type="submit" className="gap-1.5 bg-primary hover:bg-primary" disabled={form.processing}>
                                 <Send className="h-3.5 w-3.5" />Send Requests
                             </Button>
                         </div>
@@ -335,7 +335,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                             <div className="space-y-3">
                                 {newTemplate.questions.map((q, i) => (
                                     <div key={i} className="flex gap-2 rounded-lg border p-3">
-                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-bold text-violet-700">{i + 1}</div>
+                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{i + 1}</div>
                                         <div className="flex-1 space-y-2">
                                             <Input value={q.question} onChange={e => updateQuestion(i, 'question', e.target.value)} placeholder="e.g. How effectively does this person communicate?" className="text-sm" />
                                             <Input value={q.key} onChange={e => updateQuestion(i, 'key', e.target.value)} placeholder="Key (auto-generated)" className="text-xs text-muted-foreground h-7" />
@@ -352,7 +352,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setShowCreateTemplate(false)}>Cancel</Button>
-                        <Button type="button" className="bg-violet-600 hover:bg-violet-700" disabled={!newTemplate.name || newTemplate.questions.some(q => !q.question)} onClick={submitTemplate}>
+                        <Button type="button" className="bg-primary hover:bg-primary" disabled={!newTemplate.name || newTemplate.questions.some(q => !q.question)} onClick={submitTemplate}>
                             Create Template
                         </Button>
                     </DialogFooter>

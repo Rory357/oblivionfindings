@@ -236,7 +236,7 @@ export default function ShowPosition({ position, can }: Props) {
                         ) : (
                             <div className="overflow-hidden rounded-xl border">
                                 <table className="w-full text-sm">
-                                    <thead className="border-b bg-slate-50/5">
+                                    <thead className="border-b bg-muted/5">
                                         <tr>
                                             <th className="px-4 py-3 text-left font-medium">Name</th>
                                             <th className="px-4 py-3 text-left font-medium">Email</th>

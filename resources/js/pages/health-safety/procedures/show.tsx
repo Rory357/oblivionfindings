@@ -40,21 +40,21 @@ type Props = {
 function categoryBadge(cat: string) {
     switch (cat) {
         case 'fire_safety': return 'bg-red-100 text-red-800 border-red-200';
-        case 'chemical_handling': return 'bg-purple-100 text-purple-800 border-purple-200';
+        case 'chemical_handling': return 'bg-primary/10 text-primary border-primary';
         case 'manual_handling': return 'bg-blue-100 text-blue-800 border-blue-200';
         case 'infection_control': return 'bg-green-100 text-green-800 border-green-200';
         case 'emergency_procedures': return 'bg-orange-100 text-orange-800 border-orange-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusBadge(status: string) {
     switch (status) {
         case 'approved': return 'bg-green-100 text-green-800 border-green-200';
-        case 'draft': return 'bg-slate-100 text-slate-800 border-slate-200';
+        case 'draft': return 'bg-muted text-foreground border-border';
         case 'under_review': return 'bg-amber-100 text-amber-800 border-amber-200';
         case 'archived': return 'bg-red-100 text-red-800 border-red-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -87,7 +87,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                     {procedure.reference_number && (
-                                        <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs">{procedure.reference_number}</span>
+                                        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs">{procedure.reference_number}</span>
                                     )}
                                     <Badge className={categoryBadge(procedure.category)}>
                                         {procedure.category?.replace(/_/g, ' ')}
@@ -95,7 +95,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                     <Badge className={statusBadge(procedure.status)}>
                                         {procedure.status?.replace(/_/g, ' ')}
                                     </Badge>
-                                    <span className="text-xs text-slate-500">Version {procedure.version}</span>
+                                    <span className="text-xs text-muted-foreground">Version {procedure.version}</span>
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -128,7 +128,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                             <CardTitle className="text-base">Purpose</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{procedure.purpose || 'Not specified.'}</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{procedure.purpose || 'Not specified.'}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -136,7 +136,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                             <CardTitle className="text-base">Scope</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{procedure.scope || 'Not specified.'}</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{procedure.scope || 'Not specified.'}</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -155,7 +155,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                             {step.step_number}
                                         </div>
                                         <div className="flex-1">
-                                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{step.description}</p>
+                                            <p className="text-sm text-foreground whitespace-pre-wrap">{step.description}</p>
                                             {step.safety_notes && (
                                                 <div className="mt-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
                                                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -167,7 +167,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                 </div>
                             ))}
                             {!(procedure.steps ?? []).length && (
-                                <p className="text-sm text-slate-500">No steps defined.</p>
+                                <p className="text-sm text-muted-foreground">No steps defined.</p>
                             )}
                         </div>
                     </CardContent>
@@ -181,7 +181,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                     <CardContent className="space-y-4">
                         <div>
                             <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
-                                <HardHat className="h-4 w-4 text-slate-500" />
+                                <HardHat className="h-4 w-4 text-muted-foreground" />
                                 PPE Required
                             </div>
                             {(procedure.ppe_required ?? []).length > 0 ? (
@@ -193,16 +193,16 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-slate-500">None specified.</p>
+                                <p className="text-sm text-muted-foreground">None specified.</p>
                             )}
                         </div>
 
                         <div>
                             <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
-                                <Shield className="h-4 w-4 text-slate-500" />
+                                <Shield className="h-4 w-4 text-muted-foreground" />
                                 Emergency Procedures
                             </div>
-                            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
                                 {procedure.emergency_procedures || 'Not specified.'}
                             </p>
                         </div>
@@ -225,7 +225,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-slate-500">All roles.</p>
+                                    <p className="text-sm text-muted-foreground">All roles.</p>
                                 )}
                             </div>
                             <div>
@@ -237,7 +237,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-slate-500">All sites.</p>
+                                    <p className="text-sm text-muted-foreground">All sites.</p>
                                 )}
                             </div>
                         </div>
@@ -276,7 +276,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 font-medium">Version</th>
                                         <th className="pb-2 font-medium">Change Summary</th>
                                         <th className="pb-2 font-medium">Changed By</th>
@@ -294,7 +294,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                     ))}
                                     {!versions.length && (
                                         <tr>
-                                            <td colSpan={4} className="py-4 text-center text-slate-500">No version history.</td>
+                                            <td colSpan={4} className="py-4 text-center text-muted-foreground">No version history.</td>
                                         </tr>
                                     )}
                                 </tbody>

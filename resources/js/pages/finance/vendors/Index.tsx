@@ -52,10 +52,10 @@ const vendorTypeLabels: Record<string, string> = {
 
 const vendorTypeColors: Record<string, string> = {
     supplier: 'bg-blue-100 text-blue-800',
-    contractor: 'bg-purple-100 text-purple-800',
+    contractor: 'bg-primary/10 text-primary',
     utility: 'bg-amber-100 text-amber-800',
     government: 'bg-teal-100 text-teal-800',
-    other: 'bg-gray-100 text-gray-800',
+    other: 'bg-muted text-foreground',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -234,7 +234,7 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                                                     className={
                                                         vendor.is_active
                                                             ? 'bg-green-100 text-green-800'
-                                                            : 'bg-gray-100 text-gray-600'
+                                                            : 'bg-muted text-muted-foreground'
                                                     }
                                                 >
                                                     {vendor.is_active ? 'Active' : 'Inactive'}

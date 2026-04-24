@@ -131,6 +131,19 @@ class HandleInertiaRequests extends Middleware
                 'name' => is_string($brandingName) && trim($brandingName) !== '' ? $brandingName : config('app.name'),
                 'logoUrl' => $logoUrl,
             ],
+            // Per-user appearance preferences so the React app can hydrate
+            // from server state instead of only trusting localStorage. Null
+            // values mean "fall back to brand/org defaults".
+            'appearance' => $user ? [
+                'theme' => $user->theme ?? 'system',
+                'accent_colour' => $user->accent_colour,
+                'font_size' => (int) ($user->font_size ?? 14),
+                'sidebar_density' => $user->sidebar_density ?? 'comfortable',
+                'reduce_motion' => (bool) ($user->reduce_motion ?? false),
+                'first_day_of_week' => $user->first_day_of_week ?? 'monday',
+                'date_format' => $user->date_format ?? 'DD/MM/YYYY',
+                'time_format' => $user->time_format ?? '24',
+            ] : null,
             'fleet' => [
                 'maps' => [
                     'apiKey' => config('fleet.maps.api_key'),

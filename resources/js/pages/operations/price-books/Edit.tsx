@@ -78,7 +78,7 @@ export default function PriceBookEdit({ price_book }: Props) {
                                     type="checkbox"
                                     checked={data.is_default}
                                     onChange={(e) => setData('is_default', e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300"
+                                    className="h-4 w-4 rounded border-border"
                                 />
                                 <Label htmlFor="is_default" className="cursor-pointer">Set as default price book</Label>
                             </div>

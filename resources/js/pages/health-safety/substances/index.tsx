@@ -51,13 +51,13 @@ const statusColor = (status: string) => {
         case 'active':
             return 'bg-green-100 text-green-800';
         case 'inactive':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         case 'pending_review':
             return 'bg-amber-100 text-amber-800';
         case 'restricted':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -115,7 +115,7 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Name or HSNO number"
                                 value={filters.q || ''}
@@ -123,7 +123,7 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -139,7 +139,7 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Physical Form</Label>
+                            <Label className="text-xs text-muted-foreground">Physical Form</Label>
                             <Select
                                 value={filters.physical_form ?? ANY}
                                 onValueChange={(v) => onFilter({ physical_form: v === ANY ? null : v })}
@@ -157,7 +157,7 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Controlled</Label>
+                            <Label className="text-xs text-muted-foreground">Controlled</Label>
                             <Select
                                 value={filters.is_controlled ?? ANY}
                                 onValueChange={(v) => onFilter({ is_controlled: v === ANY ? null : v })}
@@ -179,7 +179,7 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Name</th>
                                         <th className="pb-2 pr-4 font-medium">HSNO Classification</th>
                                         <th className="pb-2 pr-4 font-medium">Physical Form</th>
@@ -231,7 +231,7 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                                 </tbody>
                             </table>
                             {!substances.data.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No substances found.
                                 </div>
                             )}

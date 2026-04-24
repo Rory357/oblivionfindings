@@ -84,12 +84,12 @@ const TRANSPORT_TYPE_COLORS: Record<string, string> = {
         'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     social: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     shopping:
-        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+        'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
     community:
         'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
     respite:
         'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-    other: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+    other: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
 };
 
 function statusVariant(
@@ -227,9 +227,9 @@ export default function TransportsIndex({
                         icon={Car}
                         subtitle="Vehicle this month"
                     />
-                    <Card className="border bg-purple-50 transition-shadow hover:shadow-lg dark:bg-purple-950/20">
+                    <Card className="border bg-primary/10 transition-shadow hover:shadow-lg dark:bg-primary/20">
                         <CardContent className="p-4">
-                            <p className="mb-2 text-[10px] font-medium tracking-wider text-slate-400 uppercase">
+                            <p className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
                                 BY DAY OF WEEK
                             </p>
                             <MiniBarChart

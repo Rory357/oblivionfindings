@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
-    protected $fillable = ['name', 'label', 'level', 'type', 'description'];
+    protected $fillable = ['name', 'label', 'level', 'type', 'description', 'landing_route'];
 
     protected $casts = [
         'level' => 'integer',

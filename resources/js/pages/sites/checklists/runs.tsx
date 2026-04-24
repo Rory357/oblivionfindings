@@ -66,7 +66,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                             <ClipboardCheck className="w-5 h-5" />
                             Checklist Runs
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm">
@@ -81,7 +81,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{runs.data.length}</div>
-                            <div className="text-sm text-slate-400">Total Runs</div>
+                            <div className="text-sm text-muted-foreground">Total Runs</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-yellow-500/5 border-yellow-500/20">
@@ -89,7 +89,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                             <div className="text-2xl font-bold text-yellow-400">
                                 {runs.data.filter(r => r.status === 'scheduled').length}
                             </div>
-                            <div className="text-sm text-slate-400">Scheduled</div>
+                            <div className="text-sm text-muted-foreground">Scheduled</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-blue-500/5 border-blue-500/20">
@@ -97,7 +97,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                             <div className="text-2xl font-bold text-blue-400">
                                 {runs.data.filter(r => r.status === 'in_progress').length}
                             </div>
-                            <div className="text-sm text-slate-400">In Progress</div>
+                            <div className="text-sm text-muted-foreground">In Progress</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
@@ -105,7 +105,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                             <div className="text-2xl font-bold text-emerald-400">
                                 {runs.data.filter(r => r.status === 'completed').length}
                             </div>
-                            <div className="text-sm text-slate-400">Completed</div>
+                            <div className="text-sm text-muted-foreground">Completed</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -117,7 +117,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                     </CardHeader>
                     <CardContent>
                         {runs.data.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No checklist runs yet</p>
                             </div>
@@ -130,7 +130,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                                     >
                                         <div>
                                             <div className="font-medium">{run.template.name}</div>
-                                            <div className="text-sm text-slate-400 flex items-center gap-3 mt-1">
+                                            <div className="text-sm text-muted-foreground flex items-center gap-3 mt-1">
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="w-3.5 h-3.5" />
                                                     {new Date(run.scheduled_date).toLocaleDateString()}

@@ -88,7 +88,7 @@ const refStatusColors: Record<string, string> = {
     completed: 'border-emerald-500/30 text-emerald-600 bg-emerald-500/10',
     received: 'border-blue-500/30 text-blue-600 bg-blue-500/10',
     requested: 'border-amber-500/30 text-amber-600 bg-amber-500/10',
-    pending: 'border-slate-500/30 text-slate-500 bg-slate-500/10',
+    pending: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
 };
 
 export default function CreateOffer({ application, sites, roles }: Props) {

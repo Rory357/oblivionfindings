@@ -93,13 +93,13 @@ const statusColor = (status: string) => {
             return 'bg-green-100 text-green-800';
         case 'inactive':
         case 'superseded':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         case 'pending_review':
             return 'bg-amber-100 text-amber-800';
         case 'expired':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -140,7 +140,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
     const infoRow = (label: string, value: string | null | undefined) =>
         value ? (
             <div>
-                <div className="text-xs text-slate-500">{label}</div>
+                <div className="text-xs text-muted-foreground">{label}</div>
                 <div className="mt-0.5 text-sm whitespace-pre-wrap">{value}</div>
             </div>
         ) : null;
@@ -159,7 +159,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{substance.name}</h1>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             {substance.common_name && <span>{substance.common_name}</span>}
                             <Badge className={statusColor(substance.status)}>{substance.status}</Badge>
                             {substance.is_controlled_substance && (
@@ -246,7 +246,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Version</th>
                                         <th className="pb-2 pr-4 font-medium">Issue Date</th>
                                         <th className="pb-2 pr-4 font-medium">Supplier</th>
@@ -284,7 +284,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                 </tbody>
                             </table>
                             {!substance.sds_records.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No SDS records found.
                                 </div>
                             )}
@@ -311,7 +311,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Site</th>
                                         <th className="pb-2 pr-4 font-medium">Location</th>
                                         <th className="pb-2 pr-4 font-medium">Quantity</th>
@@ -342,7 +342,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                 </tbody>
                             </table>
                             {!substance.storage_locations.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No storage locations recorded.
                                 </div>
                             )}
@@ -369,7 +369,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Worker</th>
                                         <th className="pb-2 pr-4 font-medium">Date</th>
                                         <th className="pb-2 pr-4 font-medium">Exposure Type</th>
@@ -396,7 +396,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                 </tbody>
                             </table>
                             {!substance.exposure_records.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No exposure records found.
                                 </div>
                             )}

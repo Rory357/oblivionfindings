@@ -18,9 +18,9 @@ export const OPS_COLORS = {
 
 const COLOR_MAP: Record<string, { bg: string; text: string; iconBg: string }> = {
     indigo: {
-        bg: 'bg-indigo-50 dark:bg-indigo-950/30',
-        text: 'text-indigo-700 dark:text-indigo-300',
-        iconBg: 'bg-indigo-100 dark:bg-indigo-900/40',
+        bg: 'bg-primary/10 dark:bg-primary/30',
+        text: 'text-primary dark:text-primary/70',
+        iconBg: 'bg-primary/10 dark:bg-primary/40',
     },
     blue: {
         bg: 'bg-blue-50 dark:bg-blue-950/30',
@@ -48,14 +48,14 @@ const COLOR_MAP: Record<string, { bg: string; text: string; iconBg: string }> = 
         iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
     },
     slate: {
-        bg: 'bg-slate-50 dark:bg-slate-900/30',
-        text: 'text-slate-700 dark:text-slate-300',
-        iconBg: 'bg-slate-100 dark:bg-slate-800/40',
+        bg: 'bg-muted dark:bg-muted/30',
+        text: 'text-foreground dark:text-muted-foreground',
+        iconBg: 'bg-muted dark:bg-muted/40',
     },
     violet: {
-        bg: 'bg-violet-50 dark:bg-violet-950/30',
-        text: 'text-violet-700 dark:text-violet-300',
-        iconBg: 'bg-violet-100 dark:bg-violet-900/40',
+        bg: 'bg-primary/10 dark:bg-primary/30',
+        text: 'text-primary dark:text-primary/70',
+        iconBg: 'bg-primary/10 dark:bg-primary/40',
     },
 };
 

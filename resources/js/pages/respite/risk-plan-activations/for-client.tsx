@@ -16,12 +16,12 @@ const statusColors: Record<string, string> = {
     pending_review: 'bg-amber-100 text-amber-800',
     active: 'bg-green-100 text-green-800',
     modified: 'bg-blue-100 text-blue-800',
-    suspended: 'bg-slate-100 text-slate-600',
-    completed: 'bg-slate-100 text-slate-800',
+    suspended: 'bg-muted text-muted-foreground',
+    completed: 'bg-muted text-foreground',
 };
 
 const typeColors: Record<string, string> = {
-    behaviour: 'bg-purple-100 text-purple-800',
+    behaviour: 'bg-primary/10 text-primary',
     safety: 'bg-red-100 text-red-800',
     medical: 'bg-blue-100 text-blue-800',
     mobility: 'bg-orange-100 text-orange-800',
@@ -36,7 +36,7 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Risk Plans for Client</h1>
-                    <div className="mt-1 text-sm text-slate-500">All risk plan activations across all stays for this client.</div>
+                    <div className="mt-1 text-sm text-muted-foreground">All risk plan activations across all stays for this client.</div>
                 </div>
                 <RespiteSubnav />
 
@@ -53,9 +53,9 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
                                                 <Badge className={statusColors[a.status] || ''}>{a.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
                                             {a.stay && (
-                                                <div className="mt-2 text-xs text-slate-500">Stay #{a.stay.id}</div>
+                                                <div className="mt-2 text-xs text-muted-foreground">Stay #{a.stay.id}</div>
                                             )}
-                                            <div className="mt-1 text-xs text-slate-400">{formatDateTime(a.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(a.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View
@@ -66,7 +66,7 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
                         </Card>
                     ))}
                     {!activations.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No risk plan activations found for this client.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No risk plan activations found for this client.</div>
                     )}
                 </div>
 

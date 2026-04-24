@@ -57,13 +57,13 @@ const getChangeTypeColor = (type: string) => {
         case 'promotion':
             return 'bg-green-100 text-green-800 border-green-200';
         case 'review':
-            return 'bg-purple-100 text-purple-800 border-purple-200';
+            return 'bg-primary/10 text-primary border-primary';
         case 'adjustment':
             return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'correction':
             return 'bg-red-100 text-red-800 border-red-200';
         default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -91,7 +91,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                             </Link>
                             <h1 className="text-lg font-semibold">Compensation History</h1>
                         </div>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {profile.user.name} &middot; {profile.position_title}
                         </div>
                     </div>
@@ -100,7 +100,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-500">Current Annual Salary</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Current Annual Salary</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-semibold">{formatCurrency(profile.annual_salary)}</div>
@@ -108,7 +108,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-500">Current Hourly Rate</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Current Hourly Rate</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-semibold">{formatCurrency(profile.hourly_rate)}</div>
@@ -122,7 +122,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                     </CardHeader>
                     <CardContent>
                         {history.data.length === 0 && (
-                            <p className="py-8 text-center text-sm text-slate-500">No compensation history recorded.</p>
+                            <p className="py-8 text-center text-sm text-muted-foreground">No compensation history recorded.</p>
                         )}
                         <div className="space-y-4">
                             {history.data.map((entry, idx) => {
@@ -131,7 +131,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                                 const isNegative = pctVal !== null && pctVal < 0;
 
                                 return (
-                                    <div key={entry.id} className="relative flex gap-4 border-l-2 border-slate-200 pb-4 pl-6 last:border-transparent last:pb-0">
+                                    <div key={entry.id} className="relative flex gap-4 border-l-2 border-border pb-4 pl-6 last:border-transparent last:pb-0">
                                         <div className="absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-white bg-slate-300" />
 
                                         <div className="flex-1 space-y-1">
@@ -141,7 +141,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                                                     {entry.change_type.replace(/_/g, ' ')}
                                                 </Badge>
                                                 {pctVal !== null && (
-                                                    <span className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-slate-500'}`}>
+                                                    <span className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'}`}>
                                                         {isPositive ? <TrendingUp className="h-3 w-3" /> : isNegative ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
                                                         {isPositive ? '+' : ''}{pctVal}%
                                                     </span>
@@ -150,17 +150,17 @@ export default function CompensationHistory({ profile, history, can }: Props) {
 
                                             <div className="grid grid-cols-2 gap-4 text-sm">
                                                 <div>
-                                                    <span className="text-slate-500">Hourly Rate: </span>
+                                                    <span className="text-muted-foreground">Hourly Rate: </span>
                                                     {entry.previous_hourly_rate && (
-                                                        <span className="text-slate-400 line-through">{formatCurrency(entry.previous_hourly_rate)}</span>
+                                                        <span className="text-muted-foreground line-through">{formatCurrency(entry.previous_hourly_rate)}</span>
                                                     )}
                                                     {' '}
                                                     <span className="font-medium">{formatCurrency(entry.new_hourly_rate)}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-slate-500">Annual Salary: </span>
+                                                    <span className="text-muted-foreground">Annual Salary: </span>
                                                     {entry.previous_annual_salary && (
-                                                        <span className="text-slate-400 line-through">{formatCurrency(entry.previous_annual_salary)}</span>
+                                                        <span className="text-muted-foreground line-through">{formatCurrency(entry.previous_annual_salary)}</span>
                                                     )}
                                                     {' '}
                                                     <span className="font-medium">{formatCurrency(entry.new_annual_salary)}</span>
@@ -168,10 +168,10 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                                             </div>
 
                                             {entry.reason && (
-                                                <p className="text-sm text-slate-600">{entry.reason}</p>
+                                                <p className="text-sm text-muted-foreground">{entry.reason}</p>
                                             )}
 
-                                            <div className="flex gap-4 text-xs text-slate-400">
+                                            <div className="flex gap-4 text-xs text-muted-foreground">
                                                 {entry.approver && <span>Approved by {entry.approver.name}</span>}
                                                 {entry.creator && <span>Created by {entry.creator.name}</span>}
                                             </div>

@@ -47,16 +47,16 @@ const formatNZD = (amount: string | number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
     approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
-    sent: { label: 'Sent', className: 'bg-indigo-100 text-indigo-800' },
+    sent: { label: 'Sent', className: 'bg-primary/10 text-primary' },
     partially_received: { label: 'Partially Received', className: 'bg-yellow-100 text-yellow-800' },
     received: { label: 'Received', className: 'bg-green-100 text-green-800' },
     cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
 };
 
 function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] ?? { label: status, className: 'bg-gray-100 text-gray-800' };
+    const config = statusConfig[status] ?? { label: status, className: 'bg-muted text-foreground' };
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>{config.label}</span>;
 }
 
@@ -90,7 +90,7 @@ export default function PurchaseOrderShow() {
                             <h1 className="text-xl font-semibold">{po.po_number}</h1>
                             <StatusBadge status={po.status} />
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Vendor: {po.vendor?.name ?? '—'}
                         </p>
                     </div>
@@ -116,30 +116,30 @@ export default function PurchaseOrderShow() {
                     <CardContent>
                         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             <div>
-                                <dt className="text-xs font-medium text-slate-500">Order Date</dt>
+                                <dt className="text-xs font-medium text-muted-foreground">Order Date</dt>
                                 <dd className="mt-1 text-sm">{po.order_date}</dd>
                             </div>
                             <div>
-                                <dt className="text-xs font-medium text-slate-500">Expected Date</dt>
+                                <dt className="text-xs font-medium text-muted-foreground">Expected Date</dt>
                                 <dd className="mt-1 text-sm">{po.expected_date ?? '—'}</dd>
                             </div>
                             <div>
-                                <dt className="text-xs font-medium text-slate-500">Cost Centre</dt>
+                                <dt className="text-xs font-medium text-muted-foreground">Cost Centre</dt>
                                 <dd className="mt-1 text-sm">{po.cost_centre ? `${po.cost_centre.code} - ${po.cost_centre.name}` : '—'}</dd>
                             </div>
                             <div>
-                                <dt className="text-xs font-medium text-slate-500">Funding Stream</dt>
+                                <dt className="text-xs font-medium text-muted-foreground">Funding Stream</dt>
                                 <dd className="mt-1 text-sm">{po.funding_stream ? `${po.funding_stream.code} - ${po.funding_stream.name}` : '—'}</dd>
                             </div>
                             {approver && (
                                 <div>
-                                    <dt className="text-xs font-medium text-slate-500">Approved By</dt>
+                                    <dt className="text-xs font-medium text-muted-foreground">Approved By</dt>
                                     <dd className="mt-1 text-sm">{approver.name}{po.approved_at ? ` on ${po.approved_at}` : ''}</dd>
                                 </div>
                             )}
                             {po.notes && (
                                 <div className="sm:col-span-2 lg:col-span-4">
-                                    <dt className="text-xs font-medium text-slate-500">Notes</dt>
+                                    <dt className="text-xs font-medium text-muted-foreground">Notes</dt>
                                     <dd className="mt-1 whitespace-pre-wrap text-sm">{po.notes}</dd>
                                 </div>
                             )}
@@ -183,11 +183,11 @@ export default function PurchaseOrderShow() {
                             <div className="flex justify-end">
                                 <div className="w-64 space-y-1 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500">Subtotal</span>
+                                        <span className="text-muted-foreground">Subtotal</span>
                                         <span>{formatNZD(po.subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-500">GST</span>
+                                        <span className="text-muted-foreground">GST</span>
                                         <span>{formatNZD(po.gst_amount)}</span>
                                     </div>
                                     <div className="flex justify-between border-t pt-1 font-semibold">

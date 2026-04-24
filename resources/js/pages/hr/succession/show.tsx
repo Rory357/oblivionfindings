@@ -12,7 +12,7 @@ type Props = { plan: Plan; can: { manage?: boolean } };
 
 const breadcrumbs = [{ title: 'HR', href: '/hr' }, { title: 'Succession', href: '/hr/succession' }, { title: 'Detail', href: '#' }];
 const readinessLabels: Record<string, string> = { ready_now: 'Ready Now', ready_1_year: '1 Year', ready_2_years: '2 Years', developing: 'Developing' };
-const readinessColors: Record<string, string> = { ready_now: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', ready_1_year: 'border-blue-500/30 text-blue-400 bg-blue-500/10', ready_2_years: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', developing: 'border-slate-500/30 text-slate-400' };
+const readinessColors: Record<string, string> = { ready_now: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', ready_1_year: 'border-blue-500/30 text-blue-400 bg-blue-500/10', ready_2_years: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', developing: 'border-slate-500/30 text-muted-foreground' };
 
 export default function SuccessionShow({ plan, can }: Props) {
     return (

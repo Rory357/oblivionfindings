@@ -329,7 +329,7 @@ function AlertCard({
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => onToggleSelect(alert.id)}
-                                className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300"
+                                className="mt-0.5 h-3.5 w-3.5 rounded border-border"
                             />
                         )}
                         <div className="min-w-0">

@@ -73,8 +73,8 @@ export default function SecuritySettings({
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-violet-100 p-2">
-                                    <KeyRound className="h-5 w-5 text-violet-600" />
+                                <div className="rounded-lg bg-primary/10 p-2">
+                                    <KeyRound className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <CardTitle>Password Policy</CardTitle>
@@ -325,7 +325,7 @@ export default function SecuritySettings({
                     <div className="flex justify-end">
                         <Button
                             type="submit"
-                            className="bg-violet-600 hover:bg-violet-700"
+                            className="bg-primary hover:bg-primary"
                             disabled={form.processing}
                         >
                             {form.processing ? 'Saving...' : 'Save Security Settings'}

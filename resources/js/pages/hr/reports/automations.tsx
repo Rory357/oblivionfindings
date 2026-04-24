@@ -69,7 +69,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const statusClass: Record<string, string> = {
     success: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     failed: 'border-red-500/30 text-red-400 bg-red-500/10',
-    skipped: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+    skipped: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
 };
 
 export default function HrAutomationsPage({

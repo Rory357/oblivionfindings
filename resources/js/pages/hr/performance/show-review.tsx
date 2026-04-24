@@ -75,9 +75,9 @@ export default function ShowReview({ review, can }: Props) {
             case 'in_progress':
                 return 'bg-blue-100 text-blue-800 border-blue-200';
             case 'draft':
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 

@@ -118,7 +118,7 @@ const getStatusColor = (status: string) => {
         case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
         case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
         case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -199,7 +199,7 @@ export default function PerformanceIndex({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-lg font-semibold">Performance & Supervision</h1>
-                        <p className="mt-0.5 text-sm text-slate-500">
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             Supervision notes, performance reviews, and staff development
                         </p>
                     </div>
@@ -274,16 +274,16 @@ export default function PerformanceIndex({
                             </CardContent>
                         </Card>
                     </Link>
-                    <Card className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-amber-50/50' : 'border-l-purple-500 bg-purple-50/40'}`}>
+                    <Card className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-amber-50/50' : 'border-l-purple-500 bg-primary/10/40'}`}>
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-amber-700' : 'text-purple-700'}`}>1:1 Overdue</p>
-                                <div className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-amber-100' : 'bg-purple-100'}`}>
-                                    <Users className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-purple-600'}`} />
+                                <p className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-amber-700' : 'text-primary'}`}>1:1 Overdue</p>
+                                <div className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-amber-100' : 'bg-primary/10'}`}>
+                                    <Users className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-primary'}`} />
                                 </div>
                             </div>
-                            <span className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-amber-800' : 'text-purple-900'}`}>{oneToOneSla.overdue_count}</span>
-                            <p className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-purple-500'}`}>{oneToOneSla.due_soon_count} due in 7 days</p>
+                            <span className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-amber-800' : 'text-primary'}`}>{oneToOneSla.overdue_count}</span>
+                            <p className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-primary'}`}>{oneToOneSla.due_soon_count} due in 7 days</p>
                         </CardContent>
                     </Card>
                     <Card className={`border-l-4 ${engagementActionPlanSla.overdue > 0 ? 'border-l-orange-500 bg-orange-50/50' : 'border-l-cyan-500 bg-cyan-50/40'}`}>
@@ -414,7 +414,7 @@ export default function PerformanceIndex({
                                             Competency Gaps
                                         </CardTitle>
                                         <Link href="/hr/development/goals">
-                                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                                 View All <ArrowRight className="ml-1 h-3 w-3" />
                                             </Button>
                                         </Link>
@@ -436,7 +436,7 @@ export default function PerformanceIndex({
                                             PIP Status
                                         </CardTitle>
                                         <Link href="/hr/performance/pips">
-                                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                                 View All <ArrowRight className="ml-1 h-3 w-3" />
                                             </Button>
                                         </Link>
@@ -460,7 +460,7 @@ export default function PerformanceIndex({
                                             {pipChartData.map((d) => (
                                                 <div key={d.name} className="flex items-center gap-2">
                                                     <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                                                    <span className="text-slate-600">{d.name}: <span className="font-medium text-foreground">{d.value}</span></span>
+                                                    <span className="text-muted-foreground">{d.name}: <span className="font-medium text-foreground">{d.value}</span></span>
                                                 </div>
                                             ))}
                                         </div>
@@ -475,11 +475,11 @@ export default function PerformanceIndex({
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                            <MessageSquare className="h-4 w-4 text-purple-500" />
+                                            <MessageSquare className="h-4 w-4 text-primary" />
                                             360 Feedback
                                         </CardTitle>
                                         <Link href="/hr/feedback">
-                                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                                 View All <ArrowRight className="ml-1 h-3 w-3" />
                                             </Button>
                                         </Link>
@@ -490,16 +490,16 @@ export default function PerformanceIndex({
                                         <ProgressRing value={feedbackCompletionPct} size={120} color="#8b5cf6" label="Completed" />
                                         <div className="space-y-2 text-sm">
                                             <div className="flex items-center justify-between gap-4">
-                                                <span className="text-slate-500">Pending</span>
+                                                <span className="text-muted-foreground">Pending</span>
                                                 <span className="font-medium">{feedbackSummary.pending}</span>
                                             </div>
                                             <div className="flex items-center justify-between gap-4">
-                                                <span className="text-slate-500">Completed</span>
+                                                <span className="text-muted-foreground">Completed</span>
                                                 <span className="font-medium text-green-600">{feedbackSummary.completed}</span>
                                             </div>
                                             {feedbackSummary.overdue > 0 && (
                                                 <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-slate-500">Overdue</span>
+                                                    <span className="text-muted-foreground">Overdue</span>
                                                     <span className="font-medium text-red-600">{feedbackSummary.overdue}</span>
                                                 </div>
                                             )}
@@ -521,7 +521,7 @@ export default function PerformanceIndex({
                                     Upcoming Reviews
                                 </CardTitle>
                                 <Link href="/hr/performance/reviews">
-                                    <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                         View All <ArrowRight className="ml-1 h-3 w-3" />
                                     </Button>
                                 </Link>
@@ -541,7 +541,7 @@ export default function PerformanceIndex({
                                         {upcomingReviews.slice(0, 5).map((review) => (
                                             <TableRow key={review.id}>
                                                 <TableCell className="font-medium">{review.staff_user.name}</TableCell>
-                                                <TableCell className="text-sm text-slate-600">{formatDate(review.scheduled_at)}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{formatDate(review.scheduled_at)}</TableCell>
                                                 <TableCell>
                                                     <Badge className={getStatusColor(review.status)}>
                                                         {review.status.replace(/_/g, ' ')}
@@ -554,7 +554,7 @@ export default function PerformanceIndex({
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
                                     <Calendar className="mb-2 h-8 w-8 text-slate-300" />
-                                    <p className="text-sm text-slate-500">No upcoming reviews</p>
+                                    <p className="text-sm text-muted-foreground">No upcoming reviews</p>
                                 </div>
                             )}
                         </CardContent>
@@ -569,7 +569,7 @@ export default function PerformanceIndex({
                                 </CardTitle>
                                 {can.manage && (
                                     <Link href="/hr/performance/supervision/create">
-                                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                                             Schedule <ArrowRight className="ml-1 h-3 w-3" />
                                         </Button>
                                     </Link>
@@ -582,10 +582,10 @@ export default function PerformanceIndex({
                                     <div key={row.id} className="flex items-center justify-between rounded-md border p-2.5">
                                         <div>
                                             <p className="text-sm font-medium">{row.employee_name}</p>
-                                            <p className="text-xs text-slate-500">{row.supervisor_name}</p>
+                                            <p className="text-xs text-muted-foreground">{row.supervisor_name}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-xs text-slate-500">{formatDate(row.next_session_date)}</p>
+                                            <p className="text-xs text-muted-foreground">{formatDate(row.next_session_date)}</p>
                                             <Badge className={`text-[10px] ${row.is_overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
                                                 {row.is_overdue ? 'overdue' : 'scheduled'}
                                             </Badge>
@@ -595,7 +595,7 @@ export default function PerformanceIndex({
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
                                     <Users className="mb-2 h-8 w-8 text-slate-300" />
-                                    <p className="text-sm text-slate-500">No upcoming 1:1 sessions</p>
+                                    <p className="text-sm text-muted-foreground">No upcoming 1:1 sessions</p>
                                 </div>
                             )}
                         </CardContent>
@@ -609,7 +609,7 @@ export default function PerformanceIndex({
                             <CardTitle className="text-sm font-medium">Supervision Notes</CardTitle>
                             <div className="w-56">
                                 <div className="relative">
-                                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />
+                                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Search notes..."
                                         value={filters.q || ''}
@@ -639,7 +639,7 @@ export default function PerformanceIndex({
                                             <TableCell className="font-medium">{note.staff_user.name}</TableCell>
                                             <TableCell>{note.supervisor.name}</TableCell>
                                             <TableCell>{formatDate(note.date)}</TableCell>
-                                            <TableCell className="max-w-xs truncate text-sm text-slate-600">{note.summary}</TableCell>
+                                            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{note.summary}</TableCell>
                                             <TableCell>
                                                 <Link href={`/hr/performance/supervision/${note.id}`}>
                                                     <Button variant="ghost" size="sm" disabled={processing}>View</Button>
@@ -652,7 +652,7 @@ export default function PerformanceIndex({
                         ) : (
                             <div className="flex flex-col items-center justify-center py-8 text-center">
                                 <FileText className="mb-2 h-8 w-8 text-slate-300" />
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-muted-foreground">
                                     {filters.q ? 'No notes match your search.' : 'No supervision notes yet.'}
                                 </p>
                                 {can.manage && !filters.q && (

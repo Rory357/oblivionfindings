@@ -153,8 +153,8 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Edit Vendor</h1>
-                        <p className="text-gray-500 mt-1">{vendor.name}</p>
+                        <h1 className="text-3xl font-bold text-foreground">Edit Vendor</h1>
+                        <p className="text-muted-foreground mt-1">{vendor.name}</p>
                     </div>
                 </div>
 
@@ -259,7 +259,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         type="checkbox"
                                         checked={data.is_active}
                                         onChange={(e) => setData('is_active', e.target.checked)}
-                                        className="rounded border-gray-300"
+                                        className="rounded border-border"
                                     />
                                     Active
                                 </label>
@@ -413,7 +413,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                         </CardHeader>
                         <CardContent>
                             {data.contacts.length === 0 ? (
-                                <p className="text-sm text-gray-500 text-center py-4">
+                                <p className="text-sm text-muted-foreground text-center py-4">
                                     No contacts added yet. Click "Add Contact" to add one.
                                 </p>
                             ) : (
@@ -425,7 +425,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         >
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium text-gray-700">
+                                                    <span className="text-sm font-medium text-foreground">
                                                         Contact {index + 1}
                                                     </span>
                                                     <label className="flex items-center gap-1.5 text-sm">
@@ -435,7 +435,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                                             onChange={(e) =>
                                                                 updateContact(index, 'is_primary', e.target.checked)
                                                             }
-                                                            className="rounded border-gray-300"
+                                                            className="rounded border-border"
                                                         />
                                                         Primary
                                                     </label>

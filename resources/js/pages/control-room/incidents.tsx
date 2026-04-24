@@ -90,19 +90,19 @@ const severityColors: Record<string, string> = {
 const statusColors: Record<string, string> = {
     submitted: 'bg-blue-100 text-blue-800',
     reported: 'bg-blue-100 text-blue-800',
-    reviewed: 'bg-indigo-100 text-indigo-800',
+    reviewed: 'bg-primary/10 text-primary',
     investigating: 'bg-yellow-100 text-yellow-800',
     triaged: 'bg-yellow-100 text-yellow-800',
-    action_plan: 'bg-purple-100 text-purple-800',
+    action_plan: 'bg-primary/10 text-primary',
     monitoring: 'bg-teal-100 text-teal-800',
     resolved: 'bg-green-100 text-green-800',
-    closed: 'bg-gray-100 text-gray-800',
+    closed: 'bg-muted text-foreground',
 };
 
 const sourceTypeConfig: Record<string, { label: string; color: string; icon: typeof AlertTriangle }> = {
     client_incident: { label: 'Client Incident', color: 'bg-blue-100 text-blue-800', icon: FileWarning },
     medication_error: { label: 'Medication Error', color: 'bg-red-100 text-red-800', icon: Pill },
-    safeguarding: { label: 'Safeguarding', color: 'bg-purple-100 text-purple-800', icon: Shield },
+    safeguarding: { label: 'Safeguarding', color: 'bg-primary/10 text-primary', icon: Shield },
 };
 
 const severityBorderColors: Record<string, string> = {

@@ -231,7 +231,7 @@ function DepartmentDialog({
                                 id="is_active"
                                 checked={form.data.is_active}
                                 onChange={(e) => form.setData('is_active', e.target.checked)}
-                                className="rounded border-gray-300"
+                                className="rounded border-border"
                             />
                             <Label htmlFor="is_active">Active</Label>
                         </div>
@@ -395,7 +395,7 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                                                     className={
                                                         dept.is_active
                                                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                                            : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-400'
+                                                            : 'border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground'
                                                     }
                                                 >
                                                     {dept.is_active ? 'Active' : 'Inactive'}

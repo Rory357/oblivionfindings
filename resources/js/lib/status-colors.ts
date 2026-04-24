@@ -1,43 +1,74 @@
+/**
+ * Status-colour classes for badges and pills.
+ *
+ * Values are built from semantic tokens (bg-status-*, text-status-*,
+ * border-status-*) defined in resources/css/app.css, so every badge across
+ * the app re-tints when the Branding page changes --primary. No raw
+ * Tailwind colour classes live here any more.
+ *
+ * Severity mapping:
+ *   success / active / approved / completed / verified / low / closed (when resolved)
+ *     → bg-status-success-bg text-status-success border-status-success/30
+ *   warning / pending / medium / corrective_action / under_review / investigating / monitoring
+ *     → bg-status-warning-bg text-status-warning border-status-warning/30
+ *   critical / overdue / rejected / high / extreme
+ *     → bg-status-critical-bg text-status-critical border-status-critical/30
+ *   info / open / in_progress / findings_recorded
+ *     → bg-status-info-bg text-status-info border-status-info/30
+ *   neutral / draft / cancelled / archived / superseded / closed (inactive)
+ *     → bg-muted text-muted-foreground border-border
+ */
+
+const SUCCESS = 'bg-status-success-bg text-status-success border-status-success/30';
+const WARNING = 'bg-status-warning-bg text-status-warning border-status-warning/30';
+const CRITICAL = 'bg-status-critical-bg text-status-critical border-status-critical/30';
+const INFO = 'bg-status-info-bg text-status-info border-status-info/30';
+const NEUTRAL = 'bg-muted text-muted-foreground border-border';
+
 export const statusColors: Record<string, string> = {
-  // General statuses
-  draft: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700',
-  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-800',
-  active: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800',
-  approved: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800',
-  completed: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800',
-  rejected: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800',
-  cancelled: 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
-  overdue: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800',
-  in_progress: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800',
-  under_review: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-800',
-  archived: 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+    // General statuses
+    draft: NEUTRAL,
+    pending: WARNING,
+    active: SUCCESS,
+    approved: SUCCESS,
+    completed: INFO,
+    rejected: CRITICAL,
+    cancelled: NEUTRAL,
+    overdue: CRITICAL,
+    in_progress: INFO,
+    under_review: WARNING,
+    archived: NEUTRAL,
 
-  // Severity levels
-  critical: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800',
-  high: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-200 dark:border-orange-800',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-200 dark:border-yellow-800',
-  low: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800',
-  extreme: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800',
+    // Severity levels
+    critical: CRITICAL,
+    high: CRITICAL,
+    medium: WARNING,
+    low: SUCCESS,
+    extreme: CRITICAL,
 
-  // H&S specific statuses
-  open: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800',
-  investigating: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-800',
-  corrective_action: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800',
-  monitoring: 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-200 dark:border-cyan-800',
-  closed: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
-  verified: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-800',
-  findings_recorded: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800',
-  superseded: 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+    // H&S specific statuses
+    open: INFO,
+    investigating: WARNING,
+    corrective_action: WARNING,
+    monitoring: INFO,
+    closed: NEUTRAL,
+    verified: SUCCESS,
+    findings_recorded: INFO,
+    superseded: NEUTRAL,
 };
 
 export function getStatusColor(status: string): string {
-  const normalized = status.toLowerCase().replace(/[\s-]/g, '_');
-  return statusColors[normalized] ?? statusColors.draft ?? '';
+    const normalized = status.toLowerCase().replace(/[\s-]/g, '_');
+    return statusColors[normalized] ?? statusColors.draft ?? NEUTRAL;
 }
 
+/**
+ * Risk score heatmap. Still uses severity semantics but via the semantic
+ * tokens — matches the rest of the app when branding changes.
+ */
 export const riskScoreColor = (score: number): string => {
-  if (score >= 20) return 'bg-red-500 text-white';
-  if (score >= 15) return 'bg-orange-500 text-white';
-  if (score >= 10) return 'bg-yellow-500 text-black';
-  return 'bg-green-500 text-white';
+    if (score >= 20) return 'bg-status-critical text-status-critical-foreground';
+    if (score >= 15) return 'bg-status-warning text-status-warning-foreground';
+    if (score >= 10) return 'bg-status-warning-bg text-status-warning';
+    return 'bg-status-success text-status-success-foreground';
 };

@@ -204,8 +204,8 @@ export default function BillCreate({ auth, vendors, accounts, costCentres, fundi
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">New Bill</h1>
-                        <p className="text-gray-500 mt-1">Create a new accounts payable bill</p>
+                        <h1 className="text-3xl font-bold text-foreground">New Bill</h1>
+                        <p className="text-muted-foreground mt-1">Create a new accounts payable bill</p>
                     </div>
                 </div>
 
@@ -450,11 +450,11 @@ export default function BillCreate({ auth, vendors, accounts, costCentres, fundi
                             <div className="flex justify-end mt-4">
                                 <div className="w-64 space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="text-muted-foreground">Subtotal</span>
                                         <span>{formatCurrency(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">GST</span>
+                                        <span className="text-muted-foreground">GST</span>
                                         <span>{formatCurrency(gstTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-base font-bold border-t pt-2">

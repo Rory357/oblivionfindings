@@ -145,8 +145,8 @@ const eventConfig: Record<string, { label: string; color: string; icon: typeof L
     role_changed: { label: 'Role changed', color: 'bg-amber-500', icon: Shield },
     '2fa_enabled': { label: '2FA enabled', color: 'bg-amber-500', icon: ShieldCheck },
     '2fa_disabled': { label: '2FA disabled', color: 'bg-amber-500', icon: ShieldAlert },
-    approved: { label: 'Account approved', color: 'bg-violet-500', icon: CheckCircle2 },
-    suspended: { label: 'Account suspended', color: 'bg-violet-500', icon: ShieldAlert },
+    approved: { label: 'Account approved', color: 'bg-primary', icon: CheckCircle2 },
+    suspended: { label: 'Account suspended', color: 'bg-primary', icon: ShieldAlert },
 };
 
 const eventFilterCategories: Record<string, string[]> = {
@@ -196,13 +196,13 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                     </Link>
 
                     {/* Profile Header */}
-                    <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-gray-950">
+                    <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-muted">
                         <div className="h-1.5 w-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-600" />
                         <div className="px-6 py-6">
                             <div className="flex items-center gap-5">
-                                <Avatar className="h-16 w-16 border-2 border-violet-100 shadow-md">
+                                <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-md">
                                     <AvatarImage src={u.avatar} alt={u.name} />
-                                    <AvatarFallback className="bg-violet-600 text-lg font-semibold text-white">{initials}</AvatarFallback>
+                                    <AvatarFallback className="bg-primary text-lg font-semibold text-white">{initials}</AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3">
@@ -263,7 +263,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2">
-                                            <User className="h-5 w-5 text-violet-600" /> Account Details
+                                            <User className="h-5 w-5 text-primary" /> Account Details
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
@@ -341,7 +341,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <CardTitle className="flex items-center gap-2">
-                                                        <Shield className="h-5 w-5 text-violet-600" /> Roles
+                                                        <Shield className="h-5 w-5 text-primary" /> Roles
                                                     </CardTitle>
                                                     <CardDescription>Assign or remove roles for this user</CardDescription>
                                                 </div>
@@ -360,7 +360,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                         </CardHeader>
                                         <CardContent className="space-y-3">
                                             {showAddRole && availableRoles.length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-violet-300 bg-violet-50/50 p-3">
+                                                <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-primary bg-primary/10/50 p-3">
                                                     <span className="text-xs text-muted-foreground w-full mb-1">Click to assign:</span>
                                                     {availableRoles.map((role) => (
                                                         <button
@@ -371,7 +371,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                                 router.put(`${usersBasePath}/${u.id}`, { role_ids: newIds }, { preserveScroll: true });
                                                                 setShowAddRole(false);
                                                             }}
-                                                            className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
+                                                            className="inline-flex items-center gap-1 rounded-full border border-primary bg-white px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
                                                         >
                                                             <Plus className="h-3 w-3" /> {role.label || role.name}
                                                         </button>
@@ -385,7 +385,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                     {roles.map((role: Role) => (
                                                         <div key={role.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
                                                             <div className="flex items-center gap-2">
-                                                                <Shield className="h-3.5 w-3.5 text-violet-600" />
+                                                                <Shield className="h-3.5 w-3.5 text-primary" />
                                                                 <span className="text-sm font-medium">{role.label || role.name}</span>
                                                             </div>
                                                             <button
@@ -410,7 +410,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                     <Card>
                                         <CardHeader>
                                             <CardTitle className="flex items-center gap-2">
-                                                <Clock className="h-5 w-5 text-violet-600" /> Quick Stats
+                                                <Clock className="h-5 w-5 text-primary" /> Quick Stats
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-3">
@@ -484,7 +484,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                         return (
                                             <div
                                                 key={log.id}
-                                                className={`flex items-start gap-4 rounded-lg border bg-white p-4 dark:bg-gray-950 ${isFailed ? 'border-l-4 border-l-red-400' : ''}`}
+                                                className={`flex items-start gap-4 rounded-lg border bg-white p-4 dark:bg-muted ${isFailed ? 'border-l-4 border-l-red-400' : ''}`}
                                             >
                                                 <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white ${config.color}`}>
                                                     <Icon className="h-4 w-4" />
@@ -558,8 +558,8 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                         const BrowserIcon = os === 'iOS' || os === 'Android' ? Smartphone : Monitor;
 
                                         return (
-                                            <div key={session.id} className="flex items-center gap-4 rounded-lg border bg-white p-4 dark:bg-gray-950">
-                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                                            <div key={session.id} className="flex items-center gap-4 rounded-lg border bg-white p-4 dark:bg-muted">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                                                     <BrowserIcon className="h-5 w-5" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
@@ -601,7 +601,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2">
-                                            <UserCog className="h-5 w-5 text-violet-600" /> Staff Profile
+                                            <UserCog className="h-5 w-5 text-primary" /> Staff Profile
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-4">

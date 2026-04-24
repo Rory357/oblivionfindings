@@ -31,12 +31,12 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
 
   const getStatusColor = (status: string) => {
     return {
-      drafting: 'bg-gray-100 text-gray-800',
+      drafting: 'bg-muted text-foreground',
       proposed: 'bg-yellow-100 text-yellow-800',
       under_review: 'bg-blue-100 text-blue-800',
       approved: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getStatusIcon = (status: string) => {
@@ -45,7 +45,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
       case 'proposed':
       case 'under_review': return <Clock className="w-4 h-4 text-yellow-600" />;
       case 'rejected': return <AlertTriangle className="w-4 h-4 text-red-600" />;
-      default: return <FileText className="w-4 h-4 text-gray-400" />;
+      default: return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -71,8 +71,8 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Budgets</h1>
-            <p className="text-gray-500 mt-1">Financial planning and oversight</p>
+            <h1 className="text-3xl font-bold text-foreground">Budgets</h1>
+            <p className="text-muted-foreground mt-1">Financial planning and oversight</p>
           </div>
           {(auth.can as any)?.governance?.budgets?.create && (
             <Button asChild>
@@ -88,10 +88,10 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Total Budgets</p>
+                    <p className="text-sm text-muted-foreground">Total Budgets</p>
                     <p className="text-2xl font-bold">{budgetItems.length}</p>
                   </div>
-                  <DollarSign className="w-8 h-8 text-gray-400" />
+                  <DollarSign className="w-8 h-8 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
@@ -99,7 +99,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Approved</p>
+                    <p className="text-sm text-muted-foreground">Approved</p>
                     <p className="text-2xl font-bold text-green-600">
                       {budgetItems.filter(b => b.status === 'approved').length}
                     </p>
@@ -112,7 +112,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Pending Review</p>
+                    <p className="text-sm text-muted-foreground">Pending Review</p>
                     <p className="text-2xl font-bold text-yellow-600">
                       {budgetItems.filter(b => ['proposed', 'under_review'].includes(b.status)).length}
                     </p>
@@ -130,8 +130,8 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
             <CardContent className="pt-6">
               <div className="text-center py-12">
                 <DollarSign className="mx-auto h-12 w-12 text-gray-300" />
-                <h3 className="mt-2 text-sm font-semibold text-gray-900">No budgets yet</h3>
-                <p className="mt-1 text-sm text-gray-500">Create your first budget to start financial planning.</p>
+                <h3 className="mt-2 text-sm font-semibold text-foreground">No budgets yet</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Create your first budget to start financial planning.</p>
                 <div className="mt-6">
                   <Button asChild>
                     <Link href="/governance/budgets/create">Create Budget</Link>
@@ -167,18 +167,18 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
                           </Badge>
                           <Badge variant="outline">v{budget.version_number}</Badge>
                         </div>
-                        <p className="text-gray-500 mb-3">Fiscal Year: {budget.fiscal_year}</p>
+                        <p className="text-muted-foreground mb-3">Fiscal Year: {budget.fiscal_year}</p>
 
                         {/* Budget progress bar */}
                         <div className="flex items-center gap-4">
                           <div className="flex-1 max-w-md">
-                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
                               <span>{formatCurrency(budget.total_actual)} spent</span>
                               <span>{formatCurrency(budget.total_allocated)} budgeted</span>
                             </div>
                             <Progress value={Math.min(utilization, 100)} className="h-2" />
                           </div>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-sm text-muted-foreground">
                             {budget.line_items_count || 0} line items
                           </span>
                         </div>

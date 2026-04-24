@@ -42,7 +42,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Course Catalog', href: '/hr/training/catalog' },
 ];
 
-const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-violet-100 text-violet-700', self_paced: 'bg-amber-100 text-amber-700' };
+const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-primary/10 text-primary', self_paced: 'bg-amber-100 text-amber-700' };
 const DELIVERY_ICONS: Record<string, typeof Monitor> = { online: Monitor, in_person: MapPin, blended: Layers, self_paced: Zap };
 const deliveryLabels: Record<string, string> = { online: 'Online', in_person: 'In Person', blended: 'Blended', self_paced: 'Self-Paced' };
 
@@ -120,7 +120,7 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                                     <Link href="/hr/compliance/training"><BarChart3 className="h-4 w-4" />Dashboard</Link>
                                 </Button>
                                 {can.manage && (
-                                    <Button size="sm" className="gap-1.5 bg-white text-violet-700 hover:bg-white/90 shadow-md" onClick={() => { setForm(emptyForm); setOpen(true); }}>
+                                    <Button size="sm" className="gap-1.5 bg-white text-primary hover:bg-white/90 shadow-md" onClick={() => { setForm(emptyForm); setOpen(true); }}>
                                         <Plus className="h-4 w-4" />New Course
                                     </Button>
                                 )}
@@ -132,7 +132,7 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
                     {[
-                        { label: 'Courses', value: summary.total_courses, icon: BookOpen, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-violet-100', iconColor: 'text-violet-600', borderHover: 'hover:border-violet-300' },
+                        { label: 'Courses', value: summary.total_courses, icon: BookOpen, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-primary/10', iconColor: 'text-primary', borderHover: 'hover:border-primary' },
                         { label: 'Mandatory', value: summary.mandatory_courses, icon: ShieldCheck, gradient: 'from-red-500/10 to-rose-500/5', iconBg: 'bg-red-100', iconColor: 'text-red-600', borderHover: 'hover:border-red-300' },
                         { label: 'Enrollments', value: summary.total_enrollments, icon: Users, gradient: 'from-blue-500/10 to-indigo-500/5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600', borderHover: 'hover:border-blue-300' },
                         { label: 'Completion', value: `${summary.completion_rate}%`, icon: CheckCircle2, gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', borderHover: 'hover:border-emerald-300' },
@@ -178,7 +178,7 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                         </SelectContent>
                     </Select>
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <input type="checkbox" checked={filters.mandatory_only} onChange={(e) => onFilter({ mandatory_only: e.target.checked })} className="rounded border-gray-300" />
+                        <input type="checkbox" checked={filters.mandatory_only} onChange={(e) => onFilter({ mandatory_only: e.target.checked })} className="rounded border-border" />
                         Mandatory only
                     </label>
                 </div>
@@ -187,15 +187,15 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                 {courses.data.length === 0 ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                <GraduationCap className="h-8 w-8 text-violet-400" />
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                <GraduationCap className="h-8 w-8 text-primary" />
                             </div>
                             <p className="font-medium">No Courses Found</p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 {filters.search || filters.category || filters.delivery_method || filters.mandatory_only ? 'No courses match your filters.' : 'Create your first training course to get started.'}
                             </p>
                             {can.manage && !filters.search && !filters.category && (
-                                <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => { setForm(emptyForm); setOpen(true); }}>
+                                <Button className="mt-4 gap-1.5 bg-primary hover:bg-primary" size="sm" onClick={() => { setForm(emptyForm); setOpen(true); }}>
                                     <Plus className="h-3.5 w-3.5" /> New Course
                                 </Button>
                             )}
@@ -204,10 +204,10 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                 ) : (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {courses.data.map((c) => {
-                            const dmColor = DELIVERY_COLORS[c.delivery_method] || 'bg-slate-100 text-slate-600';
+                            const dmColor = DELIVERY_COLORS[c.delivery_method] || 'bg-muted text-muted-foreground';
                             const DmIcon = DELIVERY_ICONS[c.delivery_method] || BookOpen;
                             return (
-                                <Card key={c.id} className="group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-violet-300"
+                                <Card key={c.id} className="group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-primary"
                                     onClick={() => router.get(`/hr/training/courses/${c.id}`)}>
                                     <div className={`h-1 ${c.is_mandatory ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-violet-400 to-purple-500'}`} />
                                     <CardContent className="pt-4">
@@ -216,8 +216,8 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                                                 <h3 className="font-semibold text-sm leading-tight line-clamp-2">{c.title}</h3>
                                                 <p className="mt-1 font-mono text-[10px] text-muted-foreground">{c.code}</p>
                                             </div>
-                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.is_mandatory ? 'bg-red-50' : 'bg-violet-50'} transition-transform group-hover:scale-110`}>
-                                                <DmIcon className={`h-4 w-4 ${c.is_mandatory ? 'text-red-500' : 'text-violet-500'}`} />
+                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.is_mandatory ? 'bg-red-50' : 'bg-primary/10'} transition-transform group-hover:scale-110`}>
+                                                <DmIcon className={`h-4 w-4 ${c.is_mandatory ? 'text-red-500' : 'text-primary'}`} />
                                             </div>
                                         </div>
 
@@ -284,7 +284,7 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                            <Button type="submit" className="bg-violet-600 hover:bg-violet-700">Create Course</Button>
+                            <Button type="submit" className="bg-primary hover:bg-primary">Create Course</Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

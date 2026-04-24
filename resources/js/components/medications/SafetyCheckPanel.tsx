@@ -55,9 +55,9 @@ export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails 
 
   if (!safetyCheck) {
     return (
-      <Card className="border-slate-200">
+      <Card className="border-border">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-2 text-slate-500">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Info className="h-5 w-5" />
             <span>Safety check pending...</span>
           </div>
@@ -96,7 +96,7 @@ export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails 
 
         {showDetails && safetyCheck.warnings.length > 0 && (
           <div className="space-y-2">
-            <div className="text-sm font-medium text-slate-700">Warnings & Alerts:</div>
+            <div className="text-sm font-medium text-foreground">Warnings & Alerts:</div>
             {safetyCheck.warnings.map((warning, idx) => {
               const config = severityConfig[warning.severity] || severityConfig.info;
               const WarningIcon = config.icon;
@@ -111,7 +111,7 @@ export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails 
                     <div className={`text-sm ${config.color}`}>{warning.message}</div>
                   </div>
                   {warning.details && (
-                    <div className="mt-2 pl-6 text-xs text-slate-600">
+                    <div className="mt-2 pl-6 text-xs text-muted-foreground">
                       {Object.entries(warning.details).map(([key, value]) => (
                         <div key={key} className="capitalize">
                           {key.replace(/_/g, ' ')}: {String(value)}

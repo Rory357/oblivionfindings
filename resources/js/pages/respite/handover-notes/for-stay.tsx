@@ -22,7 +22,7 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
                         <h1 className="text-lg font-semibold">
                             Handover Notes for {stay.client?.first_name} {stay.client?.last_name}
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">Stay #{stay.id}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Stay #{stay.id}</div>
                     </div>
                     <Link href={`/respite/handover-notes/create?stay_id=${stay.id}`}>
                         <Button size="sm">New Handover Note</Button>
@@ -42,8 +42,8 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
                                                 {!n.acknowledged_at && <Badge className="bg-amber-100 text-amber-800">Unacknowledged</Badge>}
                                                 {n.acknowledged_at && <Badge className="bg-green-100 text-green-800">Acknowledged</Badge>}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500 line-clamp-2">{n.notes}</div>
-                                            <div className="mt-1 text-xs text-slate-400">{formatDateTime(n.created_at)}</div>
+                                            <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{n.notes}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(n.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/handover-notes/${n.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View
@@ -54,7 +54,7 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
                         </Card>
                     ))}
                     {!notes.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No handover notes found for this stay.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No handover notes found for this stay.</div>
                     )}
                 </div>
             </div>

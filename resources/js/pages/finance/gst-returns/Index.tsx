@@ -58,7 +58,7 @@ const basisLabels: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 border-gray-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
     filed: { label: 'Filed', className: 'bg-green-100 text-green-700 border-green-300' },
     amended: { label: 'Amended', className: 'bg-blue-100 text-blue-700 border-blue-300' },
 };

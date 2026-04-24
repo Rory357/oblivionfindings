@@ -185,9 +185,9 @@ export default function MileageCreate({ clients, ird_rate }: Props) {
                             </Card>
 
                             {/* Rate & Total Summary */}
-                            <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20">
+                            <Card className="border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/20">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-purple-800 dark:text-purple-300">
+                                    <CardTitle className="flex items-center gap-2 text-primary dark:text-primary/70">
                                         <DollarSign className="h-5 w-5" />
                                         Reimbursement Calculation
                                     </CardTitle>
@@ -206,8 +206,8 @@ export default function MileageCreate({ clients, ird_rate }: Props) {
                                         </div>
                                         <div className="border-t pt-2 mt-2">
                                             <div className="flex items-center justify-between">
-                                                <span className="font-medium text-purple-800 dark:text-purple-300">Total</span>
-                                                <span className="text-xl font-bold tabular-nums text-purple-700 dark:text-purple-300">
+                                                <span className="font-medium text-primary dark:text-primary/70">Total</span>
+                                                <span className="text-xl font-bold tabular-nums text-primary dark:text-primary/70">
                                                     {formatCurrency(calculatedTotal)}
                                                 </span>
                                             </div>

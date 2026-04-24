@@ -70,10 +70,10 @@ export default function StrategyShow({ auth, plan }: Props) {
       quality: 'bg-blue-100 text-blue-800 border-blue-200',
       people: 'bg-green-100 text-green-800 border-green-200',
       finance: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      compliance: 'bg-purple-100 text-purple-800 border-purple-200',
+      compliance: 'bg-primary/10 text-primary border-primary',
       it_resilience: 'bg-cyan-100 text-cyan-800 border-cyan-200',
     };
-    return colors[pillar] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return colors[pillar] || 'bg-muted text-foreground border-border';
   };
 
   const getStatusColor = (status: string) => {
@@ -91,7 +91,7 @@ export default function StrategyShow({ auth, plan }: Props) {
       case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -134,10 +134,10 @@ export default function StrategyShow({ auth, plan }: Props) {
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <Compass className="w-8 h-8 text-indigo-500" />
+                <Compass className="w-8 h-8 text-primary" />
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{plan.title}</h1>
-                  <p className="text-gray-500">{plan.period_start} to {plan.period_end}</p>
+                  <h1 className="text-2xl font-bold text-foreground">{plan.title}</h1>
+                  <p className="text-muted-foreground">{plan.period_start} to {plan.period_end}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
@@ -153,20 +153,20 @@ export default function StrategyShow({ auth, plan }: Props) {
 
           {/* Vision & Mission */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <Card className="border-indigo-200 bg-indigo-50">
+            <Card className="border-primary bg-primary/10">
               <CardHeader>
-                <CardTitle className="text-indigo-800">Vision</CardTitle>
+                <CardTitle className="text-primary">Vision</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-indigo-900 italic text-lg">{plan.vision_statement}</p>
+                <p className="text-primary italic text-lg">{plan.vision_statement}</p>
               </CardContent>
             </Card>
-            <Card className="border-purple-200 bg-purple-50">
+            <Card className="border-primary bg-primary/10">
               <CardHeader>
-                <CardTitle className="text-purple-800">Mission</CardTitle>
+                <CardTitle className="text-primary">Mission</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-purple-900">{plan.mission_statement}</p>
+                <p className="text-primary">{plan.mission_statement}</p>
               </CardContent>
             </Card>
           </div>
@@ -180,10 +180,10 @@ export default function StrategyShow({ auth, plan }: Props) {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {plan.values.map((value, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg text-center">
-                      <p className="font-semibold text-gray-900">{value.value}</p>
+                    <div key={index} className="p-4 bg-muted rounded-lg text-center">
+                      <p className="font-semibold text-foreground">{value.value}</p>
                       {value.description && (
-                        <p className="text-sm text-gray-500 mt-1">{value.description}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{value.description}</p>
                       )}
                     </div>
                   ))}
@@ -211,7 +211,7 @@ export default function StrategyShow({ auth, plan }: Props) {
 
           {/* Strategic Goals by Pillar */}
           <div className="space-y-6">
-            <h2 className="text-xl font-bold text-gray-900">Strategic Goals</h2>
+            <h2 className="text-xl font-bold text-foreground">Strategic Goals</h2>
 
             {Object.entries(groupGoalsByPillar()).map(([pillar, goals]) => (
               <Card key={pillar}>
@@ -225,11 +225,11 @@ export default function StrategyShow({ auth, plan }: Props) {
                 <CardContent className="pt-4">
                   <div className="space-y-6">
                     {goals.map((goal) => (
-                      <div key={goal.id} className="border-l-4 border-gray-200 pl-4">
+                      <div key={goal.id} className="border-l-4 border-border pl-4">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <h4 className="font-semibold text-gray-900">{goal.title}</h4>
-                            <p className="text-sm text-gray-600">{goal.description}</p>
+                            <h4 className="font-semibold text-foreground">{goal.title}</h4>
+                            <p className="text-sm text-muted-foreground">{goal.description}</p>
                           </div>
                           <div className="flex gap-2">
                             <Badge variant="outline" className="text-xs">{goal.timeframe}</Badge>
@@ -240,7 +240,7 @@ export default function StrategyShow({ auth, plan }: Props) {
                         {/* Key Results */}
                         {goal.key_results.length > 0 && (
                           <div className="mt-3 space-y-2">
-                            <p className="text-sm font-medium text-gray-700">Key Results:</p>
+                            <p className="text-sm font-medium text-foreground">Key Results:</p>
                             {goal.key_results.map((kr, index) => (
                               <div key={index} className="flex items-center gap-2 text-sm">
                                 {kr.status === 'achieved' ? (
@@ -251,7 +251,7 @@ export default function StrategyShow({ auth, plan }: Props) {
                                   <AlertTriangle className="w-4 h-4 text-yellow-500" />
                                 )}
                                 <span className={cn(
-                                  kr.status === 'achieved' && 'line-through text-gray-400'
+                                  kr.status === 'achieved' && 'line-through text-muted-foreground'
                                 )}>{kr.result}</span>
                               </div>
                             ))}
@@ -261,17 +261,17 @@ export default function StrategyShow({ auth, plan }: Props) {
                         {/* Initiatives */}
                         {goal.initiatives.length > 0 && (
                           <div className="mt-4">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Initiatives:</p>
+                            <p className="text-sm font-medium text-foreground mb-2">Initiatives:</p>
                             <div className="space-y-3">
                               {goal.initiatives.map((initiative) => (
-                                <div key={initiative.id} className="p-3 bg-gray-50 rounded-lg">
+                                <div key={initiative.id} className="p-3 bg-muted rounded-lg">
                                   <div className="flex items-start justify-between">
                                     <div>
                                       <div className="flex items-center gap-2">
-                                        <Rocket className="w-4 h-4 text-gray-400" />
+                                        <Rocket className="w-4 h-4 text-muted-foreground" />
                                         <p className="font-medium text-sm">{initiative.name}</p>
                                       </div>
-                                      <p className="text-xs text-gray-500 mt-1">
+                                      <p className="text-xs text-muted-foreground mt-1">
                                         {initiative.owner?.name || 'No owner'} •
                                         Due: {initiative.target_completion}
                                       </p>
@@ -281,7 +281,7 @@ export default function StrategyShow({ auth, plan }: Props) {
                                     </Badge>
                                   </div>
                                   <div className="mt-2">
-                                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                                       <span>Budget</span>
                                       <span>${initiative.budget_spent.toLocaleString()} / ${initiative.budget_allocated.toLocaleString()}</span>
                                     </div>
@@ -301,7 +301,7 @@ export default function StrategyShow({ auth, plan }: Props) {
 
             {plan.goals.length === 0 && (
               <Card>
-                <CardContent className="py-12 text-center text-gray-500">
+                <CardContent className="py-12 text-center text-muted-foreground">
                   <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No strategic goals defined yet.</p>
                   <Button variant="outline" className="mt-4">Add Goal</Button>

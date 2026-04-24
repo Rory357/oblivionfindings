@@ -142,12 +142,12 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
 
   const getStatusColor = (status: string) => {
     return {
-      drafting: 'bg-gray-100 text-gray-800',
+      drafting: 'bg-muted text-foreground',
       proposed: 'bg-yellow-100 text-yellow-800',
       under_review: 'bg-blue-100 text-blue-800',
       approved: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getCategoryLabel = (category: string) => {
@@ -300,19 +300,19 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             <div className="flex items-center gap-3 mb-2">
               <Wallet className="w-8 h-8 text-green-500" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{budget.title || `FY${budget.fiscal_year} Budget`}</h1>
-                <p className="text-gray-500">Fiscal Year {budget.fiscal_year}</p>
+                <h1 className="text-2xl font-bold text-foreground">{budget.title || `FY${budget.fiscal_year} Budget`}</h1>
+                <p className="text-muted-foreground">Fiscal Year {budget.fiscal_year}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 mt-2">
               <Badge className={getStatusColor(budget.status)}>{budget.status.replace('_', ' ')}</Badge>
               <Badge variant="outline">v{budget.version_number}</Badge>
               {budget.created_by && (
-                <span className="text-sm text-gray-500">Created by {budget.created_by.name}</span>
+                <span className="text-sm text-muted-foreground">Created by {budget.created_by.name}</span>
               )}
             </div>
             {budget.description && (
-              <p className="text-gray-600 mt-2 text-sm">{budget.description}</p>
+              <p className="text-muted-foreground mt-2 text-sm">{budget.description}</p>
             )}
           </div>
           <div className="flex gap-2">
@@ -387,10 +387,10 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Total Budget</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(totals.budget)}</p>
+                  <p className="text-sm text-muted-foreground">Total Budget</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totals.budget)}</p>
                 </div>
-                <DollarSign className="w-8 h-8 text-gray-400" />
+                <DollarSign className="w-8 h-8 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
@@ -398,8 +398,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Actual Spend</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(totals.actual)}</p>
+                  <p className="text-sm text-muted-foreground">Actual Spend</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totals.actual)}</p>
                 </div>
                 <Wallet className="w-8 h-8 text-blue-400" />
               </div>
@@ -409,13 +409,13 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Remaining</p>
+                  <p className="text-sm text-muted-foreground">Remaining</p>
                   <p className={cn(
                     'text-2xl font-bold',
                     totals.remaining >= 0 ? 'text-green-600' : 'text-red-600',
                   )}>{formatCurrency(totals.remaining)}</p>
                 </div>
-                <BarChart3 className="w-8 h-8 text-gray-400" />
+                <BarChart3 className="w-8 h-8 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
@@ -423,8 +423,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Utilization</p>
-                  <p className="text-2xl font-bold text-gray-900">{totals.utilization.toFixed(1)}%</p>
+                  <p className="text-sm text-muted-foreground">Utilization</p>
+                  <p className="text-2xl font-bold text-foreground">{totals.utilization.toFixed(1)}%</p>
                 </div>
                 <Progress value={Math.min(totals.utilization, 100)} className="w-16" />
               </div>
@@ -437,10 +437,10 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Variance</p>
+                  <p className="text-sm text-muted-foreground">Variance</p>
                   <p className={cn(
                     'text-2xl font-bold',
-                    totals.variance > 0 ? 'text-red-600' : totals.variance < 0 ? 'text-green-600' : 'text-gray-900',
+                    totals.variance > 0 ? 'text-red-600' : totals.variance < 0 ? 'text-green-600' : 'text-foreground',
                   )}>
                     {totals.variance > 0 ? '+' : ''}{formatCurrency(totals.variance)}
                   </p>
@@ -613,8 +613,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                 {(budget.line_items || []).length === 0 ? (
                   <div className="text-center py-12">
                     <DollarSign className="mx-auto h-12 w-12 text-gray-300" />
-                    <h3 className="mt-2 text-sm font-semibold text-gray-900">No line items</h3>
-                    <p className="mt-1 text-sm text-gray-500">Get started by adding budget line items to track allocations and spending.</p>
+                    <h3 className="mt-2 text-sm font-semibold text-foreground">No line items</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Get started by adding budget line items to track allocations and spending.</p>
                     {canEdit && (
                       <div className="mt-6">
                         <Button size="sm" onClick={() => setLineItemDialogOpen(true)}>
@@ -645,18 +645,18 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                             ? (Number(item.variance_amount) / Number(item.budget_amount)) * 100
                             : 0;
                           return (
-                            <tr key={item.id} className="border-b last:border-0 hover:bg-gray-50">
+                            <tr key={item.id} className="border-b last:border-0 hover:bg-muted">
                               <td className="py-2">
                                 <Badge variant="outline" className="text-xs">{getCategoryLabel(item.category)}</Badge>
                               </td>
                               <td className="py-2">
                                 <div>
                                   <p className="font-medium">{item.description}</p>
-                                  {item.account_code && <p className="text-xs text-gray-500">{item.account_code}</p>}
+                                  {item.account_code && <p className="text-xs text-muted-foreground">{item.account_code}</p>}
                                 </div>
                               </td>
                               <td className="text-right py-2">{formatCurrency(Number(item.budget_amount))}</td>
-                              <td className="text-right py-2 text-gray-500">{formatCurrency(Number(item.forecast_amount))}</td>
+                              <td className="text-right py-2 text-muted-foreground">{formatCurrency(Number(item.forecast_amount))}</td>
                               <td className="text-right py-2">{formatCurrency(Number(item.actual_amount))}</td>
                               <td className={cn(
                                 'text-right py-2 font-medium',
@@ -721,7 +721,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                         <tr className="border-t-2 font-semibold">
                           <td className="py-2" colSpan={2}>Totals</td>
                           <td className="text-right py-2">{formatCurrency(totals.allocated)}</td>
-                          <td className="text-right py-2 text-gray-500">{formatCurrency(totals.forecast)}</td>
+                          <td className="text-right py-2 text-muted-foreground">{formatCurrency(totals.forecast)}</td>
                           <td className="text-right py-2">{formatCurrency(totals.actual)}</td>
                           <td className={cn(
                             'text-right py-2',
@@ -817,7 +817,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                           />
                           {adjustmentForm.errors.reason && <p className="text-sm text-red-500 mt-1">{adjustmentForm.errors.reason}</p>}
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Adjustments exceeding 5% of total budget will require board resolution.
                         </p>
                         <div className="flex justify-end gap-2">
@@ -833,12 +833,12 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
               </CardHeader>
               <CardContent>
                 {(budget.adjustments || []).length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No budget adjustments have been requested.</p>
+                  <p className="text-muted-foreground text-center py-8">No budget adjustments have been requested.</p>
                 ) : (
                   <div className="space-y-3">
                     {pendingAdjustments.length > 0 && (
                       <div className="mb-4">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Pending Approvals</h4>
+                        <h4 className="text-sm font-semibold text-foreground mb-2">Pending Approvals</h4>
                         {pendingAdjustments.map((adj) => (
                           <div key={adj.id} className="p-4 border rounded-lg border-yellow-200 bg-yellow-50 mb-2">
                             <div className="flex items-start justify-between">
@@ -850,11 +850,11 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                     <Badge variant="destructive" className="text-xs">Board Approval Required</Badge>
                                   )}
                                 </div>
-                                <p className="text-sm text-gray-600">{adj.reason}</p>
+                                <p className="text-sm text-muted-foreground">{adj.reason}</p>
                                 {adj.line_item && (
-                                  <p className="text-xs text-gray-500 mt-1">Line item: {adj.line_item.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">Line item: {adj.line_item.description}</p>
                                 )}
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                   Requested by {adj.proposed_by?.name} on {new Date(adj.proposed_at).toLocaleDateString('en-NZ')}
                                 </p>
                               </div>
@@ -876,7 +876,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                     {resolvedAdjustments.length > 0 && (
                       <div>
                         {pendingAdjustments.length > 0 && (
-                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Resolved</h4>
+                          <h4 className="text-sm font-semibold text-foreground mb-2">Resolved</h4>
                         )}
                         {resolvedAdjustments.map((adj) => (
                           <div key={adj.id} className="p-4 border rounded-lg mb-2">
@@ -886,9 +886,9 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                   <Badge variant="outline" className="capitalize">{adj.adjustment_type}</Badge>
                                   <span className="font-medium">{formatCurrency(Number(adj.amount))}</span>
                                 </div>
-                                <p className="text-sm text-gray-600">{adj.reason}</p>
+                                <p className="text-sm text-muted-foreground">{adj.reason}</p>
                                 {adj.review_notes && (
-                                  <p className="text-xs text-gray-500 mt-1 italic">Review: {adj.review_notes}</p>
+                                  <p className="text-xs text-muted-foreground mt-1 italic">Review: {adj.review_notes}</p>
                                 )}
                               </div>
                               <Badge className={cn(
@@ -951,7 +951,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                               <tr key={item.id} className="border-b last:border-0">
                                 <td className="py-2">
                                   <p className="font-medium">{item.description}</p>
-                                  {item.account_code && <p className="text-xs text-gray-500">{item.account_code}</p>}
+                                  {item.account_code && <p className="text-xs text-muted-foreground">{item.account_code}</p>}
                                 </td>
                                 <td className="text-right py-2">{formatCurrency(Number(item.budget_amount))}</td>
                                 <td className="text-right py-2">{formatCurrency(Number(item.actual_amount))}</td>
@@ -974,7 +974,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
               {Object.keys(groupLineItemsByCategory()).length === 0 && (
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-gray-500 text-center py-8">No line items to summarize. Add line items first.</p>
+                    <p className="text-muted-foreground text-center py-8">No line items to summarize. Add line items first.</p>
                   </CardContent>
                 </Card>
               )}

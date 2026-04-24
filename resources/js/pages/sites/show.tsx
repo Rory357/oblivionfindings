@@ -371,7 +371,7 @@ export default function SiteShow({
                                     className={
                                         site.is_active
                                             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                                            : 'border-slate-500/30 text-slate-400'
+                                            : 'border-slate-500/30 text-muted-foreground'
                                     }
                                 >
                                     {site.is_active ? 'Active' : 'Inactive'}
@@ -396,7 +396,7 @@ export default function SiteShow({
                 {/* Setup completeness — compact, unobtrusive strip.
                     Hidden entirely once fully onboarded. */}
                 {!isOnboardingComplete && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/30">
+                    <div className="rounded-lg border border-border bg-muted/60 dark:border-border dark:bg-muted/30">
                         <button
                             type="button"
                             onClick={() => setSetupExpanded((v) => !v)}
@@ -406,7 +406,7 @@ export default function SiteShow({
                                 <div
                                     className={`h-full rounded-full transition-all duration-500 ${
                                         percent >= 70
-                                            ? 'bg-indigo-500'
+                                            ? 'bg-primary'
                                             : percent >= 40
                                               ? 'bg-amber-500'
                                               : 'bg-slate-400'
@@ -424,7 +424,7 @@ export default function SiteShow({
                             <Link
                                 href={`/sites/${site.id}/onboarding`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="ml-auto text-indigo-500 hover:underline"
+                                className="ml-auto text-primary hover:underline"
                             >
                                 Continue →
                             </Link>
@@ -435,7 +435,7 @@ export default function SiteShow({
                             )}
                         </button>
                         {setupExpanded && (
-                            <div className="border-t border-slate-200 px-3 py-3 dark:border-slate-800">
+                            <div className="border-t border-border px-3 py-3 dark:border-border">
                                 <div className="grid gap-1.5 sm:grid-cols-2">
                                     {checklist.map((item) => (
                                         <div
@@ -644,61 +644,61 @@ export default function SiteShow({
                                 </CardHeader>
                                 <CardContent className="space-y-0 text-sm">
                                     <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Phone
                                         </div>
                                         <div>
                                             {site.phone || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Email
                                         </div>
                                         <div>
                                             {site.email || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Site Lead
                                         </div>
                                         <div>
                                             {site.primary_contact?.name ||
                                                 site.manager_name || (
-                                                    <span className="text-slate-500 italic">
+                                                    <span className="text-muted-foreground italic">
                                                         —
                                                     </span>
                                                 )}
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Manager Phone
                                         </div>
                                         <div>
                                             {site.manager_phone || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             After hours
                                         </div>
                                         <div>
                                             {site.after_hours_phone || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
@@ -713,12 +713,12 @@ export default function SiteShow({
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
                                     <div>
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Address
                                         </div>
                                         <div className="mt-1">
                                             {site.address || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
@@ -726,7 +726,7 @@ export default function SiteShow({
                                     </div>
                                     {site.region && (
                                         <div>
-                                            <div className="text-slate-400">
+                                            <div className="text-muted-foreground">
                                                 Region
                                             </div>
                                             <div className="mt-1">
@@ -736,7 +736,7 @@ export default function SiteShow({
                                     )}
                                     {site.latitude && site.longitude && (
                                         <div>
-                                            <div className="text-slate-400">
+                                            <div className="text-muted-foreground">
                                                 GPS Coordinates
                                             </div>
                                             <div className="mt-1 font-mono text-xs">
@@ -747,7 +747,7 @@ export default function SiteShow({
                                     )}
                                     {site.access_instructions && (
                                         <div>
-                                            <div className="text-slate-400">
+                                            <div className="text-muted-foreground">
                                                 Access Instructions
                                             </div>
                                             <div className="mt-1 whitespace-pre-wrap text-slate-300">
@@ -764,24 +764,24 @@ export default function SiteShow({
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
                                     <div>
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Emergency plan location
                                         </div>
                                         <div className="mt-1">
                                             {site.emergency_plan_location || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-slate-400">
+                                        <div className="text-muted-foreground">
                                             Medication storage location
                                         </div>
                                         <div className="mt-1">
                                             {site.medication_storage_location || (
-                                                <span className="text-slate-500 italic">
+                                                <span className="text-muted-foreground italic">
                                                     —
                                                 </span>
                                             )}
@@ -801,7 +801,7 @@ export default function SiteShow({
                                                     </div>
                                                 )}
                                                 {site.risk_review_date && (
-                                                    <div className="mt-1 text-xs text-slate-400">
+                                                    <div className="mt-1 text-xs text-muted-foreground">
                                                         Review due:{' '}
                                                         {site.risk_review_date}
                                                     </div>
@@ -833,13 +833,13 @@ export default function SiteShow({
                             </CardHeader>
                             <CardContent>
                                 {clients.length === 0 ? (
-                                    <div className="text-sm text-slate-400">
+                                    <div className="text-sm text-muted-foreground">
                                         No clients linked to this site yet.
                                     </div>
                                 ) : (
                                     <div className="overflow-hidden rounded-xl border">
                                         <table className="w-full text-sm">
-                                            <thead className="border-b bg-slate-50/5">
+                                            <thead className="border-b bg-muted/5">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left font-medium">
                                                         Client
@@ -865,7 +865,7 @@ export default function SiteShow({
                                                         <td className="px-4 py-3 text-right">
                                                             <Link
                                                                 href={`/clients/${c.id}`}
-                                                                className="text-indigo-300 hover:text-indigo-200"
+                                                                className="text-primary/70 hover:text-primary/70"
                                                             >
                                                                 View
                                                             </Link>
@@ -901,13 +901,13 @@ export default function SiteShow({
                             </CardHeader>
                             <CardContent>
                                 {assets.length === 0 ? (
-                                    <div className="text-sm text-slate-400">
+                                    <div className="text-sm text-muted-foreground">
                                         No assets linked to this site yet.
                                     </div>
                                 ) : (
                                     <div className="overflow-hidden rounded-xl border">
                                         <table className="w-full text-sm">
-                                            <thead className="border-b bg-slate-50/5">
+                                            <thead className="border-b bg-muted/5">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left font-medium">
                                                         Asset
@@ -934,7 +934,7 @@ export default function SiteShow({
                                                             <div className="font-medium">
                                                                 {a.name}
                                                             </div>
-                                                            <div className="text-xs text-slate-400">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 {[
                                                                     a.asset_tag,
                                                                     a.category,
@@ -955,7 +955,7 @@ export default function SiteShow({
                                                                     a.owner
                                                                         .type ===
                                                                     'client'
-                                                                        ? 'border-indigo-500/30 text-indigo-200'
+                                                                        ? 'border-primary/30 text-primary/70'
                                                                         : 'border-slate-500/30 text-slate-300'
                                                                 }
                                                             >
@@ -975,7 +975,7 @@ export default function SiteShow({
                                                         <td className="px-4 py-3 text-right">
                                                             <Link
                                                                 href={`/assets/${a.id}`}
-                                                                className="text-indigo-300 hover:text-indigo-200"
+                                                                className="text-primary/70 hover:text-primary/70"
                                                             >
                                                                 View
                                                             </Link>
@@ -1020,7 +1020,7 @@ export default function SiteShow({
                                 </Button>
                             </CardHeader>
                             <CardContent>
-                                <div className="py-8 text-center text-slate-400">
+                                <div className="py-8 text-center text-muted-foreground">
                                     <Calendar className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                     <p>Calendar events will appear here</p>
                                     <Button
@@ -1051,7 +1051,7 @@ export default function SiteShow({
                                 </Button>
                             </CardHeader>
                             <CardContent>
-                                <div className="py-8 text-center text-slate-400">
+                                <div className="py-8 text-center text-muted-foreground">
                                     <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                     <p>
                                         Scheduled checklists and completed runs
@@ -1084,7 +1084,7 @@ export default function SiteShow({
                                 </Button>
                             </CardHeader>
                             <CardContent>
-                                <div className="py-8 text-center text-slate-400">
+                                <div className="py-8 text-center text-muted-foreground">
                                     <ShieldAlert className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                     <p>Logged hazards and risk assessments</p>
                                     <div className="mt-4 flex justify-center gap-2">
@@ -1130,7 +1130,7 @@ export default function SiteShow({
                                         </Card>
                                         <Card className="border">
                                             <CardContent className="p-4 text-center">
-                                                <MapPin className="mx-auto h-4 w-4 text-purple-500 mb-1" />
+                                                <MapPin className="mx-auto h-4 w-4 text-primary mb-1" />
                                                 <div className="text-lg font-bold">{fs.distance_this_month} <span className="text-xs font-normal text-muted-foreground">km</span></div>
                                                 <div className="text-[10px] text-muted-foreground">Distance this month</div>
                                             </CardContent>
@@ -1289,7 +1289,7 @@ export default function SiteShow({
                                     </CardHeader>
                                     <CardContent>
                                         {vendors.length === 0 ? (
-                                            <p className="text-sm text-slate-400">
+                                            <p className="text-sm text-muted-foreground">
                                                 No vendors registered for this
                                                 site.
                                             </p>
@@ -1316,14 +1316,14 @@ export default function SiteShow({
                                                                     </Badge>
                                                                 )}
                                                             </div>
-                                                            <div className="text-xs text-slate-400">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 {v.service_type}
                                                             </div>
                                                         </div>
                                                         {v.phone && (
                                                             <a
                                                                 href={`tel:${v.phone}`}
-                                                                className="text-sm text-indigo-400 hover:text-indigo-300"
+                                                                className="text-sm text-primary hover:text-primary/70"
                                                             >
                                                                 {v.phone}
                                                             </a>
@@ -1356,7 +1356,7 @@ export default function SiteShow({
                                     </CardHeader>
                                     <CardContent>
                                         {credentialCount === 0 ? (
-                                            <p className="text-sm text-slate-400">
+                                            <p className="text-sm text-muted-foreground">
                                                 No credentials stored for this
                                                 site.
                                             </p>
@@ -1387,7 +1387,7 @@ export default function SiteShow({
                                             <Cpu className="h-4 w-4" />
                                             Location Hardware & Configuration
                                         </h3>
-                                        <p className="mt-1 text-sm text-slate-400">
+                                        <p className="mt-1 text-sm text-muted-foreground">
                                             {hardwareCount} device
                                             {hardwareCount !== 1
                                                 ? 's'
@@ -1429,7 +1429,7 @@ export default function SiteShow({
                                                         : i.status ===
                                                             'tenant_only'
                                                           ? 'border-blue-500/30 text-blue-400'
-                                                          : 'border-slate-500/30 text-slate-400'
+                                                          : 'border-slate-500/30 text-muted-foreground'
                                                 }
                                             >
                                                 {i.provider
@@ -1443,7 +1443,7 @@ export default function SiteShow({
                                 )}
                                 {hardwareCount === 0 &&
                                     integrationStatus.length === 0 && (
-                                        <div className="py-8 text-center text-slate-400">
+                                        <div className="py-8 text-center text-muted-foreground">
                                             <Cpu className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                             <p>
                                                 No hardware registered for this
@@ -1491,7 +1491,7 @@ export default function SiteShow({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
-                                            <Layers className="h-5 w-5 text-violet-600" />
+                                            <Layers className="h-5 w-5 text-primary" />
                                             Service Contexts
                                         </CardTitle>
                                         <p className="mt-1 text-sm text-muted-foreground">
@@ -1570,7 +1570,7 @@ export default function SiteShow({
                     <TabsContent value="financials">
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center gap-4 py-12">
-                                <DollarSign className="h-10 w-10 text-purple-500/40" />
+                                <DollarSign className="h-10 w-10 text-primary/40" />
                                 <div className="text-center">
                                     <p className="font-medium">Financial Dashboard</p>
                                     <p className="mt-1 text-sm text-muted-foreground">
@@ -1641,7 +1641,7 @@ function ContactsTab({
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {contacts.length === 0 ? (
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-muted-foreground">
                             No contacts yet.
                         </div>
                     ) : (
@@ -1664,7 +1664,7 @@ function ContactsTab({
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <div className="text-slate-400">
+                                            <div className="text-muted-foreground">
                                                 {[c.type, c.role]
                                                     .filter(Boolean)
                                                     .join(' • ') || '—'}
@@ -1688,7 +1688,7 @@ function ContactsTab({
                                         <div>{c.phone || '—'}</div>
                                         <div>{c.email || '—'}</div>
                                         {c.notes && (
-                                            <div className="mt-1 whitespace-pre-wrap text-slate-400">
+                                            <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
                                                 {c.notes}
                                             </div>
                                         )}
@@ -1867,13 +1867,13 @@ function DocumentsTab({
                 </CardHeader>
                 <CardContent>
                     {documents.length === 0 ? (
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-muted-foreground">
                             No documents uploaded yet.
                         </div>
                     ) : (
                         <div className="overflow-hidden rounded-xl border">
                             <table className="w-full text-sm">
-                                <thead className="border-b bg-slate-50/5">
+                                <thead className="border-b bg-muted/5">
                                     <tr>
                                         <th className="px-4 py-3 text-left font-medium">
                                             Title
@@ -1899,7 +1899,7 @@ function DocumentsTab({
                                             <td className="px-4 py-3 text-right">
                                                 <Link
                                                     href={`/sites/${site.id}/documents/${d.id}/download`}
-                                                    className="text-indigo-300 hover:text-indigo-200"
+                                                    className="text-primary/70 hover:text-primary/70"
                                                 >
                                                     Download
                                                 </Link>
@@ -2002,7 +2002,7 @@ function TypeSpecificTab({
                 </CardHeader>
                 <CardContent>
                     {!data.rooms || data.rooms.length === 0 ? (
-                        <div className="py-8 text-center text-slate-400">
+                        <div className="py-8 text-center text-muted-foreground">
                             <BedDouble className="mx-auto mb-3 h-12 w-12 opacity-50" />
                             <p>No bedrooms configured yet</p>
                             <Button asChild className="mt-4">
@@ -2024,7 +2024,7 @@ function TypeSpecificTab({
                                         {room.assigned_client ? (
                                             <Badge
                                                 variant="outline"
-                                                className="mt-2 border-indigo-500/30 text-indigo-300"
+                                                className="mt-2 border-primary/30 text-primary/70"
                                             >
                                                 Assigned:{' '}
                                                 {room.assigned_client.name}
@@ -2032,7 +2032,7 @@ function TypeSpecificTab({
                                         ) : (
                                             <Badge
                                                 variant="outline"
-                                                className="mt-2 border-slate-500/30 text-slate-400"
+                                                className="mt-2 border-slate-500/30 text-muted-foreground"
                                             >
                                                 Available
                                             </Badge>
@@ -2063,7 +2063,7 @@ function TypeSpecificTab({
                 </CardHeader>
                 <CardContent>
                     {!data.resources || data.resources.length === 0 ? (
-                        <div className="py-8 text-center text-slate-400">
+                        <div className="py-8 text-center text-muted-foreground">
                             <DoorOpen className="mx-auto mb-3 h-12 w-12 opacity-50" />
                             <p>No rooms or resources configured yet</p>
                             <Button asChild className="mt-4">
@@ -2082,11 +2082,11 @@ function TypeSpecificTab({
                                         <div className="font-medium">
                                             {resource.name}
                                         </div>
-                                        <div className="mt-1 text-sm text-slate-400 capitalize">
+                                        <div className="mt-1 text-sm text-muted-foreground capitalize">
                                             {resource.type.replace('_', ' ')}
                                         </div>
                                         {resource.capacity && (
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 Capacity: {resource.capacity}
                                             </div>
                                         )}
@@ -2114,7 +2114,7 @@ function TypeSpecificTab({
             </CardHeader>
             <CardContent>
                 {!data.zones || data.zones.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400">
+                    <div className="py-8 text-center text-muted-foreground">
                         <LayoutGrid className="mx-auto mb-3 h-12 w-12 opacity-50" />
                         <p>No zones configured yet</p>
                         <Button asChild className="mt-4">
@@ -2134,7 +2134,7 @@ function TypeSpecificTab({
                                         {zone.name}
                                     </div>
                                     {zone.type && (
-                                        <div className="mt-1 text-sm text-slate-400">
+                                        <div className="mt-1 text-sm text-muted-foreground">
                                             {zone.type}
                                         </div>
                                     )}
@@ -2208,7 +2208,7 @@ const categoryConfig = {
     },
     specialist: {
         label: 'Specialist',
-        color: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10',
+        color: 'border-primary/30 text-primary/70 bg-primary/10',
         icon: Award,
     },
 };
@@ -2224,7 +2224,7 @@ const coverageTypeConfig = {
     },
     overnight: {
         label: 'Overnight',
-        color: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10',
+        color: 'border-primary/30 text-primary/70 bg-primary/10',
     },
     custom: {
         label: 'Custom',
@@ -2388,15 +2388,15 @@ function CoverageRequirementsTab({
     return (
         <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-                <Card className="overflow-hidden border-indigo-200/60 bg-gradient-to-br from-white via-indigo-50/70 to-cyan-50/70">
+                <Card className="overflow-hidden border-primary/60 bg-gradient-to-br from-white via-indigo-50/70 to-cyan-50/70">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <CardTitle className="flex items-center gap-2 text-base text-slate-950">
-                                    <Layers className="h-4 w-4 text-indigo-500" />
+                                <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                                    <Layers className="h-4 w-4 text-primary" />
                                     Coverage health
                                 </CardTitle>
-                                <p className="mt-1 text-xs text-slate-600">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Demand versus assigned supply for the next
                                     fortnight at {site.name}.
                                 </p>
@@ -2424,13 +2424,13 @@ function CoverageRequirementsTab({
                     <CardContent className="space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
-                                <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                                     Windows
                                 </p>
-                                <p className="mt-2 text-3xl font-bold text-slate-950">
+                                <p className="mt-2 text-3xl font-bold text-foreground">
                                     {sitePreview?.total_windows ?? 0}
                                 </p>
-                                <p className="mt-1 text-xs text-slate-600">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Active demand windows
                                 </p>
                             </div>
@@ -2441,7 +2441,7 @@ function CoverageRequirementsTab({
                                 <p className="mt-2 text-3xl font-bold text-red-600">
                                     {sitePreview?.under_covered_windows ?? 0}
                                 </p>
-                                <p className="mt-1 text-xs text-slate-600">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Need action now
                                 </p>
                             </div>
@@ -2452,7 +2452,7 @@ function CoverageRequirementsTab({
                                 <p className="mt-2 text-3xl font-bold text-emerald-600">
                                     {sitePreview?.exact_windows ?? 0}
                                 </p>
-                                <p className="mt-1 text-xs text-slate-600">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Demand matched cleanly
                                 </p>
                             </div>
@@ -2463,7 +2463,7 @@ function CoverageRequirementsTab({
                                 <p className="mt-2 text-3xl font-bold text-amber-600">
                                     {sitePreview?.largest_missing_staff ?? 0}
                                 </p>
-                                <p className="mt-1 text-xs text-slate-600">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     Missing staff in one window
                                 </p>
                             </div>
@@ -2487,7 +2487,7 @@ function CoverageRequirementsTab({
                                                 key={segment.label}
                                                 className="flex items-center justify-between gap-4 text-sm"
                                             >
-                                                <span className="flex items-center gap-2 text-slate-700">
+                                                <span className="flex items-center gap-2 text-foreground">
                                                     <span
                                                         className="h-2.5 w-2.5 rounded-full"
                                                         style={{
@@ -2497,7 +2497,7 @@ function CoverageRequirementsTab({
                                                     />
                                                     {segment.label}
                                                 </span>
-                                                <span className="font-semibold text-slate-950">
+                                                <span className="font-semibold text-foreground">
                                                     {segment.value}
                                                 </span>
                                             </div>
@@ -2515,10 +2515,10 @@ function CoverageRequirementsTab({
                                         label="covered"
                                     />
                                     <div className="mt-3 text-center">
-                                        <p className="text-sm font-semibold text-slate-950">
+                                        <p className="text-sm font-semibold text-foreground">
                                             Stable coverage
                                         </p>
-                                        <p className="text-xs text-slate-600">
+                                        <p className="text-xs text-muted-foreground">
                                             Exact + overstaffed windows
                                         </p>
                                     </div>
@@ -2531,10 +2531,10 @@ function CoverageRequirementsTab({
                                         label="risk"
                                     />
                                     <div className="mt-3 text-center">
-                                        <p className="text-sm font-semibold text-slate-950">
+                                        <p className="text-sm font-semibold text-foreground">
                                             Coverage risk
                                         </p>
-                                        <p className="text-xs text-slate-600">
+                                        <p className="text-xs text-muted-foreground">
                                             Windows below minimum staffing
                                         </p>
                                     </div>
@@ -2550,10 +2550,10 @@ function CoverageRequirementsTab({
                         ) : (
                             <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
                                 <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
-                                    <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                                    <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                                         Largest gaps
                                     </p>
-                                    <p className="mt-1 text-xs text-slate-600">
+                                    <p className="mt-1 text-xs text-muted-foreground">
                                         Missing staff by next impacted windows.
                                     </p>
                                     <div className="mt-4">
@@ -2586,10 +2586,10 @@ function CoverageRequirementsTab({
                                         >
                                             <div className="flex items-center justify-between gap-3">
                                                 <div>
-                                                    <div className="font-medium text-slate-950">
+                                                    <div className="font-medium text-foreground">
                                                         {alert.rule_name}
                                                     </div>
-                                                    <div className="text-sm text-slate-600">
+                                                    <div className="text-sm text-muted-foreground">
                                                         {alert.window_label}
                                                     </div>
                                                 </div>
@@ -2659,7 +2659,7 @@ function CoverageRequirementsTab({
                                         </DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-2">
-                                        <Label className="text-xs text-slate-400">
+                                        <Label className="text-xs text-muted-foreground">
                                             Quick presets
                                         </Label>
                                         <div className="flex flex-wrap gap-2">
@@ -3265,7 +3265,7 @@ function CoverageRequirementsTab({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="shrink-0 text-slate-500 hover:text-red-400"
+                                                    className="shrink-0 text-muted-foreground hover:text-red-400"
                                                     onClick={() =>
                                                         deleteRequirement(
                                                             requirement.id,
@@ -3369,7 +3369,7 @@ function StaffRequirementsTab({
 
                             {/* Preset buttons */}
                             <div className="space-y-2">
-                                <Label className="text-xs text-slate-400">
+                                <Label className="text-xs text-muted-foreground">
                                     Quick-add common NZ requirements:
                                 </Label>
                                 <div className="flex flex-wrap gap-1">
@@ -3494,11 +3494,11 @@ function StaffRequirementsTab({
             {requirements.length === 0 ? (
                 <Card>
                     <CardContent className="py-8 text-center">
-                        <GraduationCap className="mx-auto mb-3 h-12 w-12 text-slate-500 opacity-50" />
-                        <p className="text-slate-400">
+                        <GraduationCap className="mx-auto mb-3 h-12 w-12 text-muted-foreground opacity-50" />
+                        <p className="text-muted-foreground">
                             No staff requirements configured for this site
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Add mandatory, recommended, and specialist
                             competency requirements
                         </p>
@@ -3551,7 +3551,7 @@ function StaffRequirementsTab({
                                                         {req.expiry_period_months && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-slate-500/30 text-xs text-slate-400"
+                                                                className="border-slate-500/30 text-xs text-muted-foreground"
                                                             >
                                                                 Renew every{' '}
                                                                 {
@@ -3562,7 +3562,7 @@ function StaffRequirementsTab({
                                                         )}
                                                     </div>
                                                     {req.description && (
-                                                        <p className="mt-1 text-sm text-slate-400">
+                                                        <p className="mt-1 text-sm text-muted-foreground">
                                                             {req.description}
                                                         </p>
                                                     )}
@@ -3571,7 +3571,7 @@ function StaffRequirementsTab({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="shrink-0 text-slate-500 hover:text-red-400"
+                                                        className="shrink-0 text-muted-foreground hover:text-red-400"
                                                         onClick={() =>
                                                             deleteRequirement(
                                                                 req.id,

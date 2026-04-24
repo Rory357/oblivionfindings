@@ -53,16 +53,16 @@ export default function ActionItemShow({ auth, action }: Props) {
       in_progress: 'bg-yellow-100 text-yellow-800',
       complete: 'bg-green-100 text-green-800',
       overdue: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getPriorityColor = (priority: string) => {
     return {
-      low: 'bg-gray-100 text-gray-800',
+      low: 'bg-muted text-foreground',
       medium: 'bg-blue-100 text-blue-800',
       high: 'bg-orange-100 text-orange-800',
       critical: 'bg-red-100 text-red-800',
-    }[priority] || 'bg-gray-100 text-gray-800';
+    }[priority] || 'bg-muted text-foreground';
   };
 
   const formatDate = (dateString: string | null | undefined) => {
@@ -96,11 +96,11 @@ export default function ActionItemShow({ auth, action }: Props) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-gray-900">{action.action_reference}</h1>
+              <h1 className="text-3xl font-bold text-foreground">{action.action_reference}</h1>
               <Badge className={cn(getStatusColor(action.status))}>{action.status}</Badge>
               <Badge className={cn(getPriorityColor(action.priority))}>{action.priority}</Badge>
             </div>
-            <p className="text-gray-600">{action.description}</p>
+            <p className="text-muted-foreground">{action.description}</p>
           </div>
           <Button variant="outline" asChild>
             <Link href="/governance/actions">Back</Link>
@@ -110,7 +110,7 @@ export default function ActionItemShow({ auth, action }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="w-4 h-4" />
                 Due Date
               </div>
@@ -119,19 +119,19 @@ export default function ActionItemShow({ auth, action }: Props) {
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="w-4 h-4" />
                 Assigned To
               </div>
               <p className="font-semibold">{action.assigned_to?.name ?? 'Unassigned'}</p>
               {action.assigned_to?.email && (
-                <p className="text-sm text-gray-500">{action.assigned_to.email}</p>
+                <p className="text-sm text-muted-foreground">{action.assigned_to.email}</p>
               )}
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <AlertTriangle className="w-4 h-4" />
                 Evidence
               </div>
@@ -148,7 +148,7 @@ export default function ActionItemShow({ auth, action }: Props) {
             <CardDescription>Where this action item originated</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {action.source_type ? `${action.source_type} #${action.source_id}` : 'Not linked'}
             </p>
           </CardContent>
@@ -171,13 +171,13 @@ export default function ActionItemShow({ auth, action }: Props) {
                   Completed {formatDate(action.completed_at)}
                 </div>
                 {action.completed_by?.name && (
-                  <p className="text-sm text-gray-600">Completed by {action.completed_by.name}</p>
+                  <p className="text-sm text-muted-foreground">Completed by {action.completed_by.name}</p>
                 )}
                 {action.completion_notes && (
-                  <p className="text-sm text-gray-600">{action.completion_notes}</p>
+                  <p className="text-sm text-muted-foreground">{action.completion_notes}</p>
                 )}
                 {action.evidence_attachments?.length ? (
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-muted-foreground">
                     <p className="font-medium">Evidence</p>
                     <ul className="list-disc list-inside">
                       {action.evidence_attachments.map((item, index) => (
@@ -197,7 +197,7 @@ export default function ActionItemShow({ auth, action }: Props) {
                 <Button type="submit" disabled={processing}>Mark Complete</Button>
               </form>
             ) : (
-              <p className="text-sm text-gray-500">You do not have permission to complete this action.</p>
+              <p className="text-sm text-muted-foreground">You do not have permission to complete this action.</p>
             )}
           </CardContent>
         </Card>

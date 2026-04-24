@@ -189,8 +189,8 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-                                    <CheckCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
+                                    <CheckCircle className="h-5 w-5 text-primary dark:text-primary" />
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-muted-foreground">Avg Resolution</p>
@@ -228,8 +228,8 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-                                    <Zap className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                <div className="rounded-lg bg-primary/10 p-2 dark:bg-primary/30">
+                                    <Zap className="h-5 w-5 text-primary dark:text-primary" />
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-muted-foreground">Alerts Today</p>
@@ -444,7 +444,7 @@ export default function ControlRoomStats({
                                                     <td className="hidden py-3 sm:table-cell">
                                                         <div className="h-2 w-full max-w-[200px] rounded-full bg-muted">
                                                             <div
-                                                                className="h-2 rounded-full bg-indigo-500"
+                                                                className="h-2 rounded-full bg-primary"
                                                                 style={{
                                                                     width: `${(op.alerts_handled / maxOperatorAlerts) * 100}%`,
                                                                 }}

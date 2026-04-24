@@ -80,7 +80,7 @@ const errorTypeLabels: Record<string, string> = {
 };
 
 const severityColors: Record<string, string> = {
-    near_miss: 'bg-slate-100 text-slate-700',
+    near_miss: 'bg-muted text-foreground',
     minor: 'bg-blue-100 text-blue-700',
     moderate: 'bg-amber-100 text-amber-700',
     major: 'bg-orange-100 text-orange-700',
@@ -91,7 +91,7 @@ const statusColors: Record<string, string> = {
     reported: 'bg-amber-100 text-amber-700',
     investigating: 'bg-blue-100 text-blue-700',
     resolved: 'bg-green-100 text-green-700',
-    closed: 'bg-slate-100 text-slate-600',
+    closed: 'bg-muted text-muted-foreground',
 };
 
 function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
@@ -309,7 +309,7 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                                     e.target.checked,
                                 )
                             }
-                            className="h-4 w-4 rounded border-gray-300"
+                            className="h-4 w-4 rounded border-border"
                         />
                         <Label
                             htmlFor="create_incident"

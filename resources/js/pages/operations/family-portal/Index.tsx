@@ -86,7 +86,7 @@ export default function FamilyPortalIndex({ clients = { data: [], links: [], cur
                         <Card key={client.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="p-4">
                                 <div className="flex items-start gap-4">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
                                         <Users className="h-5 w-5" />
                                     </div>
                                     <div className="min-w-0 flex-1">

@@ -76,7 +76,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Competency Assessment</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Rate an employee against the competency framework
                     </div>
                 </div>
@@ -117,7 +117,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                                             <div className="font-medium">{comp.name}</div>
                                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                                 <div>
-                                                    <Label className="text-xs text-slate-500">Current Level</Label>
+                                                    <Label className="text-xs text-muted-foreground">Current Level</Label>
                                                     <Select
                                                         value={data.assessments[index].proficiency_level}
                                                         onValueChange={(val) => updateAssessment(index, 'proficiency_level', val)}
@@ -133,7 +133,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                                                     </Select>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs text-slate-500">Target Level</Label>
+                                                    <Label className="text-xs text-muted-foreground">Target Level</Label>
                                                     <Select
                                                         value={data.assessments[index].target_level}
                                                         onValueChange={(val) => updateAssessment(index, 'target_level', val)}
@@ -149,7 +149,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                                                     </Select>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs text-slate-500">Notes</Label>
+                                                    <Label className="text-xs text-muted-foreground">Notes</Label>
                                                     <Textarea
                                                         value={data.assessments[index].notes}
                                                         onChange={(e) => updateAssessment(index, 'notes', e.target.value)}

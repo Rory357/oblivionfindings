@@ -73,10 +73,10 @@ const actionColors: Record<string, string> = {
     created: 'border-green-500/30 text-green-400 bg-green-500/10',
     updated: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
     deleted: 'border-red-500/30 text-red-400 bg-red-500/10',
-    viewed: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+    viewed: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
     approved: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     rejected: 'border-orange-500/30 text-orange-400 bg-orange-500/10',
-    signed: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    signed: 'border-primary/30 text-primary bg-primary/10',
     exported: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
 };
 

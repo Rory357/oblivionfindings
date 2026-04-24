@@ -38,16 +38,16 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
       in_progress: 'bg-yellow-100 text-yellow-800',
       complete: 'bg-green-100 text-green-800',
       overdue: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getPriorityColor = (priority: string) => {
     return {
-      low: 'bg-gray-100 text-gray-800',
+      low: 'bg-muted text-foreground',
       medium: 'bg-blue-100 text-blue-800',
       high: 'bg-orange-100 text-orange-800',
       critical: 'bg-red-100 text-red-800',
-    }[priority] || 'bg-gray-100 text-gray-800';
+    }[priority] || 'bg-muted text-foreground';
   };
 
   const formatDate = (dateString: string) => {
@@ -56,7 +56,7 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
     
     if (days < 0) return { text: `${Math.abs(days)} days overdue`, color: 'text-red-600' };
     if (days === 0) return { text: 'Due today', color: 'text-orange-600' };
-    return { text: `${days} days left`, color: days <= 3 ? 'text-yellow-600' : 'text-gray-500' };
+    return { text: `${days} days left`, color: days <= 3 ? 'text-yellow-600' : 'text-muted-foreground' };
   };
 
   return (
@@ -73,8 +73,8 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Actions</h1>
-              <p className="text-gray-500 mt-1">Track board decisions and follow-ups</p>
+              <h1 className="text-3xl font-bold text-foreground">Actions</h1>
+              <p className="text-muted-foreground mt-1">Track board decisions and follow-ups</p>
             </div>
           </div>
 
@@ -82,7 +82,7 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Open</p>
+                <p className="text-sm text-muted-foreground">Open</p>
                 <p className="text-3xl font-bold">{summary.total_open}</p>
               </CardContent>
             </Card>
@@ -94,7 +94,7 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">My Open</p>
+                <p className="text-sm text-muted-foreground">My Open</p>
                 <p className="text-3xl font-bold">{summary.my_open}</p>
               </CardContent>
             </Card>
@@ -125,13 +125,13 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm text-gray-500">{item.action_reference}</span>
+                          <span className="text-sm text-muted-foreground">{item.action_reference}</span>
                           <Badge className={cn(getPriorityColor(item.priority))}>
                             {item.priority}
                           </Badge>
                         </div>
                         <p className="font-medium">{item.description}</p>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3" />
                             {item.assigned_to.name}

@@ -73,28 +73,28 @@ const vendorTypeLabels: Record<string, string> = {
 
 const vendorTypeColors: Record<string, string> = {
     supplier: 'bg-blue-100 text-blue-800',
-    contractor: 'bg-purple-100 text-purple-800',
+    contractor: 'bg-primary/10 text-primary',
     utility: 'bg-amber-100 text-amber-800',
     government: 'bg-teal-100 text-teal-800',
-    other: 'bg-gray-100 text-gray-800',
+    other: 'bg-muted text-foreground',
 };
 
 const billStatusColors: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     pending: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-blue-100 text-blue-800',
     paid: 'bg-green-100 text-green-800',
     overdue: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-600',
+    cancelled: 'bg-muted text-muted-foreground',
 };
 
 const poStatusColors: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     pending_approval: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-blue-100 text-blue-800',
-    sent: 'bg-indigo-100 text-indigo-800',
+    sent: 'bg-primary/10 text-primary',
     received: 'bg-green-100 text-green-800',
-    cancelled: 'bg-gray-100 text-gray-600',
+    cancelled: 'bg-muted text-muted-foreground',
 };
 
 const formatCurrency = (amount: number) =>
@@ -148,7 +148,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                     className={
                                         vendor.is_active
                                             ? 'bg-green-100 text-green-800'
-                                            : 'bg-gray-100 text-gray-600'
+                                            : 'bg-muted text-muted-foreground'
                                     }
                                 >
                                     {vendor.is_active ? 'Active' : 'Inactive'}
@@ -344,7 +344,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                     <TableCell>
                                                         <Badge
                                                             variant="secondary"
-                                                            className={billStatusColors[bill.status] || 'bg-gray-100 text-gray-800'}
+                                                            className={billStatusColors[bill.status] || 'bg-muted text-foreground'}
                                                         >
                                                             {formatStatus(bill.status)}
                                                         </Badge>
@@ -400,7 +400,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                     <TableCell>
                                                         <Badge
                                                             variant="secondary"
-                                                            className={poStatusColors[po.status] || 'bg-gray-100 text-gray-800'}
+                                                            className={poStatusColors[po.status] || 'bg-muted text-foreground'}
                                                         >
                                                             {formatStatus(po.status)}
                                                         </Badge>

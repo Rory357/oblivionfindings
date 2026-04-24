@@ -462,7 +462,7 @@ export default function TimelineIndex(props: Props) {
                                                     </div>
                                                 </div>
                                                 {e.body && (
-                                                    <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-slate-700 dark:text-slate-200">
+                                                    <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-foreground dark:text-foreground">
                                                         {e.body.length > 300
                                                             ? e.body.slice(
                                                                   0,
@@ -513,14 +513,14 @@ export default function TimelineIndex(props: Props) {
                                                                         calm: 'bg-sky-100 text-sky-700',
                                                                         excited:
                                                                             'bg-amber-100 text-amber-700',
-                                                                        tired: 'bg-indigo-100 text-indigo-700',
+                                                                        tired: 'bg-primary/10 text-primary',
                                                                         anxious:
                                                                             'bg-orange-100 text-orange-700',
                                                                         sad: 'bg-blue-100 text-blue-700',
                                                                         frustrated:
                                                                             'bg-red-100 text-red-700',
                                                                         confused:
-                                                                            'bg-purple-100 text-purple-700',
+                                                                            'bg-primary/10 text-primary',
                                                                     };
                                                                     return (
                                                                         <span

@@ -63,7 +63,7 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                             <Building2 className="w-5 h-5 text-blue-400" />
                             Head Office Reports
                         </h1>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-muted-foreground">
                             Room utilization, safety compliance, and facilities
                         </p>
                     </div>
@@ -80,31 +80,31 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_offices}</div>
-                            <div className="text-sm text-slate-400">Offices</div>
+                            <div className="text-sm text-muted-foreground">Offices</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_rooms}</div>
-                            <div className="text-sm text-slate-400">Rooms</div>
+                            <div className="text-sm text-muted-foreground">Rooms</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.room_bookings}</div>
-                            <div className="text-sm text-slate-400">Bookings</div>
+                            <div className="text-sm text-muted-foreground">Bookings</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-red-500/5 border-red-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-red-400">{stats.open_hazards}</div>
-                            <div className="text-sm text-slate-400">Open Hazards</div>
+                            <div className="text-sm text-muted-foreground">Open Hazards</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{stats.safety_compliance_rate}%</div>
-                            <div className="text-sm text-slate-400">Safety Compliance</div>
+                            <div className="text-sm text-muted-foreground">Safety Compliance</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -153,7 +153,7 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                                     <div key={office.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{office.name}</div>
-                                            <div className="text-sm text-slate-400 flex items-center gap-3">
+                                            <div className="text-sm text-muted-foreground flex items-center gap-3">
                                                 <span className="flex items-center gap-1">
                                                     <DoorOpen className="w-3.5 h-3.5" />
                                                     {office.ho_resources_count} rooms

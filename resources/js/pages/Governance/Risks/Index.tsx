@@ -75,8 +75,8 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Risk Register</h1>
-              <p className="text-gray-500 mt-1">Enterprise risk management</p>
+              <h1 className="text-3xl font-bold text-foreground">Risk Register</h1>
+              <p className="text-muted-foreground mt-1">Enterprise risk management</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" asChild>
@@ -96,10 +96,10 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Total Risks</p>
+                    <p className="text-sm text-muted-foreground">Total Risks</p>
                     <p className="text-3xl font-bold">{totalStats.total}</p>
                   </div>
-                  <Shield className="w-8 h-8 text-gray-400" />
+                  <Shield className="w-8 h-8 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
@@ -125,14 +125,14 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-purple-200">
+            <Card className="border-primary">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-600">Above Appetite</p>
-                    <p className="text-3xl font-bold text-purple-600">{totalStats.above_appetite}</p>
+                    <p className="text-sm text-primary">Above Appetite</p>
+                    <p className="text-3xl font-bold text-primary">{totalStats.above_appetite}</p>
                   </div>
-                  <TrendingUp className="w-8 h-8 text-purple-500" />
+                  <TrendingUp className="w-8 h-8 text-primary" />
                 </div>
               </CardContent>
             </Card>
@@ -185,8 +185,8 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                   <div
                     key={risk.id}
                     className={cn(
-                      "flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors",
-                      !risk.within_appetite && "border-purple-200 bg-purple-50/50"
+                      "flex items-center justify-between p-4 rounded-lg border hover:bg-muted transition-colors",
+                      !risk.within_appetite && "border-primary bg-primary/10/50"
                     )}
                   >
                     <div className="flex items-center gap-4">
@@ -197,16 +197,16 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                         <div className="flex items-center gap-2">
                           <Link 
                             href={showRisk.url({ risk: risk.id })}
-                            className="font-semibold text-gray-900 hover:text-blue-600"
+                            className="font-semibold text-foreground hover:text-blue-600"
                           >
                             {risk.title}
                           </Link>
                           <Badge variant="outline">{risk.risk_reference}</Badge>
                           {!risk.within_appetite && (
-                            <Badge className="bg-purple-100 text-purple-800">Above Appetite</Badge>
+                            <Badge className="bg-primary/10 text-primary">Above Appetite</Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                           <span>{categories.find(c => c.value === risk.category)?.label}</span>
                           <span>•</span>
                           <span>Owner: {risk.risk_owner.name}</span>

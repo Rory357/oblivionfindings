@@ -52,7 +52,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Daily Notes</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Shift-by-shift wellbeing and activity records for respite stays.
                         </div>
                     </div>
@@ -103,7 +103,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                                     type="checkbox"
                                     checked={localFilters.with_concerns === '1'}
                                     onChange={() => toggleFilter('with_concerns')}
-                                    className="rounded border-slate-300"
+                                    className="rounded border-border"
                                 />
                                 With concerns
                             </label>
@@ -112,7 +112,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                                     type="checkbox"
                                     checked={localFilters.with_incidents === '1'}
                                     onChange={() => toggleFilter('with_incidents')}
-                                    className="rounded border-slate-300"
+                                    className="rounded border-border"
                                 />
                                 With incidents
                             </label>
@@ -136,7 +136,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                                                 {note.has_concerns && <Badge variant="outline">Concern</Badge>}
                                                 {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(note.note_date)}
                                             </div>
                                         </div>
@@ -149,7 +149,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                         </Card>
                     ))}
                     {!notes.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No items found.
                         </div>
                     )}

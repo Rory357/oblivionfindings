@@ -30,11 +30,11 @@ interface Props extends PageProps {
 
 export default function PolicyIndex({ auth, policies, categories }: Props) {
   const getStatusColor = (status: string) => ({
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     active: 'bg-green-100 text-green-800',
     under_review: 'bg-yellow-100 text-yellow-800',
     archived: 'bg-red-100 text-red-800',
-  }[status] || 'bg-gray-100 text-gray-800');
+  }[status] || 'bg-muted text-foreground');
 
   const getCategoryLabel = (value: string) =>
     categories.find(c => c.value === value)?.label ?? value;
@@ -45,8 +45,8 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Governance Policies</h1>
-            <p className="text-gray-500 mt-1">Board policies, procedures, and attestation tracking</p>
+            <h1 className="text-2xl font-bold text-foreground">Governance Policies</h1>
+            <p className="text-muted-foreground mt-1">Board policies, procedures, and attestation tracking</p>
           </div>
           <Link href="/governance/policies/create">
             <Button><Plus className="w-4 h-4 mr-2" /> New Policy</Button>
@@ -69,7 +69,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
                         {policy.status.replace('_', ' ')}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                       <span>{getCategoryLabel(policy.category)}</span>
                       <span>Review: {new Date(policy.review_date).toLocaleDateString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                       {policy.requires_attestation && (
@@ -87,7 +87,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
 
           {policies.data.length === 0 && (
             <Card>
-              <CardContent className="p-8 text-center text-gray-500">
+              <CardContent className="p-8 text-center text-muted-foreground">
                 No policies found. Create your first governance policy.
               </CardContent>
             </Card>
@@ -102,7 +102,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
                 href={link.url || '#'}
                 className={cn(
                   'px-3 py-1 rounded text-sm',
-                  link.active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50',
+                  link.active ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground hover:bg-muted',
                   !link.url && 'opacity-50 pointer-events-none'
                 )}
                 dangerouslySetInnerHTML={{ __html: link.label }}

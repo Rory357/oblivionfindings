@@ -141,7 +141,7 @@ export default function Modules({
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
-                            <Boxes className="h-5 w-5 text-violet-600" />
+                            <Boxes className="h-5 w-5 text-primary" />
                             <div>
                                 <CardTitle>Active Modules</CardTitle>
                                 <CardDescription>Enable or disable modules for your organisation</CardDescription>
@@ -153,11 +153,11 @@ export default function Modules({
                             {modules.map((mod) => {
                                 const Icon = mod.icon;
                                 return (
-                                    <Card key={mod.id} className={`border transition-colors ${mod.enabled ? 'border-violet-200 bg-violet-50/30' : 'border-muted'}`}>
+                                    <Card key={mod.id} className={`border transition-colors ${mod.enabled ? 'border-primary bg-primary/10/30' : 'border-muted'}`}>
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex items-start gap-3">
-                                                    <div className={`rounded-lg p-2 ${mod.enabled ? 'bg-violet-100 text-violet-600' : 'bg-muted text-muted-foreground'}`}>
+                                                    <div className={`rounded-lg p-2 ${mod.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                                                         <Icon className="h-5 w-5" />
                                                     </div>
                                                     <div className="min-w-0">
@@ -188,7 +188,7 @@ export default function Modules({
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
-                            <FlaskConical className="h-5 w-5 text-violet-600" />
+                            <FlaskConical className="h-5 w-5 text-primary" />
                             <div>
                                 <CardTitle>Beta Features</CardTitle>
                                 <CardDescription>Try new features before they are generally available</CardDescription>
@@ -224,7 +224,7 @@ export default function Modules({
                 <div className="flex justify-end">
                     <Button
                         dusk="modules-save"
-                        className="bg-violet-600 hover:bg-violet-700"
+                        className="bg-primary hover:bg-primary"
                         onClick={handleSave}
                         disabled={saving}
                     >

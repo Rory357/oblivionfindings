@@ -188,7 +188,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                             <BookOpen className="w-5 h-5" />
                             House Ledger
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <div className="flex gap-2">
                         {canManage && (
@@ -208,13 +208,13 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
 
                 {/* Balance Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card className="bg-indigo-500/5 border-indigo-500/20">
+                    <Card className="bg-primary/5 border-primary/20">
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 mb-1">
-                                <Wallet className="w-5 h-5 text-indigo-400" />
-                                <span className="text-sm text-slate-400">Current Balance</span>
+                                <Wallet className="w-5 h-5 text-primary" />
+                                <span className="text-sm text-muted-foreground">Current Balance</span>
                             </div>
-                            <div className="text-3xl font-bold text-indigo-400">
+                            <div className="text-3xl font-bold text-primary">
                                 {formatCurrency(ledger.current_balance)}
                             </div>
                         </CardContent>
@@ -223,7 +223,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 mb-1">
                                 <TrendingUp className="w-4 h-4 text-emerald-400" />
-                                <span className="text-sm text-slate-400">Income</span>
+                                <span className="text-sm text-muted-foreground">Income</span>
                             </div>
                             <div className="text-2xl font-bold text-emerald-400">
                                 {formatCurrency(incomeTotal)}
@@ -234,7 +234,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 mb-1">
                                 <TrendingDown className="w-4 h-4 text-red-400" />
-                                <span className="text-sm text-slate-400">Expenses</span>
+                                <span className="text-sm text-muted-foreground">Expenses</span>
                             </div>
                             <div className="text-2xl font-bold text-red-400">
                                 {formatCurrency(expenseTotal)}
@@ -244,8 +244,8 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 mb-1">
-                                <CalendarCheck className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-400">Last Reconciled</span>
+                                <CalendarCheck className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Last Reconciled</span>
                             </div>
                             <div className="text-lg font-semibold">
                                 {ledger.last_reconciled_at
@@ -260,7 +260,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                 <Card>
                     <CardContent className="p-0">
                         {entries.data.length === 0 ? (
-                            <div className="text-center py-12 text-slate-400">
+                            <div className="text-center py-12 text-muted-foreground">
                                 <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No ledger entries yet</p>
                                 {canCreate && (
@@ -299,7 +299,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                             <TableCell className="max-w-[200px] truncate">
                                                 {entry.description}
                                             </TableCell>
-                                            <TableCell className="text-slate-400">
+                                            <TableCell className="text-muted-foreground">
                                                 {entry.reference || '-'}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
@@ -329,7 +329,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                                         {entry.attachments[0].original_name}
                                                     </a>
                                                 ) : (
-                                                    <span className="text-slate-500">-</span>
+                                                    <span className="text-muted-foreground">-</span>
                                                 )}
                                             </TableCell>
                                             <TableCell>{entry.recorded_by.name}</TableCell>
@@ -484,7 +484,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                                 form.setData('attachment', null);
                                                 if (fileInputRef.current) fileInputRef.current.value = '';
                                             }}
-                                            className="text-slate-400 hover:text-red-400 transition-colors"
+                                            className="text-muted-foreground hover:text-red-400 transition-colors"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
@@ -493,7 +493,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full mt-1 flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-600 px-3 py-3 text-sm text-slate-400 transition-colors hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 cursor-pointer"
+                                        className="w-full mt-1 flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-600 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 cursor-pointer"
                                     >
                                         <Upload className="w-4 h-4" />
                                         Choose file (PDF or image, max 10MB)
