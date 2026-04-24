@@ -1,15 +1,30 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import {
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, BarChart3, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 interface MonthlyData {
@@ -85,7 +100,13 @@ const riskColors: Record<string, string> = {
     critical: 'bg-status-critical-bg text-status-critical',
 };
 
-export default function LeaveReports({ absenteeism, bradfordFactor, utilization, year, can }: Props) {
+export default function LeaveReports({
+    absenteeism,
+    bradfordFactor,
+    utilization,
+    year,
+    can,
+}: Props) {
     const [activeTab, setActiveTab] = useState('absenteeism');
 
     const maxCount = Math.max(...absenteeism.monthly.map((m) => m.count), 1);
@@ -105,20 +126,29 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                     <div>
                         <h1 className="text-lg font-semibold">Leave Reports</h1>
                         <div className="mt-1 text-sm text-muted-foreground">
-                            Absenteeism trends, Bradford Factor analysis, and leave utilisation
+                            Absenteeism trends, Bradford Factor analysis, and
+                            leave utilisation
                         </div>
                     </div>
 
                     <Select
                         value={String(year)}
-                        onValueChange={(val) => router.get('/hr/leave/reports', { year: val }, { preserveState: true })}
+                        onValueChange={(val) =>
+                            router.get(
+                                '/hr/leave/reports',
+                                { year: val },
+                                { preserveState: true },
+                            )
+                        }
                     >
                         <SelectTrigger className="w-32">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {yearOptions.map((y) => (
-                                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                <SelectItem key={y} value={String(y)}>
+                                    {y}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -144,19 +174,35 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                     <TabsContent value="absenteeism" className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Monthly Sick Leave ({year})</CardTitle>
+                                <CardTitle className="text-base">
+                                    Monthly Sick Leave ({year})
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex items-end gap-2" style={{ height: 200 }}>
+                                <div
+                                    className="flex items-end gap-2"
+                                    style={{ height: 200 }}
+                                >
                                     {absenteeism.monthly.map((m) => (
-                                        <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
+                                        <div
+                                            key={m.month}
+                                            className="flex flex-1 flex-col items-center gap-1"
+                                        >
                                             <div
                                                 className="w-full rounded-t bg-status-info transition-all"
-                                                style={{ height: `${(m.count / maxCount) * 160}px`, minHeight: m.count > 0 ? 4 : 0 }}
+                                                style={{
+                                                    height: `${(m.count / maxCount) * 160}px`,
+                                                    minHeight:
+                                                        m.count > 0 ? 4 : 0,
+                                                }}
                                                 title={`${m.count} occurrences, ${m.total_hours}h`}
                                             />
-                                            <span className="text-xs text-muted-foreground">{m.label}</span>
-                                            <span className="text-xs font-medium">{m.count}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {m.label}
+                                            </span>
+                                            <span className="text-xs font-medium">
+                                                {m.count}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
@@ -165,28 +211,46 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
 
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Top Absentees</CardTitle>
+                                <CardTitle className="text-base">
+                                    Top Absentees
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Employee</TableHead>
-                                            <TableHead className="text-right">Occurrences</TableHead>
-                                            <TableHead className="text-right">Total Hours</TableHead>
+                                            <TableHead className="text-right">
+                                                Occurrences
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Total Hours
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {absenteeism.top_absentees.length === 0 && (
+                                        {absenteeism.top_absentees.length ===
+                                            0 && (
                                             <TableRow>
-                                                <TableCell colSpan={3} className="text-center text-muted-foreground">No data for this period</TableCell>
+                                                <TableCell
+                                                    colSpan={3}
+                                                    className="text-center text-muted-foreground"
+                                                >
+                                                    No data for this period
+                                                </TableCell>
                                             </TableRow>
                                         )}
                                         {absenteeism.top_absentees.map((a) => (
                                             <TableRow key={a.user_id}>
-                                                <TableCell className="font-medium">{a.name}</TableCell>
-                                                <TableCell className="text-right">{a.occurrences}</TableCell>
-                                                <TableCell className="text-right">{a.total_hours}h</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {a.name}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {a.occurrences}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {a.total_hours}h
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -199,33 +263,62 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                     <TabsContent value="bradford" className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Bradford Factor ({year})</CardTitle>
+                                <CardTitle className="text-base">
+                                    Bradford Factor ({year})
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Employee</TableHead>
-                                            <TableHead className="text-right">Spells (S)</TableHead>
-                                            <TableHead className="text-right">Days (D)</TableHead>
-                                            <TableHead className="text-right">Factor (S²xD)</TableHead>
+                                            <TableHead className="text-right">
+                                                Spells (S)
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Days (D)
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Factor (S²xD)
+                                            </TableHead>
                                             <TableHead>Risk</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {bradfordFactor.employees.length === 0 && (
+                                        {bradfordFactor.employees.length ===
+                                            0 && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="text-center text-muted-foreground">No data for this period</TableCell>
+                                                <TableCell
+                                                    colSpan={5}
+                                                    className="text-center text-muted-foreground"
+                                                >
+                                                    No data for this period
+                                                </TableCell>
                                             </TableRow>
                                         )}
                                         {bradfordFactor.employees.map((e) => (
                                             <TableRow key={e.user_id}>
-                                                <TableCell className="font-medium">{e.name}</TableCell>
-                                                <TableCell className="text-right">{e.spells}</TableCell>
-                                                <TableCell className="text-right">{e.days}</TableCell>
-                                                <TableCell className="text-right font-mono">{e.factor}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {e.name}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {e.spells}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {e.days}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {e.factor}
+                                                </TableCell>
                                                 <TableCell>
-                                                    <Badge className={riskColors[e.risk_level] || 'bg-muted'} variant="outline">
+                                                    <Badge
+                                                        className={
+                                                            riskColors[
+                                                                e.risk_level
+                                                            ] || 'bg-muted'
+                                                        }
+                                                        variant="outline"
+                                                    >
                                                         {e.risk_level}
                                                     </Badge>
                                                 </TableCell>
@@ -241,40 +334,65 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                     <TabsContent value="utilization" className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Leave Utilisation ({year})</CardTitle>
+                                <CardTitle className="text-base">
+                                    Leave Utilisation ({year})
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Employee</TableHead>
-                                            <TableHead className="text-right">Entitlement</TableHead>
-                                            <TableHead className="text-right">Used</TableHead>
-                                            <TableHead className="text-right">Remaining</TableHead>
+                                            <TableHead className="text-right">
+                                                Entitlement
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Used
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Remaining
+                                            </TableHead>
                                             <TableHead>Utilisation</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {utilization.employees.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="text-center text-muted-foreground">No data for this period</TableCell>
+                                                <TableCell
+                                                    colSpan={5}
+                                                    className="text-center text-muted-foreground"
+                                                >
+                                                    No data for this period
+                                                </TableCell>
                                             </TableRow>
                                         )}
                                         {utilization.employees.map((e) => (
                                             <TableRow key={e.user_id}>
-                                                <TableCell className="font-medium">{e.name}</TableCell>
-                                                <TableCell className="text-right">{e.total_entitlement}h</TableCell>
-                                                <TableCell className="text-right">{e.total_used}h</TableCell>
-                                                <TableCell className="text-right">{e.total_remaining}h</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {e.name}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {e.total_entitlement}h
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {e.total_used}h
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {e.total_remaining}h
+                                                </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
                                                         <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
                                                             <div
                                                                 className={`h-full rounded-full ${e.overall_pct >= 90 ? 'bg-status-critical' : e.overall_pct >= 70 ? 'bg-status-warning' : 'bg-status-success'}`}
-                                                                style={{ width: `${Math.min(100, e.overall_pct)}%` }}
+                                                                style={{
+                                                                    width: `${Math.min(100, e.overall_pct)}%`,
+                                                                }}
                                                             />
                                                         </div>
-                                                        <span className="text-xs text-muted-foreground">{e.overall_pct}%</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {e.overall_pct}%
+                                                        </span>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>

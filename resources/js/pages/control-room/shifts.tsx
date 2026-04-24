@@ -103,9 +103,11 @@ interface Props {
 const noteTypeColors: Record<string, string> = {
     note: 'bg-muted text-foreground border-border',
     action: 'bg-status-info-bg text-status-info border-status-info/30',
-    escalation: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    escalation:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     decision: 'bg-primary/10 text-primary border-primary',
-    handover: 'bg-status-success-bg text-status-success border-status-success/30',
+    handover:
+        'bg-status-success-bg text-status-success border-status-success/30',
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -200,7 +202,9 @@ export default function ControlRoomShifts({
             `/control-room/shifts/${activeShift.id}/handover`,
             {
                 handover_notes: handoverNotes,
-                priority_items: priorityItems.filter((item) => item.trim() !== ''),
+                priority_items: priorityItems.filter(
+                    (item) => item.trim() !== '',
+                ),
                 incoming_lead_user_id: parseInt(incomingLead),
                 incoming_team_members: incomingTeam.map((id) => parseInt(id)),
             },
@@ -274,7 +278,10 @@ export default function ControlRoomShifts({
                     description="Shift management, operator notes, and handover workflow."
                     actions={
                         can.manage && !activeShift ? (
-                            <Dialog open={newShiftOpen} onOpenChange={setNewShiftOpen}>
+                            <Dialog
+                                open={newShiftOpen}
+                                onOpenChange={setNewShiftOpen}
+                            >
                                 <DialogTrigger asChild>
                                     <Button size="sm">
                                         <Plus className="mr-2 h-4 w-4" />
@@ -284,10 +291,13 @@ export default function ControlRoomShifts({
                                 <DialogContent className="sm:max-w-lg">
                                     <form onSubmit={handleStartShift}>
                                         <DialogHeader>
-                                            <DialogTitle>Start New Shift</DialogTitle>
+                                            <DialogTitle>
+                                                Start New Shift
+                                            </DialogTitle>
                                             <DialogDescription>
-                                                Begin a new shift with a designated
-                                                lead and team members.
+                                                Begin a new shift with a
+                                                designated lead and team
+                                                members.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <div className="mt-4 space-y-4">
@@ -311,7 +321,9 @@ export default function ControlRoomShifts({
                                                 <Label>Shift Lead</Label>
                                                 <Select
                                                     value={newShiftLead}
-                                                    onValueChange={setNewShiftLead}
+                                                    onValueChange={
+                                                        setNewShiftLead
+                                                    }
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Select shift lead" />
@@ -332,9 +344,11 @@ export default function ControlRoomShifts({
                                                 <Label>Team Members</Label>
                                                 <div className="mt-1 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-md border p-2">
                                                     {staff.map((s) => (
-                                                        <button
+                                                        <Button
                                                             key={s.id}
                                                             type="button"
+                                                            variant="outline"
+                                                            size="sm"
                                                             onClick={() =>
                                                                 toggleTeamMember(
                                                                     s.id.toString(),
@@ -342,7 +356,7 @@ export default function ControlRoomShifts({
                                                                     setNewShiftTeam,
                                                                 )
                                                             }
-                                                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                                            className={`h-7 rounded-full px-3 text-xs ${
                                                                 newShiftTeam.includes(
                                                                     s.id.toString(),
                                                                 )
@@ -351,7 +365,7 @@ export default function ControlRoomShifts({
                                                             }`}
                                                         >
                                                             {s.name}
-                                                        </button>
+                                                        </Button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -369,7 +383,8 @@ export default function ControlRoomShifts({
                                             <Button
                                                 type="submit"
                                                 disabled={
-                                                    !newShiftName || !newShiftLead
+                                                    !newShiftName ||
+                                                    !newShiftLead
                                                 }
                                             >
                                                 Start Shift
@@ -390,7 +405,7 @@ export default function ControlRoomShifts({
                                 <div>
                                     <CardTitle className="flex items-center gap-2">
                                         {activeShift.name}
-                                        <Badge className="bg-status-success-bg text-status-success border-status-success/30">
+                                        <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
                                             Active
                                         </Badge>
                                     </CardTitle>
@@ -405,7 +420,8 @@ export default function ControlRoomShifts({
                                         {activeShift.shift_lead && (
                                             <span className="flex items-center gap-1">
                                                 <User className="h-3.5 w-3.5" />
-                                                Lead: {activeShift.shift_lead.name}
+                                                Lead:{' '}
+                                                {activeShift.shift_lead.name}
                                             </span>
                                         )}
                                     </div>
@@ -417,7 +433,10 @@ export default function ControlRoomShifts({
                                             onOpenChange={setNoteOpen}
                                         >
                                             <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                >
                                                     <MessageSquarePlus className="mr-2 h-4 w-4" />
                                                     Add Note
                                                 </Button>
@@ -429,14 +448,17 @@ export default function ControlRoomShifts({
                                                             Add Operator Note
                                                         </DialogTitle>
                                                         <DialogDescription>
-                                                            Record an observation,
-                                                            action, or decision for
-                                                            this shift.
+                                                            Record an
+                                                            observation, action,
+                                                            or decision for this
+                                                            shift.
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <div className="mt-4 space-y-4">
                                                         <div>
-                                                            <Label>Note Type</Label>
+                                                            <Label>
+                                                                Note Type
+                                                            </Label>
                                                             <Select
                                                                 value={noteType}
                                                                 onValueChange={
@@ -468,7 +490,9 @@ export default function ControlRoomShifts({
                                                             </Label>
                                                             <Textarea
                                                                 id="note-content"
-                                                                value={noteContent}
+                                                                value={
+                                                                    noteContent
+                                                                }
                                                                 onChange={(e) =>
                                                                     setNoteContent(
                                                                         e.target
@@ -481,7 +505,9 @@ export default function ControlRoomShifts({
                                                                 placeholder="Enter note details..."
                                                             />
                                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                                {noteContent.length}
+                                                                {
+                                                                    noteContent.length
+                                                                }
                                                                 /2000
                                                             </p>
                                                         </div>
@@ -492,9 +518,12 @@ export default function ControlRoomShifts({
                                                                     checked={
                                                                         notePinned
                                                                     }
-                                                                    onChange={(e) =>
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
                                                                         setNotePinned(
-                                                                            e.target
+                                                                            e
+                                                                                .target
                                                                                 .checked,
                                                                         )
                                                                     }
@@ -508,15 +537,19 @@ export default function ControlRoomShifts({
                                                                     checked={
                                                                         noteFollowup
                                                                     }
-                                                                    onChange={(e) =>
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
                                                                         setNoteFollowup(
-                                                                            e.target
+                                                                            e
+                                                                                .target
                                                                                 .checked,
                                                                         )
                                                                     }
                                                                     className="rounded border-border"
                                                                 />
-                                                                Requires follow-up
+                                                                Requires
+                                                                follow-up
                                                             </label>
                                                         </div>
                                                     </div>
@@ -525,14 +558,18 @@ export default function ControlRoomShifts({
                                                             type="button"
                                                             variant="outline"
                                                             onClick={() =>
-                                                                setNoteOpen(false)
+                                                                setNoteOpen(
+                                                                    false,
+                                                                )
                                                             }
                                                         >
                                                             Cancel
                                                         </Button>
                                                         <Button
                                                             type="submit"
-                                                            disabled={!noteContent}
+                                                            disabled={
+                                                                !noteContent
+                                                            }
                                                         >
                                                             Add Note
                                                         </Button>
@@ -557,9 +594,10 @@ export default function ControlRoomShifts({
                                                             Shift Handover
                                                         </DialogTitle>
                                                         <DialogDescription>
-                                                            Complete the current shift
-                                                            and hand over to the
-                                                            incoming team.
+                                                            Complete the current
+                                                            shift and hand over
+                                                            to the incoming
+                                                            team.
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
@@ -569,7 +607,9 @@ export default function ControlRoomShifts({
                                                             </Label>
                                                             <Textarea
                                                                 id="handover-notes"
-                                                                value={handoverNotes}
+                                                                value={
+                                                                    handoverNotes
+                                                                }
                                                                 onChange={(e) =>
                                                                     setHandoverNotes(
                                                                         e.target
@@ -587,9 +627,14 @@ export default function ControlRoomShifts({
                                                             </Label>
                                                             <div className="mt-1 space-y-2">
                                                                 {priorityItems.map(
-                                                                    (item, i) => (
+                                                                    (
+                                                                        item,
+                                                                        i,
+                                                                    ) => (
                                                                         <div
-                                                                            key={i}
+                                                                            key={
+                                                                                i
+                                                                            }
                                                                             className="flex gap-2"
                                                                         >
                                                                             <Input
@@ -641,10 +686,13 @@ export default function ControlRoomShifts({
                                                         </div>
                                                         <div>
                                                             <Label>
-                                                                Incoming Shift Lead
+                                                                Incoming Shift
+                                                                Lead
                                                             </Label>
                                                             <Select
-                                                                value={incomingLead}
+                                                                value={
+                                                                    incomingLead
+                                                                }
                                                                 onValueChange={
                                                                     setIncomingLead
                                                                 }
@@ -672,31 +720,40 @@ export default function ControlRoomShifts({
                                                         </div>
                                                         <div>
                                                             <Label>
-                                                                Incoming Team Members
+                                                                Incoming Team
+                                                                Members
                                                             </Label>
                                                             <div className="mt-1 flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-md border p-2">
-                                                                {staff.map((s) => (
-                                                                    <button
-                                                                        key={s.id}
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            toggleTeamMember(
-                                                                                s.id.toString(),
-                                                                                incomingTeam,
-                                                                                setIncomingTeam,
-                                                                            )
-                                                                        }
-                                                                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                                                                            incomingTeam.includes(
-                                                                                s.id.toString(),
-                                                                            )
-                                                                                ? 'border-primary bg-primary text-primary-foreground'
-                                                                                : 'hover:bg-muted'
-                                                                        }`}
-                                                                    >
-                                                                        {s.name}
-                                                                    </button>
-                                                                ))}
+                                                                {staff.map(
+                                                                    (s) => (
+                                                                        <Button
+                                                                            key={
+                                                                                s.id
+                                                                            }
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                toggleTeamMember(
+                                                                                    s.id.toString(),
+                                                                                    incomingTeam,
+                                                                                    setIncomingTeam,
+                                                                                )
+                                                                            }
+                                                                            className={`h-7 rounded-full px-3 text-xs ${
+                                                                                incomingTeam.includes(
+                                                                                    s.id.toString(),
+                                                                                )
+                                                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                                                    : 'hover:bg-muted'
+                                                                            }`}
+                                                                        >
+                                                                            {
+                                                                                s.name
+                                                                            }
+                                                                        </Button>
+                                                                    ),
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -705,7 +762,9 @@ export default function ControlRoomShifts({
                                                             type="button"
                                                             variant="outline"
                                                             onClick={() =>
-                                                                setHandoverOpen(false)
+                                                                setHandoverOpen(
+                                                                    false,
+                                                                )
                                                             }
                                                         >
                                                             Cancel
@@ -877,9 +936,11 @@ export default function ControlRoomShifts({
                                                     <Label>Team Members</Label>
                                                     <div className="mt-1 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-md border p-2">
                                                         {staff.map((s) => (
-                                                            <button
+                                                            <Button
                                                                 key={s.id}
                                                                 type="button"
+                                                                variant="outline"
+                                                                size="sm"
                                                                 onClick={() =>
                                                                     toggleTeamMember(
                                                                         s.id.toString(),
@@ -887,7 +948,7 @@ export default function ControlRoomShifts({
                                                                         setNewShiftTeam,
                                                                     )
                                                                 }
-                                                                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                                                className={`h-7 rounded-full px-3 text-xs ${
                                                                     newShiftTeam.includes(
                                                                         s.id.toString(),
                                                                     )
@@ -896,7 +957,7 @@ export default function ControlRoomShifts({
                                                                 }`}
                                                             >
                                                                 {s.name}
-                                                            </button>
+                                                            </Button>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -1004,9 +1065,9 @@ export default function ControlRoomShifts({
                                 ))}
                             </div>
                         ) : (
-                            <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+                            <Card className="px-4 py-8 text-center text-sm text-muted-foreground">
                                 No operator notes for this shift yet.
-                            </div>
+                            </Card>
                         )}
                     </div>
                 )}

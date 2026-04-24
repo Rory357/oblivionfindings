@@ -1,16 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -19,6 +10,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
@@ -110,7 +111,8 @@ const statusColors: Record<string, string> = {
     open: 'bg-status-critical-bg text-status-critical border-status-critical/30',
     ack: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     triaging: 'bg-status-info-bg text-status-info border-status-info/30',
-    resolved: 'bg-status-success-bg text-status-success border-status-success/30',
+    resolved:
+        'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
@@ -242,20 +244,22 @@ export default function AlertsIndex({
         [basePath, currentSort, currentDir, filters],
     );
 
-    function SortIcon({ field }: { field: string }) {
-        if (currentSort !== field) return <ChevronDown className="h-3 w-3 opacity-30" />;
+    const renderSortIcon = (field: string) => {
+        if (currentSort !== field)
+            return <ChevronDown className="h-3 w-3 opacity-30" />;
         return currentDir === 'asc' ? (
             <ChevronUp className="h-3 w-3" />
         ) : (
             <ChevronDown className="h-3 w-3" />
         );
-    }
+    };
 
     // ------------------------------------------------------------------
     // Selection helpers
     // ------------------------------------------------------------------
 
-    const allOnPageSelected = alerts.data.length > 0 && alerts.data.every((a) => selected.has(a.id));
+    const allOnPageSelected =
+        alerts.data.length > 0 && alerts.data.every((a) => selected.has(a.id));
 
     const toggleAll = () => {
         if (allOnPageSelected) {
@@ -290,7 +294,10 @@ export default function AlertsIndex({
         if (!assignUserId) return;
         router.post(
             '/control-room/alerts/bulk-assign',
-            { alert_ids: Array.from(selected), assigned_to_user_id: Number(assignUserId) },
+            {
+                alert_ids: Array.from(selected),
+                assigned_to_user_id: Number(assignUserId),
+            },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -307,11 +314,19 @@ export default function AlertsIndex({
     // ------------------------------------------------------------------
 
     const inlineAcknowledge = (id: number) => {
-        router.post(`/control-room/alerts/${id}/acknowledge`, {}, { preserveScroll: true });
+        router.post(
+            `/control-room/alerts/${id}/acknowledge`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     const inlineAssignToMe = (id: number) => {
-        router.post(`/control-room/alerts/${id}/assign-to-me`, {}, { preserveScroll: true });
+        router.post(
+            `/control-room/alerts/${id}/assign-to-me`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     // ------------------------------------------------------------------
@@ -321,16 +336,29 @@ export default function AlertsIndex({
     const tabs = [
         { label: 'All', count: stats.total, filter: {} },
         { label: 'Open', count: stats.open, filter: { status: 'open' } },
-        { label: 'Critical', count: stats.critical, filter: { severity: 'critical' } },
-        { label: 'Assigned to Me', count: stats.assigned_to_me, filter: { assigned_to: 'me' } },
-        { label: 'Unassigned', count: stats.unassigned, filter: { assigned_to: 'unassigned' } },
+        {
+            label: 'Critical',
+            count: stats.critical,
+            filter: { severity: 'critical' },
+        },
+        {
+            label: 'Assigned to Me',
+            count: stats.assigned_to_me,
+            filter: { assigned_to: 'me' },
+        },
+        {
+            label: 'Unassigned',
+            count: stats.unassigned,
+            filter: { assigned_to: 'unassigned' },
+        },
     ];
 
     const activeTab = (() => {
         if (filters.assigned_to === 'me') return 'Assigned to Me';
         if (filters.assigned_to === 'unassigned') return 'Unassigned';
         if (filters.status === 'open' && !filters.severity) return 'Open';
-        if (filters.severity === 'critical' && !filters.status) return 'Critical';
+        if (filters.severity === 'critical' && !filters.status)
+            return 'Critical';
         if (!hasFilters) return 'All';
         return null;
     })();
@@ -340,16 +368,22 @@ export default function AlertsIndex({
     // ------------------------------------------------------------------
 
     return (
-        <AppLayout
-            breadcrumbs={pageBreadcrumbs}
-        >
-            <Head title={pageTitle === 'Alerts' ? 'Control Room Alerts' : `${pageTitle} - Control Room`} />
+        <AppLayout breadcrumbs={pageBreadcrumbs}>
+            <Head
+                title={
+                    pageTitle === 'Alerts'
+                        ? 'Control Room Alerts'
+                        : `${pageTitle} - Control Room`
+                }
+            />
 
             <div className="flex flex-col gap-4 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{pageTitle}</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            {pageTitle}
+                        </h1>
                         <p className="text-sm text-muted-foreground">
                             {pageDescription}
                         </p>
@@ -362,10 +396,12 @@ export default function AlertsIndex({
                 {/* Quick filter tabs */}
                 <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
                     {tabs.map((tab) => (
-                        <button
+                        <Button
                             key={tab.label}
+                            type="button"
+                            variant="ghost"
                             onClick={() => applyQuickFilter(tab.filter)}
-                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                            className={`h-auto gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                                 activeTab === tab.label
                                     ? 'bg-background text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground'
@@ -381,12 +417,12 @@ export default function AlertsIndex({
                             >
                                 {tab.count}
                             </span>
-                        </button>
+                        </Button>
                     ))}
                 </div>
 
                 {/* Filter bar */}
-                <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3">
+                <Card className="flex flex-row flex-wrap items-end gap-3 rounded-lg p-3">
                     <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                         <Filter className="h-4 w-4" />
                         Filters
@@ -399,13 +435,18 @@ export default function AlertsIndex({
                         className="h-9 w-52"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter')
-                                applyFilter('search', (e.target as HTMLInputElement).value);
+                                applyFilter(
+                                    'search',
+                                    (e.target as HTMLInputElement).value,
+                                );
                         }}
                     />
 
                     <Select
                         value={filters.severity || 'all'}
-                        onValueChange={(v) => applyFilter('severity', v === 'all' ? '' : v)}
+                        onValueChange={(v) =>
+                            applyFilter('severity', v === 'all' ? '' : v)
+                        }
                     >
                         <SelectTrigger className="h-9 w-36">
                             <SelectValue placeholder="Severity" />
@@ -421,7 +462,9 @@ export default function AlertsIndex({
 
                     <Select
                         value={filters.source || 'all'}
-                        onValueChange={(v) => applyFilter('source', v === 'all' ? '' : v)}
+                        onValueChange={(v) =>
+                            applyFilter('source', v === 'all' ? '' : v)
+                        }
                     >
                         <SelectTrigger className="h-9 w-36">
                             <SelectValue placeholder="Source" />
@@ -429,17 +472,23 @@ export default function AlertsIndex({
                         <SelectContent>
                             <SelectItem value="all">All Sources</SelectItem>
                             <SelectItem value="fleet">Fleet</SelectItem>
-                            <SelectItem value="personal_tracker">Tracker</SelectItem>
+                            <SelectItem value="personal_tracker">
+                                Tracker
+                            </SelectItem>
                             <SelectItem value="manual">Manual</SelectItem>
                             <SelectItem value="external">External</SelectItem>
-                            <SelectItem value="compliance">Compliance</SelectItem>
+                            <SelectItem value="compliance">
+                                Compliance
+                            </SelectItem>
                             <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                     </Select>
 
                     <Select
                         value={filters.status || 'all'}
-                        onValueChange={(v) => applyFilter('status', v === 'all' ? '' : v)}
+                        onValueChange={(v) =>
+                            applyFilter('status', v === 'all' ? '' : v)
+                        }
                     >
                         <SelectTrigger className="h-9 w-36">
                             <SelectValue placeholder="Status" />
@@ -459,7 +508,9 @@ export default function AlertsIndex({
                         placeholder="From"
                         defaultValue={filters.date_from || ''}
                         className="h-9 w-36"
-                        onChange={(e) => applyFilter('date_from', e.target.value)}
+                        onChange={(e) =>
+                            applyFilter('date_from', e.target.value)
+                        }
                     />
 
                     <Input
@@ -471,12 +522,17 @@ export default function AlertsIndex({
                     />
 
                     {hasFilters && (
-                        <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-9"
+                            onClick={clearFilters}
+                        >
                             <X className="mr-1 h-3 w-3" />
                             Clear
                         </Button>
                     )}
-                </div>
+                </Card>
 
                 {/* Bulk actions bar */}
                 {selected.size > 0 && (
@@ -486,7 +542,11 @@ export default function AlertsIndex({
                         </span>
                         <div className="h-4 w-px bg-border" />
                         {can.manage && (
-                            <Button variant="outline" size="sm" onClick={bulkAcknowledge}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={bulkAcknowledge}
+                            >
                                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                                 Acknowledge Selected
                             </Button>
@@ -509,10 +569,10 @@ export default function AlertsIndex({
                 )}
 
                 {/* Alerts table */}
-                <div className="overflow-x-auto rounded-lg border bg-card">
+                <Card className="gap-0 overflow-x-auto rounded-lg p-0">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            <tr className="border-b bg-muted/50 text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                 <th className="w-10 px-3 py-3">
                                     <Checkbox
                                         checked={allOnPageSelected}
@@ -524,7 +584,8 @@ export default function AlertsIndex({
                                     onClick={() => toggleSort('alert_type')}
                                 >
                                     <span className="inline-flex items-center gap-1">
-                                        Alert Type <SortIcon field="alert_type" />
+                                        Alert Type{' '}
+                                        {renderSortIcon('alert_type')}
                                     </span>
                                 </th>
                                 <th className="px-3 py-3">Source</th>
@@ -533,7 +594,7 @@ export default function AlertsIndex({
                                     onClick={() => toggleSort('severity')}
                                 >
                                     <span className="inline-flex items-center gap-1">
-                                        Severity <SortIcon field="severity" />
+                                        Severity {renderSortIcon('severity')}
                                     </span>
                                 </th>
                                 <th
@@ -541,7 +602,7 @@ export default function AlertsIndex({
                                     onClick={() => toggleSort('status')}
                                 >
                                     <span className="inline-flex items-center gap-1">
-                                        Status <SortIcon field="status" />
+                                        Status {renderSortIcon('status')}
                                     </span>
                                 </th>
                                 <th className="px-3 py-3">SLA</th>
@@ -550,20 +611,27 @@ export default function AlertsIndex({
                                     onClick={() => toggleSort('triggered_at')}
                                 >
                                     <span className="inline-flex items-center gap-1">
-                                        Triggered <SortIcon field="triggered_at" />
+                                        Triggered{' '}
+                                        {renderSortIcon('triggered_at')}
                                     </span>
                                 </th>
                                 <th className="px-3 py-3">Assigned</th>
-                                <th className="px-3 py-3 text-right">Actions</th>
+                                <th className="px-3 py-3 text-right">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {alerts.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-16 text-center">
+                                    <td
+                                        colSpan={9}
+                                        className="px-3 py-16 text-center"
+                                    >
                                         <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
                                         <p className="text-sm text-muted-foreground">
-                                            No alerts found matching your filters.
+                                            No alerts found matching your
+                                            filters.
                                         </p>
                                     </td>
                                 </tr>
@@ -572,15 +640,20 @@ export default function AlertsIndex({
                                     <tr
                                         key={alert.id}
                                         className={`border-b border-l-4 transition-colors hover:bg-muted/40 ${
-                                            severityBorders[alert.severity] ?? 'border-l-transparent'
+                                            severityBorders[alert.severity] ??
+                                            'border-l-transparent'
                                         } ${idx % 2 === 1 ? 'bg-muted/20' : ''} ${
-                                            selected.has(alert.id) ? 'bg-primary/5' : ''
+                                            selected.has(alert.id)
+                                                ? 'bg-primary/5'
+                                                : ''
                                         }`}
                                     >
                                         <td className="px-3 py-2.5">
                                             <Checkbox
                                                 checked={selected.has(alert.id)}
-                                                onCheckedChange={() => toggleOne(alert.id)}
+                                                onCheckedChange={() =>
+                                                    toggleOne(alert.id)
+                                                }
                                             />
                                         </td>
                                         <td className="px-3 py-2.5">
@@ -589,12 +662,16 @@ export default function AlertsIndex({
                                                     {alert.alert_type}
                                                 </span>
                                                 {alert.escalation_level &&
-                                                    alert.escalation_level > 0 && (
+                                                    alert.escalation_level >
+                                                        0 && (
                                                         <Badge
                                                             variant="outline"
-                                                            className="border-status-warning/30 text-status-warning text-[10px] px-1 py-0"
+                                                            className="border-status-warning/30 px-1 py-0 text-[10px] text-status-warning"
                                                         >
-                                                            L{alert.escalation_level}
+                                                            L
+                                                            {
+                                                                alert.escalation_level
+                                                            }
                                                         </Badge>
                                                     )}
                                             </div>
@@ -605,14 +682,19 @@ export default function AlertsIndex({
                                             )}
                                         </td>
                                         <td className="px-3 py-2.5">
-                                            <span className="text-xs capitalize text-muted-foreground">
-                                                {alert.source?.replace('_', ' ')}
+                                            <span className="text-xs text-muted-foreground capitalize">
+                                                {alert.source?.replace(
+                                                    '_',
+                                                    ' ',
+                                                )}
                                             </span>
                                         </td>
                                         <td className="px-3 py-2.5">
                                             <Badge
                                                 className={`inline-flex items-center gap-1 ${
-                                                    severityColors[alert.severity] ??
+                                                    severityColors[
+                                                        alert.severity
+                                                    ] ??
                                                     'bg-muted-foreground/80 text-white'
                                                 }`}
                                             >
@@ -624,17 +706,22 @@ export default function AlertsIndex({
                                             <Badge
                                                 variant="outline"
                                                 className={
-                                                    statusColors[alert.status] ?? ''
+                                                    statusColors[
+                                                        alert.status
+                                                    ] ?? ''
                                                 }
                                             >
-                                                {statusLabels[alert.status] ?? alert.status}
+                                                {statusLabels[alert.status] ??
+                                                    alert.status}
                                             </Badge>
                                         </td>
                                         <td className="px-3 py-2.5">
                                             {alert.sla_status ? (
                                                 <Circle
                                                     className={`h-3 w-3 fill-current ${
-                                                        slaColors[alert.sla_status] ??
+                                                        slaColors[
+                                                            alert.sla_status
+                                                        ] ??
                                                         'text-muted-foreground'
                                                     }`}
                                                 />
@@ -656,7 +743,9 @@ export default function AlertsIndex({
                                                 }
                                             >
                                                 <Clock className="h-3 w-3" />
-                                                {formatRelativeTime(alert.triggered_at)}
+                                                {formatRelativeTime(
+                                                    alert.triggered_at,
+                                                )}
                                             </span>
                                         </td>
                                         <td className="px-3 py-2.5">
@@ -680,7 +769,9 @@ export default function AlertsIndex({
                                                             size="sm"
                                                             className="h-7 px-2 text-xs"
                                                             onClick={() =>
-                                                                inlineAcknowledge(alert.id)
+                                                                inlineAcknowledge(
+                                                                    alert.id,
+                                                                )
                                                             }
                                                         >
                                                             <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -694,7 +785,9 @@ export default function AlertsIndex({
                                                             size="sm"
                                                             className="h-7 px-2 text-xs"
                                                             onClick={() =>
-                                                                inlineAssignToMe(alert.id)
+                                                                inlineAssignToMe(
+                                                                    alert.id,
+                                                                )
                                                             }
                                                         >
                                                             <UserPlus className="mr-1 h-3 w-3" />
@@ -721,32 +814,42 @@ export default function AlertsIndex({
                             )}
                         </tbody>
                     </table>
-                </div>
+                </Card>
 
                 {/* Pagination */}
                 {alerts.links?.length > 3 && (
                     <div className="flex items-center justify-between">
                         <p className="text-xs text-muted-foreground">
-                            Page {alerts.current_page} of {alerts.last_page} ({alerts.total} total
-                            alerts)
+                            Page {alerts.current_page} of {alerts.last_page} (
+                            {alerts.total} total alerts)
                         </p>
                         <div className="flex gap-1">
                             {alerts.links.map((link, i) => (
                                 <Button
                                     key={i}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     size="sm"
                                     className="h-8 min-w-[2rem] px-2 text-xs"
                                     disabled={!link.url}
                                     onClick={() =>
                                         link.url &&
-                                        router.get(link.url, {}, {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        })
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            },
+                                        )
                                     }
                                 >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    <span
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
+                                    />
                                 </Button>
                             ))}
                         </div>
@@ -760,11 +863,15 @@ export default function AlertsIndex({
                     <DialogHeader>
                         <DialogTitle>Assign Alerts</DialogTitle>
                         <DialogDescription>
-                            Assign {selected.size} selected alert(s) to a staff member.
+                            Assign {selected.size} selected alert(s) to a staff
+                            member.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        <Select value={assignUserId} onValueChange={setAssignUserId}>
+                        <Select
+                            value={assignUserId}
+                            onValueChange={setAssignUserId}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select staff member..." />
                             </SelectTrigger>

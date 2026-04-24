@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { type BreadcrumbItem } from '@/types';
-import { Plus } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 interface Template {
     id: number;
@@ -45,18 +51,32 @@ const typeColors: Record<string, string> = {
     contract: 'border-status-info/30 text-status-info bg-status-info',
     letter: 'border-status-warning/30 text-status-warning bg-status-warning',
     policy: 'border-primary/30 text-primary bg-primary/10',
-    certificate: 'border-status-success/30 text-status-success bg-status-success',
+    certificate:
+        'border-status-success/30 text-status-success bg-status-success',
     offer: 'border-primary/30 text-primary bg-primary/10',
     other: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 
-export default function DocumentTemplates({ templates, categories, filters, can }: Props) {
+export default function DocumentTemplates({
+    templates,
+    categories,
+    filters,
+    can,
+}: Props) {
     function applyFilter(key: string, value: string | null) {
-        router.get('/hr/documents/templates', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/hr/documents/templates',
+            { ...filters, [key]: value || undefined },
+            { preserveState: true, replace: true },
+        );
     }
 
     function toggleActive(template: Template) {
-        router.post(`/hr/documents/templates/${template.id}/toggle-active`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/documents/templates/${template.id}/toggle-active`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -82,19 +102,26 @@ export default function DocumentTemplates({ templates, categories, filters, can 
                         className="w-64"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                                applyFilter('q', (e.target as HTMLInputElement).value);
+                                applyFilter(
+                                    'q',
+                                    (e.target as HTMLInputElement).value,
+                                );
                             }
                         }}
                     />
                     <Select
                         value={filters.category || '__none__'}
-                        onValueChange={(v) => applyFilter('category', v === '__none__' ? null : v)}
+                        onValueChange={(v) =>
+                            applyFilter('category', v === '__none__' ? null : v)
+                        }
                     >
                         <SelectTrigger className="w-48">
                             <SelectValue placeholder="All categories" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="__none__">All categories</SelectItem>
+                            <SelectItem value="__none__">
+                                All categories
+                            </SelectItem>
                             {categories.map((category) => (
                                 <SelectItem key={category} value={category}>
                                     {category.replace('_', ' ')}
@@ -109,57 +136,112 @@ export default function DocumentTemplates({ templates, categories, filters, can 
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">Name</th>
-                                    <th className="px-4 py-3 text-left font-medium">Category</th>
-                                    <th className="px-4 py-3 text-left font-medium">Merge Fields</th>
-                                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    <th className="px-4 py-3 text-left font-medium">Version</th>
-                                    <th className="px-4 py-3 text-left font-medium">Updated</th>
-                                    {can.manage && <th className="px-4 py-3 text-right font-medium">Actions</th>}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Name
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Category
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Merge Fields
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Version
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Updated
+                                    </th>
+                                    {can.manage && (
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Actions
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {templates.data.map((template) => {
-                                    const typeClass = typeColors[template.category] || typeColors.other;
+                                    const typeClass =
+                                        typeColors[template.category] ||
+                                        typeColors.other;
                                     return (
-                                        <tr key={template.id} className="hover:bg-muted/30">
-                                            <td className="px-4 py-3 font-medium">{template.name}</td>
+                                        <tr
+                                            key={template.id}
+                                            className="hover:bg-muted/30"
+                                        >
+                                            <td className="px-4 py-3 font-medium">
+                                                {template.name}
+                                            </td>
                                             <td className="px-4 py-3">
-                                                <Badge variant="outline" className={typeClass}>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={typeClass}
+                                                >
                                                     {template.category}
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
-                                                {template.merge_fields.length > 0
-                                                    ? template.merge_fields.slice(0, 3).join(', ')
+                                                {template.merge_fields.length >
+                                                0
+                                                    ? template.merge_fields
+                                                          .slice(0, 3)
+                                                          .join(', ')
                                                     : '�'}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                    <Badge variant={template.is_active ? 'default' : 'secondary'}>
-                                                        {template.is_active ? 'Active' : 'Inactive'}
+                                                    <Badge
+                                                        variant={
+                                                            template.is_active
+                                                                ? 'default'
+                                                                : 'secondary'
+                                                        }
+                                                    >
+                                                        {template.is_active
+                                                            ? 'Active'
+                                                            : 'Inactive'}
                                                     </Badge>
                                                     {template.approval_required && (
-                                                        <Badge variant="outline">Approval required</Badge>
+                                                        <Badge variant="outline">
+                                                            Approval required
+                                                        </Badge>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-muted-foreground">v{template.version}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{template.updated_at}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                v{template.version}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {template.updated_at}
+                                            </td>
                                             {can.manage && (
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/hr/documents/templates/${template.id}/edit`}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/hr/documents/templates/${template.id}/edit`}
+                                                            >
                                                                 Edit
                                                             </Link>
                                                         </Button>
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => toggleActive(template)}
+                                                            onClick={() =>
+                                                                toggleActive(
+                                                                    template,
+                                                                )
+                                                            }
                                                         >
-                                                            {template.is_active ? 'Deactivate' : 'Activate'}
+                                                            {template.is_active
+                                                                ? 'Deactivate'
+                                                                : 'Activate'}
                                                         </Button>
                                                     </div>
                                                 </td>
@@ -169,7 +251,10 @@ export default function DocumentTemplates({ templates, categories, filters, can 
                                 })}
                                 {templates.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={can.manage ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={can.manage ? 7 : 6}
+                                            className="px-4 py-8 text-center text-muted-foreground"
+                                        >
                                             No document templates found.
                                         </td>
                                     </tr>
@@ -182,9 +267,15 @@ export default function DocumentTemplates({ templates, categories, filters, can 
                 {templates.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(templates.current_page - 1) * templates.per_page + 1} to{' '}
-                            {Math.min(templates.current_page * templates.per_page, templates.total)} of{' '}
-                            {templates.total} templates
+                            Showing{' '}
+                            {(templates.current_page - 1) * templates.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                templates.current_page * templates.per_page,
+                                templates.total,
+                            )}{' '}
+                            of {templates.total} templates
                         </p>
                         <LaravelPagination links={templates.links} />
                     </div>

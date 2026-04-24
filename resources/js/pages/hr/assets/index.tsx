@@ -1,17 +1,28 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router, Link } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Package } from 'lucide-react';
-import { type BreadcrumbItem } from '@/types';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 interface SelectOption {
     value: string;
@@ -39,7 +50,11 @@ interface Asset {
 
 interface Props {
     assets: { data: Asset[]; links: any[] };
-    filters: { status: string | null; category: string | null; search: string | null };
+    filters: {
+        status: string | null;
+        category: string | null;
+        search: string | null;
+    };
     categories: SelectOption[];
     can: { manage: boolean };
 }
@@ -71,18 +86,36 @@ const formatCurrency = (value: string | null) => {
     if (!value) return '-';
     const num = parseFloat(value);
     if (Number.isNaN(num)) return value;
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(num);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(num);
 };
 
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
-export default function AssetsIndex({ assets, filters, categories, can }: Props) {
+export default function AssetsIndex({
+    assets,
+    filters,
+    categories,
+    can,
+}: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/assets', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/assets',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -92,7 +125,9 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">Asset Management</h1>
+                        <h1 className="text-lg font-semibold">
+                            Asset Management
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
                             Track company assets and their assignments
                         </div>
@@ -115,41 +150,78 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Search by name, tag, serial..."
                                 value={filters.search || ''}
-                                onChange={(e) => onFilter({ search: e.target.value || null })}
+                                onChange={(e) =>
+                                    onFilter({ search: e.target.value || null })
+                                }
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Category</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Category
+                            </Label>
                             <Select
                                 value={filters.category || 'all'}
-                                onValueChange={(val) => onFilter({ category: val === 'all' ? null : val })}
+                                onValueChange={(val) =>
+                                    onFilter({
+                                        category: val === 'all' ? null : val,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Categories</SelectItem>
+                                    <SelectItem value="all">
+                                        All Categories
+                                    </SelectItem>
                                     {categories.map((cat) => (
-                                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                                        <SelectItem
+                                            key={cat.value}
+                                            value={cat.value}
+                                        >
+                                            {cat.label}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status || 'all'}
-                                onValueChange={(val) => onFilter({ status: val === 'all' ? null : val })}
+                                onValueChange={(val) =>
+                                    onFilter({
+                                        status: val === 'all' ? null : val,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="available">Available</SelectItem>
-                                    <SelectItem value="assigned">Assigned</SelectItem>
-                                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                                    <SelectItem value="retired">Retired</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
+                                    <SelectItem value="available">
+                                        Available
+                                    </SelectItem>
+                                    <SelectItem value="assigned">
+                                        Assigned
+                                    </SelectItem>
+                                    <SelectItem value="maintenance">
+                                        Maintenance
+                                    </SelectItem>
+                                    <SelectItem value="retired">
+                                        Retired
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -176,22 +248,42 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                                     <TableRow
                                         key={asset.id}
                                         className="cursor-pointer hover:bg-muted/50"
-                                        onClick={() => router.get(`/hr/assets/${asset.id}`)}
+                                        onClick={() =>
+                                            router.get(`/hr/assets/${asset.id}`)
+                                        }
                                     >
-                                        <TableCell className="font-mono text-xs font-medium">{asset.asset_tag}</TableCell>
-                                        <TableCell className="font-medium">{asset.name}</TableCell>
+                                        <TableCell className="font-mono text-xs font-medium">
+                                            {asset.asset_tag}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {asset.name}
+                                        </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline">{categoryLabels[asset.category] || asset.category}</Badge>
+                                            <Badge variant="outline">
+                                                {categoryLabels[
+                                                    asset.category
+                                                ] || asset.category}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
-                                            {[asset.make, asset.model].filter(Boolean).join(' ') || '-'}
+                                            {[asset.make, asset.model]
+                                                .filter(Boolean)
+                                                .join(' ') || '-'}
                                         </TableCell>
                                         <TableCell>
-                                            {asset.current_assignment?.employee_profile?.user?.name || '-'}
+                                            {asset.current_assignment
+                                                ?.employee_profile?.user
+                                                ?.name || '-'}
                                         </TableCell>
-                                        <TableCell className="text-sm">{formatCurrency(asset.purchase_cost)}</TableCell>
+                                        <TableCell className="text-sm">
+                                            {formatCurrency(
+                                                asset.purchase_cost,
+                                            )}
+                                        </TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[asset.status] ?? ''}`}>
+                                            <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[asset.status] ?? ''}`}
+                                            >
                                                 {asset.status}
                                             </span>
                                         </TableCell>
@@ -199,7 +291,10 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                                 ))}
                                 {!assets.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No assets found.
                                         </TableCell>
                                     </TableRow>

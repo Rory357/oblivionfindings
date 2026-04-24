@@ -1,14 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Head, Link, router } from '@inertiajs/react';
-import { ShieldCheck, Search } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { Search, ShieldCheck } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -40,18 +45,24 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDateTime = (value?: string | null) => {
     if (!value) return 'Not set';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          });
 };
 
 export default function PolicyAttestations({ attestations, filters }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/policies/attestations', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/policies/attestations',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -66,12 +77,16 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                             Policy Attestations
                         </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
-                            Track staff acknowledgement and attestation of organisational policies
+                            Track staff acknowledgement and attestation of
+                            organisational policies
                         </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/hr/policies" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                        <Link
+                            href="/hr/policies"
+                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                        >
                             Back to Policies
                         </Link>
                     </div>
@@ -83,13 +98,17 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by staff name or policy title..."
                                     value={filters.q || ''}
-                                    onChange={(e) => onFilter({ q: e.target.value })}
+                                    onChange={(e) =>
+                                        onFilter({ q: e.target.value })
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -121,16 +140,27 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline">
-                                                v{att.policy_version.version_number}
+                                                v
+                                                {
+                                                    att.policy_version
+                                                        .version_number
+                                                }
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="font-medium">{att.user.name}</TableCell>
-                                        <TableCell>{formatDateTime(att.attested_at)}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {att.user.name}
+                                        </TableCell>
+                                        <TableCell>
+                                            {formatDateTime(att.attested_at)}
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                                 {!attestations.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={4}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No attestations found.
                                         </TableCell>
                                     </TableRow>

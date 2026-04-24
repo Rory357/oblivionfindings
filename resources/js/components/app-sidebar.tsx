@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -45,8 +46,8 @@ import {
     FlaskConical,
     FolderOpen,
     Fuel,
-    GraduationCap,
     GitBranch,
+    GraduationCap,
     HardHat,
     Heart,
     HeartPulse,
@@ -316,8 +317,7 @@ function buildIconNavItems({
     // should see ONE clear home destination; managers and HR admins keep the
     // traditional `/dashboard`. Dashboard routing itself redirects staff to
     // `/my-day`, so even a stale link stays safe.
-    const isManager =
-        !!can?.shifts?.manageAny || !!can?.timesheets?.manageAny;
+    const isManager = !!can?.shifts?.manageAny || !!can?.timesheets?.manageAny;
     const isHrAdmin = !!can?.hr?.analytics?.view && !can?.shifts?.manageAny;
     const showDashboardHome = isManager || isHrAdmin;
 
@@ -330,19 +330,19 @@ function buildIconNavItems({
         },
         ...(showDashboardHome
             ? [
-                {
-                    id: 'dashboard',
-                    icon: LayoutGrid,
-                    label: 'Dashboard',
-                    href: '/dashboard',
-                } as IconNavItem,
-                {
-                    id: 'today',
-                    icon: ClipboardList,
-                    label: 'Today',
-                    href: '/today',
-                } as IconNavItem,
-            ]
+                  {
+                      id: 'dashboard',
+                      icon: LayoutGrid,
+                      label: 'Dashboard',
+                      href: '/dashboard',
+                  } as IconNavItem,
+                  {
+                      id: 'today',
+                      icon: ClipboardList,
+                      label: 'Today',
+                      href: '/today',
+                  } as IconNavItem,
+              ]
             : []),
         {
             id: 'my-calendar',
@@ -698,7 +698,11 @@ function buildOperationsSubPanelGroups({
     // on `/my-day` and don't need it here.
     const overview: NavItem[] = [];
     if (isManager || can?.operations?.dashboard) {
-        overview.push({ title: 'Dashboard', href: '/operations', icon: LayoutGrid });
+        overview.push({
+            title: 'Dashboard',
+            href: '/operations',
+            icon: LayoutGrid,
+        });
     }
     if (
         isManager ||
@@ -723,7 +727,8 @@ function buildOperationsSubPanelGroups({
             href: '/operations/summaries',
             icon: FileText,
         });
-    if (overview.length > 0) groups.push({ label: 'Overview', items: overview });
+    if (overview.length > 0)
+        groups.push({ label: 'Overview', items: overview });
 
     // Client Management
     const clientLabel = labels?.['client.singular'] ?? 'Client';
@@ -1196,7 +1201,11 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     if (can?.risks?.viewAny || can?.risks?.viewAssigned)
-        compliance.push({ title: 'Risks', href: '/health-safety/risk-assessments', icon: Target });
+        compliance.push({
+            title: 'Risks',
+            href: '/health-safety/risk-assessments',
+            icon: Target,
+        });
     if (can?.privacy?.viewRequests)
         compliance.push({
             title: 'Privacy & GDPR',
@@ -1278,7 +1287,11 @@ function buildFleetAssetsSubPanelGroups({
             icon: AlertTriangle,
         });
     }
-    if (can?.assets?.geofencesManage || can?.geofences?.viewAny || can?.fleet?.viewAny) {
+    if (
+        can?.assets?.geofencesManage ||
+        can?.geofences?.viewAny ||
+        can?.fleet?.viewAny
+    ) {
         assets.items.push({
             title: 'Geofences',
             href: '/fleet-assets/geofences',
@@ -1770,7 +1783,8 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/sites/reports',
             icon: Building2,
         });
-    if (sites.length) groups.push({ label: 'Sites & Facilities', items: sites });
+    if (sites.length)
+        groups.push({ label: 'Sites & Facilities', items: sites });
 
     const hr: NavItem[] = [];
     if (can?.hr?.reports?.view)
@@ -1947,7 +1961,11 @@ function buildSecurityDevicesSubPanelGroups({
             icon: Siren,
         });
     if (can?.securityDevices?.devicesView)
-        items.push({ title: 'CCTV', href: '/security-devices/cctv', icon: Cctv });
+        items.push({
+            title: 'CCTV',
+            href: '/security-devices/cctv',
+            icon: Cctv,
+        });
     if (can?.securityDevices?.devicesView)
         items.push({
             title: 'Tracking Devices',
@@ -2015,9 +2033,7 @@ function buildSecurityDevicesSubPanelGroups({
             icon: FileText,
         });
 
-    return items.length
-        ? [{ label: 'Security & Devices', items }]
-        : [];
+    return items.length ? [{ label: 'Security & Devices', items }] : [];
 }
 
 function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -2028,7 +2044,11 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         label: 'My HR',
         items: [
             { title: 'My HR', href: '/hr/my', icon: Home },
-            { title: 'My Documents', href: '/hr/my/documents', icon: FolderOpen },
+            {
+                title: 'My Documents',
+                href: '/hr/my/documents',
+                icon: FolderOpen,
+            },
             { title: 'My Training', href: '/hr/my/training', icon: Target },
             { title: 'My Payslips', href: '/hr/my/payslips', icon: FileText },
         ],
@@ -2237,8 +2257,16 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     }
     if (can?.hr?.training?.view) {
-        admin.items.push({ title: 'Course Catalog', href: '/hr/training/catalog', icon: BookOpen });
-        admin.items.push({ title: 'Training Dashboard', href: '/hr/compliance/training', icon: GraduationCap });
+        admin.items.push({
+            title: 'Course Catalog',
+            href: '/hr/training/catalog',
+            icon: BookOpen,
+        });
+        admin.items.push({
+            title: 'Training Dashboard',
+            href: '/hr/compliance/training',
+            icon: GraduationCap,
+        });
     }
     if (can?.hr?.assets?.view) {
         admin.items.push({
@@ -2436,12 +2464,16 @@ function SubPanel({
                 <span className="text-sm font-semibold text-sidebar-foreground">
                     {title || 'Menu'}
                 </span>
-                <button
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close menu"
                     onClick={onClose}
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    className="h-6 w-6 rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 >
                     <X className="h-4 w-4" />
-                </button>
+                </Button>
             </div>
 
             {/* Panel groups */}
@@ -2529,7 +2561,7 @@ export function AppSidebar() {
             'security-devices': buildSecurityDevicesSubPanelGroups({ can }),
             'control-room': buildControlRoomSubPanelGroups({ can }),
         }),
-        [can, role],
+        [can, labels, role],
     );
 
     const toggleSubPanel = useCallback((id: string) => {
@@ -2600,20 +2632,23 @@ export function AppSidebar() {
                                     >
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <button
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
                                                     data-sub-panel-trigger
                                                     onClick={() =>
                                                         toggleSubPanel(item.id)
                                                     }
                                                     className={cn(
-                                                        'flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
+                                                        'h-10 w-10 rounded-xl transition-colors',
                                                         active || isPanelOpen
                                                             ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                                                             : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                                     )}
                                                 >
                                                     <item.icon className="h-6 w-6" />
-                                                </button>
+                                                </Button>
                                             </TooltipTrigger>
                                             <TooltipContent side="right">
                                                 {item.label}
@@ -2781,7 +2816,7 @@ export function AppSidebarMobile({
             'security-devices': buildSecurityDevicesSubPanelGroups({ can }),
             'control-room': buildControlRoomSubPanelGroups({ can }),
         }),
-        [can, role],
+        [can, labels, role],
     );
 
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -2789,7 +2824,7 @@ export function AppSidebarMobile({
     // Close on navigation
     useEffect(() => {
         onClose();
-    }, [currentUrl]);
+    }, [currentUrl, onClose]);
 
     if (!open) return null;
 
@@ -2806,12 +2841,16 @@ export function AppSidebarMobile({
                 {/* Close button */}
                 <div className="flex items-center justify-between border-b border-sidebar-border/50 px-4 py-3">
                     <span className="text-sm font-semibold">Menu</span>
-                    <button
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Close menu"
                         onClick={onClose}
-                        className="rounded-md p-1 hover:bg-sidebar-accent"
+                        className="h-8 w-8 rounded-md p-1 hover:bg-sidebar-accent"
                     >
                         <X className="h-5 w-5" />
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="py-2">
@@ -2828,14 +2867,16 @@ export function AppSidebarMobile({
                             const isExpanded = expandedId === item.id;
                             return (
                                 <div key={item.id}>
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
                                         onClick={() =>
                                             setExpandedId(
                                                 isExpanded ? null : item.id,
                                             )
                                         }
                                         className={cn(
-                                            'flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                            'h-auto w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
                                             active
                                                 ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
                                                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
@@ -2849,7 +2890,7 @@ export function AppSidebarMobile({
                                                 isExpanded && 'rotate-90',
                                             )}
                                         />
-                                    </button>
+                                    </Button>
                                     {isExpanded &&
                                         groups?.map((group) => (
                                             <div

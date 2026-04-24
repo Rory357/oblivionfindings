@@ -6,7 +6,9 @@ interface UsePersistedFiltersOptions {
   defaults?: Record<string, any>;
 }
 
-export function usePersistedFilters({ route: routeName, defaults = {} }: UsePersistedFiltersOptions) {
+const EMPTY_FILTER_DEFAULTS: Record<string, any> = {};
+
+export function usePersistedFilters({ route: routeName, defaults = EMPTY_FILTER_DEFAULTS }: UsePersistedFiltersOptions) {
   const params = useMemo(() => {
     const url = new URL(window.location.href);
     const result: Record<string, string> = {};
@@ -14,7 +16,7 @@ export function usePersistedFilters({ route: routeName, defaults = {} }: UsePers
       result[key] = value;
     });
     return { ...defaults, ...result };
-  }, []);
+  }, [defaults]);
 
   const setFilter = useCallback((key: string, value: any) => {
     const url = new URL(window.location.href);

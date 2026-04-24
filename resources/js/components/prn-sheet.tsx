@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Sheet,
@@ -139,11 +140,13 @@ export default function PrnSheet({
         notes: string;
     }>({
         client_medication_id:
-            preselectedClient && medications.length === 1 ? medications[0].id : null,
+            preselectedClient && medications.length === 1
+                ? medications[0].id
+                : null,
         reason: '',
         dose_given:
             preselectedClient && medications.length === 1
-                ? medications[0].dose ?? ''
+                ? (medications[0].dose ?? '')
                 : '',
         notes: '',
     });
@@ -193,9 +196,10 @@ export default function PrnSheet({
 
     const reasonChips = selected ? reasonChipsFor(selected) : [];
 
-    const effectiveReason = reasonChoice === '__other__' || reasonChips.length === 0
-        ? reasonText.trim()
-        : (reasonChoice ?? '');
+    const effectiveReason =
+        reasonChoice === '__other__' || reasonChips.length === 0
+            ? reasonText.trim()
+            : (reasonChoice ?? '');
 
     function pickMed(med: PrnMedication) {
         setSelected(med);
@@ -241,7 +245,10 @@ export default function PrnSheet({
             }).then(() => {
                 // Refresh the page props so `given_last_24h` etc. stay accurate
                 // once the queued record lands. This is a no-op while offline.
-                router.reload({ only: ['prnMedications'], preserveScroll: true });
+                router.reload({
+                    only: ['prnMedications'],
+                    preserveScroll: true,
+                });
                 onOpenChange(false);
             });
             return;
@@ -262,13 +269,14 @@ export default function PrnSheet({
         });
     }
 
-    const canSubmit = !!selected && effectiveReason.length > 0 && !form.processing;
+    const canSubmit =
+        !!selected && effectiveReason.length > 0 && !form.processing;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="flex max-h-[92dvh] flex-col gap-0 rounded-t-2xl p-0 sm:max-w-xl sm:mx-auto"
+                className="flex max-h-[92dvh] flex-col gap-0 rounded-t-2xl p-0 sm:mx-auto sm:max-w-xl"
             >
                 <SheetHeader className="border-b px-4 pt-5 pb-3 text-left">
                     <div className="flex items-center gap-2">
@@ -288,7 +296,9 @@ export default function PrnSheet({
                             <Zap className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">
-                            <SheetTitle className="text-base">Give as-needed med</SheetTitle>
+                            <SheetTitle className="text-base">
+                                Give as-needed med
+                            </SheetTitle>
                             <SheetDescription className="text-xs">
                                 {step === 'pick'
                                     ? preselectedClient
@@ -326,9 +336,13 @@ export default function PrnSheet({
                         onSubmit={submit}
                         submitting={form.processing}
                         canSubmit={canSubmit}
-                        error={form.errors.reason || form.errors.client_medication_id}
+                        error={
+                            form.errors.reason ||
+                            form.errors.client_medication_id
+                        }
                         nullShiftNotice={
-                            preselectedClient && preselectedClient.hasActiveShift === false
+                            preselectedClient &&
+                            preselectedClient.hasActiveShift === false
                         }
                     />
                 )}
@@ -375,7 +389,7 @@ function PickStep({
             {!preselectedClient && (
                 <div className="border-b px-4 py-3">
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             type="search"
                             placeholder="Search client or med"
@@ -398,18 +412,19 @@ function PickStep({
                         {groupedByClient.map(([clientName, meds]) => (
                             <li key={clientName} className="py-1">
                                 {!preselectedClient && (
-                                    <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    <p className="px-4 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                                         {clientName}
                                     </p>
                                 )}
                                 <ul>
                                     {meds.map((med) => (
                                         <li key={med.id}>
-                                            <button
+                                            <Button
                                                 type="button"
+                                                variant="ghost"
                                                 onClick={() => onPick(med)}
                                                 aria-label={`Record as-needed dose of ${med.name} for ${med.client_name}`}
-                                                className="frontline-focus flex w-full min-h-14 items-center gap-3 px-4 py-3 text-left transition hover:bg-accent active:bg-accent/70"
+                                                className="frontline-focus h-auto min-h-14 w-full justify-start gap-3 rounded-none px-4 py-3 text-left font-normal transition hover:bg-accent active:bg-accent/70"
                                             >
                                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                                                     <Pill className="h-4 w-4 text-muted-foreground" />
@@ -422,24 +437,34 @@ function PickStep({
                                                         {med.is_controlled && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="shrink-0 border-primary text-[10px] uppercase tracking-wide text-primary dark:border-primary/30 dark:text-primary/70"
+                                                                className="shrink-0 border-primary text-[10px] tracking-wide text-primary uppercase dark:border-primary/30 dark:text-primary/70"
                                                             >
                                                                 CD
                                                             </Badge>
                                                         )}
                                                     </div>
                                                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                                                        {med.dose && <span>{med.dose}</span>}
+                                                        {med.dose && (
+                                                            <span>
+                                                                {med.dose}
+                                                            </span>
+                                                        )}
                                                         {med.route && (
                                                             <>
-                                                                <span aria-hidden>&middot;</span>
-                                                                <span>{med.route}</span>
+                                                                <span
+                                                                    aria-hidden
+                                                                >
+                                                                    &middot;
+                                                                </span>
+                                                                <span>
+                                                                    {med.route}
+                                                                </span>
                                                             </>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <PrnLimitPill med={med} />
-                                            </button>
+                                            </Button>
                                         </li>
                                     ))}
                                 </ul>
@@ -514,14 +539,17 @@ function RecordStep({
     error?: string;
     nullShiftNotice?: boolean;
 }) {
-    const freeTextShown = reasonChips.length === 0 || reasonChoice === '__other__';
+    const freeTextShown =
+        reasonChips.length === 0 || reasonChoice === '__other__';
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
                 {/* Med summary */}
-                <div className="rounded-lg border bg-card/60 p-3">
-                    <p className="text-xs text-muted-foreground">{med.client_name}</p>
+                <Card className="gap-0 rounded-lg bg-card/60 p-3 shadow-none">
+                    <p className="text-xs text-muted-foreground">
+                        {med.client_name}
+                    </p>
                     <p className="mt-0.5 text-sm font-semibold">{med.name}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                         {med.dose && <span>{med.dose}</span>}
@@ -539,9 +567,11 @@ function RecordStep({
                         )}
                     </div>
                     {med.instructions && (
-                        <p className="mt-2 text-xs text-muted-foreground">{med.instructions}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            {med.instructions}
+                        </p>
                     )}
-                </div>
+                </Card>
 
                 {/* Over-limit banner */}
                 {med.over_limit && (
@@ -549,10 +579,12 @@ function RecordStep({
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical dark:text-status-critical" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-critical dark:text-status-critical">
-                                Already given {med.given_last_24h} of {med.max_per_day} in the last 24 hours
+                                Already given {med.given_last_24h} of{' '}
+                                {med.max_per_day} in the last 24 hours
                             </p>
                             <p className="mt-0.5 text-xs text-status-critical dark:text-status-critical">
-                                Don&rsquo;t give another dose without checking with your supervisor first.
+                                Don&rsquo;t give another dose without checking
+                                with your supervisor first.
                             </p>
                         </div>
                     </div>
@@ -569,9 +601,9 @@ function RecordStep({
                                 Not on shift for this client
                             </p>
                             <p className="mt-0.5 text-xs text-status-info dark:text-status-info">
-                                The dose will still record, but it won&rsquo;t be linked to a
-                                shift. Add a note below if anything about the context
-                                matters.
+                                The dose will still record, but it won&rsquo;t
+                                be linked to a shift. Add a note below if
+                                anything about the context matters.
                             </p>
                         </div>
                     </div>
@@ -579,14 +611,15 @@ function RecordStep({
 
                 {/* Controlled / witness hint */}
                 {med.requires_witness && (
-                    <div className="flex items-start gap-3 rounded-lg border border-primary bg-primary/10/70 p-3 text-sm dark:border-primary/30 dark:bg-primary/20">
+                    <div className="bg-primary/10/70 flex items-start gap-3 rounded-lg border border-primary p-3 text-sm dark:border-primary/30 dark:bg-primary/20">
                         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary/70" />
                         <div className="min-w-0">
                             <p className="font-medium text-primary dark:text-primary/70">
                                 Needs a witness
                             </p>
                             <p className="mt-0.5 text-xs text-primary dark:text-primary/70">
-                                Record this dose on the full MAR with a witness, so the register stays correct.
+                                Record this dose on the full MAR with a witness,
+                                so the register stays correct.
                             </p>
                         </div>
                     </div>
@@ -594,7 +627,9 @@ function RecordStep({
 
                 {/* Why */}
                 <div>
-                    <label className="text-sm font-medium">Why is it needed?</label>
+                    <label className="text-sm font-medium">
+                        Why is it needed?
+                    </label>
                     {reasonChips.length > 0 ? (
                         <div
                             role="radiogroup"
@@ -604,37 +639,33 @@ function RecordStep({
                             {reasonChips.map((chip) => {
                                 const active = reasonChoice === chip;
                                 return (
-                                    <button
+                                    <Button
                                         key={chip}
                                         type="button"
                                         role="radio"
                                         aria-checked={active}
+                                        variant={active ? 'default' : 'outline'}
                                         onClick={() => onReasonChoice(chip)}
-                                        className={
-                                            'frontline-focus min-h-11 rounded-full border px-4 py-2 text-sm transition ' +
-                                            (active
-                                                ? 'border-primary bg-primary text-primary-foreground'
-                                                : 'border-input bg-background hover:bg-accent')
-                                        }
+                                        className="frontline-focus min-h-11 rounded-full px-4 py-2 text-sm transition"
                                     >
                                         {chip}
-                                    </button>
+                                    </Button>
                                 );
                             })}
-                            <button
+                            <Button
                                 type="button"
                                 role="radio"
                                 aria-checked={reasonChoice === '__other__'}
-                                onClick={() => onReasonChoice('__other__')}
-                                className={
-                                    'frontline-focus min-h-11 rounded-full border px-4 py-2 text-sm transition ' +
-                                    (reasonChoice === '__other__'
-                                        ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'border-input bg-background hover:bg-accent')
+                                variant={
+                                    reasonChoice === '__other__'
+                                        ? 'default'
+                                        : 'outline'
                                 }
+                                onClick={() => onReasonChoice('__other__')}
+                                className="frontline-focus min-h-11 rounded-full px-4 py-2 text-sm transition"
                             >
                                 Something else
-                            </button>
+                            </Button>
                         </div>
                     ) : null}
 
@@ -671,8 +702,14 @@ function RecordStep({
                 {/* Note */}
                 <div>
                     <div className="flex items-center justify-between">
-                        <label htmlFor="prn-note" className="text-sm font-medium">
-                            Add a note <span className="text-xs text-muted-foreground">(optional)</span>
+                        <label
+                            htmlFor="prn-note"
+                            className="text-sm font-medium"
+                        >
+                            Add a note{' '}
+                            <span className="text-xs text-muted-foreground">
+                                (optional)
+                            </span>
                         </label>
                         <VoiceInputButton
                             value={notes}

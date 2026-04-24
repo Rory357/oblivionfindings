@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
     Select,
     SelectContent,
@@ -245,12 +246,13 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                                 {INCIDENT_TYPES.map((type) => {
                                     const IconComp = type.icon;
                                     return (
-                                        <button
+                                        <Button
                                             key={type.value}
                                             type="button"
+                                            variant="outline"
                                             onClick={() => form.setData('incident_type', type.value)}
                                             className={cn(
-                                                "flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm transition-all",
+                                                "h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all",
                                                 form.data.incident_type === type.value
                                                     ? 'border-primary bg-primary/10 shadow-md dark:bg-primary/20 dark:border-primary'
                                                     : 'border-transparent bg-muted hover:bg-muted/80 hover:border-muted-foreground/20'
@@ -258,7 +260,7 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                                         >
                                             <IconComp className="h-7 w-7" />
                                             <span className="font-semibold">{type.label}</span>
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -276,19 +278,20 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                         <CardContent>
                             <div className="flex gap-2">
                                 {SEVERITY_LEVELS.map((level) => (
-                                    <button
+                                    <Button
                                         key={level.value}
                                         type="button"
+                                        variant="outline"
                                         onClick={() => form.setData('severity', level.value)}
                                         className={cn(
-                                            "flex-1 rounded-xl border-2 px-3 py-4 text-sm font-bold transition-all text-center",
+                                            "h-auto flex-1 whitespace-normal rounded-xl border-2 px-3 py-4 font-bold transition-all text-center",
                                             form.data.severity === level.value
                                                 ? `${level.color} shadow-md`
                                                 : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80'
                                         )}
                                     >
                                         {level.label}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                             {form.errors.severity && (
@@ -374,7 +377,7 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                                     <div className="font-medium">Police Notified</div>
                                     <div className="text-xs text-muted-foreground">Has the police been notified about this incident?</div>
                                 </Label>
-                                <button type="button" onClick={() => form.setData('police_notified', !form.data.police_notified)} className={cn("h-7 w-12 rounded-full transition-colors", form.data.police_notified ? "bg-primary" : "bg-muted")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data.police_notified ? "translate-x-6" : "translate-x-1")} /></button>
+                                <Switch checked={form.data.police_notified} onCheckedChange={() => form.setData('police_notified', !form.data.police_notified)} />
                             </div>
                             {form.data.police_notified && (
                                 <div className="ml-4">
@@ -392,7 +395,7 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                                     <div className="font-medium">Insurance Claim</div>
                                     <div className="text-xs text-muted-foreground">Has an insurance claim been lodged?</div>
                                 </Label>
-                                <button type="button" onClick={() => form.setData('insurance_claimed', !form.data.insurance_claimed)} className={cn("h-7 w-12 rounded-full transition-colors", form.data.insurance_claimed ? "bg-primary" : "bg-muted")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data.insurance_claimed ? "translate-x-6" : "translate-x-1")} /></button>
+                                <Switch checked={form.data.insurance_claimed} onCheckedChange={() => form.setData('insurance_claimed', !form.data.insurance_claimed)} />
                             </div>
                             {form.data.insurance_claimed && (
                                 <div className="ml-4">

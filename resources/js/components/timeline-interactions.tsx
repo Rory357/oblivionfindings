@@ -77,16 +77,26 @@ export function TimelineInteractions({
     showStaffBadge = false,
 }: Props) {
     const [showComments, setShowComments] = useState(false);
-    const [replyingTo, setReplyingTo] = useState<{ id: number; name: string } | null>(null);
+    const [replyingTo, setReplyingTo] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
     const commentForm = useForm({ body: '', parent_id: null as number | null });
 
-    const totalComments = comments.reduce((sum, c) => sum + 1 + (c.replies?.length ?? 0), 0);
+    const totalComments = comments.reduce(
+        (sum, c) => sum + 1 + (c.replies?.length ?? 0),
+        0,
+    );
 
     const toggleReaction = (emoji: string) => {
-        router.post(reactUrl, { emoji }, {
-            preserveScroll: true,
-            preserveState: true,
-        });
+        router.post(
+            reactUrl,
+            { emoji },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
     };
 
     const submitComment = (e: React.FormEvent) => {
@@ -121,10 +131,14 @@ export function TimelineInteractions({
     };
 
     const toggleLike = (commentId: number) => {
-        router.post(`${likeCommentUrl}/${commentId}/like`, {}, {
-            preserveScroll: true,
-            preserveState: true,
-        });
+        router.post(
+            `${likeCommentUrl}/${commentId}/like`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
     };
 
     return (
@@ -134,11 +148,13 @@ export function TimelineInteractions({
                 {reactions.map((r) => {
                     const isActive = r.user_ids.includes(currentUserId);
                     return (
-                        <button
+                        <Button
                             key={r.emoji}
+                            type="button"
+                            variant="outline"
                             onClick={() => canReact && toggleReaction(r.emoji)}
                             disabled={!canReact}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors hover:bg-muted ${
+                            className={`h-auto gap-1 rounded-full px-2 py-0.5 text-xs transition-colors hover:bg-muted ${
                                 isActive
                                     ? 'border-primary/50 bg-primary/5'
                                     : 'border-border'
@@ -146,45 +162,56 @@ export function TimelineInteractions({
                         >
                             <span>{r.emoji}</span>
                             <span className="font-medium">{r.count}</span>
-                        </button>
+                        </Button>
                     );
                 })}
 
                 {canReact && (
                     <Popover>
                         <PopoverTrigger asChild>
-                            <button className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:bg-muted">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="h-auto gap-1 rounded-full border-dashed px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:bg-muted"
+                            >
                                 <Smile className="h-3 w-3" />
                                 <span>+</span>
-                            </button>
+                            </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-2" align="start">
                             <div className="grid grid-cols-3 gap-1">
                                 {ALLOWED_REACTIONS.map((emoji) => (
-                                    <button
+                                    <Button
                                         key={emoji}
+                                        type="button"
+                                        variant="ghost"
                                         onClick={() => toggleReaction(emoji)}
-                                        className="rounded-lg p-2 text-lg transition-colors hover:bg-muted"
+                                        className="h-auto rounded-lg p-2 text-lg transition-colors hover:bg-muted"
                                     >
                                         {emoji}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </PopoverContent>
                     </Popover>
                 )}
 
-                <button
+                <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => setShowComments(!showComments)}
-                    className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    className="ml-auto h-auto gap-1 p-0 text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                     <MessageSquare className="h-3 w-3" />
                     {totalComments > 0 ? (
-                        <span>{totalComments} comment{totalComments !== 1 ? 's' : ''}</span>
+                        <span>
+                            {totalComments} comment
+                            {totalComments !== 1 ? 's' : ''}
+                        </span>
                     ) : (
                         <span>Comment</span>
                     )}
-                </button>
+                </Button>
             </div>
 
             {/* Comments Section */}
@@ -199,25 +226,38 @@ export function TimelineInteractions({
                                         currentUserId={currentUserId}
                                         showStaffBadge={showStaffBadge}
                                         onDelete={deleteComment}
-                                        onReply={canComment ? startReply : undefined}
+                                        onReply={
+                                            canComment ? startReply : undefined
+                                        }
                                         onToggleLike={toggleLike}
                                     />
                                     {/* Replies */}
-                                    {comment.replies && comment.replies.length > 0 && (
-                                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-muted pl-3">
-                                            {comment.replies.map((reply) => (
-                                                <CommentRow
-                                                    key={reply.id}
-                                                    comment={reply}
-                                                    currentUserId={currentUserId}
-                                                    showStaffBadge={showStaffBadge}
-                                                    onDelete={deleteComment}
-                                                    onToggleLike={toggleLike}
-                                                    isReply
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
+                                    {comment.replies &&
+                                        comment.replies.length > 0 && (
+                                            <div className="mt-1 ml-6 space-y-1 border-l-2 border-muted pl-3">
+                                                {comment.replies.map(
+                                                    (reply) => (
+                                                        <CommentRow
+                                                            key={reply.id}
+                                                            comment={reply}
+                                                            currentUserId={
+                                                                currentUserId
+                                                            }
+                                                            showStaffBadge={
+                                                                showStaffBadge
+                                                            }
+                                                            onDelete={
+                                                                deleteComment
+                                                            }
+                                                            onToggleLike={
+                                                                toggleLike
+                                                            }
+                                                            isReply
+                                                        />
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
                                 </div>
                             ))}
                         </div>
@@ -230,23 +270,45 @@ export function TimelineInteractions({
                                 <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                                     <Reply className="h-3 w-3" />
                                     Replying to {replyingTo.name}
-                                    <button onClick={cancelReply} className="ml-1 text-primary hover:underline">Cancel</button>
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={cancelReply}
+                                        className="ml-1 h-auto p-0 text-xs"
+                                    >
+                                        Cancel
+                                    </Button>
                                 </div>
                             )}
-                            <form onSubmit={submitComment} className="flex gap-2">
+                            <form
+                                onSubmit={submitComment}
+                                className="flex gap-2"
+                            >
                                 <input
                                     type="text"
-                                    placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : 'Leave a comment...'}
+                                    placeholder={
+                                        replyingTo
+                                            ? `Reply to ${replyingTo.name}...`
+                                            : 'Leave a comment...'
+                                    }
                                     value={commentForm.data.body}
-                                    onChange={(e) => commentForm.setData('body', e.target.value)}
-                                    className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                    onChange={(e) =>
+                                        commentForm.setData(
+                                            'body',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
                                     maxLength={1000}
                                 />
                                 <Button
                                     type="submit"
                                     size="sm"
                                     className="h-8 px-3"
-                                    disabled={commentForm.processing || !commentForm.data.body.trim()}
+                                    disabled={
+                                        commentForm.processing ||
+                                        !commentForm.data.body.trim()
+                                    }
                                 >
                                     <Send className="h-3 w-3" />
                                 </Button>
@@ -295,51 +357,69 @@ function CommentRow({
                 <div className="min-w-0 flex-1">
                     <p className="text-xs">
                         <span className="font-medium">{comment.user_name}</span>
-                        {showStaffBadge && (
-                            comment.is_staff ? (
-                                <Badge variant="outline" className="ml-1 text-[9px] border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
+                        {showStaffBadge &&
+                            (comment.is_staff ? (
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 border-status-info/30 bg-status-info-bg text-[9px] text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info"
+                                >
                                     Staff
                                 </Badge>
                             ) : (
-                                <Badge variant="outline" className="ml-1 text-[9px] border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 border-status-warning/30 bg-status-warning-bg text-[9px] text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
+                                >
                                     Family
                                 </Badge>
-                            )
-                        )}
-                        <span className="ml-2 text-muted-foreground">{relativeTime(comment.created_at)}</span>
+                            ))}
+                        <span className="ml-2 text-muted-foreground">
+                            {relativeTime(comment.created_at)}
+                        </span>
                     </p>
                     <p className="mt-0.5 text-sm">{comment.body}</p>
                     {/* Actions: Like, Reply */}
                     <div className="mt-1 flex items-center gap-3">
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
                             onClick={() => onToggleLike(comment.id)}
-                            className={`inline-flex items-center gap-1 text-[11px] transition-colors ${
+                            className={`h-auto gap-1 p-0 text-[11px] transition-colors ${
                                 isLiked
                                     ? 'text-status-critical'
                                     : 'text-muted-foreground hover:text-status-critical'
                             }`}
                         >
-                            <Heart className={`h-3 w-3 ${isLiked ? 'fill-rose-500' : ''}`} />
+                            <Heart
+                                className={`h-3 w-3 ${isLiked ? 'fill-rose-500' : ''}`}
+                            />
                             {likesCount > 0 && <span>{likesCount}</span>}
-                        </button>
+                        </Button>
                         {onReply && !isReply && (
-                            <button
-                                onClick={() => onReply(comment.id, comment.user_name)}
-                                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() =>
+                                    onReply(comment.id, comment.user_name)
+                                }
+                                className="h-auto gap-1 p-0 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                             >
                                 <Reply className="h-3 w-3" />
                                 Reply
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>
                 {comment.user_id === currentUserId && (
-                    <button
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => onDelete(comment.id)}
-                        className="shrink-0 text-muted-foreground/50 transition-colors hover:text-status-critical"
+                        className="h-6 w-6 shrink-0 text-muted-foreground/50 transition-colors hover:text-status-critical"
                     >
                         <Trash2 className="h-3 w-3" />
-                    </button>
+                    </Button>
                 )}
             </div>
         </div>

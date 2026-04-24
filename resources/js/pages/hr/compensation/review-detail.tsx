@@ -1,15 +1,28 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Check, X, Play } from 'lucide-react';
-import { useState, FormEvent } from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { ArrowLeft, Play, X } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -62,14 +75,23 @@ type Props = {
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const formatCurrency = (value: string | null) => {
     if (!value) return '-';
     const num = parseFloat(value);
     if (Number.isNaN(num)) return value;
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(num);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(num);
 };
 
 const getStatusColor = (status: string) => {
@@ -93,21 +115,35 @@ const getStatusColor = (status: string) => {
 
 const getCycleLabel = (cycle: string) => {
     switch (cycle) {
-        case 'annual': return 'Annual';
-        case 'mid_year': return 'Mid-Year';
-        case 'ad_hoc': return 'Ad Hoc';
-        default: return cycle;
+        case 'annual':
+            return 'Annual';
+        case 'mid_year':
+            return 'Mid-Year';
+        case 'ad_hoc':
+            return 'Ad Hoc';
+        default:
+            return cycle;
     }
 };
 
-export default function CompensationReviewDetail({ review, employees, reviewCycles, can }: Props) {
+export default function CompensationReviewDetail({
+    review,
+    employees,
+    reviewCycles,
+    can,
+}: Props) {
     const isNew = !review;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Compensation', href: '/hr/compensation/bands' },
         { title: 'Reviews', href: '/hr/compensation/reviews' },
-        { title: isNew ? 'New Review' : review.title, href: isNew ? '/hr/compensation/reviews/create' : `/hr/compensation/reviews/${review.id}` },
+        {
+            title: isNew ? 'New Review' : review.title,
+            href: isNew
+                ? '/hr/compensation/reviews/create'
+                : `/hr/compensation/reviews/${review.id}`,
+        },
     ];
 
     const [form, setForm] = useState({
@@ -125,18 +161,22 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
         }>,
     });
 
-    const set = (key: string, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
+    const set = (key: string, value: any) =>
+        setForm((prev) => ({ ...prev, [key]: value }));
 
     const addItem = () => {
         setForm((prev) => ({
             ...prev,
-            items: [...prev.items, {
-                employee_profile_id: '',
-                current_salary: '',
-                proposed_salary: '',
-                change_percentage: '',
-                justification: '',
-            }],
+            items: [
+                ...prev.items,
+                {
+                    employee_profile_id: '',
+                    current_salary: '',
+                    proposed_salary: '',
+                    change_percentage: '',
+                    justification: '',
+                },
+            ],
         }));
     };
 
@@ -150,7 +190,10 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                 const current = parseFloat(items[idx].current_salary);
                 const proposed = parseFloat(items[idx].proposed_salary);
                 if (current > 0 && proposed > 0) {
-                    items[idx].change_percentage = (((proposed - current) / current) * 100).toFixed(2);
+                    items[idx].change_percentage = (
+                        ((proposed - current) / current) *
+                        100
+                    ).toFixed(2);
                 }
             }
 
@@ -179,7 +222,12 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
     };
 
     const applyReview = () => {
-        if (review && confirm('Apply this compensation review? This will update all approved employee salaries.')) {
+        if (
+            review &&
+            confirm(
+                'Apply this compensation review? This will update all approved employee salaries.',
+            )
+        ) {
             router.post(`/hr/compensation/reviews/${review.id}/apply`);
         }
     };
@@ -197,91 +245,219 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                 Back
                             </Button>
                         </Link>
-                        <h1 className="text-lg font-semibold">New Compensation Review</h1>
+                        <h1 className="text-lg font-semibold">
+                            New Compensation Review
+                        </h1>
                     </div>
 
                     <form onSubmit={submitCreate} className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Review Details</CardTitle>
+                                <CardTitle className="text-base">
+                                    Review Details
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
                                         <Label>Title</Label>
-                                        <Input value={form.title} onChange={(e) => set('title', e.target.value)} required />
+                                        <Input
+                                            value={form.title}
+                                            onChange={(e) =>
+                                                set('title', e.target.value)
+                                            }
+                                            required
+                                        />
                                     </div>
                                     <div>
                                         <Label>Review Cycle</Label>
-                                        <Select value={form.review_cycle} onValueChange={(v) => set('review_cycle', v)}>
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <Select
+                                            value={form.review_cycle}
+                                            onValueChange={(v) =>
+                                                set('review_cycle', v)
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
                                             <SelectContent>
                                                 {reviewCycles.map((c) => (
-                                                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                                    <SelectItem
+                                                        key={c.value}
+                                                        value={c.value}
+                                                    >
+                                                        {c.label}
+                                                    </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <div>
                                         <Label>Effective Date</Label>
-                                        <Input type="date" value={form.effective_date} onChange={(e) => set('effective_date', e.target.value)} required />
+                                        <Input
+                                            type="date"
+                                            value={form.effective_date}
+                                            onChange={(e) =>
+                                                set(
+                                                    'effective_date',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
                                     </div>
                                     <div>
                                         <Label>Budget Amount</Label>
-                                        <Input type="number" step="0.01" value={form.budget_amount} onChange={(e) => set('budget_amount', e.target.value)} />
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            value={form.budget_amount}
+                                            onChange={(e) =>
+                                                set(
+                                                    'budget_amount',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
                                     </div>
                                 </div>
                                 <div>
                                     <Label>Notes</Label>
-                                    <Textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={3} />
+                                    <Textarea
+                                        value={form.notes}
+                                        onChange={(e) =>
+                                            set('notes', e.target.value)
+                                        }
+                                        rows={3}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
 
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">Employee Adjustments</CardTitle>
-                                <Button type="button" size="sm" variant="outline" onClick={addItem}>Add Employee</Button>
+                                <CardTitle className="text-base">
+                                    Employee Adjustments
+                                </CardTitle>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={addItem}
+                                >
+                                    Add Employee
+                                </Button>
                             </CardHeader>
                             <CardContent>
                                 {form.items.length === 0 && (
                                     <p className="py-4 text-center text-sm text-muted-foreground">
-                                        No employees added yet. Click "Add Employee" to begin.
+                                        No employees added yet. Click "Add
+                                        Employee" to begin.
                                     </p>
                                 )}
                                 {form.items.map((item, idx) => (
-                                    <div key={idx} className="mb-4 grid grid-cols-6 gap-3 rounded-md border p-3">
+                                    <div
+                                        key={idx}
+                                        className="mb-4 grid grid-cols-6 gap-3 rounded-md border p-3"
+                                    >
                                         <div className="col-span-2">
-                                            <Label className="text-xs">Employee</Label>
-                                            <Select value={item.employee_profile_id} onValueChange={(v) => onEmployeeSelect(idx, v)}>
-                                                <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                            <Label className="text-xs">
+                                                Employee
+                                            </Label>
+                                            <Select
+                                                value={item.employee_profile_id}
+                                                onValueChange={(v) =>
+                                                    onEmployeeSelect(idx, v)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select..." />
+                                                </SelectTrigger>
                                                 <SelectContent>
                                                     {employees.map((emp) => (
-                                                        <SelectItem key={emp.id} value={String(emp.id)}>{emp.user.name}</SelectItem>
+                                                        <SelectItem
+                                                            key={emp.id}
+                                                            value={String(
+                                                                emp.id,
+                                                            )}
+                                                        >
+                                                            {emp.user.name}
+                                                        </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
                                         </div>
                                         <div>
-                                            <Label className="text-xs">Current Salary</Label>
-                                            <Input type="number" step="0.01" value={item.current_salary} onChange={(e) => updateItem(idx, 'current_salary', e.target.value)} />
+                                            <Label className="text-xs">
+                                                Current Salary
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={item.current_salary}
+                                                onChange={(e) =>
+                                                    updateItem(
+                                                        idx,
+                                                        'current_salary',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
                                         <div>
-                                            <Label className="text-xs">Proposed Salary</Label>
-                                            <Input type="number" step="0.01" value={item.proposed_salary} onChange={(e) => updateItem(idx, 'proposed_salary', e.target.value)} />
+                                            <Label className="text-xs">
+                                                Proposed Salary
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={item.proposed_salary}
+                                                onChange={(e) =>
+                                                    updateItem(
+                                                        idx,
+                                                        'proposed_salary',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
                                         <div>
-                                            <Label className="text-xs">Change %</Label>
-                                            <Input type="number" step="0.01" value={item.change_percentage} readOnly className="bg-muted" />
+                                            <Label className="text-xs">
+                                                Change %
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={item.change_percentage}
+                                                readOnly
+                                                className="bg-muted"
+                                            />
                                         </div>
                                         <div className="flex items-end">
-                                            <Button type="button" size="sm" variant="outline" onClick={() => removeItem(idx)}>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => removeItem(idx)}
+                                            >
                                                 <X className="h-4 w-4" />
                                             </Button>
                                         </div>
                                         <div className="col-span-6">
-                                            <Label className="text-xs">Justification</Label>
-                                            <Input value={item.justification} onChange={(e) => updateItem(idx, 'justification', e.target.value)} placeholder="Reason for change..." />
+                                            <Label className="text-xs">
+                                                Justification
+                                            </Label>
+                                            <Input
+                                                value={item.justification}
+                                                onChange={(e) =>
+                                                    updateItem(
+                                                        idx,
+                                                        'justification',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Reason for change..."
+                                            />
                                         </div>
                                     </div>
                                 ))}
@@ -312,11 +488,18 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-lg font-semibold">{review.title}</h1>
+                            <h1 className="text-lg font-semibold">
+                                {review.title}
+                            </h1>
                             <div className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
-                                <span>{getCycleLabel(review.review_cycle)}</span>
+                                <span>
+                                    {getCycleLabel(review.review_cycle)}
+                                </span>
                                 <span>&middot;</span>
-                                <span>Effective {formatDate(review.effective_date)}</span>
+                                <span>
+                                    Effective{' '}
+                                    {formatDate(review.effective_date)}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -340,20 +523,32 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 {review.budget_amount && (
                                     <div>
-                                        <span className="text-sm text-muted-foreground">Budget Amount</span>
-                                        <div className="text-lg font-semibold">{formatCurrency(review.budget_amount)}</div>
+                                        <span className="text-sm text-muted-foreground">
+                                            Budget Amount
+                                        </span>
+                                        <div className="text-lg font-semibold">
+                                            {formatCurrency(
+                                                review.budget_amount,
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                                 {review.creator && (
                                     <div>
-                                        <span className="text-sm text-muted-foreground">Created By</span>
-                                        <div className="text-sm font-medium">{review.creator.name}</div>
+                                        <span className="text-sm text-muted-foreground">
+                                            Created By
+                                        </span>
+                                        <div className="text-sm font-medium">
+                                            {review.creator.name}
+                                        </div>
                                     </div>
                                 )}
                             </div>
                             {review.notes && (
                                 <div className="mt-3">
-                                    <span className="text-sm text-muted-foreground">Notes</span>
+                                    <span className="text-sm text-muted-foreground">
+                                        Notes
+                                    </span>
                                     <p className="text-sm">{review.notes}</p>
                                 </div>
                             )}
@@ -363,7 +558,9 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Employee Adjustments ({review.items.length})</CardTitle>
+                        <CardTitle className="text-base">
+                            Employee Adjustments ({review.items.length})
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
@@ -382,20 +579,45 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                 {review.items.map((item) => (
                                     <TableRow key={item.id}>
                                         <TableCell className="font-medium">
-                                            {item.employee_profile?.user?.name ?? 'Unknown'}
+                                            {item.employee_profile?.user
+                                                ?.name ?? 'Unknown'}
                                         </TableCell>
-                                        <TableCell>{formatCurrency(item.current_salary)}</TableCell>
-                                        <TableCell className="font-medium">{formatCurrency(item.proposed_salary)}</TableCell>
                                         <TableCell>
-                                            <span className={item.change_percentage > 0 ? 'text-status-success' : item.change_percentage < 0 ? 'text-status-critical' : ''}>
-                                                {item.change_percentage > 0 ? '+' : ''}{item.change_percentage}%
+                                            {formatCurrency(
+                                                item.current_salary,
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {formatCurrency(
+                                                item.proposed_salary,
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <span
+                                                className={
+                                                    item.change_percentage > 0
+                                                        ? 'text-status-success'
+                                                        : item.change_percentage <
+                                                            0
+                                                          ? 'text-status-critical'
+                                                          : ''
+                                                }
+                                            >
+                                                {item.change_percentage > 0
+                                                    ? '+'
+                                                    : ''}
+                                                {item.change_percentage}%
                                             </span>
                                         </TableCell>
                                         <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
                                             {item.justification ?? '-'}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={getStatusColor(item.status)}>
+                                            <Badge
+                                                className={getStatusColor(
+                                                    item.status,
+                                                )}
+                                            >
                                                 {item.status}
                                             </Badge>
                                         </TableCell>
@@ -406,7 +628,10 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                 ))}
                                 {!review.items.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No employees in this review.
                                         </TableCell>
                                     </TableRow>

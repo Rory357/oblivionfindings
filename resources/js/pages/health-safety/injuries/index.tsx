@@ -1,4 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { HeartPulse, ClipboardList, CalendarX, Clock } from 'lucide-react';
+import { HeartPulse } from 'lucide-react';
 
 type Injury = {
     id: number;
@@ -81,14 +81,21 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
     const ANY = '__any__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/health-safety/injuries', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/health-safety/injuries',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Injuries & Return to Work', href: '/health-safety/injuries' },
+                {
+                    title: 'Injuries & Return to Work',
+                    href: '/health-safety/injuries',
+                },
             ]}
         >
             <Head title="Injuries & Return to Work" />
@@ -100,9 +107,15 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                     description="Track workplace injuries, RTW plans, and capacity assessments"
                     icon={<HeartPulse className="h-7 w-7 text-white" />}
                     stats={[
-                        { label: 'Active Injuries', value: stats.active_injuries },
+                        {
+                            label: 'Active Injuries',
+                            value: stats.active_injuries,
+                        },
                         { label: 'RTW Plans', value: stats.active_rtw_plans },
-                        { label: 'Lost Days (30d)', value: stats.lost_days_30d },
+                        {
+                            label: 'Lost Days (30d)',
+                            value: stats.lost_days_30d,
+                        },
                         { label: 'Pending', value: stats.pending_assessments },
                     ]}
                     actions={
@@ -119,43 +132,73 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Worker name"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="open">Open</SelectItem>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="recovering">Recovering</SelectItem>
-                                    <SelectItem value="returned_to_work">Returned to Work</SelectItem>
-                                    <SelectItem value="closed">Closed</SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="recovering">
+                                        Recovering
+                                    </SelectItem>
+                                    <SelectItem value="returned_to_work">
+                                        Returned to Work
+                                    </SelectItem>
+                                    <SelectItem value="closed">
+                                        Closed
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Severity</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Severity
+                            </Label>
                             <Select
                                 value={filters.severity ?? ANY}
-                                onValueChange={(v) => onFilter({ severity: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ severity: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Severity" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Severity" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="minor">Minor</SelectItem>
-                                    <SelectItem value="moderate">Moderate</SelectItem>
-                                    <SelectItem value="serious">Serious</SelectItem>
-                                    <SelectItem value="critical">Critical</SelectItem>
+                                    <SelectItem value="moderate">
+                                        Moderate
+                                    </SelectItem>
+                                    <SelectItem value="serious">
+                                        Serious
+                                    </SelectItem>
+                                    <SelectItem value="critical">
+                                        Critical
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -169,40 +212,87 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="pb-2 pr-4 font-medium">Worker</th>
-                                        <th className="pb-2 pr-4 font-medium">Date</th>
-                                        <th className="pb-2 pr-4 font-medium">Type</th>
-                                        <th className="pb-2 pr-4 font-medium">Body Part</th>
-                                        <th className="pb-2 pr-4 font-medium">Severity</th>
-                                        <th className="pb-2 pr-4 font-medium">Status</th>
-                                        <th className="pb-2 pr-4 font-medium">Lost Days</th>
-                                        <th className="pb-2 pr-4 font-medium">ACC Claim</th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Worker
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Date
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Type
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Body Part
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Severity
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Lost Days
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            ACC Claim
+                                        </th>
                                         <th className="pb-2 font-medium"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {injuries.data.map((inj) => (
-                                        <tr key={inj.id} className="border-b last:border-0">
-                                            <td className="py-2 pr-4 font-medium">{inj.user?.name ?? 'Unknown'}</td>
-                                            <td className="py-2 pr-4">
-                                                {new Date(inj.injury_date).toLocaleDateString('en-GB')}
-                                            </td>
-                                            <td className="py-2 pr-4 capitalize">{inj.injury_type.replace(/_/g, ' ')}</td>
-                                            <td className="py-2 pr-4">{inj.body_part_affected ?? '-'}</td>
-                                            <td className="py-2 pr-4">
-                                                <Badge className={severityColor(inj.severity)}>{inj.severity}</Badge>
+                                        <tr
+                                            key={inj.id}
+                                            className="border-b last:border-0"
+                                        >
+                                            <td className="py-2 pr-4 font-medium">
+                                                {inj.user?.name ?? 'Unknown'}
                                             </td>
                                             <td className="py-2 pr-4">
-                                                <Badge className={statusColor(inj.status)}>{inj.status}</Badge>
+                                                {new Date(
+                                                    inj.injury_date,
+                                                ).toLocaleDateString('en-GB')}
                                             </td>
-                                            <td className="py-2 pr-4">{inj.lost_time_days}</td>
+                                            <td className="py-2 pr-4 capitalize">
+                                                {inj.injury_type.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {inj.body_part_affected ?? '-'}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                <Badge
+                                                    className={severityColor(
+                                                        inj.severity,
+                                                    )}
+                                                >
+                                                    {inj.severity}
+                                                </Badge>
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                <Badge
+                                                    className={statusColor(
+                                                        inj.status,
+                                                    )}
+                                                >
+                                                    {inj.status}
+                                                </Badge>
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {inj.lost_time_days}
+                                            </td>
                                             <td className="py-2 pr-4">
                                                 {inj.acc_claim_lodged ? (
                                                     <Badge className="bg-status-info-bg text-status-info">
-                                                        {inj.acc_claim_number ?? 'Lodged'}
+                                                        {inj.acc_claim_number ??
+                                                            'Lodged'}
                                                     </Badge>
                                                 ) : (
-                                                    <span className="text-xs text-muted-foreground">No</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        No
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="py-2">
@@ -230,11 +320,24 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                 {injuries?.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {injuries.links.map((l) => (
-                            <button
+                            <Button
+                                type="button"
                                 key={l.label}
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
+                                className="text-xs"
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

@@ -1,25 +1,44 @@
-import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, router } from '@inertiajs/react';
-import FullCalendar from '@fullcalendar/react';
+import AppLayout from '@/layouts/app-layout';
+import type {
+    DateSelectArg,
+    DatesSetArg,
+    EventClickArg,
+    EventDropArg,
+} from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import listPlugin from '@fullcalendar/list';
-import interactionPlugin from '@fullcalendar/interaction';
-import type { EventClickArg, DatesSetArg, DateSelectArg, EventDropArg } from '@fullcalendar/core';
 import type { EventResizeDoneArg } from '@fullcalendar/interaction';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import interactionPlugin from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
+import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import { Head, Link, router } from '@inertiajs/react';
 import {
-    Calendar, CalendarDays, ChevronLeft, ChevronRight, Clock, ListTodo,
-    MapPin, MoreHorizontal, Palmtree, Pill, Plus, Shield, X,
+    Calendar,
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    ListTodo,
+    MapPin,
+    Palmtree,
+    Pill,
+    Plus,
+    Shield,
 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,17 +52,46 @@ const views: { key: ViewKey; label: string }[] = [
 ];
 
 const categories = [
-    { bg: 'bg-status-info-bg dark:bg-status-info', dot: 'bg-status-info', label: 'Shifts', icon: CalendarDays },
-    { bg: 'bg-status-success-bg dark:bg-status-success', dot: 'bg-status-success', label: 'In Progress', icon: Clock },
-    { bg: 'bg-status-warning-bg dark:bg-status-warning', dot: 'bg-status-warning', label: 'Medications', icon: Pill },
-    { bg: 'bg-status-success-bg dark:bg-status-success', dot: 'bg-status-success', label: 'Leave', icon: Palmtree },
-    { bg: 'bg-primary/10 dark:bg-primary/40', dot: 'bg-primary', label: 'Tasks', icon: ListTodo },
+    {
+        bg: 'bg-status-info-bg dark:bg-status-info',
+        dot: 'bg-status-info',
+        label: 'Shifts',
+        icon: CalendarDays,
+    },
+    {
+        bg: 'bg-status-success-bg dark:bg-status-success',
+        dot: 'bg-status-success',
+        label: 'In Progress',
+        icon: Clock,
+    },
+    {
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        dot: 'bg-status-warning',
+        label: 'Medications',
+        icon: Pill,
+    },
+    {
+        bg: 'bg-status-success-bg dark:bg-status-success',
+        dot: 'bg-status-success',
+        label: 'Leave',
+        icon: Palmtree,
+    },
+    {
+        bg: 'bg-primary/10 dark:bg-primary/40',
+        dot: 'bg-primary',
+        label: 'Tasks',
+        icon: ListTodo,
+    },
 ];
 
 // ── CSRF helper ───────────────────────────────────────────────────────────────
 
 function getCsrfToken() {
-    return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content;
+    return (
+        document.querySelector(
+            'meta[name="csrf-token"]',
+        ) as HTMLMetaElement | null
+    )?.content;
 }
 
 // ── CSS overrides ─────────────────────────────────────────────────────────────
@@ -152,31 +200,42 @@ const calendarStyles = `
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function pad2(n: number) { return String(n).padStart(2, '0'); }
+function pad2(n: number) {
+    return String(n).padStart(2, '0');
+}
 function toLocalISO(d: Date) {
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 // ── Event renderer ────────────────────────────────────────────────────────────
 
-function renderEventContent(eventInfo: { event: any; view: any; timeText: string }) {
+function renderEventContent(eventInfo: {
+    event: any;
+    view: any;
+    timeText: string;
+}) {
     const props = eventInfo.event.extendedProps;
     const isTime = eventInfo.view.type.includes('timeGrid');
     const isDay = eventInfo.view.type === 'timeGridDay';
 
     return (
         <div className="flex h-full flex-col overflow-hidden">
-            <span className={`truncate font-bold leading-tight ${isDay ? 'text-sm' : 'text-xs'}`}>
+            <span
+                className={`truncate leading-tight font-bold ${isDay ? 'text-sm' : 'text-xs'}`}
+            >
                 {eventInfo.event.title}
             </span>
             {isTime && (
-                <span className={`truncate opacity-70 ${isDay ? 'text-xs' : 'text-[10px]'}`}>
+                <span
+                    className={`truncate opacity-70 ${isDay ? 'text-xs' : 'text-[10px]'}`}
+                >
                     {eventInfo.timeText}
                 </span>
             )}
             {isTime && props.location && (
                 <span className="mt-auto flex items-center gap-0.5 truncate text-[10px] opacity-50">
-                    <MapPin className="h-2.5 w-2.5 shrink-0" />{props.location}
+                    <MapPin className="h-2.5 w-2.5 shrink-0" />
+                    {props.location}
                 </span>
             )}
         </div>
@@ -191,7 +250,12 @@ export default function MyCalendar() {
     const [title, setTitle] = useState('');
 
     // Context menu state
-    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; date: Date; endDate?: Date } | null>(null);
+    const [ctxMenu, setCtxMenu] = useState<{
+        x: number;
+        y: number;
+        date: Date;
+        endDate?: Date;
+    } | null>(null);
     // Create event dialog
     const [createOpen, setCreateOpen] = useState(false);
     const [createType, setCreateType] = useState<'shift' | 'task'>('shift');
@@ -208,7 +272,10 @@ export default function MyCalendar() {
     }, []);
 
     // ── Navigation ────────────────────────────────────────────────────────────
-    const goToday = useCallback(() => calendarRef.current?.getApi().today(), []);
+    const goToday = useCallback(
+        () => calendarRef.current?.getApi().today(),
+        [],
+    );
     const goPrev = useCallback(() => calendarRef.current?.getApi().prev(), []);
     const goNext = useCallback(() => calendarRef.current?.getApi().next(), []);
     const changeView = useCallback((view: ViewKey) => {
@@ -224,8 +291,12 @@ export default function MyCalendar() {
 
     const handleEventClick = useCallback((info: EventClickArg) => {
         const t = info.event.extendedProps.type;
-        if (t === 'shift') router.visit(`/clients/${info.event.extendedProps.client_id}`);
-        if (t === 'task') router.visit(`/control-room/alerts/${info.event.extendedProps.alert_id}`);
+        if (t === 'shift')
+            router.visit(`/clients/${info.event.extendedProps.client_id}`);
+        if (t === 'task')
+            router.visit(
+                `/control-room/alerts/${info.event.extendedProps.alert_id}`,
+            );
     }, []);
 
     // Drag to select → open context menu or create dialog
@@ -243,7 +314,12 @@ export default function MyCalendar() {
     const handleDateRightClick = useCallback((e: React.MouseEvent) => {
         // Only handle right-click on the calendar grid
         const target = e.target as HTMLElement;
-        if (!target.closest('.fc-timegrid-slot-lane, .fc-daygrid-day, .fc-timegrid-col')) return;
+        if (
+            !target.closest(
+                '.fc-timegrid-slot-lane, .fc-daygrid-day, .fc-timegrid-col',
+            )
+        )
+            return;
         e.preventDefault();
         setCtxMenu({ x: e.clientX, y: e.clientY, date: new Date() });
     }, []);
@@ -251,13 +327,20 @@ export default function MyCalendar() {
     // Event drag & drop (move)
     const handleEventDrop = useCallback(async (info: EventDropArg) => {
         const type = info.event.extendedProps.type;
-        if (type !== 'shift') { info.revert(); return; }
+        if (type !== 'shift') {
+            info.revert();
+            return;
+        }
         const shiftId = info.event.id.replace('shift-', '');
         try {
             const token = getCsrfToken();
             const res = await fetch(`/calendar/shifts/${shiftId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(token ? { 'X-CSRF-TOKEN': token } : {}) },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+                },
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     starts_at: info.event.start?.toISOString(),
@@ -265,24 +348,37 @@ export default function MyCalendar() {
                 }),
             });
             if (!res.ok) info.revert();
-        } catch { info.revert(); }
+        } catch {
+            info.revert();
+        }
     }, []);
 
     // Event resize
     const handleEventResize = useCallback(async (info: EventResizeDoneArg) => {
         const type = info.event.extendedProps.type;
-        if (type !== 'shift') { info.revert(); return; }
+        if (type !== 'shift') {
+            info.revert();
+            return;
+        }
         const shiftId = info.event.id.replace('shift-', '');
         try {
             const token = getCsrfToken();
             const res = await fetch(`/calendar/shifts/${shiftId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(token ? { 'X-CSRF-TOKEN': token } : {}) },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+                },
                 credentials: 'same-origin',
-                body: JSON.stringify({ ends_at: info.event.end?.toISOString() }),
+                body: JSON.stringify({
+                    ends_at: info.event.end?.toISOString(),
+                }),
             });
             if (!res.ok) info.revert();
-        } catch { info.revert(); }
+        } catch {
+            info.revert();
+        }
     }, []);
 
     const fetchEvents = useCallback(
@@ -292,10 +388,13 @@ export default function MyCalendar() {
                     start: info.startStr,
                     end: info.endStr,
                 });
-                const res = await fetch(`/my-calendar/events?${params.toString()}`, {
-                    credentials: 'same-origin',
-                    headers: { 'Accept': 'application/json' },
-                });
+                const res = await fetch(
+                    `/my-calendar/events?${params.toString()}`,
+                    {
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' },
+                    },
+                );
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 successCallback(data);
@@ -303,7 +402,8 @@ export default function MyCalendar() {
                 console.error('Calendar fetch error:', e);
                 failureCallback(e);
             }
-        }, [],
+        },
+        [],
     );
 
     // Open create dialog from context menu
@@ -323,7 +423,9 @@ export default function MyCalendar() {
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <AppLayout breadcrumbs={[{ title: 'My Calendar', href: '/my-calendar' }]}>
+        <AppLayout
+            breadcrumbs={[{ title: 'My Calendar', href: '/my-calendar' }]}
+        >
             <Head title="My Calendar" />
             <style dangerouslySetInnerHTML={{ __html: calendarStyles }} />
 
@@ -333,16 +435,25 @@ export default function MyCalendar() {
                     <div className="hidden w-60 shrink-0 space-y-4 lg:block">
                         <Card className="overflow-hidden">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-semibold">My Calendars</CardTitle>
+                                <CardTitle className="text-sm font-semibold">
+                                    My Calendars
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-0.5 pb-4">
                                 {categories.map((cat) => {
                                     const Icon = cat.icon;
                                     return (
-                                        <div key={cat.label} className={`flex items-center gap-3 rounded-lg px-3 py-2 ${cat.bg}`}>
-                                            <span className={`h-2.5 w-2.5 rounded-full ${cat.dot}`} />
+                                        <div
+                                            key={cat.label}
+                                            className={`flex items-center gap-3 rounded-lg px-3 py-2 ${cat.bg}`}
+                                        >
+                                            <span
+                                                className={`h-2.5 w-2.5 rounded-full ${cat.dot}`}
+                                            />
                                             <Icon className="h-3.5 w-3.5 opacity-50" />
-                                            <span className="text-sm font-medium">{cat.label}</span>
+                                            <span className="text-sm font-medium">
+                                                {cat.label}
+                                            </span>
                                         </div>
                                     );
                                 })}
@@ -351,14 +462,38 @@ export default function MyCalendar() {
 
                         <Card>
                             <CardContent className="space-y-1 pt-4">
-                                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sm" asChild>
-                                    <Link href="/my-tasks"><Clock className="h-4 w-4" />My Day</Link>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 text-sm"
+                                    asChild
+                                >
+                                    <Link href="/my-tasks">
+                                        <Clock className="h-4 w-4" />
+                                        My Day
+                                    </Link>
                                 </Button>
-                                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sm" asChild>
-                                    <Link href="/calendar"><Calendar className="h-4 w-4" />Team Calendar</Link>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 text-sm"
+                                    asChild
+                                >
+                                    <Link href="/calendar">
+                                        <Calendar className="h-4 w-4" />
+                                        Team Calendar
+                                    </Link>
                                 </Button>
-                                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sm" asChild>
-                                    <Link href="/control-room"><Shield className="h-4 w-4" />Control Room</Link>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 text-sm"
+                                    asChild
+                                >
+                                    <Link href="/control-room">
+                                        <Shield className="h-4 w-4" />
+                                        Control Room
+                                    </Link>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -369,41 +504,71 @@ export default function MyCalendar() {
                         {/* Header */}
                         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-4">
-                                <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+                                <h1 className="text-2xl font-bold tracking-tight">
+                                    {title}
+                                </h1>
                                 <div className="flex items-center">
-                                    <button onClick={goPrev} className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted transition-colors">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={goPrev}
+                                        className="h-9 w-9 rounded-full"
+                                    >
                                         <ChevronLeft className="h-5 w-5" />
-                                    </button>
-                                    <button onClick={goNext} className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted transition-colors">
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={goNext}
+                                        className="h-9 w-9 rounded-full"
+                                    >
                                         <ChevronRight className="h-5 w-5" />
-                                    </button>
+                                    </Button>
                                 </div>
-                                <button onClick={goToday} className="rounded-full border px-5 py-1.5 text-sm font-semibold shadow-sm hover:bg-accent transition-colors">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={goToday}
+                                    className="rounded-full px-5 font-semibold"
+                                >
                                     Today
-                                </button>
+                                </Button>
                             </div>
-                            <div className="inline-flex items-center gap-1 rounded-full border p-1 bg-muted/20">
+                            <div className="inline-flex items-center gap-1 rounded-full border bg-muted/20 p-1">
                                 {views.map((v) => (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
                                         key={v.key}
                                         onClick={() => changeView(v.key)}
-                                        className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${
+                                        className={`h-auto rounded-full px-4 py-1.5 text-sm font-semibold ${
                                             currentView === v.key
                                                 ? 'bg-foreground text-background shadow'
                                                 : 'text-muted-foreground hover:text-foreground'
                                         }`}
                                     >
                                         {v.label}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
 
                         {/* Calendar */}
-                        <div className="rounded-2xl border bg-card shadow-sm overflow-hidden" onContextMenu={handleDateRightClick}>
+                        <div
+                            className="overflow-hidden rounded-2xl border bg-card shadow-sm"
+                            onContextMenu={handleDateRightClick}
+                        >
                             <FullCalendar
                                 ref={calendarRef}
-                                plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                                plugins={[
+                                    dayGridPlugin,
+                                    timeGridPlugin,
+                                    listPlugin,
+                                    interactionPlugin,
+                                ]}
                                 initialView="timeGridWeek"
                                 headerToolbar={false}
                                 events={fetchEvents}
@@ -423,14 +588,22 @@ export default function MyCalendar() {
                                 editable={true}
                                 eventResizableFromStart={true}
                                 selectMirror={true}
-                                businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '18:00' }}
+                                businessHours={{
+                                    daysOfWeek: [1, 2, 3, 4, 5],
+                                    startTime: '08:00',
+                                    endTime: '18:00',
+                                }}
                                 slotDuration="00:30:00"
                                 dayMaxEvents={3}
                                 moreLinkContent={(args) => `+${args.num} more`}
                                 expandRows={true}
                                 stickyHeaderDates={true}
                                 firstDay={1}
-                                eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false }}
+                                eventTimeFormat={{
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    meridiem: false,
+                                }}
                             />
                         </div>
                     </div>
@@ -443,23 +616,49 @@ export default function MyCalendar() {
                         style={{ top: ctxMenu.y, left: ctxMenu.x }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <button onClick={() => openCreateFromCtx('shift')}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
+                            onClick={() => openCreateFromCtx('shift')}
+                        >
                             <CalendarDays className="h-4 w-4 text-status-info" />
                             <span>New Shift</span>
-                        </button>
-                        <button onClick={() => openCreateFromCtx('task')}>
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
+                            onClick={() => openCreateFromCtx('task')}
+                        >
                             <ListTodo className="h-4 w-4 text-primary" />
                             <span>New Task</span>
-                        </button>
+                        </Button>
                         <hr />
-                        <button onClick={() => { setCtxMenu(null); changeView('timeGridDay'); }}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
+                            onClick={() => {
+                                setCtxMenu(null);
+                                changeView('timeGridDay');
+                            }}
+                        >
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span>View Day</span>
-                        </button>
-                        <button onClick={() => { setCtxMenu(null); router.visit('/my-tasks'); }}>
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
+                            onClick={() => {
+                                setCtxMenu(null);
+                                router.visit('/my-tasks');
+                            }}
+                        >
                             <Clock className="h-4 w-4 text-muted-foreground" />
                             <span>Go to My Day</span>
-                        </button>
+                        </Button>
                     </div>
                 )}
 
@@ -468,46 +667,87 @@ export default function MyCalendar() {
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                             <DialogTitle>
-                                {createType === 'shift' ? 'Create Event' : 'Create Task'}
+                                {createType === 'shift'
+                                    ? 'Create Event'
+                                    : 'Create Task'}
                             </DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4 py-2">
                             <div className="flex gap-2">
                                 {(['shift', 'task'] as const).map((t) => (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="outline"
                                         key={t}
                                         onClick={() => setCreateType(t)}
-                                        className={`flex-1 rounded-lg border py-2 text-sm font-medium transition-colors ${
+                                        className={`h-auto flex-1 rounded-lg py-2 text-sm font-medium ${
                                             createType === t
                                                 ? 'border-primary bg-primary/5 text-primary'
                                                 : 'text-muted-foreground hover:bg-muted'
                                         }`}
                                     >
-                                        {t === 'shift' ? 'Shift / Event' : 'Task'}
-                                    </button>
+                                        {t === 'shift'
+                                            ? 'Shift / Event'
+                                            : 'Task'}
+                                    </Button>
                                 ))}
                             </div>
                             <div>
                                 <Label>Title</Label>
-                                <Input value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} placeholder={createType === 'shift' ? 'Client name or event...' : 'Task description...'} autoFocus />
+                                <Input
+                                    value={createTitle}
+                                    onChange={(e) =>
+                                        setCreateTitle(e.target.value)
+                                    }
+                                    placeholder={
+                                        createType === 'shift'
+                                            ? 'Client name or event...'
+                                            : 'Task description...'
+                                    }
+                                    autoFocus
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <Label>Start</Label>
-                                    <Input type="datetime-local" value={createStart} onChange={(e) => setCreateStart(e.target.value)} />
+                                    <Input
+                                        type="datetime-local"
+                                        value={createStart}
+                                        onChange={(e) =>
+                                            setCreateStart(e.target.value)
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>End</Label>
-                                    <Input type="datetime-local" value={createEnd} onChange={(e) => setCreateEnd(e.target.value)} />
+                                    <Input
+                                        type="datetime-local"
+                                        value={createEnd}
+                                        onChange={(e) =>
+                                            setCreateEnd(e.target.value)
+                                        }
+                                    />
                                 </div>
                             </div>
                             <div>
                                 <Label>Notes</Label>
-                                <Textarea value={createNotes} onChange={(e) => setCreateNotes(e.target.value)} rows={2} placeholder="Optional notes..." />
+                                <Textarea
+                                    value={createNotes}
+                                    onChange={(e) =>
+                                        setCreateNotes(e.target.value)
+                                    }
+                                    rows={2}
+                                    placeholder="Optional notes..."
+                                />
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setCreateOpen(false)}
+                            >
+                                Cancel
+                            </Button>
                             <Button
                                 disabled={!createTitle.trim()}
                                 onClick={() => {

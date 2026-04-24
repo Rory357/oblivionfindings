@@ -19,8 +19,14 @@ export function useFormAutosave<T extends Record<string, unknown>>(
 ) {
     const [savedAt, setSavedAt] = useState<number | null>(null);
     const timerRef = useRef<number | null>(null);
-    const latestRef = useRef<{ data: T; meta: Record<string, unknown> }>({ data, meta });
-    latestRef.current = { data, meta };
+    const latestRef = useRef<{ data: T; meta: Record<string, unknown> }>({
+        data,
+        meta,
+    });
+
+    useEffect(() => {
+        latestRef.current = { data, meta };
+    }, [data, meta]);
 
     const writeNow = useCallback(() => {
         if (typeof window === 'undefined') return;

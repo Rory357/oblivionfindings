@@ -570,7 +570,7 @@ export default function RoadmapDashboard({
 
             return actions;
         },
-        [can.approveRoadmap, can.manageRoadmap],
+        [can.approveRoadmap],
     );
 
     const loadDashboardSummary = useCallback(async () => {

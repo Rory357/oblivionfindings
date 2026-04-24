@@ -153,9 +153,12 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                 {/* Subcategory chips */}
                 {filterOptions.subcategories.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                        <button
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
                             onClick={() => applyFilters({ subcategory: 'all' })}
-                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                            className={`h-auto rounded-full px-3 py-1 ${
                                 !filters.subcategory || filters.subcategory === 'all'
                                     ? 'border-primary bg-primary/10 text-primary'
                                     : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
@@ -163,15 +166,18 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                         >
                             All
                             <span className="ml-1 text-muted-foreground">({stats.total})</span>
-                        </button>
+                        </Button>
                         {filterOptions.subcategories.map((sub) => {
                             const count = stats.bySubcategory[sub.value] ?? 0;
                             const isActive = filters.subcategory === sub.value;
                             return (
-                                <button
+                                <Button
                                     key={sub.value}
+                                    type="button"
+                                    variant="outline"
+                                    size="xs"
                                     onClick={() => applyFilters({ subcategory: sub.value })}
-                                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                    className={`h-auto rounded-full px-3 py-1 ${
                                         isActive
                                             ? 'border-primary bg-primary/10 text-primary'
                                             : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
@@ -179,7 +185,7 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                                 >
                                     {sub.label}
                                     {count > 0 && <span className="ml-1 text-muted-foreground/70">({count})</span>}
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -188,28 +194,34 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                 {/* Category filter (for multi-category or whole-domain pages) */}
                 {filterOptions.categories && filterOptions.categories.length > 1 && (
                     <div className="flex flex-wrap gap-2">
-                        <button
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
                             onClick={() => applyFilters({ category: 'all' })}
-                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                            className={`h-auto rounded-full px-3 py-1 ${
                                 !filters.category || filters.category === 'all'
                                     ? 'border-primary bg-primary/10 text-primary'
                                     : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                             }`}
                         >
                             All categories
-                        </button>
+                        </Button>
                         {filterOptions.categories.map((cat) => (
-                            <button
+                            <Button
                                 key={cat.value}
+                                type="button"
+                                variant="outline"
+                                size="xs"
                                 onClick={() => applyFilters({ category: cat.value })}
-                                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                className={`h-auto rounded-full px-3 py-1 ${
                                     filters.category === cat.value
                                         ? 'border-primary bg-primary/10 text-primary'
                                         : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                 }`}
                             >
                                 {cat.label}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 )}

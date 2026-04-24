@@ -160,7 +160,7 @@ export default function BookingsIndex({
     bookings: rawBookings, filters: rawFilters, vehicles: rawVehicles,
     calendar_bookings: rawCalendarBookings, week_start: rawWeekStart,
 }: Props) {
-    const bookings = rawBookings?.data ?? [];
+    const bookings = useMemo(() => rawBookings?.data ?? [], [rawBookings?.data]);
     const meta = rawBookings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const links = rawBookings?.links ?? [];
     const filters = rawFilters ?? {};
@@ -223,12 +223,12 @@ export default function BookingsIndex({
                 {/* View Toggle + Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="inline-flex rounded-lg border bg-muted p-0.5">
-                        <button onClick={() => switchView('list')} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => switchView('list')} className={`h-auto gap-1.5 rounded-md px-3 py-1.5 ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                             <List className="h-4 w-4" />List
-                        </button>
-                        <button onClick={() => switchView('calendar')} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => switchView('calendar')} className={`h-auto gap-1.5 rounded-md px-3 py-1.5 ${viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                             <CalendarDays className="h-4 w-4" />Calendar
-                        </button>
+                        </Button>
                     </div>
                     {viewMode === 'list' && (
                         <Select value={filters.status || 'all'} onValueChange={(v) => applyFilters({ status: v === 'all' ? '' : v })}>

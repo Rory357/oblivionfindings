@@ -89,8 +89,8 @@ const PURPOSE_TYPES = [
 ];
 
 export default function OutingCreate({ clients, vehicles, drivers, auth_user, can }: Props) {
-    const safeClients = clients ?? [];
-    const safeVehicles = vehicles ?? [];
+    const safeClients = useMemo(() => clients ?? [], [clients]);
+    const safeVehicles = useMemo(() => vehicles ?? [], [vehicles]);
     const safeDrivers = drivers ?? [];
 
     const [step, setStep] = useState(1);
@@ -294,12 +294,13 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                         { num: 4, label: 'Vehicle & Driver' },
                         { num: 5, label: 'Risk Assessment' },
                     ].map((s) => (
-                        <button
+                        <Button
                             key={s.num}
                             type="button"
+                            variant="outline"
                             onClick={() => setStep(s.num)}
                             className={cn(
-                                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
+                                "h-auto gap-2 rounded-lg px-4 py-2 transition-all",
                                 step === s.num
                                     ? "bg-primary text-white shadow-md"
                                     : step > s.num
@@ -314,7 +315,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                 {step > s.num ? <Check className="h-3.5 w-3.5" /> : s.num}
                             </span>
                             <span className="hidden sm:inline">{s.label}</span>
-                        </button>
+                        </Button>
                     ))}
                 </div>
 
@@ -332,12 +333,13 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                         {PURPOSE_TYPES.map((type) => {
                                             const IconComp = type.icon;
                                             return (
-                                                <button
+                                                <Button
                                                     key={type.value}
                                                     type="button"
+                                                    variant="outline"
                                                     onClick={() => form.setData('purpose', type.value)}
                                                     className={cn(
-                                                        "flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm transition-all",
+                                                        "h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all",
                                                         form.data.purpose === type.value
                                                             ? `${type.color} shadow-md`
                                                             : 'border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:border-muted-foreground/20'
@@ -345,7 +347,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                 >
                                                     <IconComp className="h-7 w-7" />
                                                     <span className="font-semibold">{type.label}</span>
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -424,12 +426,13 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                 const isSelected = selectedResidents.includes(client.id);
                                                 const hasNeeds = client.transport_needs && Object.values(client.transport_needs).some(Boolean);
                                                 return (
-                                                    <button
+                                                    <Button
                                                         key={client.id}
                                                         type="button"
+                                                        variant="outline"
                                                         onClick={() => toggleResident(client.id)}
                                                         className={cn(
-                                                            "flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all",
+                                                            "h-auto items-start justify-start gap-3 whitespace-normal rounded-xl border-2 p-4 text-left transition-all",
                                                             isSelected
                                                                 ? "border-primary bg-primary/10 shadow-md dark:bg-primary/20 dark:border-primary"
                                                                 : "border-transparent bg-muted/30 hover:bg-muted/60 hover:border-muted-foreground/20"
@@ -465,7 +468,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </button>
+                                                    </Button>
                                                 );
                                             })}
                                         </div>
@@ -578,19 +581,21 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                                             if (!client) return null;
                                                                             const isAtStop = stop.resident_ids.includes(rid);
                                                                             return (
-                                                                                <button
+                                                                                <Button
                                                                                     key={rid}
                                                                                     type="button"
+                                                                                    variant="secondary"
+                                                                                    size="xs"
                                                                                     onClick={() => toggleStopResident(stop.id, rid)}
                                                                                     className={cn(
-                                                                                        "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
+                                                                                        "h-auto rounded-full px-2.5 py-1 transition-all",
                                                                                         isAtStop
                                                                                             ? "bg-primary text-white"
                                                                                             : "bg-muted text-muted-foreground hover:bg-muted/80"
                                                                                     )}
                                                                                 >
                                                                                     {client.name}
-                                                                                </button>
+                                                                                </Button>
                                                                             );
                                                                         })}
                                                                     </div>

@@ -1,5 +1,5 @@
-import 'leaflet/dist/leaflet.css';
 import { cn } from '@/lib/utils';
+import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';
 
 // Lazy-load leaflet to avoid SSR issues
@@ -49,14 +49,20 @@ type LeafletMapProps = {
     onMapClick?: (latlng: { lat: number; lng: number }) => void;
 };
 
-const STREET_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const STREET_TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+const STREET_TILE_URL =
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const STREET_TILE_ATTRIBUTION =
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
-const DARK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const DARK_TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+const DARK_TILE_URL =
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const DARK_TILE_ATTRIBUTION =
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
-const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const SATELLITE_TILE_ATTRIBUTION = '&copy; <a href="https://www.esri.com/">Esri</a>, Earthstar Geographics';
+const SATELLITE_TILE_URL =
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const SATELLITE_TILE_ATTRIBUTION =
+    '&copy; <a href="https://www.esri.com/">Esri</a>, Earthstar Geographics';
 
 // ── Marker styling helpers ──────────────────────────────────────────────────
 
@@ -72,14 +78,18 @@ function getMarkerColor(marker: MapMarker): string {
 
 const CAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>`;
 
-function createVehicleDivIcon(leaflet: typeof import('leaflet'), marker: MapMarker) {
+function createVehicleDivIcon(
+    leaflet: typeof import('leaflet'),
+    marker: MapMarker,
+) {
     const color = getMarkerColor(marker);
     const rotation = marker.heading ?? 0;
     const isMoving = marker.status === 'moving';
     const label = marker.title ?? '';
-    const speedBadge = isMoving && marker.speed != null
-        ? `<div style="position:absolute;top:-8px;right:-8px;background:#3b82f6;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;white-space:nowrap;">${marker.speed} km/h</div>`
-        : '';
+    const speedBadge =
+        isMoving && marker.speed != null
+            ? `<div style="position:absolute;top:-8px;right:-8px;background:#3b82f6;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;white-space:nowrap;">${marker.speed} km/h</div>`
+            : '';
     const pulse = isMoving
         ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid ${color};animation:leaflet-pulse 1.5s ease-out infinite;"></div>`
         : '';
@@ -104,13 +114,18 @@ function createVehicleDivIcon(leaflet: typeof import('leaflet'), marker: MapMark
     });
 }
 
-function createDefaultDivIcon(leaflet: typeof import('leaflet'), marker: MapMarker) {
+function createDefaultDivIcon(
+    leaflet: typeof import('leaflet'),
+    marker: MapMarker,
+) {
     const color = getMarkerColor(marker);
     const icons: Record<string, string> = {
         house: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
         asset: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
     };
-    const svgIcon = icons[marker.type ?? ''] ?? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+    const svgIcon =
+        icons[marker.type ?? ''] ??
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
     const rotation = marker.heading ?? 0;
 
     return leaflet.divIcon({
@@ -163,8 +178,10 @@ function clusterMarkers(markers: MapMarker[], zoom: number): ClusterGroup[] {
     }
 
     return Object.values(buckets).map((group) => {
-        const avgLat = group.markers.reduce((s, m) => s + m.lat, 0) / group.markers.length;
-        const avgLng = group.markers.reduce((s, m) => s + m.lng, 0) / group.markers.length;
+        const avgLat =
+            group.markers.reduce((s, m) => s + m.lat, 0) / group.markers.length;
+        const avgLng =
+            group.markers.reduce((s, m) => s + m.lng, 0) / group.markers.length;
         return { lat: avgLat, lng: avgLng, markers: group.markers };
     });
 }
@@ -200,7 +217,9 @@ function addDirectionArrows(
         const prev = points[i - 1];
         const curr = points[i];
         if (!prev || !curr) continue;
-        const angle = (Math.atan2(curr.lng - prev.lng, curr.lat - prev.lat) * 180) / Math.PI;
+        const angle =
+            (Math.atan2(curr.lng - prev.lng, curr.lat - prev.lat) * 180) /
+            Math.PI;
         const midLat = (prev.lat + curr.lat) / 2;
         const midLng = (prev.lng + curr.lng) / 2;
 
@@ -213,11 +232,19 @@ function addDirectionArrows(
             iconSize: [16, 16],
             iconAnchor: [8, 8],
         });
-        layer.addLayer(leaflet.marker([midLat, midLng], { icon: arrowIcon, interactive: false }));
+        layer.addLayer(
+            leaflet.marker([midLat, midLng], {
+                icon: arrowIcon,
+                interactive: false,
+            }),
+        );
     }
 }
 
-function createEndpointIcon(leaflet: typeof import('leaflet'), type: 'start' | 'end') {
+function createEndpointIcon(
+    leaflet: typeof import('leaflet'),
+    type: 'start' | 'end',
+) {
     const bg = type === 'start' ? '#22c55e' : '#ef4444';
     const label = type === 'start' ? 'A' : 'B';
     return leaflet.divIcon({
@@ -289,7 +316,10 @@ export default function LeafletMap({
     const onMapClickRef = useRef(onMapClick);
 
     // Resolve dark mode: explicit prop or auto-detect from html element
-    const resolvedDark = darkMode ?? (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+    const resolvedDark =
+        darkMode ??
+        (typeof document !== 'undefined' &&
+            document.documentElement.classList.contains('dark'));
 
     // Initialize map
     useEffect(() => {
@@ -306,9 +336,12 @@ export default function LeafletMap({
                 // Fix default marker icon paths
                 delete (L.Icon.Default.prototype as any)._getIconUrl;
                 L.Icon.Default.mergeOptions({
-                    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconRetinaUrl:
+                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                    iconUrl:
+                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    shadowUrl:
+                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
                 });
             }
 
@@ -324,20 +357,30 @@ export default function LeafletMap({
 
                 const isDark = resolvedDark;
                 const streetUrl = isDark ? DARK_TILE_URL : STREET_TILE_URL;
-                const streetAttr = isDark ? DARK_TILE_ATTRIBUTION : STREET_TILE_ATTRIBUTION;
+                const streetAttr = isDark
+                    ? DARK_TILE_ATTRIBUTION
+                    : STREET_TILE_ATTRIBUTION;
 
-                const streetLayer = L.tileLayer(streetUrl, { attribution: streetAttr, maxZoom: 19 });
-                const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, { attribution: SATELLITE_TILE_ATTRIBUTION, maxZoom: 19 });
+                const streetLayer = L.tileLayer(streetUrl, {
+                    attribution: streetAttr,
+                    maxZoom: 19,
+                });
+                const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, {
+                    attribution: SATELLITE_TILE_ATTRIBUTION,
+                    maxZoom: 19,
+                });
 
                 streetLayer.addTo(mapRef.current);
                 tileLayerRef.current = streetLayer;
                 satelliteLayerRef.current = satelliteLayer;
 
-                layerControlRef.current = L.control.layers(
-                    { 'Street': streetLayer, 'Satellite': satelliteLayer },
-                    {},
-                    { position: 'topright' },
-                ).addTo(mapRef.current);
+                layerControlRef.current = L.control
+                    .layers(
+                        { Street: streetLayer, Satellite: satelliteLayer },
+                        {},
+                        { position: 'topright' },
+                    )
+                    .addTo(mapRef.current);
 
                 markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
                 polylineLayerRef.current = L.layerGroup().addTo(mapRef.current);
@@ -346,7 +389,10 @@ export default function LeafletMap({
                 // Map click handler
                 mapRef.current.on('click', (e: any) => {
                     if (onMapClickRef.current) {
-                        onMapClickRef.current({ lat: e.latlng.lat, lng: e.latlng.lng });
+                        onMapClickRef.current({
+                            lat: e.latlng.lat,
+                            lng: e.latlng.lng,
+                        });
                     }
                 });
 
@@ -357,7 +403,7 @@ export default function LeafletMap({
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [center.lat, center.lng, resolvedDark, zoom]);
 
     // Keep onMapClick ref current
     useEffect(() => {
@@ -366,31 +412,46 @@ export default function LeafletMap({
 
     // Swap tile layers when dark mode changes
     useEffect(() => {
-        if (!mapRef.current || !tileLayerRef.current || !L || !initRef.current) return;
+        if (!mapRef.current || !tileLayerRef.current || !L || !initRef.current)
+            return;
         const isDark = resolvedDark;
 
         // Remove existing layers and control
-        if (layerControlRef.current) mapRef.current.removeControl(layerControlRef.current);
+        if (layerControlRef.current)
+            mapRef.current.removeControl(layerControlRef.current);
         mapRef.current.removeLayer(tileLayerRef.current);
-        if (satelliteLayerRef.current && mapRef.current.hasLayer(satelliteLayerRef.current)) {
+        if (
+            satelliteLayerRef.current &&
+            mapRef.current.hasLayer(satelliteLayerRef.current)
+        ) {
             mapRef.current.removeLayer(satelliteLayerRef.current);
         }
 
         const streetUrl = isDark ? DARK_TILE_URL : STREET_TILE_URL;
-        const streetAttr = isDark ? DARK_TILE_ATTRIBUTION : STREET_TILE_ATTRIBUTION;
+        const streetAttr = isDark
+            ? DARK_TILE_ATTRIBUTION
+            : STREET_TILE_ATTRIBUTION;
 
-        const streetLayer = L.tileLayer(streetUrl, { attribution: streetAttr, maxZoom: 19 });
-        const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, { attribution: SATELLITE_TILE_ATTRIBUTION, maxZoom: 19 });
+        const streetLayer = L.tileLayer(streetUrl, {
+            attribution: streetAttr,
+            maxZoom: 19,
+        });
+        const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, {
+            attribution: SATELLITE_TILE_ATTRIBUTION,
+            maxZoom: 19,
+        });
 
         streetLayer.addTo(mapRef.current);
         tileLayerRef.current = streetLayer;
         satelliteLayerRef.current = satelliteLayer;
 
-        layerControlRef.current = L.control.layers(
-            { 'Street': streetLayer, 'Satellite': satelliteLayer },
-            {},
-            { position: 'topright' },
-        ).addTo(mapRef.current);
+        layerControlRef.current = L.control
+            .layers(
+                { Street: streetLayer, Satellite: satelliteLayer },
+                {},
+                { position: 'topright' },
+            )
+            .addTo(mapRef.current);
     }, [resolvedDark]);
 
     // Update center/zoom
@@ -419,20 +480,33 @@ export default function LeafletMap({
                     if (group.markers.length === 1) {
                         const m = group.markers[0];
                         const icon = createDivIcon(L!, m);
-                        const leafletMarker = L!.marker([m.lat, m.lng], { icon });
+                        const leafletMarker = L!.marker([m.lat, m.lng], {
+                            icon,
+                        });
                         if (m.popup || m.title) {
                             leafletMarker.bindPopup(
                                 `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
                             );
                         }
-                        if (onMarkerClick) leafletMarker.on('click', () => onMarkerClick(m.id));
+                        if (onMarkerClick)
+                            leafletMarker.on('click', () =>
+                                onMarkerClick(m.id),
+                            );
                         markersLayerRef.current.addLayer(leafletMarker);
                     } else {
-                        const clusterIcon = createClusterIcon(L!, group.markers.length);
-                        const clusterMarker = L!.marker([group.lat, group.lng], { icon: clusterIcon });
+                        const clusterIcon = createClusterIcon(
+                            L!,
+                            group.markers.length,
+                        );
+                        const clusterMarker = L!.marker(
+                            [group.lat, group.lng],
+                            { icon: clusterIcon },
+                        );
                         clusterMarker.on('click', () => {
                             const bounds = L!.latLngBounds(
-                                group.markers.map((m) => [m.lat, m.lng] as [number, number]),
+                                group.markers.map(
+                                    (m) => [m.lat, m.lng] as [number, number],
+                                ),
                             );
                             map?.fitBounds(bounds, { padding: [40, 40] });
                         });
@@ -450,7 +524,8 @@ export default function LeafletMap({
                         );
                     }
 
-                    if (onMarkerClick) leafletMarker.on('click', () => onMarkerClick(m.id));
+                    if (onMarkerClick)
+                        leafletMarker.on('click', () => onMarkerClick(m.id));
                     markersLayerRef.current.addLayer(leafletMarker);
                 });
             }
@@ -469,10 +544,12 @@ export default function LeafletMap({
 
         // Auto-fit bounds if multiple markers
         if (markers.length > 1) {
-            const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lng] as [number, number]));
+            const bounds = L.latLngBounds(
+                markers.map((m) => [m.lat, m.lng] as [number, number]),
+            );
             map?.fitBounds(bounds, { padding: [40, 40] });
         }
-    }, [markers, onMarkerClick, clustering]);
+    }, [markers, onMarkerClick, clustering, zoom]);
 
     // Update polyline with enhancements (animated dash, direction arrows, endpoints)
     useEffect(() => {
@@ -490,7 +567,9 @@ export default function LeafletMap({
                 color,
                 weight: 4,
                 opacity: 0.8,
-                className: opts.animated ? 'leaflet-animated-polyline' : undefined,
+                className: opts.animated
+                    ? 'leaflet-animated-polyline'
+                    : undefined,
             },
         );
         polylineLayerRef.current.addLayer(line);
@@ -506,11 +585,21 @@ export default function LeafletMap({
             const endPt = polyline[polyline.length - 1];
             if (startPt) {
                 const startIcon = createEndpointIcon(L, 'start');
-                polylineLayerRef.current.addLayer(L.marker([startPt.lat, startPt.lng], { icon: startIcon, interactive: false }));
+                polylineLayerRef.current.addLayer(
+                    L.marker([startPt.lat, startPt.lng], {
+                        icon: startIcon,
+                        interactive: false,
+                    }),
+                );
             }
             if (endPt) {
                 const endIcon = createEndpointIcon(L, 'end');
-                polylineLayerRef.current.addLayer(L.marker([endPt.lat, endPt.lng], { icon: endIcon, interactive: false }));
+                polylineLayerRef.current.addLayer(
+                    L.marker([endPt.lat, endPt.lng], {
+                        icon: endIcon,
+                        interactive: false,
+                    }),
+                );
             }
         }
     }, [polyline, polylineOptions]);
@@ -534,7 +623,9 @@ export default function LeafletMap({
                 geofenceLayerRef.current.addLayer(circle);
             } else if (gf.type === 'polygon' && gf.coordinates?.length) {
                 const polygon = L!.polygon(
-                    gf.coordinates.map((c) => [c.lat, c.lng] as [number, number]),
+                    gf.coordinates.map(
+                        (c) => [c.lat, c.lng] as [number, number],
+                    ),
                     { color, fillColor: color, fillOpacity: 0.1, weight: 2 },
                 );
                 if (gf.name) polygon.bindPopup(gf.name);
@@ -557,7 +648,13 @@ export default function LeafletMap({
     const heightStyle = typeof height === 'number' ? `${height}px` : height;
 
     return (
-        <div className={cn('w-full overflow-hidden rounded-lg border border-border relative', className)} style={{ zIndex: 0, isolation: 'isolate' }}>
+        <div
+            className={cn(
+                'relative w-full overflow-hidden rounded-lg border border-border',
+                className,
+            )}
+            style={{ zIndex: 0, isolation: 'isolate' }}
+        >
             <div
                 ref={containerRef}
                 className="w-full"

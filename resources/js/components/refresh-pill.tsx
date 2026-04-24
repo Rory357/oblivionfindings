@@ -1,6 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -54,13 +55,14 @@ export function RefreshPill({
         : formatFreshness(lastUpdatedAt, now);
 
     return (
-        <button
+        <Button
             type="button"
+            variant="outline"
             onClick={onRefresh}
             disabled={isRefreshing}
             aria-label={`${label}. Tap to refresh now.`}
             className={cn(
-                'frontline-focus inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-muted/60 px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-70',
+                'frontline-focus min-h-9 rounded-full border-border/70 bg-muted/60 px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-70',
                 className,
             )}
         >
@@ -69,7 +71,7 @@ export function RefreshPill({
                 className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')}
             />
             <span aria-live="polite">{label}</span>
-        </button>
+        </Button>
     );
 }
 

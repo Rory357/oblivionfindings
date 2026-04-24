@@ -1,8 +1,18 @@
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -30,7 +40,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 type GroupedEvents = Record<string, string[]>;
 
@@ -83,20 +93,34 @@ const NOTIFICATION_META: Record<string, string> = {
 };
 
 function friendlyName(key: string): string {
-    return NOTIFICATION_META[key] ?? key
-        .replace(/\./g, ' ')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return (
+        NOTIFICATION_META[key] ??
+        key
+            .replace(/\./g, ' ')
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
 }
 
 type FilterMode = 'all' | 'active' | 'disabled' | 'ack';
 type SortMode = 'default' | 'urgent';
 
 /** Visual escalation timeline */
-function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availableRoleGroups: Record<string, string> }) {
+function EscalationTimeline({
+    rule,
+    availableRoleGroups,
+}: {
+    rule: Rule;
+    availableRoleGroups: Record<string, string>;
+}) {
     if (!rule.enabled) return null;
 
-    const steps: { icon: typeof Clock; label: string; sublabel?: string; colour: string }[] = [];
+    const steps: {
+        icon: typeof Clock;
+        label: string;
+        sublabel?: string;
+        colour: string;
+    }[] = [];
 
     // Notification sent step
     steps.push({
@@ -115,7 +139,10 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
         });
 
         if (rule.repeat_every_minutes > 0) {
-            const maxLabel = rule.max_reminders > 0 ? `up to ${rule.max_reminders}` : 'unlimited';
+            const maxLabel =
+                rule.max_reminders > 0
+                    ? `up to ${rule.max_reminders}`
+                    : 'unlimited';
             steps.push({
                 icon: Mail,
                 label: `Every ${rule.repeat_every_minutes}m`,
@@ -129,18 +156,23 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
     const tiers = rule.tiers || [];
     if (tiers.length > 0) {
         tiers.forEach((tier, idx) => {
-            const tierGroups = (tier.role_groups || []).map((g: string) => availableRoleGroups[g] || g);
+            const tierGroups = (tier.role_groups || []).map(
+                (g: string) => availableRoleGroups[g] || g,
+            );
             steps.push({
                 icon: TrendingUp,
                 label: `Tier ${idx + 1}`,
                 sublabel: `After reminder #${tier.from_reminder}: ${tierGroups.join(', ') || 'No groups'}`,
-                colour: idx === tiers.length - 1
-                    ? 'text-status-critical bg-status-critical-bg dark:bg-status-critical-bg dark:text-status-critical border-status-critical/30 dark:border-status-critical/30'
-                    : 'text-status-warning bg-status-warning-bg dark:bg-status-warning-bg dark:text-status-warning border-status-warning/30 dark:border-status-warning/30',
+                colour:
+                    idx === tiers.length - 1
+                        ? 'text-status-critical bg-status-critical-bg dark:bg-status-critical-bg dark:text-status-critical border-status-critical/30 dark:border-status-critical/30'
+                        : 'text-status-warning bg-status-warning-bg dark:bg-status-warning-bg dark:text-status-warning border-status-warning/30 dark:border-status-warning/30',
             });
         });
     } else {
-        const groups = (rule.escalate_to_role_groups || []).map((g) => availableRoleGroups[g] || g);
+        const groups = (rule.escalate_to_role_groups || []).map(
+            (g) => availableRoleGroups[g] || g,
+        );
         if (groups.length > 0) {
             steps.push({
                 icon: TrendingUp,
@@ -163,7 +195,8 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
     if (steps.length <= 1) {
         return (
             <div className="rounded-lg border border-dashed border-muted-foreground/30 px-4 py-3 text-sm text-muted-foreground">
-                Enabled with default settings. Configure acknowledgement or escalation groups below.
+                Enabled with default settings. Configure acknowledgement or
+                escalation groups below.
             </div>
         );
     }
@@ -178,7 +211,10 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                 {totalWindow > 0 && (
                     <Badge variant="outline" className="text-xs font-normal">
                         <Timer className="mr-1 h-3 w-3" />
-                        Total window: {totalWindow >= 60 ? `${Math.floor(totalWindow / 60)}h ${totalWindow % 60}m` : `${totalWindow}m`}
+                        Total window:{' '}
+                        {totalWindow >= 60
+                            ? `${Math.floor(totalWindow / 60)}h ${totalWindow % 60}m`
+                            : `${totalWindow}m`}
                     </Badge>
                 )}
             </div>
@@ -190,17 +226,23 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                             <div key={i} className="flex items-center gap-1">
                                 {i > 0 && (
                                     <div className="flex items-center px-0.5">
-                                        <div className="h-px w-3 bg-primary dark:from-primary dark:to-primary sm:w-6" />
+                                        <div className="h-px w-3 bg-primary sm:w-6 dark:from-primary dark:to-primary" />
                                         <ArrowRight className="h-3 w-3 text-primary" />
-                                        <div className="h-px w-3 bg-primary dark:from-primary dark:to-primary sm:w-6" />
+                                        <div className="h-px w-3 bg-primary sm:w-6 dark:from-primary dark:to-primary" />
                                     </div>
                                 )}
-                                <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-sm ${step.colour}`}>
+                                <div
+                                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-sm ${step.colour}`}
+                                >
                                     <StepIcon className="h-4 w-4 shrink-0" />
                                     <div className="min-w-0">
-                                        <div className="text-xs font-bold leading-tight">{step.label}</div>
+                                        <div className="text-xs leading-tight font-bold">
+                                            {step.label}
+                                        </div>
                                         {step.sublabel && (
-                                            <div className="max-w-[120px] truncate text-[10px] leading-tight opacity-80 sm:max-w-none">{step.sublabel}</div>
+                                            <div className="max-w-[120px] truncate text-[10px] leading-tight opacity-80 sm:max-w-none">
+                                                {step.sublabel}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -214,13 +256,22 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
             {tiers.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {tiers.map((tier, idx) => {
-                        const tierGroups = (tier.role_groups || []).map((g: string) => availableRoleGroups[g] || g);
+                        const tierGroups = (tier.role_groups || []).map(
+                            (g: string) => availableRoleGroups[g] || g,
+                        );
                         return (
                             <span key={idx} className="flex items-center gap-1">
                                 {idx > 0 && <ArrowRight className="h-3 w-3" />}
-                                <span className="font-medium text-foreground">Tier {idx + 1}</span>
-                                <span>(after {tier.from_reminder} reminder{tier.from_reminder !== 1 ? 's' : ''}):</span>
-                                <span className="font-medium">{tierGroups.join(', ') || 'None'}</span>
+                                <span className="font-medium text-foreground">
+                                    Tier {idx + 1}
+                                </span>
+                                <span>
+                                    (after {tier.from_reminder} reminder
+                                    {tier.from_reminder !== 1 ? 's' : ''}):
+                                </span>
+                                <span className="font-medium">
+                                    {tierGroups.join(', ') || 'None'}
+                                </span>
                             </span>
                         );
                     })}
@@ -252,59 +303,79 @@ function TierEditor({
     };
 
     return (
-        <div className="relative rounded-xl border-2 border-dashed border-primary bg-primary/10/30 p-4 dark:border-primary/30 dark:bg-primary/20">
+        <div className="bg-primary/10/30 relative rounded-xl border-2 border-dashed border-primary p-4 dark:border-primary/30 dark:bg-primary/20">
             <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
                         {index + 1}
                     </div>
-                    <span className="text-sm font-semibold text-foreground">Tier {index + 1}</span>
+                    <span className="text-sm font-semibold text-foreground">
+                        Tier {index + 1}
+                    </span>
                 </div>
-                <button
+                <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={onRemove}
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="h-7 w-7 rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 >
                     <X className="h-4 w-4" />
-                </button>
+                </Button>
             </div>
 
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Escalate after reminder #</Label>
+                    <Label className="text-xs font-medium">
+                        Escalate after reminder #
+                    </Label>
                     <Input
                         type="number"
                         min={1}
                         value={tier.from_reminder}
-                        onChange={(e) => onUpdate({ from_reminder: Number(e.target.value || 1) })}
+                        onChange={(e) =>
+                            onUpdate({
+                                from_reminder: Number(e.target.value || 1),
+                            })
+                        }
                         className="w-32"
                     />
                     <p className="text-[11px] text-muted-foreground">
-                        This tier activates after this many reminders have been sent
+                        This tier activates after this many reminders have been
+                        sent
                     </p>
                 </div>
 
                 <div className="space-y-1.5">
                     <Label className="text-xs font-medium">Role Groups</Label>
                     <div className="flex flex-wrap gap-2">
-                        {Object.entries(availableRoleGroups).map(([gKey, gLabel]) => {
-                            const isSelected = (tier.role_groups || []).includes(gKey);
-                            return (
-                                <button
-                                    key={gKey}
-                                    type="button"
-                                    onClick={() => toggleTierGroup(gKey, !isSelected)}
-                                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                                        isSelected
-                                            ? 'border-primary bg-primary/10 text-primary shadow-sm dark:border-primary dark:bg-primary/40 dark:text-primary/70'
-                                            : 'border-border bg-background text-muted-foreground hover:border-primary hover:bg-primary/10 dark:hover:border-primary/30 dark:hover:bg-primary/30'
-                                    }`}
-                                >
-                                    {isSelected && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                                    {gLabel}
-                                </button>
-                            );
-                        })}
+                        {Object.entries(availableRoleGroups).map(
+                            ([gKey, gLabel]) => {
+                                const isSelected = (
+                                    tier.role_groups || []
+                                ).includes(gKey);
+                                return (
+                                    <Button
+                                        key={gKey}
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() =>
+                                            toggleTierGroup(gKey, !isSelected)
+                                        }
+                                        className={`h-auto rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                                            isSelected
+                                                ? 'border-primary bg-primary/10 text-primary shadow-sm dark:border-primary dark:bg-primary/40 dark:text-primary/70'
+                                                : 'border-border bg-background text-muted-foreground hover:border-primary hover:bg-primary/10 dark:hover:border-primary/30 dark:hover:bg-primary/30'
+                                        }`}
+                                    >
+                                        {isSelected && (
+                                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                                        )}
+                                        {gLabel}
+                                    </Button>
+                                );
+                            },
+                        )}
                     </div>
                 </div>
             </div>
@@ -327,54 +398,79 @@ export default function NotificationEscalations({
     const [sortMode, setSortMode] = useState<SortMode>('default');
     const [timingOpen, setTimingOpen] = useState<Record<string, boolean>>({});
     const [targetsOpen, setTargetsOpen] = useState<Record<string, boolean>>({});
-    const initialRulesRef = useRef(JSON.stringify(rules));
+    const [initialRulesJson] = useState(() => JSON.stringify(rules));
 
-    const isDirty = JSON.stringify(form.data.rules) !== initialRulesRef.current;
+    const isDirty = JSON.stringify(form.data.rules) !== initialRulesJson;
 
-    const setRule = useCallback((key: string, patch: Partial<Rule>) => {
-        form.setData('rules', {
-            ...form.data.rules,
-            [key]: {
-                ...form.data.rules[key],
-                ...patch,
-            },
-        });
-    }, [form]);
+    const setRule = useCallback(
+        (key: string, patch: Partial<Rule>) => {
+            form.setData('rules', {
+                ...form.data.rules,
+                [key]: {
+                    ...form.data.rules[key],
+                    ...patch,
+                },
+            });
+        },
+        [form],
+    );
 
-    const toggleGroup = useCallback((eventKey: string, groupKey: string, on: boolean) => {
-        const existing = new Set(
-            form.data.rules[eventKey].escalate_to_role_groups || [],
-        );
-        if (on) existing.add(groupKey);
-        else existing.delete(groupKey);
-        setRule(eventKey, { escalate_to_role_groups: Array.from(existing) });
-    }, [form.data.rules, setRule]);
+    const toggleGroup = useCallback(
+        (eventKey: string, groupKey: string, on: boolean) => {
+            const existing = new Set(
+                form.data.rules[eventKey].escalate_to_role_groups || [],
+            );
+            if (on) existing.add(groupKey);
+            else existing.delete(groupKey);
+            setRule(eventKey, {
+                escalate_to_role_groups: Array.from(existing),
+            });
+        },
+        [form.data.rules, setRule],
+    );
 
-    const addTier = useCallback((eventKey: string) => {
-        const currentTiers = form.data.rules[eventKey].tiers || [];
-        const lastFromReminder = currentTiers.length > 0 ? currentTiers[currentTiers.length - 1].from_reminder : 0;
-        setRule(eventKey, {
-            tiers: [...currentTiers, { from_reminder: lastFromReminder + 1, role_groups: [] }],
-        });
-    }, [form.data.rules, setRule]);
+    const addTier = useCallback(
+        (eventKey: string) => {
+            const currentTiers = form.data.rules[eventKey].tiers || [];
+            const lastFromReminder =
+                currentTiers.length > 0
+                    ? currentTiers[currentTiers.length - 1].from_reminder
+                    : 0;
+            setRule(eventKey, {
+                tiers: [
+                    ...currentTiers,
+                    { from_reminder: lastFromReminder + 1, role_groups: [] },
+                ],
+            });
+        },
+        [form.data.rules, setRule],
+    );
 
-    const updateTier = useCallback((eventKey: string, tierIndex: number, patch: Partial<Tier>) => {
-        const currentTiers = [...(form.data.rules[eventKey].tiers || [])];
-        currentTiers[tierIndex] = { ...currentTiers[tierIndex], ...patch };
-        setRule(eventKey, { tiers: currentTiers });
-    }, [form.data.rules, setRule]);
+    const updateTier = useCallback(
+        (eventKey: string, tierIndex: number, patch: Partial<Tier>) => {
+            const currentTiers = [...(form.data.rules[eventKey].tiers || [])];
+            currentTiers[tierIndex] = { ...currentTiers[tierIndex], ...patch };
+            setRule(eventKey, { tiers: currentTiers });
+        },
+        [form.data.rules, setRule],
+    );
 
-    const removeTier = useCallback((eventKey: string, tierIndex: number) => {
-        const currentTiers = [...(form.data.rules[eventKey].tiers || [])];
-        currentTiers.splice(tierIndex, 1);
-        setRule(eventKey, { tiers: currentTiers });
-    }, [form.data.rules, setRule]);
+    const removeTier = useCallback(
+        (eventKey: string, tierIndex: number) => {
+            const currentTiers = [...(form.data.rules[eventKey].tiers || [])];
+            currentTiers.splice(tierIndex, 1);
+            setRule(eventKey, { tiers: currentTiers });
+        },
+        [form.data.rules, setRule],
+    );
 
     const allKeys = useMemo(() => Object.values(groups).flat(), [groups]);
 
     // Stats
     const stats = useMemo(() => {
-        let active = 0, ack = 0, force = 0;
+        let active = 0,
+            ack = 0,
+            force = 0;
         for (const k of allKeys) {
             const r = form.data.rules[k];
             if (!r) continue;
@@ -392,13 +488,24 @@ export default function NotificationEscalations({
         // Search
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
-            keys = keys.filter((k) => friendlyName(k).toLowerCase().includes(q) || k.toLowerCase().includes(q));
+            keys = keys.filter(
+                (k) =>
+                    friendlyName(k).toLowerCase().includes(q) ||
+                    k.toLowerCase().includes(q),
+            );
         }
 
         // Filter
-        if (filterMode === 'active') keys = keys.filter((k) => form.data.rules[k]?.enabled);
-        else if (filterMode === 'disabled') keys = keys.filter((k) => !form.data.rules[k]?.enabled);
-        else if (filterMode === 'ack') keys = keys.filter((k) => form.data.rules[k]?.enabled && form.data.rules[k]?.require_ack);
+        if (filterMode === 'active')
+            keys = keys.filter((k) => form.data.rules[k]?.enabled);
+        else if (filterMode === 'disabled')
+            keys = keys.filter((k) => !form.data.rules[k]?.enabled);
+        else if (filterMode === 'ack')
+            keys = keys.filter(
+                (k) =>
+                    form.data.rules[k]?.enabled &&
+                    form.data.rules[k]?.require_ack,
+            );
 
         // Sort
         if (sortMode === 'urgent') {
@@ -409,7 +516,10 @@ export default function NotificationEscalations({
                 // Enabled first
                 if (ra.enabled !== rb.enabled) return ra.enabled ? -1 : 1;
                 // Then by remind_after_minutes ASC (most urgent first)
-                return (ra.remind_after_minutes || 999) - (rb.remind_after_minutes || 999);
+                return (
+                    (ra.remind_after_minutes || 999) -
+                    (rb.remind_after_minutes || 999)
+                );
             });
         } else {
             // Default: enabled first
@@ -440,7 +550,9 @@ export default function NotificationEscalations({
                         e.preventDefault();
                         form.put('/settings/notifications/escalations', {
                             onSuccess: () => {
-                                initialRulesRef.current = JSON.stringify(form.data.rules);
+                                initialRulesRef.current = JSON.stringify(
+                                    form.data.rules,
+                                );
                                 setSaveSuccess(true);
                                 setTimeout(() => setSaveSuccess(false), 3000);
                             },
@@ -455,10 +567,15 @@ export default function NotificationEscalations({
                                 <Shield className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold tracking-tight text-foreground">Escalation Rules</h1>
+                                <h1 className="text-xl font-bold tracking-tight text-foreground">
+                                    Escalation Rules
+                                </h1>
                                 <p className="text-sm text-muted-foreground">
-                                    Configure automatic reminders, acknowledgement requirements, and multi-tier escalation chains.
-                                    Critical events will automatically escalate if not acknowledged within the configured timeframes.
+                                    Configure automatic reminders,
+                                    acknowledgement requirements, and multi-tier
+                                    escalation chains. Critical events will
+                                    automatically escalate if not acknowledged
+                                    within the configured timeframes.
                                 </p>
                             </div>
                         </div>
@@ -472,8 +589,12 @@ export default function NotificationEscalations({
                                     <Shield className="h-4 w-4 text-primary dark:text-primary" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-primary dark:text-primary">{stats.total}</p>
-                                    <p className="text-xs text-muted-foreground">Total Rules</p>
+                                    <p className="text-xl font-bold text-primary dark:text-primary">
+                                        {stats.total}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Total Rules
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -483,8 +604,12 @@ export default function NotificationEscalations({
                                     <Zap className="h-4 w-4 text-status-success dark:text-status-success" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-status-success dark:text-status-success">{stats.active}</p>
-                                    <p className="text-xs text-muted-foreground">Active Rules</p>
+                                    <p className="text-xl font-bold text-status-success dark:text-status-success">
+                                        {stats.active}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Active Rules
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -494,8 +619,12 @@ export default function NotificationEscalations({
                                     <Bell className="h-4 w-4 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-status-warning dark:text-status-warning">{stats.ack}</p>
-                                    <p className="text-xs text-muted-foreground">Require Acknowledgement</p>
+                                    <p className="text-xl font-bold text-status-warning dark:text-status-warning">
+                                        {stats.ack}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Require Acknowledgement
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -505,8 +634,12 @@ export default function NotificationEscalations({
                                     <Megaphone className="h-4 w-4 text-status-critical dark:text-status-critical" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-status-critical dark:text-status-critical">{stats.force}</p>
-                                    <p className="text-xs text-muted-foreground">Force Delivery</p>
+                                    <p className="text-xl font-bold text-status-critical dark:text-status-critical">
+                                        {stats.force}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Force Delivery
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -519,13 +652,32 @@ export default function NotificationEscalations({
                                 <Info className="h-4 w-4 text-status-info dark:text-status-info" />
                             </div>
                             <div className="space-y-2 text-sm text-status-info dark:text-status-info">
-                                <p className="font-semibold">How escalation works</p>
+                                <p className="font-semibold">
+                                    How escalation works
+                                </p>
                                 <p className="text-xs leading-relaxed text-status-info dark:text-status-info">
-                                    When a notification is sent and requires acknowledgement, the system will:
-                                    <span className="font-semibold"> (1)</span> Wait for the configured time before sending the first reminder,
-                                    <span className="font-semibold"> (2)</span> Send reminders at the configured interval,
-                                    <span className="font-semibold"> (3)</span> Escalate to progressively higher role groups if still unacknowledged.
-                                    Force delivery bypasses user notification preferences, ensuring critical alerts are always received.
+                                    When a notification is sent and requires
+                                    acknowledgement, the system will:
+                                    <span className="font-semibold">
+                                        {' '}
+                                        (1)
+                                    </span>{' '}
+                                    Wait for the configured time before sending
+                                    the first reminder,
+                                    <span className="font-semibold">
+                                        {' '}
+                                        (2)
+                                    </span>{' '}
+                                    Send reminders at the configured interval,
+                                    <span className="font-semibold">
+                                        {' '}
+                                        (3)
+                                    </span>{' '}
+                                    Escalate to progressively higher role groups
+                                    if still unacknowledged. Force delivery
+                                    bypasses user notification preferences,
+                                    ensuring critical alerts are always
+                                    received.
                                 </p>
                             </div>
                         </CardContent>
@@ -535,7 +687,7 @@ export default function NotificationEscalations({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         {/* Search */}
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder="Search rules by name..."
                                 value={searchQuery}
@@ -548,45 +700,48 @@ export default function NotificationEscalations({
                         <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
                             <Filter className="ml-1.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                             {filterButtons.map((fb) => (
-                                <button
+                                <Button
                                     key={fb.mode}
                                     type="button"
+                                    variant="ghost"
                                     onClick={() => setFilterMode(fb.mode)}
-                                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                                    className={`h-auto rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                         filterMode === fb.mode
                                             ? 'bg-primary text-white shadow-sm'
                                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                     }`}
                                 >
                                     {fb.label}
-                                </button>
+                                </Button>
                             ))}
                         </div>
 
                         {/* Sort */}
                         <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={() => setSortMode('default')}
-                                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                                className={`h-auto rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                     sortMode === 'default'
                                         ? 'bg-primary text-white shadow-sm'
                                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                 }`}
                             >
                                 Default
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={() => setSortMode('urgent')}
-                                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                                className={`h-auto rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                                     sortMode === 'urgent'
                                         ? 'bg-primary text-white shadow-sm'
                                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                 }`}
                             >
                                 Most Urgent First
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -611,23 +766,27 @@ export default function NotificationEscalations({
                                 className={`transition-all duration-200 ${
                                     !isEnabled
                                         ? 'opacity-50 grayscale-[30%]'
-                                        : 'border-primary/30 shadow-sm dark:border-primary/30/40'
+                                        : 'dark:border-primary/30/40 border-primary/30 shadow-sm'
                                 }`}
                             >
                                 {/* ── Card Header ── */}
                                 <CardHeader className="pb-3">
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex items-start gap-3">
-                                            <div className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${
-                                                isEnabled
-                                                    ? 'bg-primary/10 dark:bg-primary/30'
-                                                    : 'bg-muted'
-                                            }`}>
-                                                <AlertTriangle className={`h-5 w-5 ${
+                                            <div
+                                                className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${
                                                     isEnabled
-                                                        ? 'text-primary dark:text-primary'
-                                                        : 'text-muted-foreground'
-                                                }`} />
+                                                        ? 'bg-primary/10 dark:bg-primary/30'
+                                                        : 'bg-muted'
+                                                }`}
+                                            >
+                                                <AlertTriangle
+                                                    className={`h-5 w-5 ${
+                                                        isEnabled
+                                                            ? 'text-primary dark:text-primary'
+                                                            : 'text-muted-foreground'
+                                                    }`}
+                                                />
                                             </div>
                                             <div>
                                                 <CardTitle className="text-base font-bold">
@@ -644,11 +803,15 @@ export default function NotificationEscalations({
                                                     Active
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="secondary">Disabled</Badge>
+                                                <Badge variant="secondary">
+                                                    Disabled
+                                                </Badge>
                                             )}
                                             <Switch
                                                 checked={isEnabled}
-                                                onCheckedChange={(v) => setRule(k, { enabled: !!v })}
+                                                onCheckedChange={(v) =>
+                                                    setRule(k, { enabled: !!v })
+                                                }
                                             />
                                         </div>
                                     </div>
@@ -657,52 +820,89 @@ export default function NotificationEscalations({
                                 {isEnabled ? (
                                     <CardContent className="space-y-4 pt-0">
                                         {/* ── Section 1: Escalation Flow (always visible) ── */}
-                                        <EscalationTimeline rule={r} availableRoleGroups={availableRoleGroups} />
+                                        <EscalationTimeline
+                                            rule={r}
+                                            availableRoleGroups={
+                                                availableRoleGroups
+                                            }
+                                        />
 
                                         {/* ── Section 2: Timing & Delivery (collapsible, default open) ── */}
                                         <Collapsible
                                             open={isTimingOpen}
-                                            onOpenChange={(open) => setTimingOpen((prev) => ({ ...prev, [k]: open }))}
+                                            onOpenChange={(open) =>
+                                                setTimingOpen((prev) => ({
+                                                    ...prev,
+                                                    [k]: open,
+                                                }))
+                                            }
                                         >
                                             <CollapsibleTrigger asChild>
-                                                <button
+                                                <Button
                                                     type="button"
-                                                    className="flex w-full items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50"
+                                                    variant="outline"
+                                                    className="h-auto w-full justify-start gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50"
                                                 >
                                                     <Timer className="h-4 w-4 text-primary" />
                                                     Timing & Delivery
-                                                    <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${isTimingOpen ? 'rotate-180' : ''}`} />
-                                                </button>
+                                                    <ChevronDown
+                                                        className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${isTimingOpen ? 'rotate-180' : ''}`}
+                                                    />
+                                                </Button>
                                             </CollapsibleTrigger>
                                             <CollapsibleContent>
                                                 <div className="mt-3 space-y-5 rounded-lg border bg-muted/20 p-4">
                                                     {/* Timing inputs - 3 column grid */}
                                                     <div className="grid gap-4 sm:grid-cols-3">
                                                         <div className="space-y-1.5">
-                                                            <Label htmlFor={`${k}-remind`} className="text-xs font-semibold">
-                                                                First reminder after
+                                                            <Label
+                                                                htmlFor={`${k}-remind`}
+                                                                className="text-xs font-semibold"
+                                                            >
+                                                                First reminder
+                                                                after
                                                             </Label>
                                                             <div className="relative">
                                                                 <Input
                                                                     id={`${k}-remind`}
                                                                     type="number"
                                                                     min={1}
-                                                                    value={r.remind_after_minutes}
-                                                                    onChange={(e) =>
-                                                                        setRule(k, { remind_after_minutes: Number(e.target.value || 0) })
+                                                                    value={
+                                                                        r.remind_after_minutes
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setRule(
+                                                                            k,
+                                                                            {
+                                                                                remind_after_minutes:
+                                                                                    Number(
+                                                                                        e
+                                                                                            .target
+                                                                                            .value ||
+                                                                                            0,
+                                                                                    ),
+                                                                            },
+                                                                        )
                                                                     }
                                                                     className="pr-16"
                                                                 />
-                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                                <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
                                                                     minutes
                                                                 </span>
                                                             </div>
                                                             <p className="text-[11px] text-muted-foreground">
-                                                                Time before first reminder is sent
+                                                                Time before
+                                                                first reminder
+                                                                is sent
                                                             </p>
                                                         </div>
                                                         <div className="space-y-1.5">
-                                                            <Label htmlFor={`${k}-repeat`} className="text-xs font-semibold">
+                                                            <Label
+                                                                htmlFor={`${k}-repeat`}
+                                                                className="text-xs font-semibold"
+                                                            >
                                                                 Repeat every
                                                             </Label>
                                                             <div className="relative">
@@ -710,101 +910,202 @@ export default function NotificationEscalations({
                                                                     id={`${k}-repeat`}
                                                                     type="number"
                                                                     min={1}
-                                                                    value={r.repeat_every_minutes}
-                                                                    onChange={(e) =>
-                                                                        setRule(k, { repeat_every_minutes: Number(e.target.value || 0) })
+                                                                    value={
+                                                                        r.repeat_every_minutes
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setRule(
+                                                                            k,
+                                                                            {
+                                                                                repeat_every_minutes:
+                                                                                    Number(
+                                                                                        e
+                                                                                            .target
+                                                                                            .value ||
+                                                                                            0,
+                                                                                    ),
+                                                                            },
+                                                                        )
                                                                     }
                                                                     className="pr-16"
                                                                 />
-                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                                <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
                                                                     minutes
                                                                 </span>
                                                             </div>
                                                             <p className="text-[11px] text-muted-foreground">
-                                                                Interval between subsequent reminders
+                                                                Interval between
+                                                                subsequent
+                                                                reminders
                                                             </p>
                                                         </div>
                                                         <div className="space-y-1.5">
-                                                            <Label htmlFor={`${k}-max`} className="text-xs font-semibold">
+                                                            <Label
+                                                                htmlFor={`${k}-max`}
+                                                                className="text-xs font-semibold"
+                                                            >
                                                                 Max reminders
                                                             </Label>
                                                             <Input
                                                                 id={`${k}-max`}
                                                                 type="number"
                                                                 min={0}
-                                                                value={r.max_reminders}
+                                                                value={
+                                                                    r.max_reminders
+                                                                }
                                                                 onChange={(e) =>
-                                                                    setRule(k, { max_reminders: Number(e.target.value || 0) })
+                                                                    setRule(k, {
+                                                                        max_reminders:
+                                                                            Number(
+                                                                                e
+                                                                                    .target
+                                                                                    .value ||
+                                                                                    0,
+                                                                            ),
+                                                                    })
                                                                 }
                                                             />
                                                             <p className="text-[11px] text-muted-foreground">
-                                                                0 = unlimited reminders until acknowledged
+                                                                0 = unlimited
+                                                                reminders until
+                                                                acknowledged
                                                             </p>
                                                         </div>
                                                     </div>
 
                                                     {/* Toggle switches */}
                                                     <div className="space-y-3">
+                                                        {/* eslint-disable-next-line no-restricted-syntax -- Switch rows are compact form controls inside an existing settings Card. */}
                                                         <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3">
                                                             <div>
-                                                                <Label htmlFor={`${k}-ack`} className="cursor-pointer text-sm font-medium">
-                                                                    Require acknowledgement
+                                                                <Label
+                                                                    htmlFor={`${k}-ack`}
+                                                                    className="cursor-pointer text-sm font-medium"
+                                                                >
+                                                                    Require
+                                                                    acknowledgement
                                                                 </Label>
                                                                 <p className="text-[11px] text-muted-foreground">
-                                                                    Recipient must explicitly acknowledge this notification
+                                                                    Recipient
+                                                                    must
+                                                                    explicitly
+                                                                    acknowledge
+                                                                    this
+                                                                    notification
                                                                 </p>
                                                             </div>
                                                             <Switch
                                                                 id={`${k}-ack`}
-                                                                checked={!!r.require_ack}
-                                                                onCheckedChange={(v) => setRule(k, { require_ack: !!v })}
+                                                                checked={
+                                                                    !!r.require_ack
+                                                                }
+                                                                onCheckedChange={(
+                                                                    v,
+                                                                ) =>
+                                                                    setRule(k, {
+                                                                        require_ack:
+                                                                            !!v,
+                                                                    })
+                                                                }
                                                             />
                                                         </div>
 
+                                                        {/* eslint-disable-next-line no-restricted-syntax -- Switch rows are compact form controls inside an existing settings Card. */}
                                                         <div className="flex items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3">
                                                             <div>
                                                                 <Label
                                                                     htmlFor={`${k}-ackclose`}
                                                                     className={`cursor-pointer text-sm font-medium ${!r.require_ack ? 'opacity-50' : ''}`}
                                                                 >
-                                                                    Must acknowledge before close
+                                                                    Must
+                                                                    acknowledge
+                                                                    before close
                                                                 </Label>
-                                                                <p className={`text-[11px] text-muted-foreground ${!r.require_ack ? 'opacity-50' : ''}`}>
-                                                                    Cannot close or resolve the source event without acknowledging
+                                                                <p
+                                                                    className={`text-[11px] text-muted-foreground ${!r.require_ack ? 'opacity-50' : ''}`}
+                                                                >
+                                                                    Cannot close
+                                                                    or resolve
+                                                                    the source
+                                                                    event
+                                                                    without
+                                                                    acknowledging
                                                                 </p>
                                                             </div>
                                                             <Switch
                                                                 id={`${k}-ackclose`}
-                                                                checked={!!r.must_ack_before_close}
-                                                                onCheckedChange={(v) => setRule(k, { must_ack_before_close: !!v })}
-                                                                disabled={!r.require_ack}
+                                                                checked={
+                                                                    !!r.must_ack_before_close
+                                                                }
+                                                                onCheckedChange={(
+                                                                    v,
+                                                                ) =>
+                                                                    setRule(k, {
+                                                                        must_ack_before_close:
+                                                                            !!v,
+                                                                    })
+                                                                }
+                                                                disabled={
+                                                                    !r.require_ack
+                                                                }
                                                             />
                                                         </div>
 
-                                                        <div className={`flex items-center justify-between gap-4 rounded-lg border px-4 py-3 ${
-                                                            r.force_delivery
-                                                                ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
-                                                                : 'bg-background'
-                                                        }`}>
+                                                        <div
+                                                            className={`flex items-center justify-between gap-4 rounded-lg border px-4 py-3 ${
+                                                                r.force_delivery
+                                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                                                    : 'bg-background'
+                                                            }`}
+                                                        >
                                                             <div>
-                                                                <Label htmlFor={`${k}-force`} className="cursor-pointer text-sm font-medium">
-                                                                    Force delivery
+                                                                <Label
+                                                                    htmlFor={`${k}-force`}
+                                                                    className="cursor-pointer text-sm font-medium"
+                                                                >
+                                                                    Force
+                                                                    delivery
                                                                 </Label>
                                                                 <p className="text-[11px] text-muted-foreground">
-                                                                    Bypass user notification preferences &mdash; always deliver
+                                                                    Bypass user
+                                                                    notification
+                                                                    preferences
+                                                                    &mdash;
+                                                                    always
+                                                                    deliver
                                                                 </p>
                                                                 {r.force_delivery && (
                                                                     <div className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-status-critical dark:text-status-critical">
                                                                         <AlertTriangle className="h-3.5 w-3.5" />
-                                                                        This will override individual user preferences
+                                                                        This
+                                                                        will
+                                                                        override
+                                                                        individual
+                                                                        user
+                                                                        preferences
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             <Switch
                                                                 id={`${k}-force`}
-                                                                checked={!!r.force_delivery}
-                                                                onCheckedChange={(v) => setRule(k, { force_delivery: !!v })}
-                                                                className={r.force_delivery ? 'data-[state=checked]:bg-status-critical' : ''}
+                                                                checked={
+                                                                    !!r.force_delivery
+                                                                }
+                                                                onCheckedChange={(
+                                                                    v,
+                                                                ) =>
+                                                                    setRule(k, {
+                                                                        force_delivery:
+                                                                            !!v,
+                                                                    })
+                                                                }
+                                                                className={
+                                                                    r.force_delivery
+                                                                        ? 'data-[state=checked]:bg-status-critical'
+                                                                        : ''
+                                                                }
                                                             />
                                                         </div>
                                                     </div>
@@ -815,50 +1116,99 @@ export default function NotificationEscalations({
                                         {/* ── Section 3: Escalation Targets (collapsible) ── */}
                                         <Collapsible
                                             open={isTargetsOpen}
-                                            onOpenChange={(open) => setTargetsOpen((prev) => ({ ...prev, [k]: open }))}
+                                            onOpenChange={(open) =>
+                                                setTargetsOpen((prev) => ({
+                                                    ...prev,
+                                                    [k]: open,
+                                                }))
+                                            }
                                         >
                                             <CollapsibleTrigger asChild>
-                                                <button
+                                                <Button
                                                     type="button"
-                                                    className="flex w-full items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50"
+                                                    variant="outline"
+                                                    className="h-auto w-full justify-start gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50"
                                                 >
                                                     <TrendingUp className="h-4 w-4 text-primary" />
                                                     Escalation Targets
-                                                    {(r.escalate_to_role_groups?.length > 0 || tiers.length > 0) && (
-                                                        <Badge variant="secondary" className="ml-1 text-[10px]">
-                                                            {(r.escalate_to_role_groups?.length || 0) + tiers.length} configured
+                                                    {(r.escalate_to_role_groups
+                                                        ?.length > 0 ||
+                                                        tiers.length > 0) && (
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="ml-1 text-[10px]"
+                                                        >
+                                                            {(r
+                                                                .escalate_to_role_groups
+                                                                ?.length || 0) +
+                                                                tiers.length}{' '}
+                                                            configured
                                                         </Badge>
                                                     )}
-                                                    <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${isTargetsOpen ? 'rotate-180' : ''}`} />
-                                                </button>
+                                                    <ChevronDown
+                                                        className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${isTargetsOpen ? 'rotate-180' : ''}`}
+                                                    />
+                                                </Button>
                                             </CollapsibleTrigger>
                                             <CollapsibleContent>
                                                 <div className="mt-3 space-y-5 rounded-lg border bg-muted/20 p-4">
                                                     {/* Primary escalation groups */}
                                                     <div className="space-y-2">
-                                                        <Label className="text-xs font-semibold">Primary Escalation Groups</Label>
+                                                        <Label className="text-xs font-semibold">
+                                                            Primary Escalation
+                                                            Groups
+                                                        </Label>
                                                         <p className="text-[11px] text-muted-foreground">
-                                                            Select which role groups should receive escalated notifications
+                                                            Select which role
+                                                            groups should
+                                                            receive escalated
+                                                            notifications
                                                         </p>
                                                         <div className="flex flex-wrap gap-2">
-                                                            {Object.entries(availableRoleGroups).map(([gKey, gLabel]) => {
-                                                                const isSelected = (r.escalate_to_role_groups || []).includes(gKey);
-                                                                return (
-                                                                    <button
-                                                                        key={gKey}
-                                                                        type="button"
-                                                                        onClick={() => toggleGroup(k, gKey, !isSelected)}
-                                                                        className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                                                                            isSelected
-                                                                                ? 'border-primary bg-primary/10 text-primary shadow-sm dark:border-primary dark:bg-primary/40 dark:text-primary/70'
-                                                                                : 'border-border bg-background text-muted-foreground hover:border-primary hover:bg-primary/10 dark:hover:border-primary/30 dark:hover:bg-primary/30'
-                                                                        }`}
-                                                                    >
-                                                                        {isSelected && <CheckCircle2 className="mr-1.5 h-3 w-3" />}
-                                                                        {gLabel}
-                                                                    </button>
-                                                                );
-                                                            })}
+                                                            {Object.entries(
+                                                                availableRoleGroups,
+                                                            ).map(
+                                                                ([
+                                                                    gKey,
+                                                                    gLabel,
+                                                                ]) => {
+                                                                    const isSelected =
+                                                                        (
+                                                                            r.escalate_to_role_groups ||
+                                                                            []
+                                                                        ).includes(
+                                                                            gKey,
+                                                                        );
+                                                                    return (
+                                                                        <Button
+                                                                            key={
+                                                                                gKey
+                                                                            }
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                toggleGroup(
+                                                                                    k,
+                                                                                    gKey,
+                                                                                    !isSelected,
+                                                                                )
+                                                                            }
+                                                                            className={`h-auto rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                                                                                isSelected
+                                                                                    ? 'border-primary bg-primary/10 text-primary shadow-sm dark:border-primary dark:bg-primary/40 dark:text-primary/70'
+                                                                                    : 'border-border bg-background text-muted-foreground hover:border-primary hover:bg-primary/10 dark:hover:border-primary/30 dark:hover:bg-primary/30'
+                                                                            }`}
+                                                                        >
+                                                                            {isSelected && (
+                                                                                <CheckCircle2 className="mr-1.5 h-3 w-3" />
+                                                                            )}
+                                                                            {
+                                                                                gLabel
+                                                                            }
+                                                                        </Button>
+                                                                    );
+                                                                },
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -866,41 +1216,87 @@ export default function NotificationEscalations({
                                                     <div className="space-y-3">
                                                         <div className="flex items-center justify-between">
                                                             <div>
-                                                                <Label className="text-xs font-semibold">Tiered Escalation</Label>
+                                                                <Label className="text-xs font-semibold">
+                                                                    Tiered
+                                                                    Escalation
+                                                                </Label>
                                                                 <p className="text-[11px] text-muted-foreground">
-                                                                    Tiers allow progressive escalation &mdash; start with direct team, then coordinators, then managers
+                                                                    Tiers allow
+                                                                    progressive
+                                                                    escalation
+                                                                    &mdash;
+                                                                    start with
+                                                                    direct team,
+                                                                    then
+                                                                    coordinators,
+                                                                    then
+                                                                    managers
                                                                 </p>
                                                             </div>
                                                             <Button
                                                                 type="button"
                                                                 variant="outline"
                                                                 size="sm"
-                                                                onClick={() => addTier(k)}
+                                                                onClick={() =>
+                                                                    addTier(k)
+                                                                }
                                                                 className="gap-1.5 border-primary text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary/70 dark:hover:bg-primary/30"
                                                             >
                                                                 <Plus className="h-3.5 w-3.5" />
-                                                                Add Escalation Tier
+                                                                Add Escalation
+                                                                Tier
                                                             </Button>
                                                         </div>
 
                                                         {tiers.length > 0 ? (
                                                             <div className="relative space-y-3 pl-4">
                                                                 {/* Connecting line */}
-                                                                <div className="absolute bottom-4 left-[1.1rem] top-4 w-0.5 bg-primary dark:from-primary dark:via-primary dark:to-primary" />
-                                                                {tiers.map((tier, idx) => (
-                                                                    <TierEditor
-                                                                        key={idx}
-                                                                        tier={tier}
-                                                                        index={idx}
-                                                                        availableRoleGroups={availableRoleGroups}
-                                                                        onUpdate={(patch) => updateTier(k, idx, patch)}
-                                                                        onRemove={() => removeTier(k, idx)}
-                                                                    />
-                                                                ))}
+                                                                <div className="absolute top-4 bottom-4 left-[1.1rem] w-0.5 bg-primary dark:from-primary dark:via-primary dark:to-primary" />
+                                                                {tiers.map(
+                                                                    (
+                                                                        tier,
+                                                                        idx,
+                                                                    ) => (
+                                                                        <TierEditor
+                                                                            key={
+                                                                                idx
+                                                                            }
+                                                                            tier={
+                                                                                tier
+                                                                            }
+                                                                            index={
+                                                                                idx
+                                                                            }
+                                                                            availableRoleGroups={
+                                                                                availableRoleGroups
+                                                                            }
+                                                                            onUpdate={(
+                                                                                patch,
+                                                                            ) =>
+                                                                                updateTier(
+                                                                                    k,
+                                                                                    idx,
+                                                                                    patch,
+                                                                                )
+                                                                            }
+                                                                            onRemove={() =>
+                                                                                removeTier(
+                                                                                    k,
+                                                                                    idx,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    ),
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <div className="rounded-lg border border-dashed border-muted-foreground/30 px-4 py-6 text-center text-xs text-muted-foreground">
-                                                                No escalation tiers configured. Add a tier to enable progressive escalation.
+                                                                No escalation
+                                                                tiers
+                                                                configured. Add
+                                                                a tier to enable
+                                                                progressive
+                                                                escalation.
                                                             </div>
                                                         )}
                                                     </div>
@@ -911,7 +1307,8 @@ export default function NotificationEscalations({
                                 ) : (
                                     <CardContent className="pt-0">
                                         <div className="rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
-                                            Enable this rule to configure escalation settings
+                                            Enable this rule to configure
+                                            escalation settings
                                         </div>
                                     </CardContent>
                                 )}
@@ -923,8 +1320,12 @@ export default function NotificationEscalations({
                     {filteredKeys.length === 0 && (
                         <div className="rounded-lg border border-dashed px-6 py-12 text-center">
                             <Search className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-                            <p className="text-sm font-medium text-muted-foreground">No rules match your filters</p>
-                            <p className="mt-1 text-xs text-muted-foreground/70">Try adjusting your search or filter criteria</p>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                No rules match your filters
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground/70">
+                                Try adjusting your search or filter criteria
+                            </p>
                         </div>
                     )}
 
@@ -933,6 +1334,7 @@ export default function NotificationEscalations({
                     )}
 
                     {/* ── Sticky Save Bar ── */}
+                    {/* eslint-disable-next-line no-restricted-syntax -- Sticky save bar needs sticky positioning/backdrop styling, not Card spacing. */}
                     <div className="sticky bottom-0 -mx-1 rounded-xl border bg-background/95 px-4 py-3 shadow-lg backdrop-blur-sm">
                         <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
@@ -955,7 +1357,9 @@ export default function NotificationEscalations({
                                 className="gap-2 bg-primary px-6 hover:bg-primary"
                             >
                                 <Shield className="h-4 w-4" />
-                                {form.processing ? 'Saving...' : 'Save Escalation Rules'}
+                                {form.processing
+                                    ? 'Saving...'
+                                    : 'Save Escalation Rules'}
                             </Button>
                         </div>
                     </div>

@@ -1,21 +1,27 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { type BreadcrumbItem } from '@/types';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
-    Users,
-    UserPlus,
-    Clock,
-    ShieldAlert,
-    Search,
-    X,
-    Download,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import {
     Briefcase,
+    Clock,
+    Download,
+    Search,
+    ShieldAlert,
+    UserPlus,
+    Users,
+    X,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -99,11 +105,15 @@ function getAvatarColor(id: number): string {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-    full_time: 'bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
-    part_time: 'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
+    full_time:
+        'bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
+    part_time:
+        'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
     casual: 'bg-primary/10 text-primary border-primary dark:bg-primary/10 dark:text-primary/70 dark:border-primary/30',
-    fixed_term: 'bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
-    contractor: 'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
+    fixed_term:
+        'bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
+    contractor:
+        'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
 };
 
 const TYPE_BAR_COLORS: Record<string, string> = {
@@ -123,7 +133,11 @@ function formatDate(value?: string | null): string {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 }
 
 /* ------------------------------------------------------------------ */
@@ -164,19 +178,29 @@ const STAT_COLORS = {
 function StatCard({ label, value, icon: Icon, color, href }: StatCardProps) {
     const c = STAT_COLORS[color];
     const inner = (
-        <div className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}>
-            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}>
+        <div
+            className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}
+        >
+            <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}
+            >
                 <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
                 <p className="text-2xl font-bold tracking-tight">{value}</p>
-                <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="truncate text-xs font-medium text-muted-foreground">
+                    {label}
+                </p>
             </div>
         </div>
     );
 
     if (href) {
-        return <Link href={href} className="block">{inner}</Link>;
+        return (
+            <Link href={href} className="block">
+                {inner}
+            </Link>
+        );
     }
     return inner;
 }
@@ -185,7 +209,14 @@ function StatCard({ label, value, icon: Icon, color, href }: StatCardProps) {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function EmployeesIndex({ profiles, sites, departments, filters, summary, can }: Props) {
+export default function EmployeesIndex({
+    profiles,
+    sites,
+    departments,
+    filters,
+    summary,
+    can,
+}: Props) {
     function applyFilter(key: string, value: string | null) {
         router.get(
             '/hr/people',
@@ -198,9 +229,16 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
         router.get('/hr/people', {}, { preserveState: true, replace: true });
     }
 
-    const hasFilters = !!(filters.q || filters.status || filters.site_id || filters.department || filters.employment_type);
+    const hasFilters = !!(
+        filters.q ||
+        filters.status ||
+        filters.site_id ||
+        filters.department ||
+        filters.employment_type
+    );
 
-    const typeTotal = Object.values(summary.type_counts).reduce((a, b) => a + b, 0) || 1;
+    const typeTotal =
+        Object.values(summary.type_counts).reduce((a, b) => a + b, 0) || 1;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -210,9 +248,12 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">People</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            People
+                        </h1>
                         <p className="text-sm text-muted-foreground">
-                            Manage your workforce &mdash; {profiles.total} {profiles.total === 1 ? 'person' : 'people'} total
+                            Manage your workforce &mdash; {profiles.total}{' '}
+                            {profiles.total === 1 ? 'person' : 'people'} total
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -225,9 +266,24 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <StatCard label="Active Employees" value={summary.active} icon={Users} color="blue" />
-                    <StatCard label="New Hires (30 days)" value={summary.new_hires} icon={UserPlus} color="emerald" />
-                    <StatCard label="On Probation" value={summary.on_probation} icon={Clock} color="amber" />
+                    <StatCard
+                        label="Active Employees"
+                        value={summary.active}
+                        icon={Users}
+                        color="blue"
+                    />
+                    <StatCard
+                        label="New Hires (30 days)"
+                        value={summary.new_hires}
+                        icon={UserPlus}
+                        color="emerald"
+                    />
+                    <StatCard
+                        label="On Probation"
+                        value={summary.on_probation}
+                        icon={Clock}
+                        color="amber"
+                    />
                     <StatCard
                         label="Compliance Alerts"
                         value={summary.compliance_alerts}
@@ -243,25 +299,41 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                         <CardContent className="py-3">
                             <div className="mb-2 flex items-center gap-2">
                                 <Briefcase className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Employment Type Breakdown</span>
+                                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    Employment Type Breakdown
+                                </span>
                             </div>
                             <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                                {Object.entries(summary.type_counts).map(([type, count]) => (
-                                    <div
-                                        key={type}
-                                        className={`${TYPE_BAR_COLORS[type] || 'bg-muted'} transition-all`}
-                                        style={{ width: `${(count / typeTotal) * 100}%` }}
-                                        title={`${formatLabel(type)}: ${count}`}
-                                    />
-                                ))}
+                                {Object.entries(summary.type_counts).map(
+                                    ([type, count]) => (
+                                        <div
+                                            key={type}
+                                            className={`${TYPE_BAR_COLORS[type] || 'bg-muted'} transition-all`}
+                                            style={{
+                                                width: `${(count / typeTotal) * 100}%`,
+                                            }}
+                                            title={`${formatLabel(type)}: ${count}`}
+                                        />
+                                    ),
+                                )}
                             </div>
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                                {Object.entries(summary.type_counts).map(([type, count]) => (
-                                    <div key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <span className={`inline-block h-2.5 w-2.5 rounded-full ${TYPE_BAR_COLORS[type] || 'bg-muted'}`} />
-                                        {formatLabel(type)} <span className="font-medium text-foreground">{count}</span>
-                                    </div>
-                                ))}
+                                {Object.entries(summary.type_counts).map(
+                                    ([type, count]) => (
+                                        <div
+                                            key={type}
+                                            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                        >
+                                            <span
+                                                className={`inline-block h-2.5 w-2.5 rounded-full ${TYPE_BAR_COLORS[type] || 'bg-muted'}`}
+                                            />
+                                            {formatLabel(type)}{' '}
+                                            <span className="font-medium text-foreground">
+                                                {count}
+                                            </span>
+                                        </div>
+                                    ),
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -270,18 +342,27 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search by name or email..."
                             defaultValue={filters.q}
                             className="w-64 pl-9"
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') applyFilter('q', (e.target as HTMLInputElement).value);
+                                if (e.key === 'Enter')
+                                    applyFilter(
+                                        'q',
+                                        (e.target as HTMLInputElement).value,
+                                    );
                             }}
                         />
                     </div>
 
-                    <Select value={filters.status || NONE} onValueChange={(v) => applyFilter('status', v === NONE ? null : v)}>
+                    <Select
+                        value={filters.status || NONE}
+                        onValueChange={(v) =>
+                            applyFilter('status', v === NONE ? null : v)
+                        }
+                    >
                         <SelectTrigger className="w-36">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -292,33 +373,57 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                         </SelectContent>
                     </Select>
 
-                    <Select value={filters.site_id || NONE} onValueChange={(v) => applyFilter('site_id', v === NONE ? null : v)}>
+                    <Select
+                        value={filters.site_id || NONE}
+                        onValueChange={(v) =>
+                            applyFilter('site_id', v === NONE ? null : v)
+                        }
+                    >
                         <SelectTrigger className="w-44">
                             <SelectValue placeholder="Site" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value={NONE}>All Sites</SelectItem>
                             {sites.map((s) => (
-                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                <SelectItem key={s.id} value={String(s.id)}>
+                                    {s.name}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
 
                     {departments.length > 0 && (
-                        <Select value={filters.department || NONE} onValueChange={(v) => applyFilter('department', v === NONE ? null : v)}>
+                        <Select
+                            value={filters.department || NONE}
+                            onValueChange={(v) =>
+                                applyFilter('department', v === NONE ? null : v)
+                            }
+                        >
                             <SelectTrigger className="w-44">
                                 <SelectValue placeholder="Department" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={NONE}>All Departments</SelectItem>
+                                <SelectItem value={NONE}>
+                                    All Departments
+                                </SelectItem>
                                 {departments.map((d) => (
-                                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                                    <SelectItem key={d.id} value={String(d.id)}>
+                                        {d.name}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     )}
 
-                    <Select value={filters.employment_type || NONE} onValueChange={(v) => applyFilter('employment_type', v === NONE ? null : v)}>
+                    <Select
+                        value={filters.employment_type || NONE}
+                        onValueChange={(v) =>
+                            applyFilter(
+                                'employment_type',
+                                v === NONE ? null : v,
+                            )
+                        }
+                    >
                         <SelectTrigger className="w-40">
                             <SelectValue placeholder="Type" />
                         </SelectTrigger>
@@ -327,13 +432,22 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                             <SelectItem value="full_time">Full Time</SelectItem>
                             <SelectItem value="part_time">Part Time</SelectItem>
                             <SelectItem value="casual">Casual</SelectItem>
-                            <SelectItem value="fixed_term">Fixed Term</SelectItem>
-                            <SelectItem value="contractor">Contractor</SelectItem>
+                            <SelectItem value="fixed_term">
+                                Fixed Term
+                            </SelectItem>
+                            <SelectItem value="contractor">
+                                Contractor
+                            </SelectItem>
                         </SelectContent>
                     </Select>
 
                     {hasFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="gap-1.5 text-muted-foreground"
+                        >
                             <X className="h-3.5 w-3.5" />
                             Clear
                         </Button>
@@ -347,14 +461,30 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                             <table className="w-full text-sm">
                                 <thead className="border-b bg-muted/50">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Employee</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Employee #</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Position</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Department</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Type</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Site</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Start Date</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Employee
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase lg:table-cell">
+                                            Employee #
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Position
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase md:table-cell">
+                                            Department
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase sm:table-cell">
+                                            Type
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase xl:table-cell">
+                                            Site
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase xl:table-cell">
+                                            Start Date
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Status
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -363,48 +493,71 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                                             key={p.id}
                                             className="group cursor-pointer transition-colors hover:bg-muted/40"
                                             onClick={() => {
-                                                if (p.profile_id) router.visit(`/hr/people/${p.profile_id}`);
+                                                if (p.profile_id)
+                                                    router.visit(
+                                                        `/hr/people/${p.profile_id}`,
+                                                    );
                                             }}
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${getAvatarColor(p.id)}`}>
-                                                        {getInitials(p.user.name)}
+                                                    <div
+                                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${getAvatarColor(p.id)}`}
+                                                    >
+                                                        {getInitials(
+                                                            p.user.name,
+                                                        )}
                                                     </div>
                                                     <div className="min-w-0">
                                                         {p.profile_id ? (
                                                             <Link
                                                                 href={`/hr/people/${p.profile_id}`}
                                                                 className="font-medium text-foreground group-hover:text-primary"
-                                                                onClick={(e) => e.stopPropagation()}
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
                                                             >
                                                                 {p.user.name}
                                                             </Link>
                                                         ) : (
-                                                            <span className="font-medium">{p.user.name}</span>
+                                                            <span className="font-medium">
+                                                                {p.user.name}
+                                                            </span>
                                                         )}
-                                                        <div className="truncate text-xs text-muted-foreground">{p.user.email}</div>
+                                                        <div className="truncate text-xs text-muted-foreground">
+                                                            {p.user.email}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground lg:table-cell">
                                                 {p.employee_number || '\u2014'}
                                             </td>
-                                            <td className="px-4 py-3 text-sm">{p.position_title || '\u2014'}</td>
+                                            <td className="px-4 py-3 text-sm">
+                                                {p.position_title || '\u2014'}
+                                            </td>
                                             <td className="hidden px-4 py-3 text-sm text-muted-foreground md:table-cell">
                                                 {p.department || '\u2014'}
                                             </td>
                                             <td className="hidden px-4 py-3 sm:table-cell">
                                                 {p.employment_type ? (
-                                                    <Badge variant="outline" className={`text-[11px] ${TYPE_STYLES[p.employment_type] || ''}`}>
-                                                        {formatLabel(p.employment_type)}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={`text-[11px] ${TYPE_STYLES[p.employment_type] || ''}`}
+                                                    >
+                                                        {formatLabel(
+                                                            p.employment_type,
+                                                        )}
                                                     </Badge>
                                                 ) : (
-                                                    <span className="text-muted-foreground">{'\u2014'}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {'\u2014'}
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="hidden px-4 py-3 text-sm text-muted-foreground xl:table-cell">
-                                                {p.primary_site?.name || '\u2014'}
+                                                {p.primary_site?.name ||
+                                                    '\u2014'}
                                             </td>
                                             <td className="hidden px-4 py-3 text-sm text-muted-foreground xl:table-cell">
                                                 {formatDate(p.start_date)}
@@ -415,21 +568,30 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                                                     className={
                                                         p.is_active
                                                             ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
-                                                            : 'border-border bg-muted text-muted-foreground dark:border-border/30 dark:bg-muted-foreground/80/10 dark:text-muted-foreground'
+                                                            : 'dark:bg-muted-foreground/80/10 border-border bg-muted text-muted-foreground dark:border-border/30 dark:text-muted-foreground'
                                                     }
                                                 >
-                                                    {p.is_active ? 'Active' : 'Inactive'}
+                                                    {p.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </td>
                                         </tr>
                                     ))}
                                     {profiles.data.length === 0 && (
                                         <tr>
-                                            <td colSpan={8} className="px-4 py-16 text-center">
+                                            <td
+                                                colSpan={8}
+                                                className="px-4 py-16 text-center"
+                                            >
                                                 <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                                                <p className="font-medium text-muted-foreground">No employees found</p>
+                                                <p className="font-medium text-muted-foreground">
+                                                    No employees found
+                                                </p>
                                                 <p className="mt-1 text-sm text-muted-foreground/70">
-                                                    {hasFilters ? 'Try adjusting your filters' : 'Add employees to get started'}
+                                                    {hasFilters
+                                                        ? 'Try adjusting your filters'
+                                                        : 'Add employees to get started'}
                                                 </p>
                                             </td>
                                         </tr>

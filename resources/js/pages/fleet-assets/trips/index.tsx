@@ -1,8 +1,13 @@
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { MiniBarChart, HorizontalBarChart, SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
+import {
+    FLEET_COLORS,
+    HorizontalBarChart,
+    MiniBarChart,
+    SparklineChart,
+} from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import LeafletMap from '@/components/leaflet-map';
 import FleetHero from '@/components/fleet-hero';
+import { FleetStatCard } from '@/components/fleet-stat-card';
+import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +21,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    formatDateTime,
+    formatDistance,
+    formatDuration,
+} from '@/lib/fleet-utils';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
@@ -35,8 +45,6 @@ import {
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatDateTime, formatDuration, formatDistance } from '@/lib/fleet-utils';
-
 
 type TripSegment = {
     id: number;
@@ -107,12 +115,18 @@ type Props = {
     };
 };
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(
+    status: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
-        case 'completed': return 'default';
-        case 'in_progress': return 'secondary';
-        case 'open': return 'outline';
-        default: return 'outline';
+        case 'completed':
+            return 'default';
+        case 'in_progress':
+            return 'secondary';
+        case 'open':
+            return 'outline';
+        default:
+            return 'outline';
     }
 }
 
@@ -133,7 +147,14 @@ export default function TripsIndex({
     const links = rawTrips?.links ?? [];
     const vehicles = rawVehicles ?? [];
     const filters = rawFilters ?? {};
-    const summary = rawSummary ?? { total_trips: 0, total_distance_km: 0, total_duration_s: 0, avg_speed_kph: 0, avg_distance_km: 0, active_trips: 0 };
+    const summary = rawSummary ?? {
+        total_trips: 0,
+        total_distance_km: 0,
+        total_duration_s: 0,
+        avg_speed_kph: 0,
+        avg_distance_km: 0,
+        active_trips: 0,
+    };
     const tripsByDay = rawTripsByDay ?? [];
     const topVehicles = rawTopVehicles ?? [];
     const distanceTrend = rawDistanceTrend ?? [];
@@ -145,30 +166,54 @@ export default function TripsIndex({
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
     function handleSort(field: string) {
-        const newDir = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
+        const newDir =
+            sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
         setSortField(field);
         setSortDir(newDir);
-        router.get(window.location.pathname, { ...filters, sort: field, direction: newDir }, { preserveState: true });
-    }
-
-    function SortHeader({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) {
-        const active = sortField === field;
-        return (
-            <th className={`px-4 py-3 cursor-pointer select-none hover:bg-muted/50 font-medium ${className ?? 'text-left'}`} onClick={() => handleSort(field)}>
-                <div className="flex items-center gap-1">
-                    {children}
-                    {active ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />}
-                </div>
-            </th>
+        router.get(
+            window.location.pathname,
+            { ...filters, sort: field, direction: newDir },
+            { preserveState: true },
         );
     }
 
+    const renderSortHeader = (
+        field: string,
+        children: React.ReactNode,
+        className?: string,
+    ) => {
+        const active = sortField === field;
+        return (
+            <th
+                className={`cursor-pointer px-4 py-3 font-medium select-none hover:bg-muted/50 ${className ?? 'text-left'}`}
+                onClick={() => handleSort(field)}
+            >
+                <div className="flex items-center gap-1">
+                    {children}
+                    {active ? (
+                        sortDir === 'asc' ? (
+                            <ChevronUp className="h-3 w-3" />
+                        ) : (
+                            <ChevronDown className="h-3 w-3" />
+                        )
+                    ) : (
+                        <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
+                    )}
+                </div>
+            </th>
+        );
+    };
+
     const applyFilters = (newFilters: Partial<typeof filters>) => {
-        router.get('/fleet-assets/trips', {
-            ...filters,
-            ...newFilters,
-            page: 1,
-        }, { preserveState: true });
+        router.get(
+            '/fleet-assets/trips',
+            {
+                ...filters,
+                ...newFilters,
+                page: 1,
+            },
+            { preserveState: true },
+        );
     };
 
     const handleSearch = () => {
@@ -199,10 +244,16 @@ export default function TripsIndex({
         });
         if (points.length === 0) {
             if (trip.start_latitude && trip.start_longitude) {
-                points.push({ lat: trip.start_latitude, lng: trip.start_longitude });
+                points.push({
+                    lat: trip.start_latitude,
+                    lng: trip.start_longitude,
+                });
             }
             if (trip.end_latitude && trip.end_longitude) {
-                points.push({ lat: trip.end_latitude, lng: trip.end_longitude });
+                points.push({
+                    lat: trip.end_latitude,
+                    lng: trip.end_longitude,
+                });
             }
         }
         return points;
@@ -228,7 +279,11 @@ export default function TripsIndex({
                     title="Trip History"
                     description="View and analyse all vehicle trips across your fleet."
                     actions={
-                        <Button variant="outline" size="sm" onClick={handleExport}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExport}
+                        >
                             <Download className="mr-2 h-4 w-4" />
                             Export CSV
                         </Button>
@@ -237,78 +292,152 @@ export default function TripsIndex({
 
                 {/* KPI Row */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                    <FleetStatCard label="TOTAL TRIPS" value={summary.total_trips ?? 0} icon={Route} color="purple" subtitle="For selected period" />
-                    <FleetStatCard label="TOTAL DISTANCE" value={formatDistance(summary.total_distance_km ?? 0)} icon={Car} color="blue" subtitle="Kilometres travelled" />
-                    <FleetStatCard label="TOTAL DURATION" value={formatDuration(summary.total_duration_s ?? 0)} icon={Clock} color="cyan" subtitle="Time on road" />
-                    <FleetStatCard label="AVG SPEED" value={summary.avg_speed_kph ? `${summary.avg_speed_kph} km/h` : '---'} icon={Gauge} color="amber" subtitle="Average max speed" />
-                    <FleetStatCard label="AVG TRIP DIST" value={formatDistance(summary.avg_distance_km ?? 0)} icon={Activity} color="purple" subtitle="Average per trip" />
-                    <FleetStatCard label="ACTIVE TRIPS" value={summary.active_trips ?? 0} icon={Zap} color="red" subtitle="Open or in progress" />
+                    <FleetStatCard
+                        label="TOTAL TRIPS"
+                        value={summary.total_trips ?? 0}
+                        icon={Route}
+                        color="purple"
+                        subtitle="For selected period"
+                    />
+                    <FleetStatCard
+                        label="TOTAL DISTANCE"
+                        value={formatDistance(summary.total_distance_km ?? 0)}
+                        icon={Car}
+                        color="blue"
+                        subtitle="Kilometres travelled"
+                    />
+                    <FleetStatCard
+                        label="TOTAL DURATION"
+                        value={formatDuration(summary.total_duration_s ?? 0)}
+                        icon={Clock}
+                        color="cyan"
+                        subtitle="Time on road"
+                    />
+                    <FleetStatCard
+                        label="AVG SPEED"
+                        value={
+                            summary.avg_speed_kph
+                                ? `${summary.avg_speed_kph} km/h`
+                                : '---'
+                        }
+                        icon={Gauge}
+                        color="amber"
+                        subtitle="Average max speed"
+                    />
+                    <FleetStatCard
+                        label="AVG TRIP DIST"
+                        value={formatDistance(summary.avg_distance_km ?? 0)}
+                        icon={Activity}
+                        color="purple"
+                        subtitle="Average per trip"
+                    />
+                    <FleetStatCard
+                        label="ACTIVE TRIPS"
+                        value={summary.active_trips ?? 0}
+                        icon={Zap}
+                        color="red"
+                        subtitle="Open or in progress"
+                    />
                 </div>
 
                 {/* Charts Row */}
                 <div className="grid gap-4 lg:grid-cols-3">
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Trips by Day</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Trips by Day
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <MiniBarChart data={tripsByDay} color={FLEET_COLORS.primary} height={120} />
+                            <MiniBarChart
+                                data={tripsByDay}
+                                color={FLEET_COLORS.primary}
+                                height={120}
+                            />
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Top Vehicles</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Top Vehicles
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <HorizontalBarChart
-                                items={topVehicles.map((v) => ({ label: v.label, value: v.value }))}
+                                items={topVehicles.map((v) => ({
+                                    label: v.label,
+                                    value: v.value,
+                                }))}
                                 color={FLEET_COLORS.secondary}
                             />
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Distance Trend</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Distance Trend
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="flex items-center justify-center">
                             {distanceTrend.length > 1 ? (
-                                <SparklineChart data={distanceTrend} color={FLEET_COLORS.accent} height={80} width={260} />
+                                <SparklineChart
+                                    data={distanceTrend}
+                                    color={FLEET_COLORS.accent}
+                                    height={80}
+                                    width={260}
+                                />
                             ) : (
-                                <p className="py-4 text-center text-sm text-muted-foreground">Not enough data yet.</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                    Not enough data yet.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search vehicle or address..."
-                            className="pl-9 w-64"
+                            className="w-64 pl-9"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && handleSearch()
+                            }
                         />
                     </div>
                     <Input
                         type="date"
                         className="w-40"
                         value={filters.date_from ?? ''}
-                        onChange={(e) => applyFilters({ date_from: e.target.value || undefined })}
+                        onChange={(e) =>
+                            applyFilters({
+                                date_from: e.target.value || undefined,
+                            })
+                        }
                         placeholder="From date"
                     />
                     <Input
                         type="date"
                         className="w-40"
                         value={filters.date_to ?? ''}
-                        onChange={(e) => applyFilters({ date_to: e.target.value || undefined })}
+                        onChange={(e) =>
+                            applyFilters({
+                                date_to: e.target.value || undefined,
+                            })
+                        }
                         placeholder="To date"
                     />
                     <Select
                         value={filters.vehicle_id ?? 'all'}
-                        onValueChange={(v) => applyFilters({ vehicle_id: v === 'all' ? undefined : v })}
+                        onValueChange={(v) =>
+                            applyFilters({
+                                vehicle_id: v === 'all' ? undefined : v,
+                            })
+                        }
                     >
                         <SelectTrigger className="w-48">
                             <SelectValue placeholder="All vehicles" />
@@ -316,13 +445,19 @@ export default function TripsIndex({
                         <SelectContent>
                             <SelectItem value="all">All vehicles</SelectItem>
                             {vehicles.map((v) => (
-                                <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                                <SelectItem key={v.id} value={String(v.id)}>
+                                    {v.name}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                     <Select
                         value={filters.status ?? 'all'}
-                        onValueChange={(v) => applyFilters({ status: v === 'all' ? undefined : v })}
+                        onValueChange={(v) =>
+                            applyFilters({
+                                status: v === 'all' ? undefined : v,
+                            })
+                        }
                     >
                         <SelectTrigger className="w-36">
                             <SelectValue placeholder="Status" />
@@ -330,7 +465,9 @@ export default function TripsIndex({
                         <SelectContent>
                             <SelectItem value="all">All statuses</SelectItem>
                             <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="in_progress">
+                                In Progress
+                            </SelectItem>
                             <SelectItem value="open">Open</SelectItem>
                         </SelectContent>
                     </Select>
@@ -338,20 +475,36 @@ export default function TripsIndex({
 
                 {/* Trip Table */}
                 {tripsData.length > 0 ? (
-                    <div className="rounded-lg border overflow-hidden">
+                    <div className="overflow-hidden rounded-lg border">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
                                     <th className="w-8 px-2 py-3" />
-                                    <th className="px-4 py-3 text-left font-medium">Vehicle</th>
-                                    <th className="px-4 py-3 text-left font-medium">Driver</th>
-                                    <SortHeader field="started_at">Start Time</SortHeader>
-                                    <th className="px-4 py-3 text-left font-medium">End Time</th>
-                                    <SortHeader field="distance_km">Distance</SortHeader>
-                                    <SortHeader field="duration_s">Duration</SortHeader>
-                                    <th className="px-4 py-3 text-right font-medium">Max Speed</th>
-                                    <SortHeader field="status">Status</SortHeader>
-                                    <th className="px-4 py-3 text-center font-medium">Type</th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Vehicle
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Driver
+                                    </th>
+                                    {renderSortHeader(
+                                        'started_at',
+                                        'Start Time',
+                                    )}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        End Time
+                                    </th>
+                                    {renderSortHeader(
+                                        'distance_km',
+                                        'Distance',
+                                    )}
+                                    {renderSortHeader('duration_s', 'Duration')}
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Max Speed
+                                    </th>
+                                    {renderSortHeader('status', 'Status')}
+                                    <th className="px-4 py-3 text-center font-medium">
+                                        Type
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -420,7 +573,7 @@ function TripRow({
     return (
         <>
             <tr
-                className={`border-b transition-colors hover:bg-muted/30 cursor-pointer ${isActive ? 'border-l-2 border-l-purple-500' : ''}`}
+                className={`cursor-pointer border-b transition-colors hover:bg-muted/30 ${isActive ? 'border-l-2 border-l-purple-500' : ''}`}
                 onClick={onToggle}
             >
                 <td className="px-2 py-3 text-center">
@@ -433,16 +586,28 @@ function TripRow({
                 <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                         <Route className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{trip.asset?.name ?? '---'}</span>
+                        <span className="font-medium">
+                            {trip.asset?.name ?? '---'}
+                        </span>
                     </div>
                 </td>
                 <td className="px-4 py-3">{trip.driver?.name ?? '---'}</td>
-                <td className="px-4 py-3">{trip.started_at ? formatDateTime(trip.started_at) : '---'}</td>
-                <td className="px-4 py-3">{trip.ended_at ? formatDateTime(trip.ended_at) : '---'}</td>
-                <td className="px-4 py-3 text-right">{formatDistance(trip.distance_km ?? 0)}</td>
-                <td className="px-4 py-3 text-right">{formatDuration(trip.duration_s ?? 0)}</td>
+                <td className="px-4 py-3">
+                    {trip.started_at ? formatDateTime(trip.started_at) : '---'}
+                </td>
+                <td className="px-4 py-3">
+                    {trip.ended_at ? formatDateTime(trip.ended_at) : '---'}
+                </td>
                 <td className="px-4 py-3 text-right">
-                    {trip.max_speed_kph != null ? `${trip.max_speed_kph} km/h` : '---'}
+                    {formatDistance(trip.distance_km ?? 0)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                    {formatDuration(trip.duration_s ?? 0)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                    {trip.max_speed_kph != null
+                        ? `${trip.max_speed_kph} km/h`
+                        : '---'}
                 </td>
                 <td className="px-4 py-3">
                     <Badge variant={statusVariant(trip.status ?? 'unknown')}>
@@ -452,17 +617,27 @@ function TripRow({
                 <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                         {trip.is_personal && (
-                            <Badge className="bg-status-warning text-white text-[10px]">Personal</Badge>
+                            <Badge className="bg-status-warning text-[10px] text-white">
+                                Personal
+                            </Badge>
                         )}
                         {canManage && (
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0"
-                                title={trip.is_personal ? 'Mark as business' : 'Mark as personal'}
+                                title={
+                                    trip.is_personal
+                                        ? 'Mark as business'
+                                        : 'Mark as personal'
+                                }
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    router.post(`/fleet-assets/trips/${trip.id}/toggle-personal`, {}, { preserveScroll: true });
+                                    router.post(
+                                        `/fleet-assets/trips/${trip.id}/toggle-personal`,
+                                        {},
+                                        { preserveScroll: true },
+                                    );
                                 }}
                             >
                                 {trip.is_personal ? (
@@ -481,36 +656,48 @@ function TripRow({
                         <div className="grid gap-4 lg:grid-cols-2">
                             {/* Route Map */}
                             <div>
-                                <h4 className="text-sm font-medium mb-2">Route Map</h4>
+                                <h4 className="mb-2 text-sm font-medium">
+                                    Route Map
+                                </h4>
                                 {polyline.length > 0 ? (
                                     <LeafletMap
                                         center={center}
                                         zoom={13}
                                         polyline={polyline}
                                         markers={[
-                                            ...(trip.start_latitude && trip.start_longitude
-                                                ? [{
-                                                    id: `start-${trip.id}`,
-                                                    lat: trip.start_latitude,
-                                                    lng: trip.start_longitude,
-                                                    title: 'Start',
-                                                    popup: trip.start_address ?? 'Trip start',
-                                                }]
+                                            ...(trip.start_latitude &&
+                                            trip.start_longitude
+                                                ? [
+                                                      {
+                                                          id: `start-${trip.id}`,
+                                                          lat: trip.start_latitude,
+                                                          lng: trip.start_longitude,
+                                                          title: 'Start',
+                                                          popup:
+                                                              trip.start_address ??
+                                                              'Trip start',
+                                                      },
+                                                  ]
                                                 : []),
-                                            ...(trip.end_latitude && trip.end_longitude
-                                                ? [{
-                                                    id: `end-${trip.id}`,
-                                                    lat: trip.end_latitude,
-                                                    lng: trip.end_longitude,
-                                                    title: 'End',
-                                                    popup: trip.end_address ?? 'Trip end',
-                                                }]
+                                            ...(trip.end_latitude &&
+                                            trip.end_longitude
+                                                ? [
+                                                      {
+                                                          id: `end-${trip.id}`,
+                                                          lat: trip.end_latitude,
+                                                          lng: trip.end_longitude,
+                                                          title: 'End',
+                                                          popup:
+                                                              trip.end_address ??
+                                                              'Trip end',
+                                                      },
+                                                  ]
                                                 : []),
                                         ]}
                                         height={300}
                                     />
                                 ) : (
-                                    <div className="flex items-center justify-center h-[300px] rounded-lg border bg-muted/20 text-muted-foreground text-sm">
+                                    <div className="flex h-[300px] items-center justify-center rounded-lg border bg-muted/20 text-sm text-muted-foreground">
                                         No route data available
                                     </div>
                                 )}
@@ -521,15 +708,19 @@ function TripRow({
                                 {/* Addresses */}
                                 <div className="grid gap-2 sm:grid-cols-2">
                                     <div className="rounded-md border p-3">
-                                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Start Address</p>
-                                        <p className="mt-1 text-sm flex items-center gap-1">
+                                        <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                                            Start Address
+                                        </p>
+                                        <p className="mt-1 flex items-center gap-1 text-sm">
                                             <MapPin className="h-3 w-3 shrink-0 text-status-success" />
                                             {trip.start_address ?? '---'}
                                         </p>
                                     </div>
                                     <div className="rounded-md border p-3">
-                                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">End Address</p>
-                                        <p className="mt-1 text-sm flex items-center gap-1">
+                                        <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                                            End Address
+                                        </p>
+                                        <p className="mt-1 flex items-center gap-1 text-sm">
                                             <MapPin className="h-3 w-3 shrink-0 text-status-critical" />
                                             {trip.end_address ?? '---'}
                                         </p>
@@ -538,31 +729,61 @@ function TripRow({
 
                                 {/* Trip Segments Timeline */}
                                 <div>
-                                    <h4 className="text-sm font-medium mb-2">Trip Segments</h4>
+                                    <h4 className="mb-2 text-sm font-medium">
+                                        Trip Segments
+                                    </h4>
                                     {segments.length > 0 ? (
-                                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                        <div className="max-h-[200px] space-y-2 overflow-y-auto">
                                             {segments.map((seg, i) => (
-                                                <div key={seg.id ?? i} className="flex items-start gap-3 rounded-md border p-2 text-xs">
+                                                <div
+                                                    key={seg.id ?? i}
+                                                    className="flex items-start gap-3 rounded-md border p-2 text-xs"
+                                                >
                                                     <div className="flex flex-col items-center">
                                                         <div className="h-3 w-3 rounded-full bg-primary" />
-                                                        {i < segments.length - 1 && <div className="h-full w-px bg-border" />}
+                                                        {i <
+                                                            segments.length -
+                                                                1 && (
+                                                            <div className="h-full w-px bg-border" />
+                                                        )}
                                                     </div>
                                                     <div className="flex-1">
-                                                        <div className="font-medium">Segment {seg.seq ?? i + 1}</div>
-                                                        <div className="text-muted-foreground">
-                                                            {seg.started_at ? new Date(seg.started_at).toLocaleTimeString() : '---'}
-                                                            {' - '}
-                                                            {seg.ended_at ? new Date(seg.ended_at).toLocaleTimeString() : '---'}
+                                                        <div className="font-medium">
+                                                            Segment{' '}
+                                                            {seg.seq ?? i + 1}
                                                         </div>
                                                         <div className="text-muted-foreground">
-                                                            {formatDistance(seg.distance_km ?? 0)} &middot; {formatDuration(seg.duration_s ?? 0)}
+                                                            {seg.started_at
+                                                                ? new Date(
+                                                                      seg.started_at,
+                                                                  ).toLocaleTimeString()
+                                                                : '---'}
+                                                            {' - '}
+                                                            {seg.ended_at
+                                                                ? new Date(
+                                                                      seg.ended_at,
+                                                                  ).toLocaleTimeString()
+                                                                : '---'}
+                                                        </div>
+                                                        <div className="text-muted-foreground">
+                                                            {formatDistance(
+                                                                seg.distance_km ??
+                                                                    0,
+                                                            )}{' '}
+                                                            &middot;{' '}
+                                                            {formatDuration(
+                                                                seg.duration_s ??
+                                                                    0,
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-muted-foreground">No segment data available.</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            No segment data available.
+                                        </p>
                                     )}
                                 </div>
                             </div>

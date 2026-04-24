@@ -1,14 +1,26 @@
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, Clock, Search } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import { Search } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -57,13 +69,23 @@ const getUsageColor = (remaining: number, entitlement: number) => {
     return 'text-status-success';
 };
 
-export default function LeaveBalances({ balances, year, leaveTypes, filters, can }: Props) {
+export default function LeaveBalances({
+    balances,
+    year,
+    leaveTypes,
+    filters,
+    can,
+}: Props) {
     const NONE = '__none__';
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/leave/balances', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/leave/balances',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -73,7 +95,9 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">Leave Balances</h1>
+                        <h1 className="text-lg font-semibold">
+                            Leave Balances
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
                             Staff leave entitlements and usage for {year}
                         </div>
@@ -86,28 +110,38 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Year</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Year
+                            </Label>
                             <Select
                                 value={String(filters.year || year)}
                                 onValueChange={(v) => onFilter({ year: v })}
                             >
-                                <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Year" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     {years.map((y) => (
-                                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                        <SelectItem key={y} value={String(y)}>
+                                            {y}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by staff name or email..."
                                     value={filters.q || ''}
-                                    onChange={(e) => onFilter({ q: e.target.value })}
+                                    onChange={(e) =>
+                                        onFilter({ q: e.target.value })
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -122,26 +156,46 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                                 <TableRow>
                                     <TableHead>Staff Member</TableHead>
                                     <TableHead>Leave Type</TableHead>
-                                    <TableHead className="text-right">Entitlement</TableHead>
-                                    <TableHead className="text-right">Taken</TableHead>
-                                    <TableHead className="text-right">Pending</TableHead>
-                                    <TableHead className="text-right">Remaining</TableHead>
+                                    <TableHead className="text-right">
+                                        Entitlement
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Taken
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Pending
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Remaining
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {balances.data.map((balance) => (
                                     <TableRow key={balance.id}>
                                         <TableCell>
-                                            <div className="font-medium">{balance.user.name}</div>
-                                            <div className="text-xs text-muted-foreground">{balance.user.email}</div>
+                                            <div className="font-medium">
+                                                {balance.user.name}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {balance.user.email}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="capitalize">
-                                                {balance.leave_type.replace(/_/g, ' ')}
+                                            <Badge
+                                                variant="outline"
+                                                className="capitalize"
+                                            >
+                                                {balance.leave_type.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">
-                                            {formatHours(balance.entitlement_hours)}
+                                            {formatHours(
+                                                balance.entitlement_hours,
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {formatHours(balance.taken_hours)}
@@ -149,20 +203,31 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                                         <TableCell className="text-right">
                                             {balance.pending_hours > 0 ? (
                                                 <span className="text-status-warning">
-                                                    {formatHours(balance.pending_hours)}
+                                                    {formatHours(
+                                                        balance.pending_hours,
+                                                    )}
                                                 </span>
                                             ) : (
-                                                <span className="text-muted-foreground">0h</span>
+                                                <span className="text-muted-foreground">
+                                                    0h
+                                                </span>
                                             )}
                                         </TableCell>
-                                        <TableCell className={`text-right ${getUsageColor(balance.remaining_hours, balance.entitlement_hours)}`}>
-                                            {formatHours(balance.remaining_hours)}
+                                        <TableCell
+                                            className={`text-right ${getUsageColor(balance.remaining_hours, balance.entitlement_hours)}`}
+                                        >
+                                            {formatHours(
+                                                balance.remaining_hours,
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
                                 {!balances.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={6}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No leave balances found.
                                         </TableCell>
                                     </TableRow>

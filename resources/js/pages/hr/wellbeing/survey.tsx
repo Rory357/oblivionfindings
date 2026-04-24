@@ -12,7 +12,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Collapsible,
@@ -21,7 +27,13 @@ import {
 } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -33,7 +45,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, Send, Lock, User } from 'lucide-react';
+import { ChevronDown, ChevronRight, Lock, Send, User } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 
 type SurveyQuestion = {
@@ -91,7 +103,11 @@ type SummaryPayload = {
 
 type Props = {
     survey: SurveyPayload;
-    existingResponse: { id: number; answers: Record<string, string | number | boolean>; submitted_at: string | null } | null;
+    existingResponse: {
+        id: number;
+        answers: Record<string, string | number | boolean>;
+        submitted_at: string | null;
+    } | null;
     summary: SummaryPayload;
     responses: SurveyResponse[];
     actionPlanOwners: Array<{ id: number; name: string }>;
@@ -101,24 +117,41 @@ type Props = {
     };
 };
 
-export default function WellbeingSurveyShow({ survey, existingResponse, summary, responses = [], actionPlanOwners, can }: Props) {
-    const [expandedResponse, setExpandedResponse] = useState<number | null>(null);
-    const [confirmAction, setConfirmAction] = useState<'publish' | 'close' | null>(null);
+export default function WellbeingSurveyShow({
+    survey,
+    existingResponse,
+    summary,
+    responses = [],
+    actionPlanOwners,
+    can,
+}: Props) {
+    const [expandedResponse, setExpandedResponse] = useState<number | null>(
+        null,
+    );
+    const [confirmAction, setConfirmAction] = useState<
+        'publish' | 'close' | null
+    >(null);
 
     function handleStatusChange(action: 'publish' | 'close') {
-        const url = action === 'publish'
-            ? `/hr/wellbeing/surveys/${survey.id}/publish`
-            : `/hr/wellbeing/surveys/${survey.id}/close`;
+        const url =
+            action === 'publish'
+                ? `/hr/wellbeing/surveys/${survey.id}/publish`
+                : `/hr/wellbeing/surveys/${survey.id}/close`;
         router.post(url, {}, { preserveScroll: true });
         setConfirmAction(null);
     }
 
     const responseForm = useForm({
-        answers: (existingResponse?.answers ?? {}) as Record<string, string | number | boolean>,
+        answers: (existingResponse?.answers ?? {}) as Record<
+            string,
+            string | number | boolean
+        >,
     });
 
     const actionPlanForm = useForm({
-        owner_user_id: actionPlanOwners[0]?.id ? String(actionPlanOwners[0].id) : '',
+        owner_user_id: actionPlanOwners[0]?.id
+            ? String(actionPlanOwners[0].id)
+            : '',
         title: '',
         description: '',
         priority: 'medium' as 'low' | 'medium' | 'high',
@@ -140,7 +173,9 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
 
     function submitResponse(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        responseForm.post(`/hr/wellbeing/surveys/${survey.id}/responses`, { preserveScroll: true });
+        responseForm.post(`/hr/wellbeing/surveys/${survey.id}/responses`, {
+            preserveScroll: true,
+        });
     }
 
     function submitActionPlan(event: FormEvent<HTMLFormElement>) {
@@ -156,7 +191,10 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
             breadcrumbs={[
                 { title: 'HR', href: '/hr' },
                 { title: 'Wellbeing', href: '/hr/wellbeing' },
-                { title: survey.title, href: `/hr/wellbeing/surveys/${survey.id}` },
+                {
+                    title: survey.title,
+                    href: `/hr/wellbeing/surveys/${survey.id}`,
+                },
             ]}
         >
             <Head title={`Survey · ${survey.title}`} />
@@ -166,18 +204,35 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                     description={survey.description ?? 'Engagement survey'}
                     actions={
                         <div className="flex items-center gap-2">
-                            <Badge variant={survey.status === 'published' ? 'default' : survey.status === 'closed' ? 'secondary' : 'outline'}>
+                            <Badge
+                                variant={
+                                    survey.status === 'published'
+                                        ? 'default'
+                                        : survey.status === 'closed'
+                                          ? 'secondary'
+                                          : 'outline'
+                                }
+                            >
                                 {survey.status}
                             </Badge>
-                            <Badge variant="outline">{survey.survey_type.toUpperCase()}</Badge>
+                            <Badge variant="outline">
+                                {survey.survey_type.toUpperCase()}
+                            </Badge>
                             {can.manage && survey.status === 'draft' && (
-                                <Button size="sm" onClick={() => setConfirmAction('publish')}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setConfirmAction('publish')}
+                                >
                                     <Send className="mr-1.5 h-3.5 w-3.5" />
                                     Publish
                                 </Button>
                             )}
                             {can.manage && survey.status === 'published' && (
-                                <Button size="sm" variant="secondary" onClick={() => setConfirmAction('close')}>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setConfirmAction('close')}
+                                >
                                     <Lock className="mr-1.5 h-3.5 w-3.5" />
                                     Close
                                 </Button>
@@ -186,11 +241,16 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                     }
                 />
 
-                <AlertDialog open={confirmAction !== null} onOpenChange={(open) => !open && setConfirmAction(null)}>
+                <AlertDialog
+                    open={confirmAction !== null}
+                    onOpenChange={(open) => !open && setConfirmAction(null)}
+                >
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>
-                                {confirmAction === 'publish' ? 'Publish survey?' : 'Close survey?'}
+                                {confirmAction === 'publish'
+                                    ? 'Publish survey?'
+                                    : 'Close survey?'}
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                                 {confirmAction === 'publish'
@@ -200,8 +260,15 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => confirmAction && handleStatusChange(confirmAction)}>
-                                {confirmAction === 'publish' ? 'Publish' : 'Close'}
+                            <AlertDialogAction
+                                onClick={() =>
+                                    confirmAction &&
+                                    handleStatusChange(confirmAction)
+                                }
+                            >
+                                {confirmAction === 'publish'
+                                    ? 'Publish'
+                                    : 'Close'}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -211,21 +278,33 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                     <div className="grid gap-4 md:grid-cols-3">
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Responses</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Responses
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="text-2xl font-semibold">{summary.response_count}</CardContent>
+                            <CardContent className="text-2xl font-semibold">
+                                {summary.response_count}
+                            </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Average Score</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Average Score
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="text-2xl font-semibold">{summary.average_overall_score ?? '-'}</CardContent>
+                            <CardContent className="text-2xl font-semibold">
+                                {summary.average_overall_score ?? '-'}
+                            </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">eNPS</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    eNPS
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="text-2xl font-semibold">{summary.enps ?? '-'}</CardContent>
+                            <CardContent className="text-2xl font-semibold">
+                                {summary.enps ?? '-'}
+                            </CardContent>
                         </Card>
                     </div>
                 )}
@@ -236,71 +315,176 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                             <CardTitle>Submit Survey Response</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={submitResponse} className="space-y-4">
+                            <form
+                                onSubmit={submitResponse}
+                                className="space-y-4"
+                            >
                                 {sortedQuestions.map((question) => (
-                                    <div key={question.id} className="space-y-2 rounded-lg border p-3">
+                                    <div
+                                        key={question.id}
+                                        className="space-y-2 rounded-lg border p-3"
+                                    >
                                         <Label className="text-sm">
                                             {question.question_text}
-                                            {question.is_required && <span className="ml-1 text-destructive">*</span>}
+                                            {question.is_required && (
+                                                <span className="ml-1 text-destructive">
+                                                    *
+                                                </span>
+                                            )}
                                         </Label>
 
                                         {question.question_type === 'text' && (
                                             <Textarea
                                                 rows={3}
-                                                value={String(responseForm.data.answers[String(question.id)] ?? '')}
-                                                onChange={(event) => setAnswer(question.id, event.target.value)}
+                                                value={String(
+                                                    responseForm.data.answers[
+                                                        String(question.id)
+                                                    ] ?? '',
+                                                )}
+                                                onChange={(event) =>
+                                                    setAnswer(
+                                                        question.id,
+                                                        event.target.value,
+                                                    )
+                                                }
                                             />
                                         )}
 
-                                        {(question.question_type === 'enps' || question.question_type === 'scale') && (
+                                        {(question.question_type === 'enps' ||
+                                            question.question_type ===
+                                                'scale') && (
                                             <Input
                                                 type="number"
-                                                min={question.question_type === 'enps' ? 0 : 1}
-                                                max={question.question_type === 'enps' ? 10 : 5}
-                                                value={String(responseForm.data.answers[String(question.id)] ?? '')}
-                                                onChange={(event) => setAnswer(question.id, event.target.value === '' ? '' : Number(event.target.value))}
+                                                min={
+                                                    question.question_type ===
+                                                    'enps'
+                                                        ? 0
+                                                        : 1
+                                                }
+                                                max={
+                                                    question.question_type ===
+                                                    'enps'
+                                                        ? 10
+                                                        : 5
+                                                }
+                                                value={String(
+                                                    responseForm.data.answers[
+                                                        String(question.id)
+                                                    ] ?? '',
+                                                )}
+                                                onChange={(event) =>
+                                                    setAnswer(
+                                                        question.id,
+                                                        event.target.value ===
+                                                            ''
+                                                            ? ''
+                                                            : Number(
+                                                                  event.target
+                                                                      .value,
+                                                              ),
+                                                    )
+                                                }
                                             />
                                         )}
 
-                                        {question.question_type === 'choice' && (
+                                        {question.question_type ===
+                                            'choice' && (
                                             <Select
-                                                value={String(responseForm.data.answers[String(question.id)] ?? '')}
-                                                onValueChange={(value) => setAnswer(question.id, value)}
+                                                value={String(
+                                                    responseForm.data.answers[
+                                                        String(question.id)
+                                                    ] ?? '',
+                                                )}
+                                                onValueChange={(value) =>
+                                                    setAnswer(
+                                                        question.id,
+                                                        value,
+                                                    )
+                                                }
                                             >
-                                                <SelectTrigger><SelectValue placeholder="Select an option" /></SelectTrigger>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select an option" />
+                                                </SelectTrigger>
                                                 <SelectContent>
-                                                    {question.options.map((option) => (
-                                                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                                                    ))}
+                                                    {question.options.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={option}
+                                                                value={option}
+                                                            >
+                                                                {option}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                         )}
 
-                                        {question.question_type === 'boolean' && (
+                                        {question.question_type ===
+                                            'boolean' && (
                                             <div className="flex items-center gap-6">
                                                 <div className="flex items-center gap-2">
                                                     <Checkbox
                                                         id={`q-${question.id}-yes`}
-                                                        checked={responseForm.data.answers[String(question.id)] === true}
-                                                        onCheckedChange={() => setAnswer(question.id, true)}
+                                                        checked={
+                                                            responseForm.data
+                                                                .answers[
+                                                                String(
+                                                                    question.id,
+                                                                )
+                                                            ] === true
+                                                        }
+                                                        onCheckedChange={() =>
+                                                            setAnswer(
+                                                                question.id,
+                                                                true,
+                                                            )
+                                                        }
                                                     />
-                                                    <Label htmlFor={`q-${question.id}-yes`} className="font-normal">Yes</Label>
+                                                    <Label
+                                                        htmlFor={`q-${question.id}-yes`}
+                                                        className="font-normal"
+                                                    >
+                                                        Yes
+                                                    </Label>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Checkbox
                                                         id={`q-${question.id}-no`}
-                                                        checked={responseForm.data.answers[String(question.id)] === false}
-                                                        onCheckedChange={() => setAnswer(question.id, false)}
+                                                        checked={
+                                                            responseForm.data
+                                                                .answers[
+                                                                String(
+                                                                    question.id,
+                                                                )
+                                                            ] === false
+                                                        }
+                                                        onCheckedChange={() =>
+                                                            setAnswer(
+                                                                question.id,
+                                                                false,
+                                                            )
+                                                        }
                                                     />
-                                                    <Label htmlFor={`q-${question.id}-no`} className="font-normal">No</Label>
+                                                    <Label
+                                                        htmlFor={`q-${question.id}-no`}
+                                                        className="font-normal"
+                                                    >
+                                                        No
+                                                    </Label>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
                                 ))}
 
-                                <Button type="submit" disabled={responseForm.processing}>
-                                    {responseForm.processing ? 'Submitting...' : 'Submit Response'}
+                                <Button
+                                    type="submit"
+                                    disabled={responseForm.processing}
+                                >
+                                    {responseForm.processing
+                                        ? 'Submitting...'
+                                        : 'Submit Response'}
                                 </Button>
                             </form>
                         </CardContent>
@@ -322,28 +506,47 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                     <Card>
                         <CardHeader>
                             <CardTitle>Question Breakdown</CardTitle>
-                            <CardDescription>Per-question statistics across all responses</CardDescription>
+                            <CardDescription>
+                                Per-question statistics across all responses
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Question</TableHead>
-                                        <TableHead className="w-[100px]">Type</TableHead>
-                                        <TableHead className="w-[100px] text-right">Responses</TableHead>
-                                        <TableHead className="w-[100px] text-right">Average</TableHead>
+                                        <TableHead className="w-[100px]">
+                                            Type
+                                        </TableHead>
+                                        <TableHead className="w-[100px] text-right">
+                                            Responses
+                                        </TableHead>
+                                        <TableHead className="w-[100px] text-right">
+                                            Average
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {summary.question_stats.map((stat) => (
                                         <TableRow key={stat.id}>
-                                            <TableCell className="text-sm">{stat.question_text}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-xs">{stat.question_type}</Badge>
+                                            <TableCell className="text-sm">
+                                                {stat.question_text}
                                             </TableCell>
-                                            <TableCell className="text-right">{stat.responses}</TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-xs"
+                                                >
+                                                    {stat.question_type}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {stat.responses}
+                                            </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                {stat.average !== null ? stat.average : '-'}
+                                                {stat.average !== null
+                                                    ? stat.average
+                                                    : '-'}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -358,8 +561,10 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                         <CardHeader>
                             <CardTitle>Individual Responses</CardTitle>
                             <CardDescription>
-                                {responses.length} response{responses.length !== 1 ? 's' : ''}
-                                {survey.is_anonymous && ' (anonymous — names hidden)'}
+                                {responses.length} response
+                                {responses.length !== 1 ? 's' : ''}
+                                {survey.is_anonymous &&
+                                    ' (anonymous — names hidden)'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
@@ -367,7 +572,11 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                                 <Collapsible
                                     key={resp.id}
                                     open={expandedResponse === resp.id}
-                                    onOpenChange={(open) => setExpandedResponse(open ? resp.id : null)}
+                                    onOpenChange={(open) =>
+                                        setExpandedResponse(
+                                            open ? resp.id : null,
+                                        )
+                                    }
                                 >
                                     <CollapsibleTrigger asChild>
                                         <button
@@ -376,26 +585,39 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                                         >
                                             <div className="flex items-center gap-3">
                                                 <User className="h-4 w-4 text-muted-foreground" />
-                                                <span className="text-sm font-medium">{resp.respondent}</span>
-                                                {resp.overall_score !== null && (
-                                                    <Badge variant="outline" className="text-xs">
-                                                        Score: {resp.overall_score}
+                                                <span className="text-sm font-medium">
+                                                    {resp.respondent}
+                                                </span>
+                                                {resp.overall_score !==
+                                                    null && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-xs"
+                                                    >
+                                                        Score:{' '}
+                                                        {resp.overall_score}
                                                     </Badge>
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {resp.submitted_at && (
                                                     <span className="text-xs text-muted-foreground">
-                                                        {new Date(resp.submitted_at).toLocaleString('en-NZ', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
+                                                        {new Date(
+                                                            resp.submitted_at,
+                                                        ).toLocaleString(
+                                                            'en-NZ',
+                                                            {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            },
+                                                        )}
                                                     </span>
                                                 )}
-                                                {expandedResponse === resp.id ? (
+                                                {expandedResponse ===
+                                                resp.id ? (
                                                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                                 ) : (
                                                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -406,14 +628,31 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                                     <CollapsibleContent>
                                         <div className="mt-1 space-y-2 rounded-lg border bg-muted/30 p-4">
                                             {sortedQuestions.map((question) => {
-                                                const answer = resp.answers[String(question.id)];
+                                                const answer =
+                                                    resp.answers[
+                                                        String(question.id)
+                                                    ];
                                                 return (
-                                                    <div key={question.id} className="grid grid-cols-[1fr,auto] gap-4 border-b pb-2 last:border-0 last:pb-0">
-                                                        <p className="text-sm text-muted-foreground">{question.question_text}</p>
-                                                        <p className="text-sm font-medium text-right min-w-[80px]">
-                                                            {answer !== null && answer !== undefined && answer !== ''
-                                                                ? String(answer)
-                                                                : <span className="text-muted-foreground italic">No answer</span>}
+                                                    <div
+                                                        key={question.id}
+                                                        className="grid grid-cols-[1fr,auto] gap-4 border-b pb-2 last:border-0 last:pb-0"
+                                                    >
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {
+                                                                question.question_text
+                                                            }
+                                                        </p>
+                                                        <p className="min-w-[80px] text-right text-sm font-medium">
+                                                            {answer !== null &&
+                                                            answer !==
+                                                                undefined &&
+                                                            answer !== '' ? (
+                                                                String(answer)
+                                                            ) : (
+                                                                <span className="text-muted-foreground italic">
+                                                                    No answer
+                                                                </span>
+                                                            )}
                                                         </p>
                                                     </div>
                                                 );
@@ -433,58 +672,117 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                                 <CardTitle>Create Action Plan</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <form onSubmit={submitActionPlan} className="space-y-3">
+                                <form
+                                    onSubmit={submitActionPlan}
+                                    className="space-y-3"
+                                >
                                     <div className="space-y-2">
                                         <Label>Owner</Label>
                                         <Select
-                                            value={actionPlanForm.data.owner_user_id}
-                                            onValueChange={(value) => actionPlanForm.setData('owner_user_id', value)}
+                                            value={
+                                                actionPlanForm.data
+                                                    .owner_user_id
+                                            }
+                                            onValueChange={(value) =>
+                                                actionPlanForm.setData(
+                                                    'owner_user_id',
+                                                    value,
+                                                )
+                                            }
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select owner" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {actionPlanOwners.map((owner) => (
-                                                    <SelectItem key={owner.id} value={String(owner.id)}>
-                                                        {owner.name}
-                                                    </SelectItem>
-                                                ))}
+                                                {actionPlanOwners.map(
+                                                    (owner) => (
+                                                        <SelectItem
+                                                            key={owner.id}
+                                                            value={String(
+                                                                owner.id,
+                                                            )}
+                                                        >
+                                                            {owner.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
                                             </SelectContent>
                                         </Select>
                                         {actionPlanOwners.length === 0 && (
-                                            <p className="text-xs text-destructive">No active employees found for ownership.</p>
+                                            <p className="text-xs text-destructive">
+                                                No active employees found for
+                                                ownership.
+                                            </p>
                                         )}
-                                        {actionPlanForm.errors.owner_user_id && (
-                                            <p className="text-xs text-destructive">{actionPlanForm.errors.owner_user_id}</p>
+                                        {actionPlanForm.errors
+                                            .owner_user_id && (
+                                            <p className="text-xs text-destructive">
+                                                {
+                                                    actionPlanForm.errors
+                                                        .owner_user_id
+                                                }
+                                            </p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Title</Label>
                                         <Input
                                             value={actionPlanForm.data.title}
-                                            onChange={(event) => actionPlanForm.setData('title', event.target.value)}
+                                            onChange={(event) =>
+                                                actionPlanForm.setData(
+                                                    'title',
+                                                    event.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Description</Label>
                                         <Textarea
                                             rows={3}
-                                            value={actionPlanForm.data.description}
-                                            onChange={(event) => actionPlanForm.setData('description', event.target.value)}
+                                            value={
+                                                actionPlanForm.data.description
+                                            }
+                                            onChange={(event) =>
+                                                actionPlanForm.setData(
+                                                    'description',
+                                                    event.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2">
                                         <div className="space-y-2">
                                             <Label>Priority</Label>
                                             <Select
-                                                value={actionPlanForm.data.priority}
-                                                onValueChange={(value: 'low' | 'medium' | 'high') => actionPlanForm.setData('priority', value)}
+                                                value={
+                                                    actionPlanForm.data.priority
+                                                }
+                                                onValueChange={(
+                                                    value:
+                                                        | 'low'
+                                                        | 'medium'
+                                                        | 'high',
+                                                ) =>
+                                                    actionPlanForm.setData(
+                                                        'priority',
+                                                        value,
+                                                    )
+                                                }
                                             >
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="low">Low</SelectItem>
-                                                    <SelectItem value="medium">Medium</SelectItem>
-                                                    <SelectItem value="high">High</SelectItem>
+                                                    <SelectItem value="low">
+                                                        Low
+                                                    </SelectItem>
+                                                    <SelectItem value="medium">
+                                                        Medium
+                                                    </SelectItem>
+                                                    <SelectItem value="high">
+                                                        High
+                                                    </SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -492,13 +790,28 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                                             <Label>Due Date</Label>
                                             <Input
                                                 type="date"
-                                                value={actionPlanForm.data.due_date}
-                                                onChange={(event) => actionPlanForm.setData('due_date', event.target.value)}
+                                                value={
+                                                    actionPlanForm.data.due_date
+                                                }
+                                                onChange={(event) =>
+                                                    actionPlanForm.setData(
+                                                        'due_date',
+                                                        event.target.value,
+                                                    )
+                                                }
                                             />
                                         </div>
                                     </div>
-                                    <Button type="submit" disabled={actionPlanForm.processing || actionPlanOwners.length === 0}>
-                                        {actionPlanForm.processing ? 'Saving...' : 'Create Action Plan'}
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            actionPlanForm.processing ||
+                                            actionPlanOwners.length === 0
+                                        }
+                                    >
+                                        {actionPlanForm.processing
+                                            ? 'Saving...'
+                                            : 'Create Action Plan'}
                                     </Button>
                                 </form>
                             </CardContent>
@@ -510,18 +823,35 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {survey.action_plans.map((plan) => (
-                                    <div key={plan.id} className="rounded-lg border p-3">
+                                    <div
+                                        key={plan.id}
+                                        className="rounded-lg border p-3"
+                                    >
                                         <div className="flex items-center justify-between gap-2">
-                                            <p className="font-medium">{plan.title}</p>
-                                            <Badge variant={plan.status === 'completed' ? 'default' : 'outline'}>{plan.status}</Badge>
+                                            <p className="font-medium">
+                                                {plan.title}
+                                            </p>
+                                            <Badge
+                                                variant={
+                                                    plan.status === 'completed'
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
+                                            >
+                                                {plan.status}
+                                            </Badge>
                                         </div>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            {plan.owner?.name ?? 'Unassigned'} · {plan.priority} · {plan.progress_percent}%
+                                            {plan.owner?.name ?? 'Unassigned'} ·{' '}
+                                            {plan.priority} ·{' '}
+                                            {plan.progress_percent}%
                                         </p>
                                     </div>
                                 ))}
                                 {survey.action_plans.length === 0 && (
-                                    <p className="text-sm text-muted-foreground">No action plans linked to this survey.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No action plans linked to this survey.
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
@@ -531,4 +861,3 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
         </AppLayout>
     );
 }
-

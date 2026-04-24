@@ -1,26 +1,49 @@
+import {
+    FLEET_COLORS,
+    HalfMoonGauge,
+    HorizontalBarChart,
+    MiniBarChart,
+} from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
 import FleetHero from '@/components/fleet-hero';
+import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate, formatDistance } from '@/lib/fleet-utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
-    AlertTriangle, Calendar, CheckCircle, ChevronDown, ChevronUp, ChevronsUpDown,
-    Clock, Loader2, Plus, Timer, Activity, Check,
+    Activity,
+    AlertTriangle,
+    Calendar,
+    Check,
+    CheckCircle,
+    ChevronDown,
+    ChevronUp,
+    ChevronsUpDown,
+    Clock,
+    Loader2,
+    Plus,
+    Timer,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatDate, formatDistance } from '@/lib/fleet-utils';
 
 type ServiceSchedule = {
     id: number;
@@ -59,13 +82,18 @@ type Props = {
 
 function isDueSoon(dateStr: string | null): boolean {
     if (!dateStr) return false;
-    const diff = (new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
+    const diff =
+        (new Date(dateStr).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24);
     return diff <= 14 && diff >= 0;
 }
 
 function daysUntilDue(dateStr: string | null): number | null {
     if (!dateStr) return null;
-    return Math.ceil((new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+        (new Date(dateStr).getTime() - new Date().getTime()) /
+            (1000 * 60 * 60 * 24),
+    );
 }
 
 function daysUntilLabel(days: number | null, isOverdue: boolean): string {
@@ -83,9 +111,16 @@ function kmProgressPct(schedule: ServiceSchedule): number | null {
     const intervalKm = Number(schedule.interval_km);
     if (intervalKm <= 0) return null;
     // Progress = how far through the interval we are (estimated from dates, but we use km range)
-    const progress = ((nextKm - intervalKm) > 0)
-        ? Math.max(0, Math.min(100, ((lastKm - (nextKm - intervalKm)) / intervalKm) * 100))
-        : 0;
+    const progress =
+        nextKm - intervalKm > 0
+            ? Math.max(
+                  0,
+                  Math.min(
+                      100,
+                      ((lastKm - (nextKm - intervalKm)) / intervalKm) * 100,
+                  ),
+              )
+            : 0;
     return Math.round(progress);
 }
 
@@ -101,9 +136,13 @@ export default function SchedulesIndex({
     const allSchedules = schedules ?? [];
     const totalCount = allSchedules.length;
     const overdueCount = allSchedules.filter((s) => s.is_overdue).length;
-    const dueSoonCount = allSchedules.filter((s) => isDueSoon(s.next_due_at) && !s.is_overdue).length;
+    const dueSoonCount = allSchedules.filter(
+        (s) => isDueSoon(s.next_due_at) && !s.is_overdue,
+    ).length;
     const onTrackCount = totalCount - overdueCount - dueSoonCount;
-    const healthPct = fleet_health_pct ?? (totalCount > 0 ? Math.round((onTrackCount / totalCount) * 100) : 100);
+    const healthPct =
+        fleet_health_pct ??
+        (totalCount > 0 ? Math.round((onTrackCount / totalCount) * 100) : 100);
     const timeline = upcoming_timeline ?? [];
     const vehicleData = schedules_per_vehicle ?? [];
     const completionData = monthly_completions ?? [];
@@ -114,38 +153,71 @@ export default function SchedulesIndex({
     const [markingId, setMarkingId] = useState<number | null>(null);
 
     function handleSort(field: string) {
-        const newDir = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
+        const newDir =
+            sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
         setSortField(field);
         setSortDir(newDir);
-        router.get(window.location.pathname, { sort: field, direction: newDir }, { preserveState: true });
+        router.get(
+            window.location.pathname,
+            { sort: field, direction: newDir },
+            { preserveState: true },
+        );
     }
 
     function handleMarkComplete(scheduleId: number) {
         setMarkingId(scheduleId);
-        router.post(`/fleet-assets/maintenance/schedules/${scheduleId}/mark-complete`, {}, {
-            preserveState: true,
-            onFinish: () => setMarkingId(null),
-        });
-    }
-
-    function SortHeader({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) {
-        const active = sortField === field;
-        return (
-            <th className={`px-4 py-3 cursor-pointer select-none hover:bg-muted/50 font-medium ${className ?? 'text-left'}`} onClick={() => handleSort(field)}>
-                <div className="flex items-center gap-1">
-                    {children}
-                    {active ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />}
-                </div>
-            </th>
+        router.post(
+            `/fleet-assets/maintenance/schedules/${scheduleId}/mark-complete`,
+            {},
+            {
+                preserveState: true,
+                onFinish: () => setMarkingId(null),
+            },
         );
     }
 
-    const form = useForm({ name: '', asset_id: '', interval_km: '', interval_days: '', next_due_at: '' });
+    const renderSortHeader = (
+        field: string,
+        children: React.ReactNode,
+        className?: string,
+    ) => {
+        const active = sortField === field;
+        return (
+            <th
+                className={`cursor-pointer px-4 py-3 font-medium select-none hover:bg-muted/50 ${className ?? 'text-left'}`}
+                onClick={() => handleSort(field)}
+            >
+                <div className="flex items-center gap-1">
+                    {children}
+                    {active ? (
+                        sortDir === 'asc' ? (
+                            <ChevronUp className="h-3 w-3" />
+                        ) : (
+                            <ChevronDown className="h-3 w-3" />
+                        )
+                    ) : (
+                        <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
+                    )}
+                </div>
+            </th>
+        );
+    };
+
+    const form = useForm({
+        name: '',
+        asset_id: '',
+        interval_km: '',
+        interval_days: '',
+        next_due_at: '',
+    });
 
     const handleCreate = (e: React.FormEvent) => {
         e.preventDefault();
         form.post('/fleet-assets/maintenance/schedules', {
-            onSuccess: () => { form.reset(); setDialogOpen(false); },
+            onSuccess: () => {
+                form.reset();
+                setDialogOpen(false);
+            },
         });
     };
 
@@ -163,7 +235,8 @@ export default function SchedulesIndex({
     }
 
     function timelineLabel(item: TimelineItem): string {
-        if (item.type === 'overdue') return `${Math.abs(item.days_until)} days overdue`;
+        if (item.type === 'overdue')
+            return `${Math.abs(item.days_until)} days overdue`;
         if (item.days_until === 0) return 'Due today';
         if (item.days_until === 1) return 'Due in 1 day';
         return `Due in ${item.days_until} days`;
@@ -174,7 +247,10 @@ export default function SchedulesIndex({
             <AppLayout
                 breadcrumbs={[
                     { title: 'Fleet & Assets', href: '/fleet-assets' },
-                    { title: 'Service Schedules', href: '/fleet-assets/maintenance/schedules' },
+                    {
+                        title: 'Service Schedules',
+                        href: '/fleet-assets/maintenance/schedules',
+                    },
                 ]}
             >
                 <Head title="Service Schedules" />
@@ -182,33 +258,158 @@ export default function SchedulesIndex({
                     <FleetHero
                         title="Service Schedules"
                         description="Manage recurring service and maintenance schedules for assets."
-                        actions={can.manage ? (
-                            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button><Plus className="mr-2 h-4 w-4" />Create Schedule</Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader><DialogTitle>Create Service Schedule</DialogTitle></DialogHeader>
-                                    <form onSubmit={handleCreate} className="grid gap-4">
-                                        <div><label className="text-sm font-medium">Name *</label><Input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Oil Change" /></div>
-                                        <div><label className="text-sm font-medium">Asset *</label>
-                                            <Select value={form.data.asset_id} onValueChange={(v) => form.setData('asset_id', v)}>
-                                                <SelectTrigger><SelectValue placeholder="Select asset" /></SelectTrigger>
-                                                <SelectContent>{(assets ?? []).map((a) => (<SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>))}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div><label className="text-sm font-medium">Interval (km)</label><Input type="number" value={form.data.interval_km} onChange={(e) => form.setData('interval_km', e.target.value)} placeholder="e.g. 10000" /></div>
-                                        <div><label className="text-sm font-medium">Interval (days)</label><Input type="number" value={form.data.interval_days} onChange={(e) => form.setData('interval_days', e.target.value)} placeholder="e.g. 180" /></div>
-                                        <div><label className="text-sm font-medium">Next Due Date</label><Input type="date" value={form.data.next_due_at} onChange={(e) => form.setData('next_due_at', e.target.value)} /></div>
-                                        {form.errors.name && <p className="mt-1 text-xs text-destructive">{form.errors.name}</p>}
-                                        {form.errors.asset_id && <p className="mt-1 text-xs text-destructive">{form.errors.asset_id}</p>}
-                                        <Button type="submit" disabled={form.processing}>{form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Schedule</Button>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
-                        ) : undefined}
+                        actions={
+                            can.manage ? (
+                                <Dialog
+                                    open={dialogOpen}
+                                    onOpenChange={setDialogOpen}
+                                >
+                                    <DialogTrigger asChild>
+                                        <Button>
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Create Schedule
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>
+                                                Create Service Schedule
+                                            </DialogTitle>
+                                        </DialogHeader>
+                                        <form
+                                            onSubmit={handleCreate}
+                                            className="grid gap-4"
+                                        >
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Name *
+                                                </label>
+                                                <Input
+                                                    value={form.data.name}
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'name',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. Oil Change"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Asset *
+                                                </label>
+                                                <Select
+                                                    value={form.data.asset_id}
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'asset_id',
+                                                            v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select asset" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(assets ?? []).map(
+                                                            (a) => (
+                                                                <SelectItem
+                                                                    key={a.id}
+                                                                    value={String(
+                                                                        a.id,
+                                                                    )}
+                                                                >
+                                                                    {a.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Interval (km)
+                                                </label>
+                                                <Input
+                                                    type="number"
+                                                    value={
+                                                        form.data.interval_km
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'interval_km',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. 10000"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Interval (days)
+                                                </label>
+                                                <Input
+                                                    type="number"
+                                                    value={
+                                                        form.data.interval_days
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'interval_days',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. 180"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Next Due Date
+                                                </label>
+                                                <Input
+                                                    type="date"
+                                                    value={
+                                                        form.data.next_due_at
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'next_due_at',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            {form.errors.name && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {form.errors.name}
+                                                </p>
+                                            )}
+                                            {form.errors.asset_id && (
+                                                <p className="mt-1 text-xs text-destructive">
+                                                    {form.errors.asset_id}
+                                                </p>
+                                            )}
+                                            <Button
+                                                type="submit"
+                                                disabled={form.processing}
+                                            >
+                                                {form.processing && (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                )}
+                                                Create Schedule
+                                            </Button>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            ) : undefined
+                        }
                     />
-                    <FleetEmptyState icon={Clock} title="No service schedules" description="Set up recurring maintenance reminders to keep your fleet in top condition." />
+                    <FleetEmptyState
+                        icon={Clock}
+                        title="No service schedules"
+                        description="Set up recurring maintenance reminders to keep your fleet in top condition."
+                    />
                 </PageShell>
             </AppLayout>
         );
@@ -218,7 +419,10 @@ export default function SchedulesIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Service Schedules', href: '/fleet-assets/maintenance/schedules' },
+                {
+                    title: 'Service Schedules',
+                    href: '/fleet-assets/maintenance/schedules',
+                },
             ]}
         >
             <Head title="Service Schedules" />
@@ -226,42 +430,178 @@ export default function SchedulesIndex({
                 <FleetHero
                     title="Service Schedules"
                     description="Manage recurring service and maintenance schedules for assets."
-                    actions={can.manage ? (
-                        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button><Plus className="mr-2 h-4 w-4" />Create Schedule</Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader><DialogTitle>Create Service Schedule</DialogTitle></DialogHeader>
-                                <form onSubmit={handleCreate} className="grid gap-4">
-                                    <div><label className="text-sm font-medium">Name *</label><Input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Oil Change" /></div>
-                                    <div><label className="text-sm font-medium">Asset *</label>
-                                        <Select value={form.data.asset_id} onValueChange={(v) => form.setData('asset_id', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select asset" /></SelectTrigger>
-                                            <SelectContent>{(assets ?? []).map((a) => (<SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>))}</SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div><label className="text-sm font-medium">Interval (km)</label><Input type="number" value={form.data.interval_km} onChange={(e) => form.setData('interval_km', e.target.value)} placeholder="e.g. 10000" /></div>
-                                    <div><label className="text-sm font-medium">Interval (days)</label><Input type="number" value={form.data.interval_days} onChange={(e) => form.setData('interval_days', e.target.value)} placeholder="e.g. 180" /></div>
-                                    <div><label className="text-sm font-medium">Next Due Date</label><Input type="date" value={form.data.next_due_at} onChange={(e) => form.setData('next_due_at', e.target.value)} /></div>
-                                    {form.errors.name && <p className="mt-1 text-xs text-destructive">{form.errors.name}</p>}
-                                    {form.errors.asset_id && <p className="mt-1 text-xs text-destructive">{form.errors.asset_id}</p>}
-                                    <Button type="submit" disabled={form.processing}>{form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Schedule</Button>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    ) : undefined}
+                    actions={
+                        can.manage ? (
+                            <Dialog
+                                open={dialogOpen}
+                                onOpenChange={setDialogOpen}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create Schedule
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Create Service Schedule
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <form
+                                        onSubmit={handleCreate}
+                                        className="grid gap-4"
+                                    >
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Name *
+                                            </label>
+                                            <Input
+                                                value={form.data.name}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g. Oil Change"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Asset *
+                                            </label>
+                                            <Select
+                                                value={form.data.asset_id}
+                                                onValueChange={(v) =>
+                                                    form.setData('asset_id', v)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select asset" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {(assets ?? []).map((a) => (
+                                                        <SelectItem
+                                                            key={a.id}
+                                                            value={String(a.id)}
+                                                        >
+                                                            {a.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Interval (km)
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                value={form.data.interval_km}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'interval_km',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g. 10000"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Interval (days)
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                value={form.data.interval_days}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'interval_days',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g. 180"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">
+                                                Next Due Date
+                                            </label>
+                                            <Input
+                                                type="date"
+                                                value={form.data.next_due_at}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'next_due_at',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        {form.errors.name && (
+                                            <p className="mt-1 text-xs text-destructive">
+                                                {form.errors.name}
+                                            </p>
+                                        )}
+                                        {form.errors.asset_id && (
+                                            <p className="mt-1 text-xs text-destructive">
+                                                {form.errors.asset_id}
+                                            </p>
+                                        )}
+                                        <Button
+                                            type="submit"
+                                            disabled={form.processing}
+                                        >
+                                            {form.processing && (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            )}
+                                            Create Schedule
+                                        </Button>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        ) : undefined
+                    }
                 />
 
                 {/* KPI Row */}
-                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                    <FleetStatCard label="TOTAL SCHEDULES" value={totalCount} icon={Calendar} subtitle="All schedules" />
-                    <FleetStatCard label="OVERDUE" value={overdueCount} icon={AlertTriangle} color="red" subtitle="Past due date" />
-                    <FleetStatCard label="DUE SOON" value={dueSoonCount} icon={Timer} color="amber" subtitle="Within 14 days" />
-                    <FleetStatCard label="ON TRACK" value={onTrackCount} icon={CheckCircle} subtitle="Up to date" />
-                    <Card className="border bg-primary/10 dark:bg-primary/30 transition-shadow hover:shadow-md flex items-center justify-center">
-                        <CardContent className="p-4 flex items-center justify-center">
-                            <HalfMoonGauge value={healthPct} label="Fleet Health" sublabel={`${onTrackCount} of ${totalCount} on track`} size={130} color={FLEET_COLORS.primary} />
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                    <FleetStatCard
+                        label="TOTAL SCHEDULES"
+                        value={totalCount}
+                        icon={Calendar}
+                        subtitle="All schedules"
+                    />
+                    <FleetStatCard
+                        label="OVERDUE"
+                        value={overdueCount}
+                        icon={AlertTriangle}
+                        color="red"
+                        subtitle="Past due date"
+                    />
+                    <FleetStatCard
+                        label="DUE SOON"
+                        value={dueSoonCount}
+                        icon={Timer}
+                        color="amber"
+                        subtitle="Within 14 days"
+                    />
+                    <FleetStatCard
+                        label="ON TRACK"
+                        value={onTrackCount}
+                        icon={CheckCircle}
+                        subtitle="Up to date"
+                    />
+                    <Card className="flex items-center justify-center border bg-primary/10 transition-shadow hover:shadow-md dark:bg-primary/30">
+                        <CardContent className="flex items-center justify-center p-4">
+                            <HalfMoonGauge
+                                value={healthPct}
+                                label="Fleet Health"
+                                sublabel={`${onTrackCount} of ${totalCount} on track`}
+                                size={130}
+                                color={FLEET_COLORS.primary}
+                            />
                         </CardContent>
                     </Card>
                 </div>
@@ -270,25 +610,39 @@ export default function SchedulesIndex({
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Schedules by Vehicle</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Schedules by Vehicle
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {vehicleData.length > 0 ? (
-                                <HorizontalBarChart items={vehicleData} color={FLEET_COLORS.primary} />
+                                <HorizontalBarChart
+                                    items={vehicleData}
+                                    color={FLEET_COLORS.primary}
+                                />
                             ) : (
-                                <p className="py-4 text-center text-sm text-muted-foreground">No vehicle data available.</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                    No vehicle data available.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Monthly Completions</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Monthly Completions
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {completionData.length > 0 ? (
-                                <MiniBarChart data={completionData} color={FLEET_COLORS.primary} />
+                                <MiniBarChart
+                                    data={completionData}
+                                    color={FLEET_COLORS.primary}
+                                />
                             ) : (
-                                <p className="py-4 text-center text-sm text-muted-foreground">No completion data available.</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                    No completion data available.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
@@ -298,31 +652,42 @@ export default function SchedulesIndex({
                 {timeline.length > 0 && (
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
                                 <Activity className="h-4 w-4 text-primary" />
                                 Upcoming Service Timeline
-                                <span className="text-xs font-normal text-muted-foreground ml-1">(Next 30 days)</span>
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                    (Next 30 days)
+                                </span>
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Visual timeline bar */}
                             <div className="relative">
-                                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                                <div className="mb-1 flex justify-between text-[10px] text-muted-foreground">
                                     <span>Today</span>
                                     <span>+30 days</span>
                                 </div>
-                                <div className="relative h-8 bg-muted/30 rounded-full overflow-hidden">
+                                <div className="relative h-8 overflow-hidden rounded-full bg-muted/30">
                                     {timeline.map((item) => {
                                         // For overdue items, clamp to left edge
-                                        const position = item.days_until < 0 ? 0 : Math.min((item.days_until / 30) * 100, 100);
+                                        const position =
+                                            item.days_until < 0
+                                                ? 0
+                                                : Math.min(
+                                                      (item.days_until / 30) *
+                                                          100,
+                                                      100,
+                                                  );
                                         return (
                                             <div
                                                 key={item.id}
-                                                className="absolute top-0 h-full flex items-center"
+                                                className="absolute top-0 flex h-full items-center"
                                                 style={{ left: `${position}%` }}
                                                 title={`${item.name} - ${item.vehicle} (${timelineLabel(item)})`}
                                             >
-                                                <div className={`h-4 w-4 rounded-full border-2 border-white shadow ${timelineDotColor(item.type)}`} />
+                                                <div
+                                                    className={`h-4 w-4 rounded-full border-2 border-white shadow ${timelineDotColor(item.type)}`}
+                                                />
                                             </div>
                                         );
                                     })}
@@ -332,13 +697,28 @@ export default function SchedulesIndex({
                             {/* Timeline list */}
                             <div className="space-y-1.5">
                                 {timeline.map((item) => (
-                                    <div key={item.id} className="flex items-center gap-2 text-sm">
-                                        <span className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${timelineDotColor(item.type)}`} />
-                                        <span className="font-medium">{item.name}</span>
-                                        <span className="text-muted-foreground">--</span>
-                                        <span className="text-muted-foreground">{item.vehicle}</span>
-                                        <span className="text-muted-foreground">--</span>
-                                        <span className={`text-xs font-medium ${timelineIndicator(item.type)}`}>
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center gap-2 text-sm"
+                                    >
+                                        <span
+                                            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${timelineDotColor(item.type)}`}
+                                        />
+                                        <span className="font-medium">
+                                            {item.name}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            --
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            {item.vehicle}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            --
+                                        </span>
+                                        <span
+                                            className={`text-xs font-medium ${timelineIndicator(item.type)}`}
+                                        >
                                             {timelineLabel(item)}
                                         </span>
                                     </div>
@@ -349,96 +729,164 @@ export default function SchedulesIndex({
                 )}
 
                 {/* Schedule Table */}
-                <div className="rounded-lg border overflow-hidden">
+                <div className="overflow-hidden rounded-lg border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
-                                <SortHeader field="name">Schedule Name</SortHeader>
-                                <th className="px-4 py-3 text-left font-medium">Asset</th>
-                                <th className="px-4 py-3 text-left font-medium">Interval</th>
-                                <th className="px-4 py-3 text-left font-medium">Last Completed</th>
-                                <SortHeader field="next_due_at">Next Due</SortHeader>
-                                <th className="px-4 py-3 text-left font-medium">Days Until</th>
-                                <th className="px-4 py-3 text-left font-medium">Progress</th>
-                                <th className="px-4 py-3 text-right font-medium">Actions</th>
+                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                {renderSortHeader('name', 'Schedule Name')}
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Asset
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Interval
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Last Completed
+                                </th>
+                                {renderSortHeader('next_due_at', 'Next Due')}
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Days Until
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Progress
+                                </th>
+                                <th className="px-4 py-3 text-right font-medium">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {allSchedules.map((schedule) => {
                                 const days = daysUntilDue(schedule.next_due_at);
                                 const progressPct = kmProgressPct(schedule);
-                                const dueSoon = isDueSoon(schedule.next_due_at) && !schedule.is_overdue;
+                                const dueSoon =
+                                    isDueSoon(schedule.next_due_at) &&
+                                    !schedule.is_overdue;
                                 return (
                                     <tr
                                         key={schedule.id}
                                         className={`border-b transition-colors hover:bg-muted/30 ${
                                             schedule.is_overdue
-                                                ? 'bg-status-critical-bg dark:bg-status-critical border-l-4 border-l-red-500'
+                                                ? 'border-l-4 border-l-red-500 bg-status-critical-bg dark:bg-status-critical'
                                                 : dueSoon
-                                                    ? 'border-l-4 border-l-amber-500'
-                                                    : ''
+                                                  ? 'border-l-4 border-l-amber-500'
+                                                  : ''
                                         }`}
                                     >
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <Clock className="h-4 w-4 text-muted-foreground" />
-                                                <span className="font-medium">{schedule.name}</span>
+                                                <span className="font-medium">
+                                                    {schedule.name}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
                                             {schedule.asset ? (
-                                                <Link href={`/fleet-assets/assets/${schedule.asset.id}`} className="text-primary hover:underline">{schedule.asset.name}</Link>
+                                                <Link
+                                                    href={`/fleet-assets/assets/${schedule.asset.id}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {schedule.asset.name}
+                                                </Link>
                                             ) : (
-                                                <span className="text-muted-foreground">---</span>
+                                                <span className="text-muted-foreground">
+                                                    ---
+                                                </span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">
-                                            {schedule.interval_km && `${formatDistance(schedule.interval_km)}`}
-                                            {schedule.interval_km && schedule.interval_days && ' / '}
-                                            {schedule.interval_days && `${schedule.interval_days} days`}
-                                            {!schedule.interval_km && !schedule.interval_days && '---'}
+                                            {schedule.interval_km &&
+                                                `${formatDistance(schedule.interval_km)}`}
+                                            {schedule.interval_km &&
+                                                schedule.interval_days &&
+                                                ' / '}
+                                            {schedule.interval_days &&
+                                                `${schedule.interval_days} days`}
+                                            {!schedule.interval_km &&
+                                                !schedule.interval_days &&
+                                                '---'}
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">
-                                            {schedule.last_completed_at ? formatDate(schedule.last_completed_at) : '---'}
+                                            {schedule.last_completed_at
+                                                ? formatDate(
+                                                      schedule.last_completed_at,
+                                                  )
+                                                : '---'}
                                         </td>
                                         <td className="px-4 py-3">
                                             {schedule.next_due_at ? (
                                                 <div className="flex items-center gap-2">
-                                                    <span>{formatDate(schedule.next_due_at)}</span>
+                                                    <span>
+                                                        {formatDate(
+                                                            schedule.next_due_at,
+                                                        )}
+                                                    </span>
                                                     {schedule.is_overdue && (
-                                                        <Badge variant="destructive" className="font-bold text-[10px]"><AlertTriangle className="mr-1 h-3 w-3" />Overdue</Badge>
+                                                        <Badge
+                                                            variant="destructive"
+                                                            className="text-[10px] font-bold"
+                                                        >
+                                                            <AlertTriangle className="mr-1 h-3 w-3" />
+                                                            Overdue
+                                                        </Badge>
                                                     )}
                                                     {dueSoon && (
-                                                        <Badge variant="default" className="text-[10px]">Due soon</Badge>
+                                                        <Badge
+                                                            variant="default"
+                                                            className="text-[10px]"
+                                                        >
+                                                            Due soon
+                                                        </Badge>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-muted-foreground">---</span>
+                                                <span className="text-muted-foreground">
+                                                    ---
+                                                </span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
                                             {days !== null ? (
-                                                <span className={`text-xs font-medium ${
-                                                    schedule.is_overdue ? 'text-status-critical dark:text-status-critical' :
-                                                    dueSoon ? 'text-status-warning dark:text-status-warning' :
-                                                    'text-muted-foreground'
-                                                }`}>
-                                                    {daysUntilLabel(days, schedule.is_overdue)}
+                                                <span
+                                                    className={`text-xs font-medium ${
+                                                        schedule.is_overdue
+                                                            ? 'text-status-critical dark:text-status-critical'
+                                                            : dueSoon
+                                                              ? 'text-status-warning dark:text-status-warning'
+                                                              : 'text-muted-foreground'
+                                                    }`}
+                                                >
+                                                    {daysUntilLabel(
+                                                        days,
+                                                        schedule.is_overdue,
+                                                    )}
                                                 </span>
                                             ) : (
-                                                <span className="text-muted-foreground">---</span>
+                                                <span className="text-muted-foreground">
+                                                    ---
+                                                </span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
                                             {progressPct !== null ? (
                                                 <div className="flex items-center gap-1.5">
-                                                    <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
-                                                        <div className="h-full rounded-full bg-primary" style={{ width: `${progressPct}%` }} />
+                                                    <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                                                        <div
+                                                            className="h-full rounded-full bg-primary"
+                                                            style={{
+                                                                width: `${progressPct}%`,
+                                                            }}
+                                                        />
                                                     </div>
-                                                    <span className="text-[10px] text-muted-foreground tabular-nums">{progressPct}%</span>
+                                                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                                                        {progressPct}%
+                                                    </span>
                                                 </div>
                                             ) : (
-                                                <span className="text-muted-foreground text-xs">---</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    ---
+                                                </span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right">
@@ -446,11 +894,19 @@ export default function SchedulesIndex({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-7 text-xs gap-1"
-                                                    disabled={markingId === schedule.id}
-                                                    onClick={() => handleMarkComplete(schedule.id)}
+                                                    className="h-7 gap-1 text-xs"
+                                                    disabled={
+                                                        markingId ===
+                                                        schedule.id
+                                                    }
+                                                    onClick={() =>
+                                                        handleMarkComplete(
+                                                            schedule.id,
+                                                        )
+                                                    }
                                                 >
-                                                    {markingId === schedule.id ? (
+                                                    {markingId ===
+                                                    schedule.id ? (
                                                         <Loader2 className="h-3 w-3 animate-spin" />
                                                     ) : (
                                                         <Check className="h-3 w-3" />
@@ -458,7 +914,9 @@ export default function SchedulesIndex({
                                                     Mark Complete
                                                 </Button>
                                             ) : (
-                                                <span className="text-xs text-muted-foreground">View only</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    View only
+                                                </span>
                                             )}
                                         </td>
                                     </tr>

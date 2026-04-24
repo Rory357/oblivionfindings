@@ -1,12 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -14,8 +12,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, BarChart3, Star } from 'lucide-react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { BarChart3, Plus, Star } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -47,7 +54,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const reasonLabels: Record<string, string> = {
@@ -65,7 +78,8 @@ const reasonLabels: Record<string, string> = {
 };
 
 function SatisfactionStars({ rating }: { rating: number | null }) {
-    if (rating === null) return <span className="text-sm text-muted-foreground">-</span>;
+    if (rating === null)
+        return <span className="text-sm text-muted-foreground">-</span>;
     return (
         <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -78,11 +92,19 @@ function SatisfactionStars({ rating }: { rating: number | null }) {
     );
 }
 
-export default function ExitInterviewsIndex({ interviews, filters, can }: Props) {
+export default function ExitInterviewsIndex({
+    interviews,
+    filters,
+    can,
+}: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/exit-interviews', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/exit-interviews',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -90,7 +112,10 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
             <Head title="Exit Interviews" />
 
             <PageShell>
-                <PageHeader title="Exit Interviews" description="Track departure feedback and identify retention insights.">
+                <PageHeader
+                    title="Exit Interviews"
+                    description="Track departure feedback and identify retention insights."
+                >
                     <div className="flex flex-wrap items-center gap-2">
                         <Link href="/hr/exit-interviews/trends">
                             <Button size="sm" variant="outline">
@@ -116,17 +141,32 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Departure Reason</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Departure Reason
+                            </Label>
                             <Select
                                 value={filters.reason ?? NONE}
-                                onValueChange={(v) => onFilter({ reason: v === NONE ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ reason: v === NONE ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="All reasons" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All reasons" />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>All Reasons</SelectItem>
-                                    {Object.entries(reasonLabels).map(([value, label]) => (
-                                        <SelectItem key={value} value={value}>{label}</SelectItem>
-                                    ))}
+                                    <SelectItem value={NONE}>
+                                        All Reasons
+                                    </SelectItem>
+                                    {Object.entries(reasonLabels).map(
+                                        ([value, label]) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -152,24 +192,41 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                                 {interviews.data.map((interview) => (
                                     <TableRow key={interview.id}>
                                         <TableCell className="font-medium">
-                                            {interview.employee_profile?.user?.name ?? 'Unknown'}
+                                            {interview.employee_profile?.user
+                                                ?.name ?? 'Unknown'}
                                         </TableCell>
-                                        <TableCell>{formatDate(interview.interview_date)}</TableCell>
+                                        <TableCell>
+                                            {formatDate(
+                                                interview.interview_date,
+                                            )}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant="outline">
-                                                {reasonLabels[interview.departure_reason] ?? interview.departure_reason}
+                                                {reasonLabels[
+                                                    interview.departure_reason
+                                                ] ?? interview.departure_reason}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <SatisfactionStars rating={interview.overall_satisfaction} />
+                                            <SatisfactionStars
+                                                rating={
+                                                    interview.overall_satisfaction
+                                                }
+                                            />
                                         </TableCell>
                                         <TableCell>
-                                            {interview.would_recommend === null
-                                                ? '-'
-                                                : interview.would_recommend
-                                                    ? <Badge className="border-status-success/30 bg-status-success-bg text-status-success">Yes</Badge>
-                                                    : <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">No</Badge>
-                                            }
+                                            {interview.would_recommend ===
+                                            null ? (
+                                                '-'
+                                            ) : interview.would_recommend ? (
+                                                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
+                                                    Yes
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                    No
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {interview.interviewer?.name ?? '-'}
@@ -186,7 +243,10 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                                 ))}
                                 {!interviews.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No exit interviews found.
                                         </TableCell>
                                     </TableRow>
@@ -197,7 +257,10 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                 </Card>
 
                 {/* Pagination */}
-                <LaravelPagination links={interviews?.links ?? []} className="mt-4" />
+                <LaravelPagination
+                    links={interviews?.links ?? []}
+                    className="mt-4"
+                />
             </PageShell>
         </AppLayout>
     );

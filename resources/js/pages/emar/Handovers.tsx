@@ -190,7 +190,11 @@ function statusBadge(status: string) {
                 </Badge>
             );
         case 'submitted':
-            return <Badge className="bg-status-info-bg text-status-info">{label}</Badge>;
+            return (
+                <Badge className="bg-status-info-bg text-status-info">
+                    {label}
+                </Badge>
+            );
         case 'draft':
             return <Badge variant="secondary">{label}</Badge>;
         default:
@@ -264,6 +268,7 @@ function HandoverDialog({
 
         form.setData(buildFormState(editing));
         form.clearErrors();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia form helper is stable; hydrate only when the edited handover dialog opens.
     }, [editing, open]);
 
     const selectedShift = useMemo(

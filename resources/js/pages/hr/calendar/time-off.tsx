@@ -1,14 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LeaveEntry {
     id: number;
@@ -29,7 +32,11 @@ interface Props {
     calendarDays: CalendarDay[];
     month: string;
     monthLabel: string;
-    filters: { department: string | null; team: string | null; site_id: string | null };
+    filters: {
+        department: string | null;
+        team: string | null;
+        site_id: string | null;
+    };
     departments: Array<{ id: number; name: string }>;
     teams: string[];
 }
@@ -53,20 +60,36 @@ const leaveTypeColors: Record<string, string> = {
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function TimeOffCalendar({ calendarDays, month, monthLabel, filters, departments, teams }: Props) {
+export default function TimeOffCalendar({
+    calendarDays,
+    month,
+    monthLabel,
+    filters,
+    departments,
+    teams,
+}: Props) {
     const navigateMonth = (direction: number) => {
         const [year, m] = month.split('-').map(Number);
         const d = new Date(year, m - 1 + direction, 1);
         const newMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        router.get('/hr/calendar/time-off', { ...filters, month: newMonth }, { preserveState: true });
+        router.get(
+            '/hr/calendar/time-off',
+            { ...filters, month: newMonth },
+            { preserveState: true },
+        );
     };
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/calendar/time-off', { ...filters, ...next, month }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/calendar/time-off',
+            { ...filters, ...next, month },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     // Pad the beginning of the grid with empty cells
-    const firstDayOfWeek = calendarDays.length > 0 ? calendarDays[0].day_of_week : 0;
+    const firstDayOfWeek =
+        calendarDays.length > 0 ? calendarDays[0].day_of_week : 0;
     const paddedDays: (CalendarDay | null)[] = [
         ...Array(firstDayOfWeek).fill(null),
         ...calendarDays,
@@ -88,17 +111,29 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                 {/* Header with month navigation */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-semibold">Time Off Calendar</h1>
+                        <h1 className="text-lg font-semibold">
+                            Time Off Calendar
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
                             See who is off each day, color-coded by leave type
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={() => navigateMonth(-1)}>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => navigateMonth(-1)}
+                        >
                             <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="min-w-[140px] text-center text-sm font-medium">{monthLabel}</span>
-                        <Button variant="outline" size="icon" onClick={() => navigateMonth(1)}>
+                        <span className="min-w-[140px] text-center text-sm font-medium">
+                            {monthLabel}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => navigateMonth(1)}
+                        >
                             <ChevronRight className="h-4 w-4" />
                         </Button>
                     </div>
@@ -111,31 +146,58 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Department</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Department
+                            </Label>
                             <Select
                                 value={filters.department || 'all'}
-                                onValueChange={(val) => onFilter({ department: val === 'all' ? null : val })}
+                                onValueChange={(val) =>
+                                    onFilter({
+                                        department: val === 'all' ? null : val,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Departments</SelectItem>
+                                    <SelectItem value="all">
+                                        All Departments
+                                    </SelectItem>
                                     {departments.map((d) => (
-                                        <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                                        <SelectItem
+                                            key={d.id}
+                                            value={String(d.id)}
+                                        >
+                                            {d.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Team</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Team
+                            </Label>
                             <Select
                                 value={filters.team || 'all'}
-                                onValueChange={(val) => onFilter({ team: val === 'all' ? null : val })}
+                                onValueChange={(val) =>
+                                    onFilter({
+                                        team: val === 'all' ? null : val,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Teams</SelectItem>
+                                    <SelectItem value="all">
+                                        All Teams
+                                    </SelectItem>
                                     {teams.map((t) => (
-                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                        <SelectItem key={t} value={t}>
+                                            {t}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -144,7 +206,13 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => onFilter({ department: null, team: null, site_id: null })}
+                                onClick={() =>
+                                    onFilter({
+                                        department: null,
+                                        team: null,
+                                        site_id: null,
+                                    })
+                                }
                             >
                                 Clear Filters
                             </Button>
@@ -157,7 +225,9 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                     {Object.entries(leaveTypeColors).map(([type, color]) => (
                         <div key={type} className="flex items-center gap-1.5">
                             <div className={`h-3 w-3 rounded ${color}`} />
-                            <span className="text-xs capitalize text-muted-foreground">{type.replace('_', ' ')}</span>
+                            <span className="text-xs text-muted-foreground capitalize">
+                                {type.replace('_', ' ')}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -168,7 +238,10 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                         {/* Day headers */}
                         <div className="grid grid-cols-7 border-b">
                             {dayNames.map((name) => (
-                                <div key={name} className="border-r p-2 text-center text-xs font-medium text-muted-foreground last:border-r-0">
+                                <div
+                                    key={name}
+                                    className="border-r p-2 text-center text-xs font-medium text-muted-foreground last:border-r-0"
+                                >
                                     {name}
                                 </div>
                             ))}
@@ -179,20 +252,27 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                             {paddedDays.map((day, idx) => (
                                 <div
                                     key={idx}
-                                    className={`min-h-[100px] border-b border-r p-1.5 last:border-r-0 ${
-                                        !day ? 'bg-muted' :
-                                        day.is_weekend ? 'bg-muted' :
-                                        day.date === today ? 'bg-status-info-bg' :
-                                        ''
+                                    className={`min-h-[100px] border-r border-b p-1.5 last:border-r-0 ${
+                                        !day
+                                            ? 'bg-muted'
+                                            : day.is_weekend
+                                              ? 'bg-muted'
+                                              : day.date === today
+                                                ? 'bg-status-info-bg'
+                                                : ''
                                     }`}
                                 >
                                     {day && (
                                         <>
-                                            <div className={`mb-1 text-xs font-medium ${
-                                                day.date === today ? 'text-status-info' :
-                                                day.is_weekend ? 'text-muted-foreground' :
-                                                'text-foreground'
-                                            }`}>
+                                            <div
+                                                className={`mb-1 text-xs font-medium ${
+                                                    day.date === today
+                                                        ? 'text-status-info'
+                                                        : day.is_weekend
+                                                          ? 'text-muted-foreground'
+                                                          : 'text-foreground'
+                                                }`}
+                                            >
                                                 {day.day}
                                             </div>
                                             <div className="space-y-0.5">

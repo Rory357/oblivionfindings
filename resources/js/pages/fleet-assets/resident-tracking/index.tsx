@@ -164,11 +164,11 @@ export default function ResidentTrackingIndex({
     const [activeTab, setActiveTab] = useState<'all' | 'outside' | 'alerts'>('all');
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const safeResidents = residents ?? [];
+    const safeResidents = useMemo(() => residents ?? [], [residents]);
     const safeStats = stats ?? {} as Props['stats'];
     const safeAlerts = recent_alerts ?? [];
     const safeOutings = active_outings ?? [];
-    const safeGeofences = geofences ?? [];
+    const safeGeofences = useMemo(() => geofences ?? [], [geofences]);
 
     // Auto-refresh every 30s
     useEffect(() => {
@@ -317,36 +317,45 @@ export default function ResidentTrackingIndex({
                             <CardTitle className="text-base">Residents</CardTitle>
                             {/* Tab buttons */}
                             <div className="mt-2 flex gap-1">
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={() => setActiveTab('all')}
-                                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                         activeTab === 'all'
                                             ? 'bg-primary/10 text-primary'
                                             : 'text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
                                     All ({safeResidents.length})
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={() => setActiveTab('outside')}
-                                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                         activeTab === 'outside'
                                             ? 'bg-status-critical-bg text-status-critical'
                                             : 'text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
                                     Outside ({outsideCount})
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={() => setActiveTab('alerts')}
-                                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                         activeTab === 'alerts'
                                             ? 'bg-status-warning-bg text-status-warning'
                                             : 'text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
                                     Alerts ({safeAlerts.length})
-                                </button>
+                                </Button>
                             </div>
                             {/* Search */}
                             {activeTab !== 'alerts' && (

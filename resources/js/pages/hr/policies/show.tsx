@@ -1,10 +1,25 @@
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { FileText, CheckCircle, ShieldCheck, Clock, History, Edit, Eye, Download } from 'lucide-react';
+import {
+    CheckCircle,
+    Download,
+    Edit,
+    Eye,
+    FileText,
+    History,
+    ShieldCheck,
+} from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -53,35 +68,42 @@ type Props = {
 const formatDate = (value?: string | null) => {
     if (!value) return 'Not set';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const formatDateTime = (value?: string | null) => {
     if (!value) return 'Not set';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          });
 };
 
 const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-        'employment': 'bg-status-info-bg text-status-info border-status-info/30',
-        'health_and_safety': 'bg-status-success-bg text-status-success border-status-success/30',
-        'safeguarding': 'bg-primary/10 text-primary border-primary',
-        'data_protection': 'bg-status-warning-bg text-status-warning border-status-warning/30',
-        'conduct': 'bg-status-critical-bg text-status-critical border-status-critical/30',
-        'leave': 'bg-status-info-bg text-status-info border-status-info/30',
-        'training': 'bg-primary/10 text-primary border-primary',
-        'general': 'bg-muted text-foreground border-border',
+        employment: 'bg-status-info-bg text-status-info border-status-info/30',
+        health_and_safety:
+            'bg-status-success-bg text-status-success border-status-success/30',
+        safeguarding: 'bg-primary/10 text-primary border-primary',
+        data_protection:
+            'bg-status-warning-bg text-status-warning border-status-warning/30',
+        conduct:
+            'bg-status-critical-bg text-status-critical border-status-critical/30',
+        leave: 'bg-status-info-bg text-status-info border-status-info/30',
+        training: 'bg-primary/10 text-primary border-primary',
+        general: 'bg-muted text-foreground border-border',
     };
     return colors[category] || 'bg-muted text-foreground border-border';
 };
@@ -94,7 +116,11 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
     ];
 
     const handleAttest = () => {
-        if (confirm('By clicking confirm, you attest that you have read and understood this policy.')) {
+        if (
+            confirm(
+                'By clicking confirm, you attest that you have read and understood this policy.',
+            )
+        ) {
             router.post(`/hr/policies/${policy.id}/attest`);
         }
     };
@@ -111,19 +137,29 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                             {policy.title}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={getCategoryColor(policy.category)}>
+                            <Badge
+                                className={getCategoryColor(policy.category)}
+                            >
                                 {policy.category.replace(/_/g, ' ')}
                             </Badge>
                             {policy.is_active ? (
-                                <Badge className="bg-status-success-bg text-status-success border-status-success/30">
+                                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Active
                                 </Badge>
                             ) : (
-                                <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
+                                <Badge
+                                    variant="outline"
+                                    className="text-muted-foreground"
+                                >
+                                    Inactive
+                                </Badge>
                             )}
                             {policy.requires_attestation && (
-                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                >
                                     <ShieldCheck className="mr-1 h-3 w-3" />
                                     Attestation Required
                                 </Badge>
@@ -136,18 +172,27 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/hr/policies" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                        <Link
+                            href="/hr/policies"
+                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                        >
                             Back to list
                         </Link>
                         {policy.currentVersion?.document_path && (
                             <>
-                                <Link href={`/hr/policies/${policy.id}/download`} target="_blank">
+                                <Link
+                                    href={`/hr/policies/${policy.id}/download`}
+                                    target="_blank"
+                                >
                                     <Button size="sm" variant="outline">
                                         <Eye className="mr-1.5 h-4 w-4" />
                                         View Document
                                     </Button>
                                 </Link>
-                                <Link href={`/hr/policies/${policy.id}/download`} download>
+                                <Link
+                                    href={`/hr/policies/${policy.id}/download`}
+                                    download
+                                >
                                     <Button size="sm" variant="outline">
                                         <Download className="mr-1.5 h-4 w-4" />
                                         Download
@@ -165,8 +210,8 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                         )}
                         {can.attest && policy.requires_attestation && (
                             <Button size="sm" onClick={handleAttest}>
-                                <ShieldCheck className="mr-1.5 h-4 w-4" />
-                                I Attest
+                                <ShieldCheck className="mr-1.5 h-4 w-4" />I
+                                Attest
                             </Button>
                         )}
                     </div>
@@ -175,7 +220,9 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                 {policy.description && (
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="text-sm text-muted-foreground">{policy.description}</div>
+                            <div className="text-sm text-muted-foreground">
+                                {policy.description}
+                            </div>
                         </CardContent>
                     </Card>
                 )}
@@ -184,22 +231,34 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Attestations Completed</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Attestations Completed
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{attestationStats.total}</div>
+                                <div className="text-2xl font-bold">
+                                    {attestationStats.total}
+                                </div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Required</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Required
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
-                                    <div className="text-2xl font-bold">{attestationStats.requires}</div>
-                                    {attestationStats.total < attestationStats.requires && (
+                                    <div className="text-2xl font-bold">
+                                        {attestationStats.requires}
+                                    </div>
+                                    {attestationStats.total <
+                                        attestationStats.requires && (
                                         <span className="text-sm text-status-warning">
-                                            ({attestationStats.requires - attestationStats.total} outstanding)
+                                            (
+                                            {attestationStats.requires -
+                                                attestationStats.total}{' '}
+                                            outstanding)
                                         </span>
                                     )}
                                 </div>
@@ -213,16 +272,22 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <FileText className="h-5 w-5 text-status-info" />
-                                Current Version (v{policy.currentVersion.version_number})
+                                Current Version (v
+                                {policy.currentVersion.version_number})
                             </CardTitle>
                             <div className="text-xs text-muted-foreground">
-                                Effective from {formatDate(policy.currentVersion.effective_from)}
+                                Effective from{' '}
+                                {formatDate(
+                                    policy.currentVersion.effective_from,
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent>
                             <div
                                 className="prose prose-sm max-w-none text-foreground"
-                                dangerouslySetInnerHTML={{ __html: policy.currentVersion.content }}
+                                dangerouslySetInnerHTML={{
+                                    __html: policy.currentVersion.content,
+                                }}
                             />
                         </CardContent>
                     </Card>
@@ -250,22 +315,31 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                     <TableRow key={version.id}>
                                         <TableCell className="font-medium">
                                             v{version.version_number}
-                                            {policy.currentVersion?.id === version.id && (
-                                                <Badge className="ml-2 bg-status-success-bg text-status-success border-status-success/30">
+                                            {policy.currentVersion?.id ===
+                                                version.id && (
+                                                <Badge className="ml-2 border-status-success/30 bg-status-success-bg text-status-success">
                                                     Current
                                                 </Badge>
                                             )}
                                         </TableCell>
-                                        <TableCell>{formatDate(version.effective_from)}</TableCell>
-                                        <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                                            {version.change_summary || 'No summary provided'}
+                                        <TableCell>
+                                            {formatDate(version.effective_from)}
                                         </TableCell>
-                                        <TableCell>{formatDate(version.created_at)}</TableCell>
+                                        <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                                            {version.change_summary ||
+                                                'No summary provided'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {formatDate(version.created_at)}
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                                 {!policy.versions.length && (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={4}
+                                            className="py-6 text-center text-sm text-muted-foreground"
+                                        >
                                             No version history available.
                                         </TableCell>
                                     </TableRow>
@@ -295,9 +369,21 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 <TableBody>
                                     {policy.attestations.map((att) => (
                                         <TableRow key={att.id}>
-                                            <TableCell className="font-medium">{att.user.name}</TableCell>
-                                            <TableCell>v{att.policy_version.version_number}</TableCell>
-                                            <TableCell>{formatDateTime(att.attested_at)}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {att.user.name}
+                                            </TableCell>
+                                            <TableCell>
+                                                v
+                                                {
+                                                    att.policy_version
+                                                        .version_number
+                                                }
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDateTime(
+                                                    att.attested_at,
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>

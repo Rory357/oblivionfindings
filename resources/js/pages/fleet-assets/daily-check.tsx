@@ -201,7 +201,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
 
                                     {/* Check Form */}
                                     {activeCheck === vehicle.id && (
-                                        <div className="mt-4 rounded-lg border bg-background p-4 space-y-3">
+                                        <article className="mt-4 space-y-3 rounded-lg border bg-background p-4">
                                             <div>
                                                 <label className="text-sm font-medium">Quick Notes (optional)</label>
                                                 <Input
@@ -235,7 +235,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                                     Cancel
                                                 </Button>
                                             </div>
-                                        </div>
+                                        </article>
                                     )}
                                 </CardContent>
                             </Card>

@@ -2,7 +2,7 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     AlertTriangle,
     Check,
@@ -145,18 +145,28 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                     // Mark inbound unread messages as read
                     if (can.manage) {
                         for (const msg of data.messages) {
-                            if (msg.direction === 'inbound' && !msg.delivered_at) {
-                                fetch(`/control-room/messaging/${msg.id}/read`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-Requested-With': 'XMLHttpRequest',
-                                        'X-CSRF-TOKEN':
-                                            document
-                                                .querySelector('meta[name="csrf-token"]')
-                                                ?.getAttribute('content') ?? '',
+                            if (
+                                msg.direction === 'inbound' &&
+                                !msg.delivered_at
+                            ) {
+                                fetch(
+                                    `/control-room/messaging/${msg.id}/read`,
+                                    {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-Requested-With':
+                                                'XMLHttpRequest',
+                                            'X-CSRF-TOKEN':
+                                                document
+                                                    .querySelector(
+                                                        'meta[name="csrf-token"]',
+                                                    )
+                                                    ?.getAttribute('content') ??
+                                                '',
+                                        },
                                     },
-                                });
+                                );
                             }
                         }
                     }
@@ -301,9 +311,14 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                         {/* Left Panel - Thread List */}
                         <div className="flex w-80 flex-shrink-0 flex-col border-r">
                             <div className="flex items-center justify-between border-b p-4">
-                                <h3 className="text-sm font-semibold">Conversations</h3>
+                                <h3 className="text-sm font-semibold">
+                                    Conversations
+                                </h3>
                                 {can.manage && (
-                                    <Dialog open={newConvoOpen} onOpenChange={setNewConvoOpen}>
+                                    <Dialog
+                                        open={newConvoOpen}
+                                        onOpenChange={setNewConvoOpen}
+                                    >
                                         <DialogTrigger asChild>
                                             <Button size="sm" variant="outline">
                                                 <MessageSquarePlus className="mr-1 h-4 w-4" />
@@ -311,32 +326,53 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                             </Button>
                                         </DialogTrigger>
                                         <DialogContent className="sm:max-w-md">
-                                            <form onSubmit={handleNewConversation}>
+                                            <form
+                                                onSubmit={handleNewConversation}
+                                            >
                                                 <DialogHeader>
-                                                    <DialogTitle>New Conversation</DialogTitle>
+                                                    <DialogTitle>
+                                                        New Conversation
+                                                    </DialogTitle>
                                                     <DialogDescription>
-                                                        Start a new direct message or alert-linked conversation.
+                                                        Start a new direct
+                                                        message or alert-linked
+                                                        conversation.
                                                     </DialogDescription>
                                                 </DialogHeader>
                                                 <div className="space-y-4 py-4">
                                                     <div>
-                                                        <Label htmlFor="new-convo-user">Staff Member</Label>
+                                                        <Label htmlFor="new-convo-user">
+                                                            Staff Member
+                                                        </Label>
                                                         <Select
                                                             value={newConvoUser}
-                                                            onValueChange={setNewConvoUser}
+                                                            onValueChange={
+                                                                setNewConvoUser
+                                                            }
                                                         >
-                                                            <SelectTrigger id="new-convo-user" className="mt-1">
+                                                            <SelectTrigger
+                                                                id="new-convo-user"
+                                                                className="mt-1"
+                                                            >
                                                                 <SelectValue placeholder="Select staff member..." />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {staff.map((s) => (
-                                                                    <SelectItem
-                                                                        key={s.id}
-                                                                        value={String(s.id)}
-                                                                    >
-                                                                        {s.name}
-                                                                    </SelectItem>
-                                                                ))}
+                                                                {staff.map(
+                                                                    (s) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                s.id
+                                                                            }
+                                                                            value={String(
+                                                                                s.id,
+                                                                            )}
+                                                                        >
+                                                                            {
+                                                                                s.name
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
@@ -348,9 +384,14 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                             id="new-convo-alert"
                                                             type="number"
                                                             placeholder="Link to alert #"
-                                                            value={newConvoAlertId}
+                                                            value={
+                                                                newConvoAlertId
+                                                            }
                                                             onChange={(e) =>
-                                                                setNewConvoAlertId(e.target.value)
+                                                                setNewConvoAlertId(
+                                                                    e.target
+                                                                        .value,
+                                                                )
                                                             }
                                                             className="mt-1"
                                                         />
@@ -360,11 +401,18 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                     <Button
                                                         type="button"
                                                         variant="outline"
-                                                        onClick={() => setNewConvoOpen(false)}
+                                                        onClick={() =>
+                                                            setNewConvoOpen(
+                                                                false,
+                                                            )
+                                                        }
                                                     >
                                                         Cancel
                                                     </Button>
-                                                    <Button type="submit" disabled={!newConvoUser}>
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={!newConvoUser}
+                                                    >
                                                         Start Conversation
                                                     </Button>
                                                 </DialogFooter>
@@ -379,17 +427,22 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                 {threads.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                                         <MessageSquarePlus className="mb-2 h-8 w-8" />
-                                        <p className="text-sm">No conversations yet</p>
+                                        <p className="text-sm">
+                                            No conversations yet
+                                        </p>
                                         <p className="text-xs">
-                                            Start a new conversation to begin messaging.
+                                            Start a new conversation to begin
+                                            messaging.
                                         </p>
                                     </div>
                                 ) : (
                                     threads.map((thread) => (
-                                        <button
+                                        <Button
                                             key={thread.id}
+                                            type="button"
+                                            variant="ghost"
                                             onClick={() => selectThread(thread)}
-                                            className={`w-full border-b px-4 py-3 text-left transition-colors hover:bg-accent/50 ${
+                                            className={`h-auto w-full justify-start rounded-none border-b px-4 py-3 text-left ${
                                                 activeThread?.id === thread.id
                                                     ? 'bg-accent'
                                                     : ''
@@ -428,17 +481,21 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                     </div>
                                                     <div className="flex items-center justify-between">
                                                         <p className="truncate text-xs text-muted-foreground">
-                                                            {thread.last_message || 'No messages'}
+                                                            {thread.last_message ||
+                                                                'No messages'}
                                                         </p>
-                                                        {thread.unread_count > 0 && (
+                                                        {thread.unread_count >
+                                                            0 && (
                                                             <span className="ml-2 inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-status-critical px-1.5 text-[10px] font-bold text-white">
-                                                                {thread.unread_count}
+                                                                {
+                                                                    thread.unread_count
+                                                                }
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </button>
+                                        </Button>
                                     ))
                                 )}
                             </div>
@@ -470,13 +527,15 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                 </h3>
                                                 <Badge
                                                     variant={
-                                                        activeThread.type === 'alert'
+                                                        activeThread.type ===
+                                                        'alert'
                                                             ? 'default'
                                                             : 'secondary'
                                                     }
                                                     className="text-[10px]"
                                                 >
-                                                    {activeThread.type === 'alert'
+                                                    {activeThread.type ===
+                                                    'alert'
                                                         ? 'Alert'
                                                         : 'Direct'}
                                                 </Badge>
@@ -486,7 +545,8 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                     href={`/control-room/alerts/${activeThread.alert_id}`}
                                                     className="text-xs text-status-info hover:underline"
                                                 >
-                                                    View linked alert #{activeThread.alert_id}
+                                                    View linked alert #
+                                                    {activeThread.alert_id}
                                                 </a>
                                             )}
                                         </div>
@@ -496,14 +556,19 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                     <div className="flex-1 overflow-y-auto px-6 py-4">
                                         {loadingMessages ? (
                                             <div className="flex h-full items-center justify-center text-muted-foreground">
-                                                <p className="text-sm">Loading messages...</p>
+                                                <p className="text-sm">
+                                                    Loading messages...
+                                                </p>
                                             </div>
                                         ) : messages.length === 0 ? (
                                             <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
                                                 <MessageSquarePlus className="mb-2 h-8 w-8" />
-                                                <p className="text-sm">No messages yet</p>
+                                                <p className="text-sm">
+                                                    No messages yet
+                                                </p>
                                                 <p className="text-xs">
-                                                    Send a message to start the conversation.
+                                                    Send a message to start the
+                                                    conversation.
                                                 </p>
                                             </div>
                                         ) : (
@@ -512,14 +577,16 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                     <div
                                                         key={msg.id}
                                                         className={`flex ${
-                                                            msg.direction === 'outbound'
+                                                            msg.direction ===
+                                                            'outbound'
                                                                 ? 'justify-end'
                                                                 : 'justify-start'
                                                         }`}
                                                     >
                                                         <div
                                                             className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                                                                msg.direction === 'outbound'
+                                                                msg.direction ===
+                                                                'outbound'
                                                                     ? 'bg-primary text-primary-foreground'
                                                                     : 'bg-muted'
                                                             }`}
@@ -529,30 +596,38 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                             </p>
                                                             <div
                                                                 className={`mt-1 flex items-center gap-1.5 ${
-                                                                    msg.direction === 'outbound'
+                                                                    msg.direction ===
+                                                                    'outbound'
                                                                         ? 'justify-end'
                                                                         : 'justify-start'
                                                                 }`}
                                                             >
                                                                 <span
                                                                     className={`text-[10px] ${
-                                                                        msg.direction === 'outbound'
+                                                                        msg.direction ===
+                                                                        'outbound'
                                                                             ? 'text-primary-foreground/70'
                                                                             : 'text-muted-foreground'
                                                                     }`}
                                                                 >
-                                                                    {msg.sender_name}
+                                                                    {
+                                                                        msg.sender_name
+                                                                    }
                                                                 </span>
                                                                 <span
                                                                     className={`text-[10px] ${
-                                                                        msg.direction === 'outbound'
+                                                                        msg.direction ===
+                                                                        'outbound'
                                                                             ? 'text-primary-foreground/70'
                                                                             : 'text-muted-foreground'
                                                                     }`}
                                                                 >
-                                                                    {formatMessageTime(msg.sent_at)}
+                                                                    {formatMessageTime(
+                                                                        msg.sent_at,
+                                                                    )}
                                                                 </span>
-                                                                {msg.direction === 'outbound' && (
+                                                                {msg.direction ===
+                                                                    'outbound' && (
                                                                     <span
                                                                         className="text-primary-foreground/70"
                                                                         title={
@@ -587,7 +662,9 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                 <Input
                                                     value={composeText}
                                                     onChange={(e) =>
-                                                        setComposeText(e.target.value)
+                                                        setComposeText(
+                                                            e.target.value,
+                                                        )
                                                     }
                                                     placeholder="Type a message..."
                                                     className="flex-1"
@@ -598,7 +675,8 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                     type="submit"
                                                     size="sm"
                                                     disabled={
-                                                        !composeText.trim() || sending
+                                                        !composeText.trim() ||
+                                                        sending
                                                     }
                                                 >
                                                     <Send className="mr-1 h-4 w-4" />
@@ -611,9 +689,12 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                             ) : (
                                 <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
                                     <User className="mb-3 h-12 w-12" />
-                                    <p className="text-lg font-medium">Select a conversation</p>
+                                    <p className="text-lg font-medium">
+                                        Select a conversation
+                                    </p>
                                     <p className="text-sm">
-                                        Choose a conversation from the left panel or start a new one.
+                                        Choose a conversation from the left
+                                        panel or start a new one.
                                     </p>
                                 </div>
                             )}

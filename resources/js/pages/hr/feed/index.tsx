@@ -1,9 +1,6 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { type BreadcrumbItem } from '@/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -13,7 +10,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -21,9 +18,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Heart, Pin, MessageSquare, Trophy, Star, Gift, Briefcase, Users } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Briefcase, Gift, Heart, Pin, Star, Trophy } from 'lucide-react';
 import { useState } from 'react';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type User = { id: number; name: string };
 
@@ -83,13 +83,35 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const postTypeBadge: Record<string, { className: string; label: string }> = {
-    update: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Update' },
-    milestone: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Milestone' },
-    kudos: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Kudos' },
-    announcement: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Announcement' },
+    update: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Update',
+    },
+    milestone: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Milestone',
+    },
+    kudos: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Kudos',
+    },
+    announcement: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Announcement',
+    },
 };
 
-export default function FeedIndex({ posts, milestones, leaderboard, filters, kudosCategories, employees }: Props) {
+export default function FeedIndex({
+    posts,
+    milestones,
+    leaderboard,
+    filters,
+    kudosCategories,
+    employees,
+}: Props) {
     const [kudosOpen, setKudosOpen] = useState(false);
 
     const postForm = useForm({
@@ -104,7 +126,11 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
     });
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/feed', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/feed',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const submitPost = (e: React.FormEvent) => {
@@ -133,7 +159,9 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold">Community Feed</h1>
-                        <p className="text-sm text-muted-foreground">Stay connected with your team</p>
+                        <p className="text-sm text-muted-foreground">
+                            Stay connected with your team
+                        </p>
                     </div>
                     <Dialog open={kudosOpen} onOpenChange={setKudosOpen}>
                         <DialogTrigger asChild>
@@ -145,49 +173,69 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Send Kudos</DialogTitle>
-                                <DialogDescription>Recognize a colleague for their great work</DialogDescription>
+                                <DialogDescription>
+                                    Recognize a colleague for their great work
+                                </DialogDescription>
                             </DialogHeader>
                             <form onSubmit={submitKudos} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="to_user_id">Recipient</Label>
+                                    <Label htmlFor="to_user_id">
+                                        Recipient
+                                    </Label>
                                     <Select
                                         value={kudosForm.data.to_user_id}
-                                        onValueChange={(v) => kudosForm.setData('to_user_id', v)}
+                                        onValueChange={(v) =>
+                                            kudosForm.setData('to_user_id', v)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select a colleague" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {employees.map((emp) => (
-                                                <SelectItem key={emp.id} value={String(emp.id)}>
+                                                <SelectItem
+                                                    key={emp.id}
+                                                    value={String(emp.id)}
+                                                >
                                                     {emp.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {kudosForm.errors.to_user_id && (
-                                        <p className="text-sm text-destructive">{kudosForm.errors.to_user_id}</p>
+                                        <p className="text-sm text-destructive">
+                                            {kudosForm.errors.to_user_id}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="category">Category</Label>
                                     <Select
                                         value={kudosForm.data.category}
-                                        onValueChange={(v) => kudosForm.setData('category', v)}
+                                        onValueChange={(v) =>
+                                            kudosForm.setData('category', v)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select category" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(kudosCategories).map(([key, label]) => (
-                                                <SelectItem key={key} value={key}>
+                                            {Object.entries(
+                                                kudosCategories,
+                                            ).map(([key, label]) => (
+                                                <SelectItem
+                                                    key={key}
+                                                    value={key}
+                                                >
                                                     {label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {kudosForm.errors.category && (
-                                        <p className="text-sm text-destructive">{kudosForm.errors.category}</p>
+                                        <p className="text-sm text-destructive">
+                                            {kudosForm.errors.category}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-2">
@@ -195,19 +243,33 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                                     <Textarea
                                         id="message"
                                         value={kudosForm.data.message}
-                                        onChange={(e) => kudosForm.setData('message', e.target.value)}
+                                        onChange={(e) =>
+                                            kudosForm.setData(
+                                                'message',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="What did they do that was awesome?"
                                         rows={3}
                                     />
                                     {kudosForm.errors.message && (
-                                        <p className="text-sm text-destructive">{kudosForm.errors.message}</p>
+                                        <p className="text-sm text-destructive">
+                                            {kudosForm.errors.message}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setKudosOpen(false)}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setKudosOpen(false)}
+                                    >
                                         Cancel
                                     </Button>
-                                    <Button type="submit" disabled={kudosForm.processing}>
+                                    <Button
+                                        type="submit"
+                                        disabled={kudosForm.processing}
+                                    >
                                         Send Kudos
                                     </Button>
                                 </div>
@@ -228,13 +290,20 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                             </CardHeader>
                             <CardContent className="pt-0">
                                 {milestones.birthdays.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No upcoming birthdays</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No upcoming birthdays
+                                    </p>
                                 ) : (
                                     <ul className="space-y-2">
                                         {milestones.birthdays.map((m, i) => (
-                                            <li key={i} className="flex items-center justify-between text-sm">
+                                            <li
+                                                key={i}
+                                                className="flex items-center justify-between text-sm"
+                                            >
                                                 <span>{m.user_name}</span>
-                                                <span className="text-muted-foreground">{m.date}</span>
+                                                <span className="text-muted-foreground">
+                                                    {m.date}
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>
@@ -251,15 +320,24 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                             </CardHeader>
                             <CardContent className="pt-0">
                                 {milestones.anniversaries.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No upcoming anniversaries</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No upcoming anniversaries
+                                    </p>
                                 ) : (
                                     <ul className="space-y-2">
-                                        {milestones.anniversaries.map((m, i) => (
-                                            <li key={i} className="flex items-center justify-between text-sm">
-                                                <span>{m.user_name}</span>
-                                                <span className="text-muted-foreground">{m.years}yr - {m.date}</span>
-                                            </li>
-                                        ))}
+                                        {milestones.anniversaries.map(
+                                            (m, i) => (
+                                                <li
+                                                    key={i}
+                                                    className="flex items-center justify-between text-sm"
+                                                >
+                                                    <span>{m.user_name}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {m.years}yr - {m.date}
+                                                    </span>
+                                                </li>
+                                            ),
+                                        )}
                                     </ul>
                                 )}
                             </CardContent>
@@ -274,14 +352,20 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                             </CardHeader>
                             <CardContent className="pt-0">
                                 {milestones.new_hires.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No recent new hires</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No recent new hires
+                                    </p>
                                 ) : (
                                     <ul className="space-y-2">
                                         {milestones.new_hires.map((m, i) => (
                                             <li key={i} className="text-sm">
-                                                <div className="font-medium">{m.user_name}</div>
+                                                <div className="font-medium">
+                                                    {m.user_name}
+                                                </div>
                                                 {m.position && (
-                                                    <div className="text-muted-foreground">{m.position}</div>
+                                                    <div className="text-muted-foreground">
+                                                        {m.position}
+                                                    </div>
                                                 )}
                                             </li>
                                         ))}
@@ -296,30 +380,55 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         {/* Post Creation Form */}
                         <Card>
                             <CardContent className="pt-6">
-                                <form onSubmit={submitPost} className="space-y-3">
+                                <form
+                                    onSubmit={submitPost}
+                                    className="space-y-3"
+                                >
                                     <Textarea
                                         value={postForm.data.content}
-                                        onChange={(e) => postForm.setData('content', e.target.value)}
+                                        onChange={(e) =>
+                                            postForm.setData(
+                                                'content',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Share an update with your team..."
                                         rows={3}
                                     />
                                     {postForm.errors.content && (
-                                        <p className="text-sm text-destructive">{postForm.errors.content}</p>
+                                        <p className="text-sm text-destructive">
+                                            {postForm.errors.content}
+                                        </p>
                                     )}
                                     <div className="flex items-center justify-between">
                                         <Select
                                             value={postForm.data.post_type}
-                                            onValueChange={(v) => postForm.setData('post_type', v as 'update' | 'announcement')}
+                                            onValueChange={(v) =>
+                                                postForm.setData(
+                                                    'post_type',
+                                                    v as
+                                                        | 'update'
+                                                        | 'announcement',
+                                                )
+                                            }
                                         >
                                             <SelectTrigger className="w-40">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="update">Update</SelectItem>
-                                                <SelectItem value="announcement">Announcement</SelectItem>
+                                                <SelectItem value="update">
+                                                    Update
+                                                </SelectItem>
+                                                <SelectItem value="announcement">
+                                                    Announcement
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Button type="submit" size="sm" disabled={postForm.processing}>
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={postForm.processing}
+                                        >
                                             Post
                                         </Button>
                                     </div>
@@ -329,12 +438,27 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
 
                         {/* Type Filter */}
                         <div className="flex gap-2">
-                            {['all', 'update', 'kudos', 'announcement', 'milestone'].map((t) => (
+                            {[
+                                'all',
+                                'update',
+                                'kudos',
+                                'announcement',
+                                'milestone',
+                            ].map((t) => (
                                 <Button
                                     key={t}
-                                    variant={(!filters.type && t === 'all') || filters.type === t ? 'default' : 'outline'}
+                                    variant={
+                                        (!filters.type && t === 'all') ||
+                                        filters.type === t
+                                            ? 'default'
+                                            : 'outline'
+                                    }
                                     size="sm"
-                                    onClick={() => onFilter({ type: t === 'all' ? null : t })}
+                                    onClick={() =>
+                                        onFilter({
+                                            type: t === 'all' ? null : t,
+                                        })
+                                    }
                                 >
                                     <span className="capitalize">{t}</span>
                                 </Button>
@@ -343,20 +467,30 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
 
                         {/* Posts */}
                         {posts.data.map((post) => {
-                            const badge = postTypeBadge[post.post_type] || postTypeBadge.update;
+                            const badge =
+                                postTypeBadge[post.post_type] ||
+                                postTypeBadge.update;
                             return (
                                 <Card key={post.id}>
                                     <CardContent className="pt-6">
                                         <div className="flex items-start gap-3">
                                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
-                                                {post.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                                                {post.user?.name
+                                                    ?.charAt(0)
+                                                    ?.toUpperCase() ?? '?'}
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium">
-                                                        {post.user?.name ?? 'Unknown'}
+                                                        {post.user?.name ??
+                                                            'Unknown'}
                                                     </span>
-                                                    <Badge variant="outline" className={badge.className}>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            badge.className
+                                                        }
+                                                    >
                                                         {badge.label}
                                                     </Badge>
                                                     {post.is_pinned && (
@@ -367,21 +501,32 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                                                     </span>
                                                 </div>
 
-                                                {post.post_type === 'kudos' && post.kudos && (
-                                                    <div className="mt-1 flex items-center gap-1 text-sm text-status-critical">
-                                                        <Heart className="h-3.5 w-3.5" />
-                                                        <span>
-                                                            gave kudos to{' '}
-                                                            <strong>{post.kudos.to_user?.name}</strong>
-                                                            {' '}for{' '}
-                                                            <span className="capitalize">
-                                                                {post.kudos.category.replace('_', ' ')}
+                                                {post.post_type === 'kudos' &&
+                                                    post.kudos && (
+                                                        <div className="mt-1 flex items-center gap-1 text-sm text-status-critical">
+                                                            <Heart className="h-3.5 w-3.5" />
+                                                            <span>
+                                                                gave kudos to{' '}
+                                                                <strong>
+                                                                    {
+                                                                        post
+                                                                            .kudos
+                                                                            .to_user
+                                                                            ?.name
+                                                                    }
+                                                                </strong>{' '}
+                                                                for{' '}
+                                                                <span className="capitalize">
+                                                                    {post.kudos.category.replace(
+                                                                        '_',
+                                                                        ' ',
+                                                                    )}
+                                                                </span>
                                                             </span>
-                                                        </span>
-                                                    </div>
-                                                )}
+                                                        </div>
+                                                    )}
 
-                                                <p className="mt-2 whitespace-pre-wrap text-sm">
+                                                <p className="mt-2 text-sm whitespace-pre-wrap">
                                                     {post.content}
                                                 </p>
                                             </div>
@@ -394,7 +539,8 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         {posts.data.length === 0 && (
                             <Card>
                                 <CardContent className="py-12 text-center text-muted-foreground">
-                                    No posts yet. Be the first to share something!
+                                    No posts yet. Be the first to share
+                                    something!
                                 </CardContent>
                             </Card>
                         )}
@@ -416,11 +562,16 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                             </CardHeader>
                             <CardContent className="pt-0">
                                 {leaderboard.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No kudos given yet</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No kudos given yet
+                                    </p>
                                 ) : (
                                     <ul className="space-y-3">
                                         {leaderboard.map((entry, i) => (
-                                            <li key={entry.user_id} className="flex items-center gap-3">
+                                            <li
+                                                key={entry.user_id}
+                                                className="flex items-center gap-3"
+                                            >
                                                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
                                                     {i + 1}
                                                 </span>
@@ -429,7 +580,10 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                                                         {entry.user_name}
                                                     </div>
                                                 </div>
-                                                <Badge variant="secondary" className="shrink-0">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="shrink-0"
+                                                >
                                                     {entry.kudos_count}
                                                 </Badge>
                                             </li>

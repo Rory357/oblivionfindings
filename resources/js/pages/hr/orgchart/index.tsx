@@ -1,12 +1,13 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
+import PageShell from '@/components/page-shell';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { useState, useMemo, useCallback } from 'react';
+import { Head } from '@inertiajs/react';
+import { ChevronDown, ChevronRight, Search, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface OrgNode {
     id: number;
@@ -132,26 +133,34 @@ function OrgNodeCard({
 
                 {/* Info */}
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium leading-tight">{node.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{node.position_title || 'No position'}</p>
+                    <p className="truncate text-sm leading-tight font-medium">
+                        {node.name}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                        {node.position_title || 'No position'}
+                    </p>
                     {node.department && (
-                        <p className="truncate text-xs text-muted-foreground/70">{node.department}</p>
+                        <p className="truncate text-xs text-muted-foreground/70">
+                            {node.department}
+                        </p>
                     )}
                 </div>
 
                 {/* Expand/collapse toggle */}
                 {hasChildren && !isFilterActive && (
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={() => setCollapsed((c) => !c)}
-                        className="absolute -bottom-3 left-1/2 z-10 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:bg-muted"
+                        className="absolute -bottom-3 left-1/2 z-10 h-6 w-6 -translate-x-1/2 rounded-full text-muted-foreground shadow-sm"
                     >
                         {collapsed ? (
                             <ChevronRight className="h-3.5 w-3.5" />
                         ) : (
                             <ChevronDown className="h-3.5 w-3.5" />
                         )}
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -164,20 +173,36 @@ function OrgNodeCard({
                     {/* Horizontal connector + children */}
                     <div className="relative flex gap-8">
                         {/* Horizontal line spanning children */}
-                        {node.children.filter((c) => !isFilterActive || matchingIds.has(c.id)).length > 1 && (
-                            <div className="absolute left-[calc(50%-var(--half-width))] right-[calc(50%-var(--half-width))] top-0 h-px bg-border"
-                                style={{
-                                    '--half-width': `calc(${
-                                        ((node.children.filter((c) => !isFilterActive || matchingIds.has(c.id)).length - 1) * 100) / 2
-                                    }% + 0px)`,
-                                } as React.CSSProperties}
+                        {node.children.filter(
+                            (c) => !isFilterActive || matchingIds.has(c.id),
+                        ).length > 1 && (
+                            <div
+                                className="absolute top-0 right-[calc(50%-var(--half-width))] left-[calc(50%-var(--half-width))] h-px bg-border"
+                                style={
+                                    {
+                                        '--half-width': `calc(${
+                                            ((node.children.filter(
+                                                (c) =>
+                                                    !isFilterActive ||
+                                                    matchingIds.has(c.id),
+                                            ).length -
+                                                1) *
+                                                100) /
+                                            2
+                                        }% + 0px)`,
+                                    } as React.CSSProperties
+                                }
                             />
                         )}
 
                         {node.children.map((child) => {
-                            if (isFilterActive && !matchingIds.has(child.id)) return null;
+                            if (isFilterActive && !matchingIds.has(child.id))
+                                return null;
                             return (
-                                <div key={child.id} className="flex flex-col items-center">
+                                <div
+                                    key={child.id}
+                                    className="flex flex-col items-center"
+                                >
                                     {/* Vertical connector to child */}
                                     <div className="h-6 w-px bg-border" />
                                     <OrgNodeCard
@@ -226,7 +251,7 @@ export default function OrgChartIndex({ hierarchy, can }: Props) {
 
                 <div className="px-6">
                     <div className="relative w-full max-w-sm">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search by name, position, department..."
                             value={searchQuery}
@@ -241,9 +266,12 @@ export default function OrgChartIndex({ hierarchy, can }: Props) {
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                                 <Users className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                                <p className="text-lg font-medium text-muted-foreground">No organisation structure found</p>
+                                <p className="text-lg font-medium text-muted-foreground">
+                                    No organisation structure found
+                                </p>
                                 <p className="mt-1 text-sm text-muted-foreground/70">
-                                    Assign managers to employees to build the org chart.
+                                    Assign managers to employees to build the
+                                    org chart.
                                 </p>
                             </CardContent>
                         </Card>
@@ -251,7 +279,9 @@ export default function OrgChartIndex({ hierarchy, can }: Props) {
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                                 <Search className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                                <p className="text-lg font-medium text-muted-foreground">No results found</p>
+                                <p className="text-lg font-medium text-muted-foreground">
+                                    No results found
+                                </p>
                                 <p className="mt-1 text-sm text-muted-foreground/70">
                                     Try a different search term.
                                 </p>
@@ -260,7 +290,8 @@ export default function OrgChartIndex({ hierarchy, can }: Props) {
                     ) : (
                         <div className="flex min-w-max justify-center gap-12 pt-4">
                             {hierarchy.map((root) => {
-                                if (searchQuery && !matchingIds.has(root.id)) return null;
+                                if (searchQuery && !matchingIds.has(root.id))
+                                    return null;
                                 return (
                                     <OrgNodeCard
                                         key={root.id}

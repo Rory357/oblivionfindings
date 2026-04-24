@@ -1,13 +1,25 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { useState, useCallback } from 'react';
-import { ClipboardList, AlertTriangle, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ChevronRight,
+    ClipboardList,
+    X,
+} from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Health & Safety', href: '/health-safety' },
@@ -50,26 +62,41 @@ interface Props {
 export default function CorrectiveActionsIndex({ actions, filters }: Props) {
     const [selected, setSelected] = useState<Set<number>>(new Set());
 
-    const applyFilter = useCallback((key: string, value: string | null) => {
-        router.get('/health-safety/corrective-actions', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
-    }, [filters]);
+    const applyFilter = useCallback(
+        (key: string, value: string | null) => {
+            router.get(
+                '/health-safety/corrective-actions',
+                { ...filters, [key]: value || undefined },
+                { preserveState: true, replace: true },
+            );
+        },
+        [filters],
+    );
 
     const fmtDate = (iso: string | null) => {
         if (!iso) return '-';
-        return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+        return new Date(iso).toLocaleDateString('en-NZ', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
     };
 
-    const overdueCount = actions.data.filter(a => a.is_overdue).length;
+    const overdueCount = actions.data.filter((a) => a.is_overdue).length;
 
     // Only open/in_progress actions can be selected for bulk operations
     const selectableIds = actions.data
-        .filter(a => a.status === 'open' || a.status === 'in_progress')
-        .map(a => a.id);
+        .filter((a) => a.status === 'open' || a.status === 'in_progress')
+        .map((a) => a.id);
 
     const toggleSelect = (id: number) => {
-        setSelected(prev => {
+        setSelected((prev) => {
             const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
             return next;
         });
     };
@@ -84,13 +111,13 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
 
     const clearSelection = () => setSelected(new Set());
 
-    const allSelected = selectableIds.length > 0 && selected.size === selectableIds.length;
+    const allSelected =
+        selectableIds.length > 0 && selected.size === selectableIds.length;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Corrective Actions" />
             <div className="flex flex-col gap-6 p-4 md:p-6">
-
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -98,10 +125,17 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                             <ClipboardList className="h-5 w-5" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Corrective Actions</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                Corrective Actions
+                            </h1>
                             <p className="text-sm text-muted-foreground">
-                                {actions.total} action{actions.total !== 1 ? 's' : ''}
-                                {overdueCount > 0 && <span className="ml-2 font-medium text-status-critical">{overdueCount} overdue</span>}
+                                {actions.total} action
+                                {actions.total !== 1 ? 's' : ''}
+                                {overdueCount > 0 && (
+                                    <span className="ml-2 font-medium text-status-critical">
+                                        {overdueCount} overdue
+                                    </span>
+                                )}
                             </p>
                         </div>
                     </div>
@@ -111,13 +145,19 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                 {selected.size > 0 && (
                     <div className="flex items-center justify-between rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-sm dark:border-status-info/30 dark:bg-status-info">
                         <span className="font-medium text-status-info dark:text-status-info">
-                            {selected.size} action{selected.size !== 1 ? 's' : ''} selected
+                            {selected.size} action
+                            {selected.size !== 1 ? 's' : ''} selected
                         </span>
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-status-info dark:text-status-info">
                                 Bulk operations available in management view
                             </span>
-                            <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 gap-1 text-status-info">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={clearSelection}
+                                className="h-7 gap-1 text-status-info"
+                            >
                                 <X className="h-3 w-3" /> Clear
                             </Button>
                         </div>
@@ -127,32 +167,76 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                 {/* Filters */}
                 <Card>
                     <CardContent className="flex flex-wrap items-center gap-3 py-4">
-                        <Select value={filters.status ?? '__none__'} onValueChange={v => applyFilter('status', v === '__none__' ? null : v)}>
-                            <SelectTrigger className="w-48"><SelectValue placeholder="All statuses" /></SelectTrigger>
+                        <Select
+                            value={filters.status ?? '__none__'}
+                            onValueChange={(v) =>
+                                applyFilter(
+                                    'status',
+                                    v === '__none__' ? null : v,
+                                )
+                            }
+                        >
+                            <SelectTrigger className="w-48">
+                                <SelectValue placeholder="All statuses" />
+                            </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="__none__">All statuses</SelectItem>
+                                <SelectItem value="__none__">
+                                    All statuses
+                                </SelectItem>
                                 <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="completed">Awaiting Verification</SelectItem>
-                                <SelectItem value="verified">Verified</SelectItem>
+                                <SelectItem value="in_progress">
+                                    In Progress
+                                </SelectItem>
+                                <SelectItem value="completed">
+                                    Awaiting Verification
+                                </SelectItem>
+                                <SelectItem value="verified">
+                                    Verified
+                                </SelectItem>
                                 <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Select value={filters.priority ?? '__none__'} onValueChange={v => applyFilter('priority', v === '__none__' ? null : v)}>
-                            <SelectTrigger className="w-36"><SelectValue placeholder="All priority" /></SelectTrigger>
+                        <Select
+                            value={filters.priority ?? '__none__'}
+                            onValueChange={(v) =>
+                                applyFilter(
+                                    'priority',
+                                    v === '__none__' ? null : v,
+                                )
+                            }
+                        >
+                            <SelectTrigger className="w-36">
+                                <SelectValue placeholder="All priority" />
+                            </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="__none__">All priority</SelectItem>
-                                <SelectItem value="critical">Critical</SelectItem>
+                                <SelectItem value="__none__">
+                                    All priority
+                                </SelectItem>
+                                <SelectItem value="critical">
+                                    Critical
+                                </SelectItem>
                                 <SelectItem value="high">High</SelectItem>
                                 <SelectItem value="medium">Medium</SelectItem>
                                 <SelectItem value="low">Low</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Select value={filters.overdue ?? '__none__'} onValueChange={v => applyFilter('overdue', v === '__none__' ? null : v)}>
-                            <SelectTrigger className="w-36"><SelectValue placeholder="Due date" /></SelectTrigger>
+                        <Select
+                            value={filters.overdue ?? '__none__'}
+                            onValueChange={(v) =>
+                                applyFilter(
+                                    'overdue',
+                                    v === '__none__' ? null : v,
+                                )
+                            }
+                        >
+                            <SelectTrigger className="w-36">
+                                <SelectValue placeholder="Due date" />
+                            </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="__none__">All</SelectItem>
-                                <SelectItem value="true">Overdue only</SelectItem>
+                                <SelectItem value="true">
+                                    Overdue only
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                     </CardContent>
@@ -174,19 +258,35 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                                             />
                                         )}
                                     </th>
-                                    <th className="px-4 py-3 text-left font-medium">Reference</th>
-                                    <th className="px-4 py-3 text-left font-medium">Action</th>
-                                    <th className="px-4 py-3 text-left font-medium">Priority</th>
-                                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    <th className="px-4 py-3 text-left font-medium">Owner</th>
-                                    <th className="px-4 py-3 text-left font-medium">Due</th>
-                                    <th className="px-4 py-3 text-left font-medium">Event</th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Reference
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Action
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Priority
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Owner
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Due
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Event
+                                    </th>
                                     <th className="w-10" />
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {actions.data.map(action => {
-                                    const isSelectable = action.status === 'open' || action.status === 'in_progress';
+                                {actions.data.map((action) => {
+                                    const isSelectable =
+                                        action.status === 'open' ||
+                                        action.status === 'in_progress';
                                     const isSelected = selected.has(action.id);
 
                                     return (
@@ -194,8 +294,12 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                                             key={action.id}
                                             className={[
                                                 'hover:bg-muted/30',
-                                                action.is_overdue ? 'bg-status-critical-bg' : '',
-                                                isSelected ? 'bg-status-info-bg dark:bg-status-info' : '',
+                                                action.is_overdue
+                                                    ? 'bg-status-critical-bg'
+                                                    : '',
+                                                isSelected
+                                                    ? 'bg-status-info-bg dark:bg-status-info'
+                                                    : '',
                                             ].join(' ')}
                                         >
                                             <td className="px-4 py-3">
@@ -203,32 +307,65 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
-                                                        onChange={() => toggleSelect(action.id)}
+                                                        onChange={() =>
+                                                            toggleSelect(
+                                                                action.id,
+                                                            )
+                                                        }
                                                         className="h-4 w-4 rounded border-border"
                                                     />
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 font-medium">{action.reference_number}</td>
-                                            <td className="px-4 py-3 max-w-xs truncate text-muted-foreground">{action.title}</td>
-                                            <td className="px-4 py-3"><StatusBadge status={action.priority} /></td>
+                                            <td className="px-4 py-3 font-medium">
+                                                {action.reference_number}
+                                            </td>
+                                            <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
+                                                {action.title}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge
+                                                    status={action.priority}
+                                                />
+                                            </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1.5">
-                                                    <StatusBadge status={action.is_overdue ? 'overdue' : action.status} />
-                                                    {action.is_overdue && <AlertTriangle className="h-3.5 w-3.5 text-status-critical" />}
+                                                    <StatusBadge
+                                                        status={
+                                                            action.is_overdue
+                                                                ? 'overdue'
+                                                                : action.status
+                                                        }
+                                                    />
+                                                    {action.is_overdue && (
+                                                        <AlertTriangle className="h-3.5 w-3.5 text-status-critical" />
+                                                    )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-muted-foreground">{action.assigned_to_name ?? '-'}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{fmtDate(action.due_date)}</td>
-                                            <td className="px-4 py-3 text-muted-foreground text-xs">{action.event_reference ?? '-'}</td>
-                                            <td className="px-4 py-3"><ChevronRight className="h-4 w-4 text-muted-foreground" /></td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {action.assigned_to_name ?? '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {fmtDate(action.due_date)}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                                                {action.event_reference ?? '-'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                            </td>
                                         </tr>
                                     );
                                 })}
                                 {actions.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={9}
+                                            className="px-4 py-12 text-center text-muted-foreground"
+                                        >
                                             <CheckCircle2 className="mx-auto mb-3 h-12 w-12 opacity-30" />
-                                            <p className="text-base font-medium">No actions match your filters</p>
+                                            <p className="text-base font-medium">
+                                                No actions match your filters
+                                            </p>
                                         </td>
                                     </tr>
                                 )}
@@ -239,7 +376,10 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
 
                 {actions.last_page > 1 && (
                     <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">Showing {actions.from}–{actions.to} of {actions.total}</p>
+                        <p className="text-sm text-muted-foreground">
+                            Showing {actions.from}–{actions.to} of{' '}
+                            {actions.total}
+                        </p>
                         <LaravelPagination links={actions.links} />
                     </div>
                 )}

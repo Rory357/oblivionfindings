@@ -161,17 +161,24 @@ export default function Timeline({
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <div className="flex gap-1 rounded-lg border p-0.5">
                         {visibleFilterPills.map((pill) => (
-                            <button
+                            <Button
+                                type="button"
+                                variant={
+                                    currentFilter === pill.value
+                                        ? 'default'
+                                        : 'ghost'
+                                }
+                                size="xs"
                                 key={pill.value}
                                 onClick={() => applyFilter(pill.value)}
-                                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                className={`h-auto rounded-md px-3 py-1 text-xs font-medium ${
                                     currentFilter === pill.value
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? ''
                                         : 'text-muted-foreground hover:text-foreground'
                                 }`}
                             >
                                 {pill.label}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 </div>

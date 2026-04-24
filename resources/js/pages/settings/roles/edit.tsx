@@ -450,10 +450,11 @@ export default function RoleEdit(props: Props) {
                                             className="overflow-hidden rounded-lg border"
                                         >
                                             {/* Module header */}
-                                            <button
+                                            <Button
                                                 type="button"
+                                                variant="ghost"
                                                 onClick={() => toggleModule(mod.key)}
-                                                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                                                className="h-auto w-full justify-start gap-3 whitespace-normal px-4 py-3 text-left hover:bg-muted/50"
                                             >
                                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 dark:bg-primary/30">
                                                     <Icon className="h-4 w-4 text-primary dark:text-primary" />
@@ -475,7 +476,7 @@ export default function RoleEdit(props: Props) {
                                                 ) : (
                                                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                                                 )}
-                                            </button>
+                                            </Button>
 
                                             {/* Module body */}
                                             {isExpanded && (

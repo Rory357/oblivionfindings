@@ -1,14 +1,14 @@
+import { ClientEditDialog } from '@/components/client-edit-dialog';
 import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import ClientObservationsTab from '@/components/clinical/client-observations-tab';
 import HealthSummaryCard, {
     type HealthSummary,
 } from '@/components/clinical/health-summary-card';
-import { ClientEditDialog } from '@/components/client-edit-dialog';
-import ClientObservationsTab from '@/components/clinical/client-observations-tab';
 import {
     HalfMoonGauge,
     HorizontalBarChart,
@@ -44,7 +44,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
-import { formatDateTime as formatDT, formatRelativeTime, formatDuration, severityVariant } from '@/lib/fleet-utils';
+import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
@@ -366,7 +366,11 @@ type Props = {
     };
     location?: ClientLocationData;
     transport?: {
-        stats: { transports_30d: number; outings_30d: number; incidents_30d: number };
+        stats: {
+            transports_30d: number;
+            outings_30d: number;
+            incidents_30d: number;
+        };
         upcoming_outings: Array<{
             id: number;
             title: string;
@@ -389,7 +393,11 @@ type Props = {
             status: string;
             vehicle: { id: number; name: string } | null;
             driver: { id: number; name: string } | null;
-            shift: { id: number; starts_at: string | null; shift_type: string } | null;
+            shift: {
+                id: number;
+                starts_at: string | null;
+                shift_type: string;
+            } | null;
         }>;
         medication_logs: Array<{
             id: number;
@@ -568,8 +576,8 @@ export default function ClientShow({
                 icon: Stethoscope,
                 show: Boolean(
                     can.record_observation ||
-                        can.record_clinical_observation ||
-                        can.record_event,
+                    can.record_clinical_observation ||
+                    can.record_event,
                 ),
             },
             {
@@ -624,7 +632,9 @@ export default function ClientShow({
                 label: 'Transport',
                 icon: Truck,
                 show: true,
-                count: (transport?.stats?.transports_30d ?? 0) + (transport?.stats?.outings_30d ?? 0) || undefined,
+                count:
+                    (transport?.stats?.transports_30d ?? 0) +
+                        (transport?.stats?.outings_30d ?? 0) || undefined,
             },
             { key: 'consents', label: 'Consents', icon: Shield, show: true },
             {
@@ -663,12 +673,16 @@ export default function ClientShow({
             can.record_observation,
             can.record_clinical_observation,
             can.record_event,
+            client.id,
+            client.status,
             respiteCan?.viewAny,
             documents?.length,
             photos?.length,
             personal_assets?.length,
             onboarding?.total,
+            onboarding?.workflow,
             familyNotesOpenCount,
+            pendingConsentRequestsCount,
             transport?.stats?.outings_30d,
             transport?.stats?.transports_30d,
         ],
@@ -686,12 +700,18 @@ export default function ClientShow({
 
     // Lazy-load transport data when tab is first opened
     const [transportLoaded, setTransportLoaded] = useState(!!transport);
-    const handleTabChange = useCallback((newTab: TabKey) => {
-        setTab(newTab);
-        if (newTab === 'transport' && !transportLoaded) {
-            router.reload({ only: ['transport'], onSuccess: () => setTransportLoaded(true) });
-        }
-    }, [transportLoaded]);
+    const handleTabChange = useCallback(
+        (newTab: TabKey) => {
+            setTab(newTab);
+            if (newTab === 'transport' && !transportLoaded) {
+                router.reload({
+                    only: ['transport'],
+                    onSuccess: () => setTransportLoaded(true),
+                });
+            }
+        },
+        [transportLoaded],
+    );
 
     const templates = [
         { key: 'note', label: 'Note', body: '' },
@@ -915,9 +935,9 @@ export default function ClientShow({
                                         <Users className="mr-1.5 h-3.5 w-3.5" />
                                         Visits
                                         {pendingVisitCount > 0 ? (
-                                                <span className="ml-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
-                                                    {pendingVisitCount}
-                                                </span>
+                                            <span className="ml-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
+                                                {pendingVisitCount}
+                                            </span>
                                         ) : null}
                                     </Link>
                                 </Button>
@@ -1026,7 +1046,7 @@ export default function ClientShow({
                             .map((t) => {
                                 const Icon = t.icon;
                                 const isActive = tab === t.key;
-                                const className = `inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                const className = `inline-flex h-auto items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                                     isActive
                                         ? 'border-primary text-primary'
                                         : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
@@ -1051,20 +1071,26 @@ export default function ClientShow({
 
                                 if (!isClientNavigationTab(t)) {
                                     return (
-                                        <Link key={t.key} href={t.href} className={className}>
+                                        <Link
+                                            key={t.key}
+                                            href={t.href}
+                                            className={className}
+                                        >
                                             {inner}
                                         </Link>
                                     );
                                 }
 
                                 return (
-                                    <button
+                                    <Button
                                         key={t.key}
+                                        type="button"
+                                        variant="ghost"
                                         onClick={() => handleTabChange(t.key)}
                                         className={className}
                                     >
                                         {inner}
-                                    </button>
+                                    </Button>
                                 );
                             })}
                     </div>
@@ -1335,7 +1361,7 @@ export default function ClientShow({
                                 </div>
 
                                 {client.site && siteCoverageSummary ? (
-                                    <Card className="mt-4 overflow-hidden border-primary/70 bg-gradient-to-br from-white via-primary/10/80 to-status-info-bg/70">
+                                    <Card className="via-primary/10/80 mt-4 overflow-hidden border-primary/70 bg-gradient-to-br from-white to-status-info-bg/70">
                                         <CardHeader className="pb-3">
                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                                 <div>
@@ -1607,7 +1633,7 @@ export default function ClientShow({
                                 ) : null}
 
                                 {recurringShiftSeries.length > 0 && (
-                                    <Card className="mt-4 border-primary/70 bg-gradient-to-br from-primary/10/80 via-white to-primary/10/70">
+                                    <Card className="from-primary/10/80 to-primary/10/70 mt-4 border-primary/70 bg-gradient-to-br via-white">
                                         <CardHeader className="pb-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
@@ -1638,6 +1664,7 @@ export default function ClientShow({
                                         <CardContent className="grid gap-3 lg:grid-cols-3">
                                             {recurringShiftSeries.map(
                                                 (series) => (
+                                                    // eslint-disable-next-line no-restricted-syntax -- Recurring series tiles are nested inside the overview Card content.
                                                     <div
                                                         key={series.id}
                                                         className="rounded-xl border border-primary/70 bg-white/80 p-4"
@@ -1737,11 +1764,16 @@ export default function ClientShow({
                                 )}
 
                                 {/* Health Summary Card */}
-                                {(can.record_observation || can.record_clinical_observation || can.record_event) && health_summary && (
-                                    <div className="mt-4">
-                                        <HealthSummaryCard summary={health_summary} />
-                                    </div>
-                                )}
+                                {(can.record_observation ||
+                                    can.record_clinical_observation ||
+                                    can.record_event) &&
+                                    health_summary && (
+                                        <div className="mt-4">
+                                            <HealthSummaryCard
+                                                summary={health_summary}
+                                            />
+                                        </div>
+                                    )}
 
                                 {/* Row 2: Main Dashboard Grid */}
                                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -1841,6 +1873,7 @@ export default function ClientShow({
                                                         )}
                                                     </div>
                                                     {aboutMe.how_to_support && (
+                                                        // eslint-disable-next-line no-restricted-syntax -- Support preference callout is nested inside the About Me Card content.
                                                         <div className="rounded-lg border border-primary bg-white p-3">
                                                             <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                 How to Support
@@ -2257,6 +2290,7 @@ export default function ClientShow({
                                                 {(client.support_workers ?? [])
                                                     .slice(0, 4)
                                                     .map((sw: any) => (
+                                                        // eslint-disable-next-line no-restricted-syntax -- Medication rows use status strip styling inside the clinical Card.
                                                         <div
                                                             key={sw.id}
                                                             className="flex items-center gap-2 p-1"
@@ -3369,6 +3403,7 @@ export default function ClientShow({
                                             <div className="space-y-2">
                                                 {medical.medications.map(
                                                     (m: any) => (
+                                                        // eslint-disable-next-line no-restricted-syntax -- Medication rows use status strip styling inside the clinical Card.
                                                         <div
                                                             key={m.id}
                                                             className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-white p-3 shadow-sm"
@@ -4064,7 +4099,7 @@ export default function ClientShow({
                         clientId={client.id}
                         canRecordObservation={Boolean(
                             can.record_observation ||
-                                can.record_clinical_observation,
+                            can.record_clinical_observation,
                         )}
                         canRecordClinical={Boolean(
                             can.record_clinical_observation,
@@ -4411,6 +4446,7 @@ export default function ClientShow({
                                                                 )}
                                                             </div>
                                                             {aboutMe.how_to_support && (
+                                                                // eslint-disable-next-line no-restricted-syntax -- Support preference callout is nested inside the About Me Card content.
                                                                 <div className="rounded-lg border border-primary bg-white p-3">
                                                                     <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                         How to
@@ -5016,15 +5052,16 @@ export default function ClientShow({
                                                             emotion.key,
                                                         );
                                                     return (
-                                                        <button
+                                                        <Button
                                                             key={emotion.key}
                                                             type="button"
+                                                            variant="outline"
                                                             onClick={() =>
                                                                 toggleEmotion(
                                                                     emotion.key,
                                                                 )
                                                             }
-                                                            className={`inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-all ${
+                                                            className={`h-auto gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-all ${
                                                                 isSelected
                                                                     ? `${emotion.color} scale-105 shadow-sm`
                                                                     : 'border-border bg-card text-muted-foreground hover:border-primary/30'
@@ -5034,7 +5071,7 @@ export default function ClientShow({
                                                                 {emotion.emoji}
                                                             </span>
                                                             {emotion.label}
-                                                        </button>
+                                                        </Button>
                                                     );
                                                 })}
                                             </div>
@@ -5381,7 +5418,7 @@ export default function ClientShow({
 
                                 {/* Overall Budget Bar */}
                                 {totalBudget > 0 && (
-                                    <Card className="border-primary bg-primary/10/30">
+                                    <Card className="bg-primary/10/30 border-primary">
                                         <CardContent className="p-4">
                                             <div className="mb-2 flex items-center justify-between">
                                                 <span className="text-sm font-semibold">
@@ -5722,8 +5759,10 @@ export default function ClientShow({
                                                     </div>
                                                     {can.pin_handover &&
                                                     h.source_id ? (
-                                                        <button
-                                                            className="text-xs underline"
+                                                        <Button
+                                                            type="button"
+                                                            variant="link"
+                                                            className="h-auto p-0 text-xs underline"
                                                             onClick={async () => {
                                                                 await fetch(
                                                                     `/operations/clients/${client.id}/notes/${h.source_id}/pin`,
@@ -5747,7 +5786,7 @@ export default function ClientShow({
                                                             }}
                                                         >
                                                             Unpin
-                                                        </button>
+                                                        </Button>
                                                     ) : null}
                                                 </div>
                                             </div>
@@ -6257,9 +6296,18 @@ export default function ClientShow({
                             string,
                             { color: string; bg: string }
                         > = {
-                            pdf: { color: 'text-status-critical', bg: 'bg-status-critical-bg' },
-                            doc: { color: 'text-status-info', bg: 'bg-status-info-bg' },
-                            docx: { color: 'text-status-info', bg: 'bg-status-info-bg' },
+                            pdf: {
+                                color: 'text-status-critical',
+                                bg: 'bg-status-critical-bg',
+                            },
+                            doc: {
+                                color: 'text-status-info',
+                                bg: 'bg-status-info-bg',
+                            },
+                            docx: {
+                                color: 'text-status-info',
+                                bg: 'bg-status-info-bg',
+                            },
                             xls: {
                                 color: 'text-status-success',
                                 bg: 'bg-status-success-bg',
@@ -6295,7 +6343,8 @@ export default function ClientShow({
                         const CAT_COLORS: Record<string, string> = {
                             care_plan: 'bg-primary/10 text-primary',
                             assessment: 'bg-status-info-bg text-status-info',
-                            medical: 'bg-status-critical-bg text-status-critical',
+                            medical:
+                                'bg-status-critical-bg text-status-critical',
                             legal: 'bg-status-warning-bg text-status-warning',
                             policy: 'bg-status-success-bg text-status-success',
                             consent: 'bg-primary/10 text-primary',
@@ -6514,8 +6563,10 @@ export default function ClientShow({
                         };
                         const STATUS_COLORS: Record<string, string> = {
                             open: 'bg-status-info-bg text-status-info',
-                            in_progress: 'bg-status-warning-bg text-status-warning',
-                            completed: 'bg-status-success-bg text-status-success',
+                            in_progress:
+                                'bg-status-warning-bg text-status-warning',
+                            completed:
+                                'bg-status-success-bg text-status-success',
                             cancelled: 'bg-muted text-muted-foreground',
                         };
 
@@ -6678,7 +6729,7 @@ export default function ClientShow({
                                                                     </p>
                                                                 )}
                                                                 {note.assigned_shift && (
-                                                                    <div className="mt-1 rounded-md border border-primary bg-primary/10/50 px-2 py-1 text-xs text-primary">
+                                                                    <div className="bg-primary/10/50 mt-1 rounded-md border border-primary px-2 py-1 text-xs text-primary">
                                                                         <p className="font-medium">
                                                                             📋
                                                                             Assigned
@@ -7164,7 +7215,8 @@ export default function ClientShow({
 
                         const STATUS_COLORS: Record<string, string> = {
                             given: 'bg-status-success-bg text-status-success',
-                            refused: 'bg-status-critical-bg text-status-critical',
+                            refused:
+                                'bg-status-critical-bg text-status-critical',
                             withdrawn: 'bg-muted text-muted-foreground',
                             expired: 'bg-status-warning-bg text-status-warning',
                         };
@@ -7419,205 +7471,431 @@ export default function ClientShow({
                     />
                 )}
 
-                {tab === 'transport' && (() => {
-                    const ts = transport?.stats ?? { transports_30d: 0, outings_30d: 0, incidents_30d: 0 };
-                    const upcoming = transport?.upcoming_outings ?? [];
-                    const history = transport?.transport_history ?? [];
-                    const medLogs = transport?.medication_logs ?? [];
+                {tab === 'transport' &&
+                    (() => {
+                        const ts = transport?.stats ?? {
+                            transports_30d: 0,
+                            outings_30d: 0,
+                            incidents_30d: 0,
+                        };
+                        const upcoming = transport?.upcoming_outings ?? [];
+                        const history = transport?.transport_history ?? [];
+                        const medLogs = transport?.medication_logs ?? [];
 
-                    return (
-                        <div className="space-y-6">
-                            {/* Stats */}
-                            <div className="grid gap-3 sm:grid-cols-3">
-                                <Card className="border bg-status-info-bg dark:bg-status-info">
-                                    <CardContent className="p-4">
-                                        <div className="text-2xl font-bold text-status-info dark:text-status-info">{ts.transports_30d}</div>
-                                        <div className="text-xs text-muted-foreground">Transports (30d)</div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="border bg-primary/10/50 dark:bg-primary/20">
-                                    <CardContent className="p-4">
-                                        <div className="text-2xl font-bold text-primary dark:text-primary">{ts.outings_30d}</div>
-                                        <div className="text-xs text-muted-foreground">Outings (30d)</div>
-                                    </CardContent>
-                                </Card>
-                                <Card className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg dark:bg-status-critical' : 'bg-muted/30'}`}>
-                                    <CardContent className="p-4">
-                                        <div className={`text-2xl font-bold ${ts.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>{ts.incidents_30d}</div>
-                                        <div className="text-xs text-muted-foreground">Incidents (30d)</div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                        return (
+                            <div className="space-y-6">
+                                {/* Stats */}
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <Card className="border bg-status-info-bg dark:bg-status-info">
+                                        <CardContent className="p-4">
+                                            <div className="text-2xl font-bold text-status-info dark:text-status-info">
+                                                {ts.transports_30d}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                Transports (30d)
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="bg-primary/10/50 border dark:bg-primary/20">
+                                        <CardContent className="p-4">
+                                            <div className="text-2xl font-bold text-primary dark:text-primary">
+                                                {ts.outings_30d}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                Outings (30d)
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    <Card
+                                        className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg dark:bg-status-critical' : 'bg-muted/30'}`}
+                                    >
+                                        <CardContent className="p-4">
+                                            <div
+                                                className={`text-2xl font-bold ${ts.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                            >
+                                                {ts.incidents_30d}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                Incidents (30d)
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
 
-                            {/* Upcoming Outings */}
-                            {upcoming.length > 0 && (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Calendar className="h-4 w-4" /> Upcoming Outings
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-2">
-                                            {upcoming.map((o) => (
-                                                <Link
-                                                    key={o.id}
-                                                    href={`/fleet-assets/outings/${o.id}`}
-                                                    className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
-                                                >
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-semibold truncate">{o.title}</span>
-                                                            <Badge variant={o.status === 'active' ? 'default' : 'outline'} className="text-[10px] shrink-0">{o.status}</Badge>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                                            <span>{o.destination}</span>
-                                                            {o.vehicle && <><span>·</span><span>{o.vehicle.name}</span></>}
-                                                            {o.residents_count > 1 && <><span>·</span><span>{o.residents_count} residents</span></>}
-                                                        </div>
-                                                    </div>
-                                                    {o.planned_departure && (
-                                                        <div className="shrink-0 text-right text-xs text-muted-foreground">
-                                                            <div>{new Date(o.planned_departure).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</div>
-                                                            <div>{new Date(o.planned_departure).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}</div>
-                                                        </div>
-                                                    )}
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Transport History */}
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Truck className="h-4 w-4" /> Transport History
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {history.length > 0 ? (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-xs">
-                                                <thead>
-                                                    <tr className="border-b text-left text-muted-foreground">
-                                                        <th className="pb-2 pr-3 font-medium">Type</th>
-                                                        <th className="pb-2 pr-3 font-medium">From / To</th>
-                                                        <th className="pb-2 pr-3 font-medium">Vehicle</th>
-                                                        <th className="pb-2 pr-3 font-medium">Driver</th>
-                                                        <th className="pb-2 pr-3 font-medium">Date</th>
-                                                        <th className="pb-2 pr-3 font-medium">Duration</th>
-                                                        <th className="pb-2 font-medium">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {history.map((t) => (
-                                                        <tr key={t.id} className="border-b border-border/50 last:border-0">
-                                                            <td className="py-2 pr-3">
-                                                                <Badge variant="outline" className="text-[10px] capitalize">{(t.transport_type ?? '').replace(/_/g, ' ')}</Badge>
-                                                            </td>
-                                                            <td className="py-2 pr-3">
-                                                                <div className="max-w-[140px] truncate">{t.pickup_location ?? '—'}</div>
-                                                                <div className="max-w-[140px] truncate text-muted-foreground">→ {t.dropoff_location ?? '—'}</div>
-                                                            </td>
-                                                            <td className="py-2 pr-3">{t.vehicle?.name ?? '—'}</td>
-                                                            <td className="py-2 pr-3">{t.driver?.name ?? '—'}</td>
-                                                            <td className="py-2 pr-3 whitespace-nowrap">{t.departed_at ? formatDT(t.departed_at) : '—'}</td>
-                                                            <td className="py-2 pr-3 whitespace-nowrap">
-                                                                {t.duration_minutes != null ? `${Math.round(t.duration_minutes)}m` : '—'}
-                                                            </td>
-                                                            <td className="py-2">
+                                {/* Upcoming Outings */}
+                                {upcoming.length > 0 && (
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="flex items-center gap-2 text-base">
+                                                <Calendar className="h-4 w-4" />{' '}
+                                                Upcoming Outings
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {upcoming.map((o) => (
+                                                    <Link
+                                                        key={o.id}
+                                                        href={`/fleet-assets/outings/${o.id}`}
+                                                        className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="truncate font-semibold">
+                                                                    {o.title}
+                                                                </span>
                                                                 <Badge
-                                                                    variant={t.status === 'completed' ? 'default' : t.status === 'in_progress' ? 'secondary' : 'outline'}
-                                                                    className="text-[10px]"
-                                                                >{t.status}</Badge>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                                            <Truck className="mb-2 h-8 w-8 opacity-40" />
-                                            <p className="text-sm font-medium">No transport history</p>
-                                            <p className="text-xs">Transport records will appear here when this resident is transported.</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Medication Transit Logs */}
-                            {medLogs.length > 0 && (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Pill className="h-4 w-4" /> Medication Transit Log
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-xs">
-                                                <thead>
-                                                    <tr className="border-b text-left text-muted-foreground">
-                                                        <th className="pb-2 pr-3 font-medium">Medication</th>
-                                                        <th className="pb-2 pr-3 font-medium">Packed</th>
-                                                        <th className="pb-2 pr-3 font-medium">Administered</th>
-                                                        <th className="pb-2 pr-3 font-medium">Returned</th>
-                                                        <th className="pb-2 font-medium">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {medLogs.map((m) => (
-                                                        <tr key={m.id} className="border-b border-border/50 last:border-0">
-                                                            <td className="py-2 pr-3">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="font-medium">{m.medication_name}</span>
-                                                                    {m.is_controlled_drug && (
-                                                                        <Badge variant="destructive" className="text-[8px] px-1">CD</Badge>
+                                                                    variant={
+                                                                        o.status ===
+                                                                        'active'
+                                                                            ? 'default'
+                                                                            : 'outline'
+                                                                    }
+                                                                    className="shrink-0 text-[10px]"
+                                                                >
+                                                                    {o.status}
+                                                                </Badge>
+                                                            </div>
+                                                            <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                                                                <span>
+                                                                    {
+                                                                        o.destination
+                                                                    }
+                                                                </span>
+                                                                {o.vehicle && (
+                                                                    <>
+                                                                        <span>
+                                                                            ·
+                                                                        </span>
+                                                                        <span>
+                                                                            {
+                                                                                o
+                                                                                    .vehicle
+                                                                                    .name
+                                                                            }
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                                {o.residents_count >
+                                                                    1 && (
+                                                                    <>
+                                                                        <span>
+                                                                            ·
+                                                                        </span>
+                                                                        <span>
+                                                                            {
+                                                                                o.residents_count
+                                                                            }{' '}
+                                                                            residents
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {o.planned_departure && (
+                                                            <div className="shrink-0 text-right text-xs text-muted-foreground">
+                                                                <div>
+                                                                    {new Date(
+                                                                        o.planned_departure,
+                                                                    ).toLocaleDateString(
+                                                                        'en-NZ',
+                                                                        {
+                                                                            day: 'numeric',
+                                                                            month: 'short',
+                                                                        },
                                                                     )}
                                                                 </div>
-                                                            </td>
-                                                            <td className="py-2 pr-3">
-                                                                {m.packed_at ? (
-                                                                    <div>
-                                                                        <div>{formatDT(m.packed_at)}</div>
-                                                                        {m.packed_by && <div className="text-muted-foreground">by {m.packed_by}</div>}
-                                                                    </div>
-                                                                ) : '—'}
-                                                            </td>
-                                                            <td className="py-2 pr-3">
-                                                                {m.administered_at ? (
-                                                                    <div>
-                                                                        <div>{formatDT(m.administered_at)}</div>
-                                                                        {m.administered_by && <div className="text-muted-foreground">by {m.administered_by}</div>}
-                                                                        {m.is_controlled_drug && m.witnessed_by && (
-                                                                            <div className="text-muted-foreground">witnessed: {m.witnessed_by}</div>
-                                                                        )}
-                                                                    </div>
-                                                                ) : '—'}
-                                                            </td>
-                                                            <td className="py-2 pr-3">
-                                                                {m.returned_to_house_at ? formatDT(m.returned_to_house_at) : '—'}
-                                                            </td>
-                                                            <td className="py-2">
-                                                                <Badge
-                                                                    variant={m.status === 'returned' ? 'default' : m.status === 'administered' ? 'secondary' : 'outline'}
-                                                                    className="text-[10px] capitalize"
-                                                                >{m.status}</Badge>
-                                                            </td>
+                                                                <div>
+                                                                    {new Date(
+                                                                        o.planned_departure,
+                                                                    ).toLocaleTimeString(
+                                                                        'en-NZ',
+                                                                        {
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit',
+                                                                        },
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Transport History */}
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Truck className="h-4 w-4" />{' '}
+                                            Transport History
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {history.length > 0 ? (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead>
+                                                        <tr className="border-b text-left text-muted-foreground">
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Type
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                From / To
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Vehicle
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Driver
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Date
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Duration
+                                                            </th>
+                                                            <th className="pb-2 font-medium">
+                                                                Status
+                                                            </th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                    </thead>
+                                                    <tbody>
+                                                        {history.map((t) => (
+                                                            <tr
+                                                                key={t.id}
+                                                                className="border-b border-border/50 last:border-0"
+                                                            >
+                                                                <td className="py-2 pr-3">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="text-[10px] capitalize"
+                                                                    >
+                                                                        {(
+                                                                            t.transport_type ??
+                                                                            ''
+                                                                        ).replace(
+                                                                            /_/g,
+                                                                            ' ',
+                                                                        )}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-2 pr-3">
+                                                                    <div className="max-w-[140px] truncate">
+                                                                        {t.pickup_location ??
+                                                                            '—'}
+                                                                    </div>
+                                                                    <div className="max-w-[140px] truncate text-muted-foreground">
+                                                                        →{' '}
+                                                                        {t.dropoff_location ??
+                                                                            '—'}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2 pr-3">
+                                                                    {t.vehicle
+                                                                        ?.name ??
+                                                                        '—'}
+                                                                </td>
+                                                                <td className="py-2 pr-3">
+                                                                    {t.driver
+                                                                        ?.name ??
+                                                                        '—'}
+                                                                </td>
+                                                                <td className="py-2 pr-3 whitespace-nowrap">
+                                                                    {t.departed_at
+                                                                        ? formatDT(
+                                                                              t.departed_at,
+                                                                          )
+                                                                        : '—'}
+                                                                </td>
+                                                                <td className="py-2 pr-3 whitespace-nowrap">
+                                                                    {t.duration_minutes !=
+                                                                    null
+                                                                        ? `${Math.round(t.duration_minutes)}m`
+                                                                        : '—'}
+                                                                </td>
+                                                                <td className="py-2">
+                                                                    <Badge
+                                                                        variant={
+                                                                            t.status ===
+                                                                            'completed'
+                                                                                ? 'default'
+                                                                                : t.status ===
+                                                                                    'in_progress'
+                                                                                  ? 'secondary'
+                                                                                  : 'outline'
+                                                                        }
+                                                                        className="text-[10px]"
+                                                                    >
+                                                                        {
+                                                                            t.status
+                                                                        }
+                                                                    </Badge>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                                                <Truck className="mb-2 h-8 w-8 opacity-40" />
+                                                <p className="text-sm font-medium">
+                                                    No transport history
+                                                </p>
+                                                <p className="text-xs">
+                                                    Transport records will
+                                                    appear here when this
+                                                    resident is transported.
+                                                </p>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
-                            )}
-                        </div>
-                    );
-                })()}
+
+                                {/* Medication Transit Logs */}
+                                {medLogs.length > 0 && (
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="flex items-center gap-2 text-base">
+                                                <Pill className="h-4 w-4" />{' '}
+                                                Medication Transit Log
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead>
+                                                        <tr className="border-b text-left text-muted-foreground">
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Medication
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Packed
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Administered
+                                                            </th>
+                                                            <th className="pr-3 pb-2 font-medium">
+                                                                Returned
+                                                            </th>
+                                                            <th className="pb-2 font-medium">
+                                                                Status
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {medLogs.map((m) => (
+                                                            <tr
+                                                                key={m.id}
+                                                                className="border-b border-border/50 last:border-0"
+                                                            >
+                                                                <td className="py-2 pr-3">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="font-medium">
+                                                                            {
+                                                                                m.medication_name
+                                                                            }
+                                                                        </span>
+                                                                        {m.is_controlled_drug && (
+                                                                            <Badge
+                                                                                variant="destructive"
+                                                                                className="px-1 text-[8px]"
+                                                                            >
+                                                                                CD
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2 pr-3">
+                                                                    {m.packed_at ? (
+                                                                        <div>
+                                                                            <div>
+                                                                                {formatDT(
+                                                                                    m.packed_at,
+                                                                                )}
+                                                                            </div>
+                                                                            {m.packed_by && (
+                                                                                <div className="text-muted-foreground">
+                                                                                    by{' '}
+                                                                                    {
+                                                                                        m.packed_by
+                                                                                    }
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        '—'
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 pr-3">
+                                                                    {m.administered_at ? (
+                                                                        <div>
+                                                                            <div>
+                                                                                {formatDT(
+                                                                                    m.administered_at,
+                                                                                )}
+                                                                            </div>
+                                                                            {m.administered_by && (
+                                                                                <div className="text-muted-foreground">
+                                                                                    by{' '}
+                                                                                    {
+                                                                                        m.administered_by
+                                                                                    }
+                                                                                </div>
+                                                                            )}
+                                                                            {m.is_controlled_drug &&
+                                                                                m.witnessed_by && (
+                                                                                    <div className="text-muted-foreground">
+                                                                                        witnessed:{' '}
+                                                                                        {
+                                                                                            m.witnessed_by
+                                                                                        }
+                                                                                    </div>
+                                                                                )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        '—'
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 pr-3">
+                                                                    {m.returned_to_house_at
+                                                                        ? formatDT(
+                                                                              m.returned_to_house_at,
+                                                                          )
+                                                                        : '—'}
+                                                                </td>
+                                                                <td className="py-2">
+                                                                    <Badge
+                                                                        variant={
+                                                                            m.status ===
+                                                                            'returned'
+                                                                                ? 'default'
+                                                                                : m.status ===
+                                                                                    'administered'
+                                                                                  ? 'secondary'
+                                                                                  : 'outline'
+                                                                        }
+                                                                        className="text-[10px] capitalize"
+                                                                    >
+                                                                        {
+                                                                            m.status
+                                                                        }
+                                                                    </Badge>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                 {tab === 'assignments' && (
                     <Card>
@@ -8375,8 +8653,10 @@ function AssessmentsTab({
                                     </div>
                                     {a.notes && (
                                         <div className="mt-2 ml-12">
-                                            <button
-                                                className="text-xs text-primary hover:underline"
+                                            <Button
+                                                type="button"
+                                                variant="link"
+                                                className="h-auto p-0 text-xs text-primary hover:underline"
                                                 onClick={() =>
                                                     setExpandedId(
                                                         isExpanded
@@ -8388,7 +8668,7 @@ function AssessmentsTab({
                                                 {isExpanded
                                                     ? 'Hide notes'
                                                     : 'Show notes'}
-                                            </button>
+                                            </Button>
                                             {isExpanded && (
                                                 <div className="mt-1.5 border-l-2 border-primary pl-3 text-xs whitespace-pre-wrap text-muted-foreground">
                                                     {a.notes}
@@ -8573,9 +8853,9 @@ function PhotoGalleryTab({
                 {photos.length > 0 ? (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                         {photos.map((p) => (
-                            <div
+                            <Card
                                 key={p.id}
-                                className="group relative overflow-hidden rounded-lg border bg-card"
+                                className="group relative gap-0 overflow-hidden rounded-lg p-0"
                             >
                                 <a
                                     href={p.url}
@@ -8613,9 +8893,12 @@ function PhotoGalleryTab({
                                     </p>
                                 </div>
                                 {canEdit && (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => deletePhoto(p.id)}
-                                        className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical"
+                                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical"
                                         title="Delete photo"
                                     >
                                         <svg
@@ -8639,9 +8922,9 @@ function PhotoGalleryTab({
                                                 y2="18"
                                             />
                                         </svg>
-                                    </button>
+                                    </Button>
                                 )}
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 ) : (
@@ -8698,7 +8981,11 @@ const ASSET_CATEGORIES: Record<
         color: 'bg-status-success-bg text-status-success',
         icon: '🚗',
     },
-    other: { label: 'Other', color: 'bg-muted text-muted-foreground', icon: '📦' },
+    other: {
+        label: 'Other',
+        color: 'bg-muted text-muted-foreground',
+        icon: '📦',
+    },
 };
 
 const CONDITION_COLORS: Record<string, string> = {
@@ -8745,13 +9032,22 @@ const STATUS_CONFIG: Record<
 };
 
 const OWNERSHIP_CONFIG: Record<string, { label: string; color: string }> = {
-    client: { label: 'Client Owned', color: 'bg-status-info-bg text-status-info' },
+    client: {
+        label: 'Client Owned',
+        color: 'bg-status-info-bg text-status-info',
+    },
     provider: {
         label: 'Provider Owned',
         color: 'bg-primary/10 text-primary',
     },
-    funded: { label: 'Funded', color: 'bg-status-success-bg text-status-success' },
-    loaned: { label: 'On Loan', color: 'bg-status-warning-bg text-status-warning' },
+    funded: {
+        label: 'Funded',
+        color: 'bg-status-success-bg text-status-success',
+    },
+    loaned: {
+        label: 'On Loan',
+        color: 'bg-status-warning-bg text-status-warning',
+    },
 };
 
 function PersonalAssetsTab({
@@ -9278,59 +9574,73 @@ function PersonalAssetsTab({
                     {/* Quick status actions */}
                     {canEdit && a.status === 'active' && (
                         <div className="flex flex-wrap gap-1 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
-                            <button
+                            <Button
+                                type="button"
+                                variant="ghost"
                                 onClick={() => changeStatus(a.id, 'in_repair')}
-                                className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning transition-colors hover:bg-status-warning-bg"
+                                className="h-auto rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning transition-colors hover:bg-status-warning-bg"
                             >
                                 In Repair
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
                                 onClick={() => changeStatus(a.id, 'lost')}
-                                className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical transition-colors hover:bg-status-critical-bg"
+                                className="h-auto rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical transition-colors hover:bg-status-critical-bg"
                             >
                                 Lost
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
                                 onClick={() => changeStatus(a.id, 'damaged')}
-                                className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning transition-colors hover:bg-status-warning-bg"
+                                className="h-auto rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning transition-colors hover:bg-status-warning-bg"
                             >
                                 Damaged
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {canEdit && a.status === 'in_repair' && (
                         <div className="flex flex-wrap gap-1 pt-1">
-                            <button
+                            <Button
+                                type="button"
+                                variant="ghost"
                                 onClick={() => changeStatus(a.id, 'active')}
-                                className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success transition-colors hover:bg-status-success-bg"
+                                className="h-auto rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success transition-colors hover:bg-status-success-bg"
                             >
                                 Repaired
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
                                 onClick={() => changeStatus(a.id, 'disposed')}
-                                className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+                                className="h-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
                             >
                                 Dispose
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {canEdit &&
                         (a.status === 'lost' || a.status === 'damaged') && (
                             <div className="flex flex-wrap gap-1 pt-1">
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="ghost"
                                     onClick={() => changeStatus(a.id, 'active')}
-                                    className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success transition-colors hover:bg-status-success-bg"
+                                    className="h-auto rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success transition-colors hover:bg-status-success-bg"
                                 >
                                     Found / Restored
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
                                     onClick={() =>
                                         changeStatus(a.id, 'disposed')
                                     }
-                                    className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+                                    className="h-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
                                 >
                                     Dispose
-                                </button>
+                                </Button>
                             </div>
                         )}
 
@@ -10393,25 +10703,33 @@ function ClientCalendarTab({
                                 {calTitle}
                             </h2>
                             <div className="flex items-center">
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={goPrev}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                                    className="h-8 w-8 rounded-full transition-colors hover:bg-muted"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={goNext}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                                    className="h-8 w-8 rounded-full transition-colors hover:bg-muted"
                                 >
                                     <ChevronRight className="h-4 w-4" />
-                                </button>
+                                </Button>
                             </div>
-                            <button
+                            <Button
+                                type="button"
+                                variant="outline"
                                 onClick={goToday}
-                                className="rounded-full border px-4 py-1 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"
+                                className="h-auto rounded-full px-4 py-1 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"
                             >
                                 Today
-                            </button>
+                            </Button>
                         </div>
                         <div className="flex items-center gap-2">
                             <Button
@@ -10432,13 +10750,15 @@ function ClientCalendarTab({
                             </Button>
                             <div className="inline-flex items-center gap-1 rounded-full border bg-muted/20 p-1">
                                 {CAL_VIEWS.map((v) => (
-                                    <button
+                                    <Button
                                         key={v.key}
+                                        type="button"
+                                        variant="ghost"
                                         onClick={() => changeView(v.key)}
-                                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                                        className={`h-auto rounded-full px-3 py-1 text-xs font-semibold transition-all ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
                                         {v.label}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
@@ -10540,11 +10860,13 @@ function ClientCalendarTab({
                     style={{ top: ctxMenu.y, left: ctxMenu.x }}
                     onClick={(e) => e.stopPropagation()}
                 >
+                    {/* eslint-disable-next-line no-restricted-syntax -- Calendar context menu styling targets native menu buttons. */}
                     <button onClick={openCreateFromCtx}>
                         <Plus className="h-4 w-4 text-primary" />
                         <span>Schedule Appointment</span>
                     </button>
                     <hr />
+                    {/* eslint-disable-next-line no-restricted-syntax -- Calendar context menu styling targets native menu buttons. */}
                     <button
                         onClick={() => {
                             setCtxMenu(null);

@@ -1,17 +1,28 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import InputError from '@/components/input-error';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo } from 'react';
 
 type Site = { id: number; name: string };
-type Client = { id: number; first_name: string; last_name: string; site_id?: number | null };
+type Client = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    site_id?: number | null;
+};
 type AssetCategory = { id: number; name: string };
 
 type Mode = 'create' | 'edit';
@@ -20,7 +31,10 @@ export default function AssetForm({ mode }: { mode: Mode }) {
     const props = usePage().props as any;
 
     const sites: Site[] = props.sites ?? [];
-    const clients: Client[] = props.clients ?? [];
+    const clients: Client[] = useMemo(
+        () => props.clients ?? [],
+        [props.clients],
+    );
     const categories: AssetCategory[] = props.categories ?? [];
     const asset = props.asset ?? null;
     const prefill = props.prefill ?? {};
@@ -66,13 +80,27 @@ export default function AssetForm({ mode }: { mode: Mode }) {
     const title = mode === 'create' ? 'Create Asset' : 'Edit Asset';
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Assets', href: '/assets' }, { title, href: mode === 'create' ? '/assets/create' : `/assets/${asset?.id}/edit` }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Assets', href: '/assets' },
+                {
+                    title,
+                    href:
+                        mode === 'create'
+                            ? '/assets/create'
+                            : `/assets/${asset?.id}/edit`,
+                },
+            ]}
+        >
             <Head title={title} />
             <div className="space-y-4 p-4">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-semibold">{title}</h1>
-                        <p className="text-sm text-muted-foreground">Add site-level or client-level assets. Client assets inherit the client’s site.</p>
+                        <p className="text-sm text-muted-foreground">
+                            Add site-level or client-level assets. Client assets
+                            inherit the client’s site.
+                        </p>
                     </div>
                     {mode === 'edit' && asset ? (
                         <Link href={`/assets/${asset.id}`}>
@@ -93,8 +121,17 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                         <div className="space-y-1">
                             <Label>Site</Label>
                             <Select
-                                value={form.data.site_id ? String(form.data.site_id) : 'none'}
-                                onValueChange={(v) => form.setData('site_id', v === 'none' ? '' : v)}
+                                value={
+                                    form.data.site_id
+                                        ? String(form.data.site_id)
+                                        : 'none'
+                                }
+                                onValueChange={(v) =>
+                                    form.setData(
+                                        'site_id',
+                                        v === 'none' ? '' : v,
+                                    )
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select site (optional if client selected)" />
@@ -102,7 +139,10 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                                 <SelectContent>
                                     <SelectItem value="none">—</SelectItem>
                                     {sites.map((s) => (
-                                        <SelectItem key={s.id} value={String(s.id)}>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={String(s.id)}
+                                        >
                                             {s.name}
                                         </SelectItem>
                                     ))}
@@ -114,8 +154,17 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                         <div className="space-y-1">
                             <Label>Client</Label>
                             <Select
-                                value={form.data.client_id ? String(form.data.client_id) : 'none'}
-                                onValueChange={(v) => form.setData('client_id', v === 'none' ? '' : v)}
+                                value={
+                                    form.data.client_id
+                                        ? String(form.data.client_id)
+                                        : 'none'
+                                }
+                                onValueChange={(v) =>
+                                    form.setData(
+                                        'client_id',
+                                        v === 'none' ? '' : v,
+                                    )
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select client (optional)" />
@@ -123,13 +172,19 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                                 <SelectContent>
                                     <SelectItem value="none">—</SelectItem>
                                     {filteredClients.map((c) => (
-                                        <SelectItem key={c.id} value={String(c.id)}>
+                                        <SelectItem
+                                            key={c.id}
+                                            value={String(c.id)}
+                                        >
                                             {c.first_name} {c.last_name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <div className="mt-1 text-xs text-muted-foreground">If you select a client, the site will be set automatically on save.</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                                If you select a client, the site will be set
+                                automatically on save.
+                            </div>
                             <InputError message={form.errors.client_id} />
                         </div>
                     </CardContent>
@@ -137,29 +192,55 @@ export default function AssetForm({ mode }: { mode: Mode }) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Asset details</CardTitle>
+                        <CardTitle className="text-base">
+                            Asset details
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="space-y-1">
                             <Label>Name *</Label>
-                            <Input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
+                            <Input
+                                value={form.data.name}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.name} />
                         </div>
                         <div className="space-y-1">
                             <Label>Asset tag</Label>
-                            <Input value={form.data.asset_tag} onChange={(e) => form.setData('asset_tag', e.target.value)} />
+                            <Input
+                                value={form.data.asset_tag}
+                                onChange={(e) =>
+                                    form.setData('asset_tag', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.asset_tag} />
                         </div>
                         <div className="space-y-1">
                             <Label>Category</Label>
-                            <Input value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} />
+                            <Input
+                                value={form.data.category}
+                                onChange={(e) =>
+                                    form.setData('category', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.category} />
                         </div>
                         <div className="space-y-1">
                             <Label>Category type</Label>
                             <Select
-                                value={form.data.asset_category_id ? String(form.data.asset_category_id) : 'none'}
-                                onValueChange={(v) => form.setData('asset_category_id', v === 'none' ? '' : v)}
+                                value={
+                                    form.data.asset_category_id
+                                        ? String(form.data.asset_category_id)
+                                        : 'none'
+                                }
+                                onValueChange={(v) =>
+                                    form.setData(
+                                        'asset_category_id',
+                                        v === 'none' ? '' : v,
+                                    )
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select category type" />
@@ -167,24 +248,40 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                                 <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {categories.map((c) => (
-                                        <SelectItem key={c.id} value={String(c.id)}>
+                                        <SelectItem
+                                            key={c.id}
+                                            value={String(c.id)}
+                                        >
                                             {c.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <InputError message={form.errors.asset_category_id} />
+                            <InputError
+                                message={form.errors.asset_category_id}
+                            />
                         </div>
                         <div className="space-y-1">
                             <Label>Status</Label>
-                            <Select value={form.data.status} onValueChange={(v) => form.setData('status', v as any)}>
+                            <Select
+                                value={form.data.status}
+                                onValueChange={(v) =>
+                                    form.setData('status', v as any)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="out_of_service">Out of service</SelectItem>
-                                    <SelectItem value="retired">Retired</SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="out_of_service">
+                                        Out of service
+                                    </SelectItem>
+                                    <SelectItem value="retired">
+                                        Retired
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <InputError message={form.errors.status} />
@@ -192,13 +289,20 @@ export default function AssetForm({ mode }: { mode: Mode }) {
 
                         <div className="space-y-1">
                             <Label>Risk level</Label>
-                            <Select value={form.data.risk_level} onValueChange={(v) => form.setData('risk_level', v as any)}>
+                            <Select
+                                value={form.data.risk_level}
+                                onValueChange={(v) =>
+                                    form.setData('risk_level', v as any)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="low">Low</SelectItem>
-                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="medium">
+                                        Medium
+                                    </SelectItem>
                                     <SelectItem value="high">High</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -207,29 +311,61 @@ export default function AssetForm({ mode }: { mode: Mode }) {
 
                         <div className="space-y-1">
                             <Label>Location</Label>
-                            <Input value={form.data.location} onChange={(e) => form.setData('location', e.target.value)} />
+                            <Input
+                                value={form.data.location}
+                                onChange={(e) =>
+                                    form.setData('location', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.location} />
                         </div>
 
                         <div className="space-y-1">
                             <Label>Manufacturer</Label>
-                            <Input value={form.data.manufacturer} onChange={(e) => form.setData('manufacturer', e.target.value)} />
+                            <Input
+                                value={form.data.manufacturer}
+                                onChange={(e) =>
+                                    form.setData('manufacturer', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.manufacturer} />
                         </div>
                         <div className="space-y-1">
                             <Label>Model</Label>
-                            <Input value={form.data.model} onChange={(e) => form.setData('model', e.target.value)} />
+                            <Input
+                                value={form.data.model}
+                                onChange={(e) =>
+                                    form.setData('model', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.model} />
                         </div>
 
                         <div className="space-y-1">
                             <Label>Serial number</Label>
-                            <Input value={form.data.serial_number} onChange={(e) => form.setData('serial_number', e.target.value)} />
+                            <Input
+                                value={form.data.serial_number}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'serial_number',
+                                        e.target.value,
+                                    )
+                                }
+                            />
                             <InputError message={form.errors.serial_number} />
                         </div>
                         <div className="space-y-1">
                             <Label>Purchase date</Label>
-                            <Input type="date" value={form.data.purchase_date} onChange={(e) => form.setData('purchase_date', e.target.value)} />
+                            <Input
+                                type="date"
+                                value={form.data.purchase_date}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'purchase_date',
+                                        e.target.value,
+                                    )
+                                }
+                            />
                             <InputError message={form.errors.purchase_date} />
                         </div>
 
@@ -238,14 +374,26 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             <Input
                                 type="date"
                                 value={form.data.warranty_expires_at}
-                                onChange={(e) => form.setData('warranty_expires_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'warranty_expires_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
-                            <InputError message={form.errors.warranty_expires_at} />
+                            <InputError
+                                message={form.errors.warranty_expires_at}
+                            />
                         </div>
 
                         <div className="space-y-1 md:col-span-2">
                             <Label>Description</Label>
-                            <Textarea value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+                            <Textarea
+                                value={form.data.description}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.description} />
                         </div>
                     </CardContent>
@@ -253,17 +401,24 @@ export default function AssetForm({ mode }: { mode: Mode }) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Inspection & maintenance</CardTitle>
+                        <CardTitle className="text-base">
+                            Inspection & maintenance
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="flex items-start gap-2">
                             <Checkbox
                                 checked={form.data.requires_inspection}
-                                onCheckedChange={(v) => form.setData('requires_inspection', !!v)}
+                                onCheckedChange={(v) =>
+                                    form.setData('requires_inspection', !!v)
+                                }
                             />
                             <div className="space-y-1">
                                 <Label>Requires inspection</Label>
-                                <div className="text-xs text-muted-foreground">Track an inspection due date and record inspection events.</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Track an inspection due date and record
+                                    inspection events.
+                                </div>
                             </div>
                         </div>
                         <div className="space-y-1">
@@ -271,19 +426,31 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             <Input
                                 type="date"
                                 value={form.data.inspection_due_at}
-                                onChange={(e) => form.setData('inspection_due_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'inspection_due_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
-                            <InputError message={form.errors.inspection_due_at} />
+                            <InputError
+                                message={form.errors.inspection_due_at}
+                            />
                         </div>
 
                         <div className="flex items-start gap-2">
                             <Checkbox
                                 checked={form.data.requires_maintenance}
-                                onCheckedChange={(v) => form.setData('requires_maintenance', !!v)}
+                                onCheckedChange={(v) =>
+                                    form.setData('requires_maintenance', !!v)
+                                }
                             />
                             <div className="space-y-1">
                                 <Label>Requires maintenance</Label>
-                                <div className="text-xs text-muted-foreground">Track a maintenance due date and record maintenance events.</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Track a maintenance due date and record
+                                    maintenance events.
+                                </div>
                             </div>
                         </div>
                         <div className="space-y-1">
@@ -291,14 +458,26 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             <Input
                                 type="date"
                                 value={form.data.maintenance_due_at}
-                                onChange={(e) => form.setData('maintenance_due_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'maintenance_due_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
-                            <InputError message={form.errors.maintenance_due_at} />
+                            <InputError
+                                message={form.errors.maintenance_due_at}
+                            />
                         </div>
 
                         <div className="space-y-1 md:col-span-2">
                             <Label>Notes</Label>
-                            <Textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} />
+                            <Textarea
+                                value={form.data.notes}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
+                            />
                             <InputError message={form.errors.notes} />
                         </div>
 
@@ -306,7 +485,11 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             <Button onClick={submit} disabled={form.processing}>
                                 {mode === 'create' ? 'Create' : 'Save changes'}
                             </Button>
-                            {form.hasErrors ? <div className="mt-2 text-xs text-status-critical">Please fix the errors above.</div> : null}
+                            {form.hasErrors ? (
+                                <div className="mt-2 text-xs text-status-critical">
+                                    Please fix the errors above.
+                                </div>
+                            ) : null}
                         </div>
                     </CardContent>
                 </Card>

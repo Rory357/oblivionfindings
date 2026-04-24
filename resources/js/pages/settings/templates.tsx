@@ -1,6 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -12,7 +18,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+    TabsContent,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -33,7 +44,7 @@ import {
     Smartphone,
     Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,15 +73,34 @@ interface Props {
 // ---------------------------------------------------------------------------
 const CATEGORIES = ['All', 'Operations', 'HR', 'Incidents', 'System'] as const;
 
-const CATEGORY_CONFIG: Record<string, { colour: string; bg: string; icon: typeof Briefcase }> = {
-    operations: { colour: 'text-primary dark:text-primary', bg: 'bg-primary/10 dark:bg-primary/40', icon: Briefcase },
-    hr: { colour: 'text-status-info dark:text-status-info', bg: 'bg-status-info-bg dark:bg-status-info', icon: Users },
-    incidents: { colour: 'text-status-critical dark:text-status-critical', bg: 'bg-status-critical-bg dark:bg-status-critical', icon: AlertTriangle },
-    system: { colour: 'text-foreground dark:text-muted-foreground', bg: 'bg-muted dark:bg-muted/60', icon: Shield },
+const CATEGORY_CONFIG: Record<
+    string,
+    { colour: string; bg: string; icon: typeof Briefcase }
+> = {
+    operations: {
+        colour: 'text-primary dark:text-primary',
+        bg: 'bg-primary/10 dark:bg-primary/40',
+        icon: Briefcase,
+    },
+    hr: {
+        colour: 'text-status-info dark:text-status-info',
+        bg: 'bg-status-info-bg dark:bg-status-info',
+        icon: Users,
+    },
+    incidents: {
+        colour: 'text-status-critical dark:text-status-critical',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        icon: AlertTriangle,
+    },
+    system: {
+        colour: 'text-foreground dark:text-muted-foreground',
+        bg: 'bg-muted dark:bg-muted/60',
+        icon: Shield,
+    },
 };
 
 const KEY_DESCRIPTIONS: Record<string, string> = {
-    'welcome': 'Sent to new users when their account is created',
+    welcome: 'Sent to new users when their account is created',
     'password-reset': 'Password reset request notification',
     'shift-reminder': 'Upcoming shift reminder sent to rostered staff',
     'incident-alert': 'Notification when an incident is reported',
@@ -82,7 +112,8 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
     'invoice-sent': 'Notification when an invoice is dispatched',
     'shift-reminder-sms': 'SMS reminder for upcoming rostered shifts',
     'emergency-alert-sms': 'Urgent SMS alert for critical incidents',
-    'availability-request-sms': 'SMS requesting staff availability for open shifts',
+    'availability-request-sms':
+        'SMS requesting staff availability for open shifts',
     'medication-reminder': 'Reminder for upcoming medication administration',
     'handover-notes': 'Shift handover notes notification',
     'roster-published': 'Notification when a new roster is published',
@@ -123,7 +154,11 @@ const SAMPLE_DATA: Record<string, string> = {
 };
 
 function getCsrfToken(): string {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    return (
+        document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute('content') ?? ''
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +182,10 @@ function charCountColour(length: number): string {
 function renderWithSampleData(text: string, orgName: string): string {
     if (!text) return '';
     let result = text;
-    const data = { ...SAMPLE_DATA, '{organisation}': orgName || 'Your Organisation' };
+    const data = {
+        ...SAMPLE_DATA,
+        '{organisation}': orgName || 'Your Organisation',
+    };
     for (const [field, value] of Object.entries(data)) {
         result = result.replaceAll(field, value);
     }
@@ -157,11 +195,23 @@ function renderWithSampleData(text: string, orgName: string): string {
 // ---------------------------------------------------------------------------
 // Component: StatCard
 // ---------------------------------------------------------------------------
-function StatCard({ label, value, colour, icon: Icon }: { label: string; value: number; colour: string; icon: typeof Mail }) {
+function StatCard({
+    label,
+    value,
+    colour,
+    icon: Icon,
+}: {
+    label: string;
+    value: number;
+    colour: string;
+    icon: typeof Mail;
+}) {
     return (
         <Card>
             <CardContent className="flex items-center gap-4 p-4">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colour}`}>
+                <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colour}`}
+                >
                     <Icon className="h-5 w-5 text-white" />
                 </div>
                 <div>
@@ -217,19 +267,20 @@ function MergeFieldPills({
         <div className="space-y-2">
             {groupEntries.map(([group, groupFields]) => (
                 <div key={group}>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                         {group}
                     </p>
                     <div className="flex flex-wrap gap-1">
                         {groupFields.map((field) => (
-                            <button
+                            <Button
                                 key={field}
                                 type="button"
                                 onClick={() => onInsert(field)}
-                                className="inline-flex items-center rounded-full border border-primary bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary transition-colors hover:bg-primary/10 dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70 dark:hover:bg-primary/50"
+                                variant="outline"
+                                className="h-auto rounded-full border-primary bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary hover:bg-primary/10 dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70 dark:hover:bg-primary/50"
                             >
                                 {field}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 </div>
@@ -256,15 +307,20 @@ function TemplateCard({
 }) {
     const config = getCategoryConfig(template.category);
     const CatIcon = config.icon;
-    const description = KEY_DESCRIPTIONS[template.key] ?? `${template.name} notification`;
+    const description =
+        KEY_DESCRIPTIONS[template.key] ?? `${template.name} notification`;
     const isEmail = template.type === 'email';
 
     return (
-        <Card className={`transition-opacity ${!template.is_active ? 'opacity-50' : ''}`}>
+        <Card
+            className={`transition-opacity ${!template.is_active ? 'opacity-50' : ''}`}
+        >
             <CardContent className="p-5">
                 <div className="flex items-start gap-4">
                     {/* Category icon */}
-                    <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
+                    <div
+                        className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${config.bg}`}
+                    >
                         <CatIcon className={`h-5 w-5 ${config.colour}`} />
                     </div>
 
@@ -272,8 +328,13 @@ function TemplateCard({
                     <div className="min-w-0 flex-1 space-y-2">
                         {/* Name + badges */}
                         <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-semibold">{template.name}</h3>
-                            <Badge variant="outline" className="text-[10px] capitalize">
+                            <h3 className="text-sm font-semibold">
+                                {template.name}
+                            </h3>
+                            <Badge
+                                variant="outline"
+                                className="text-[10px] capitalize"
+                            >
                                 {template.category}
                             </Badge>
                             {template.is_active ? (
@@ -281,25 +342,35 @@ function TemplateCard({
                                     Active
                                 </Badge>
                             ) : (
-                                <Badge variant="secondary" className="text-[10px]">
+                                <Badge
+                                    variant="secondary"
+                                    className="text-[10px]"
+                                >
                                     Inactive
                                 </Badge>
                             )}
                             {template.is_system && (
-                                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                <Badge
+                                    variant="outline"
+                                    className="text-[10px] text-muted-foreground"
+                                >
                                     System
                                 </Badge>
                             )}
                         </div>
 
                         {/* Description */}
-                        <p className="text-xs text-muted-foreground">{description}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {description}
+                        </p>
 
                         {/* Subject preview (email only) */}
                         {isEmail && template.subject && (
                             <div className="rounded-md bg-muted/60 px-3 py-1.5">
                                 <p className="font-mono text-xs text-muted-foreground">
-                                    <span className="font-semibold text-foreground/70">Subject:</span>{' '}
+                                    <span className="font-semibold text-foreground/70">
+                                        Subject:
+                                    </span>{' '}
                                     {template.subject}
                                 </p>
                             </div>
@@ -307,31 +378,40 @@ function TemplateCard({
 
                         {/* Body preview for SMS */}
                         {!isEmail && template.body && (
-                            <p className="line-clamp-2 text-xs text-muted-foreground">{template.body}</p>
+                            <p className="line-clamp-2 text-xs text-muted-foreground">
+                                {template.body}
+                            </p>
                         )}
 
                         {/* Merge field pills */}
-                        {template.merge_fields && template.merge_fields.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                                {template.merge_fields.map((field) => (
-                                    <span
-                                        key={field}
-                                        className="inline-flex rounded-full border border-primary bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary"
-                                    >
-                                        {`{${field}}`}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
+                        {template.merge_fields &&
+                            template.merge_fields.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                    {template.merge_fields.map((field) => (
+                                        <span
+                                            key={field}
+                                            className="inline-flex rounded-full border border-primary bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary"
+                                        >
+                                            {`{${field}}`}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
 
                         {/* SMS character count */}
                         {!isEmail && (
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs font-medium ${charCountColour(template.body.length)}`}>
+                                <span
+                                    className={`text-xs font-medium ${charCountColour(template.body.length)}`}
+                                >
                                     {template.body.length} chars
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                    ({smsSegments(template.body.length)} segment{smsSegments(template.body.length) !== 1 ? 's' : ''})
+                                    ({smsSegments(template.body.length)} segment
+                                    {smsSegments(template.body.length) !== 1
+                                        ? 's'
+                                        : ''}
+                                    )
                                 </span>
                             </div>
                         )}
@@ -339,7 +419,12 @@ function TemplateCard({
 
                     {/* Actions */}
                     <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-                        <Button variant="outline" size="sm" onClick={onEdit} className="border-primary text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary/70">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onEdit}
+                            className="border-primary text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary/70"
+                        >
                             <Pencil className="mr-1.5 h-3 w-3" />
                             Edit
                         </Button>
@@ -348,7 +433,11 @@ function TemplateCard({
                             Preview
                         </Button>
                         {isEmail && (
-                            <Button variant="outline" size="sm" onClick={onSendTest}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onSendTest}
+                            >
                                 <Send className="mr-1.5 h-3 w-3" />
                                 Test
                             </Button>
@@ -371,7 +460,9 @@ function PhoneMockup({ message }: { message: string }) {
                 <div className="mx-auto mb-3 h-5 w-20 rounded-full bg-muted dark:bg-muted-foreground/80" />
                 {/* Screen */}
                 <div className="min-h-[200px] rounded-xl bg-card p-3 dark:bg-muted">
-                    <p className="mb-2 text-center text-[10px] text-muted-foreground">Today 09:00</p>
+                    <p className="mb-2 text-center text-[10px] text-muted-foreground">
+                        Today 09:00
+                    </p>
                     <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-xs text-primary-foreground">
                         {message}
                     </div>
@@ -386,21 +477,37 @@ function PhoneMockup({ message }: { message: string }) {
 // ---------------------------------------------------------------------------
 // Component: EmailFrame
 // ---------------------------------------------------------------------------
-function EmailFrame({ subject, body, headerColour }: { subject: string; body: string; headerColour?: string }) {
+function EmailFrame({
+    subject,
+    body,
+    headerColour,
+}: {
+    subject: string;
+    body: string;
+    headerColour?: string;
+}) {
     return (
         <div className="overflow-hidden rounded-lg border">
             {/* Colour bar */}
-            <div className="h-2" style={{ backgroundColor: headerColour || '#7c3aed' }} />
+            <div
+                className="h-2"
+                style={{ backgroundColor: headerColour || '#7c3aed' }}
+            />
             <div className="bg-white p-5 dark:bg-muted">
                 {subject && (
-                    <p className="mb-3 border-b pb-2 text-sm font-semibold text-foreground">{subject}</p>
+                    <p className="mb-3 border-b pb-2 text-sm font-semibold text-foreground">
+                        {subject}
+                    </p>
                 )}
                 <div
-                    className="prose prose-sm max-w-none text-sm dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: body.replace(/\n/g, '<br />') }}
+                    className="prose prose-sm dark:prose-invert max-w-none text-sm"
+                    dangerouslySetInnerHTML={{
+                        __html: body.replace(/\n/g, '<br />'),
+                    }}
                 />
                 <div className="mt-6 border-t pt-3 text-[10px] text-muted-foreground">
-                    This is an automated notification. Please do not reply directly to this email.
+                    This is an automated notification. Please do not reply
+                    directly to this email.
                 </div>
             </div>
         </div>
@@ -444,7 +551,7 @@ function TemplateList({
             {/* Filters */}
             <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         placeholder="Search templates..."
                         value={search}
@@ -455,7 +562,7 @@ function TemplateList({
                 <select
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:outline-none"
                 >
                     {CATEGORIES.map((cat) => (
                         <option key={cat} value={cat}>
@@ -470,8 +577,12 @@ function TemplateList({
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                         <Search className="mb-3 h-8 w-8 text-muted-foreground/40" />
-                        <p className="text-sm font-medium text-muted-foreground">No templates found</p>
-                        <p className="text-xs text-muted-foreground/70">Try adjusting your search or filter</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                            No templates found
+                        </p>
+                        <p className="text-xs text-muted-foreground/70">
+                            Try adjusting your search or filter
+                        </p>
                     </CardContent>
                 </Card>
             ) : (
@@ -497,19 +608,30 @@ function TemplateList({
 // ---------------------------------------------------------------------------
 function TemplateSettings() {
     const [signature, setSignature] = useState(() =>
-        typeof window !== 'undefined' ? localStorage.getItem('tpl:signature') ?? 'Regards,\n{organisation}' : 'Regards,\n{organisation}',
+        typeof window !== 'undefined'
+            ? (localStorage.getItem('tpl:signature') ??
+              'Regards,\n{organisation}')
+            : 'Regards,\n{organisation}',
     );
     const [logoEnabled, setLogoEnabled] = useState(() =>
-        typeof window !== 'undefined' ? localStorage.getItem('tpl:logo') !== 'false' : true,
+        typeof window !== 'undefined'
+            ? localStorage.getItem('tpl:logo') !== 'false'
+            : true,
     );
     const [headerColour, setHeaderColour] = useState(() =>
-        typeof window !== 'undefined' ? localStorage.getItem('tpl:headerColour') ?? '#7c3aed' : '#7c3aed',
+        typeof window !== 'undefined'
+            ? (localStorage.getItem('tpl:headerColour') ?? '#7c3aed')
+            : '#7c3aed',
     );
     const [unsubscribeLink, setUnsubscribeLink] = useState(() =>
-        typeof window !== 'undefined' ? localStorage.getItem('tpl:unsubscribe') !== 'false' : true,
+        typeof window !== 'undefined'
+            ? localStorage.getItem('tpl:unsubscribe') !== 'false'
+            : true,
     );
     const [replyTo, setReplyTo] = useState(() =>
-        typeof window !== 'undefined' ? localStorage.getItem('tpl:replyTo') ?? '' : '',
+        typeof window !== 'undefined'
+            ? (localStorage.getItem('tpl:replyTo') ?? '')
+            : '',
     );
     const [saved, setSaved] = useState(false);
 
@@ -528,8 +650,12 @@ function TemplateSettings() {
             {/* Email Appearance */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Email Appearance</CardTitle>
-                    <CardDescription>Customise how your outgoing emails look</CardDescription>
+                    <CardTitle className="text-base">
+                        Email Appearance
+                    </CardTitle>
+                    <CardDescription>
+                        Customise how your outgoing emails look
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                     <div>
@@ -547,9 +673,14 @@ function TemplateSettings() {
                     <div className="flex items-center justify-between">
                         <div>
                             <Label>Logo in Emails</Label>
-                            <p className="text-xs text-muted-foreground">Display your organisation logo in email headers</p>
+                            <p className="text-xs text-muted-foreground">
+                                Display your organisation logo in email headers
+                            </p>
                         </div>
-                        <Switch checked={logoEnabled} onCheckedChange={setLogoEnabled} />
+                        <Switch
+                            checked={logoEnabled}
+                            onCheckedChange={setLogoEnabled}
+                        />
                     </div>
 
                     <div>
@@ -559,12 +690,16 @@ function TemplateSettings() {
                                 type="color"
                                 id="header-colour"
                                 value={headerColour}
-                                onChange={(e) => setHeaderColour(e.target.value)}
+                                onChange={(e) =>
+                                    setHeaderColour(e.target.value)
+                                }
                                 className="h-9 w-12 cursor-pointer rounded border"
                             />
                             <Input
                                 value={headerColour}
-                                onChange={(e) => setHeaderColour(e.target.value)}
+                                onChange={(e) =>
+                                    setHeaderColour(e.target.value)
+                                }
                                 className="w-28 font-mono text-sm"
                                 maxLength={7}
                             />
@@ -580,16 +715,25 @@ function TemplateSettings() {
             {/* Delivery Settings */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Delivery Settings</CardTitle>
-                    <CardDescription>Configure email delivery preferences</CardDescription>
+                    <CardTitle className="text-base">
+                        Delivery Settings
+                    </CardTitle>
+                    <CardDescription>
+                        Configure email delivery preferences
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                     <div className="flex items-center justify-between">
                         <div>
                             <Label>Unsubscribe Link</Label>
-                            <p className="text-xs text-muted-foreground">Include an unsubscribe link in all emails</p>
+                            <p className="text-xs text-muted-foreground">
+                                Include an unsubscribe link in all emails
+                            </p>
                         </div>
-                        <Switch checked={unsubscribeLink} onCheckedChange={setUnsubscribeLink} />
+                        <Switch
+                            checked={unsubscribeLink}
+                            onCheckedChange={setUnsubscribeLink}
+                        />
                     </div>
 
                     <div>
@@ -610,10 +754,17 @@ function TemplateSettings() {
             </Card>
 
             <div className="flex items-center gap-3">
-                <Button onClick={handleSave} className="bg-primary hover:bg-primary">
+                <Button
+                    onClick={handleSave}
+                    className="bg-primary hover:bg-primary"
+                >
                     {saved ? 'Saved!' : 'Save Settings'}
                 </Button>
-                {saved && <span className="text-sm text-status-success">Settings saved successfully</span>}
+                {saved && (
+                    <span className="text-sm text-status-success">
+                        Settings saved successfully
+                    </span>
+                )}
             </div>
         </div>
     );
@@ -622,17 +773,29 @@ function TemplateSettings() {
 // ---------------------------------------------------------------------------
 // Main Page Component
 // ---------------------------------------------------------------------------
-export default function Templates({ templates: rawTemplates, mergeFieldRegistry, orgName }: Props) {
-    const templates = rawTemplates ?? [];
+export default function Templates({
+    templates: rawTemplates,
+    mergeFieldRegistry,
+    orgName,
+}: Props) {
+    const templates = useMemo(() => rawTemplates ?? [], [rawTemplates]);
     const registry = mergeFieldRegistry ?? {};
     const org = orgName ?? 'Your Organisation';
 
     // Counts
-    const emailTemplates = useMemo(() => templates.filter((t) => t.type === 'email'), [templates]);
-    const smsTemplates = useMemo(() => templates.filter((t) => t.type === 'sms'), [templates]);
+    const emailTemplates = useMemo(
+        () => templates.filter((t) => t.type === 'email'),
+        [templates],
+    );
+    const smsTemplates = useMemo(
+        () => templates.filter((t) => t.type === 'sms'),
+        [templates],
+    );
 
     // Edit dialog state
-    const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+    const [editingTemplate, setEditingTemplate] = useState<Template | null>(
+        null,
+    );
     const [editSubject, setEditSubject] = useState('');
     const [editBody, setEditBody] = useState('');
     const [editActive, setEditActive] = useState(true);
@@ -640,7 +803,9 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
     const bodyRef = useRef<HTMLTextAreaElement>(null);
 
     // Preview dialog state
-    const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
+    const [previewTemplate, setPreviewTemplate] = useState<Template | null>(
+        null,
+    );
     const [previewHtml, setPreviewHtml] = useState('');
     const [previewSubject, setPreviewSubject] = useState('');
     const [previewLoading, setPreviewLoading] = useState(false);
@@ -729,23 +894,30 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
         setPreviewSubject('');
 
         try {
-            const res = await fetch(`/settings/templates/${template.id}/preview`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
+            const res = await fetch(
+                `/settings/templates/${template.id}/preview`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                    },
                 },
-            });
+            );
             if (res.ok) {
                 const data = await res.json();
                 setPreviewHtml(data.html ?? '');
                 setPreviewSubject(data.subject ?? '');
             } else {
-                setPreviewHtml('<p class="text-status-critical">Failed to load preview.</p>');
+                setPreviewHtml(
+                    '<p class="text-status-critical">Failed to load preview.</p>',
+                );
             }
         } catch {
-            setPreviewHtml('<p class="text-status-critical">Network error loading preview.</p>');
+            setPreviewHtml(
+                '<p class="text-status-critical">Network error loading preview.</p>',
+            );
         } finally {
             setPreviewLoading(false);
         }
@@ -777,245 +949,314 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
     }, [editSubject, org]);
 
     const isEmail = editingTemplate?.type === 'email';
-    const editMergeFields = editingTemplate?.merge_fields?.map((f) => `{${f}}`) ?? [];
+    const editMergeFields =
+        editingTemplate?.merge_fields?.map((f) => `{${f}}`) ?? [];
 
-    const breadcrumbs = [{ title: 'Settings', href: '/settings' }, { title: 'Templates', href: '/settings/templates' }];
+    const breadcrumbs = [
+        { title: 'Settings', href: '/settings' },
+        { title: 'Templates', href: '/settings/templates' },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Email & SMS Templates" />
             <SettingsLayout>
-
-            {/* Flash toast */}
-            {flash && (
-                <div className="fixed right-4 top-4 z-50 animate-in fade-in slide-in-from-top-2">
-                    <div className="rounded-lg border bg-status-success-bg px-4 py-3 text-sm font-medium text-status-success shadow-lg dark:bg-status-success-bg dark:text-status-success">
-                        {flash}
-                    </div>
-                </div>
-            )}
-
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
-                            <Mail className="h-5 w-5 text-primary dark:text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-semibold">Email &amp; SMS Templates</h1>
-                            <p className="mt-0.5 text-sm text-muted-foreground">
-                                Customise notification emails and SMS messages. Use merge fields to personalise content.
-                            </p>
+                {/* Flash toast */}
+                {flash && (
+                    <div className="fixed top-4 right-4 z-50 animate-in fade-in slide-in-from-top-2">
+                        <div className="rounded-lg border bg-status-success-bg px-4 py-3 text-sm font-medium text-status-success shadow-lg dark:bg-status-success-bg dark:text-status-success">
+                            {flash}
                         </div>
                     </div>
+                )}
+
+                <div className="space-y-6">
+                    {/* Header */}
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                <Mail className="h-5 w-5 text-primary dark:text-primary" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-semibold">
+                                    Email &amp; SMS Templates
+                                </h1>
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    Customise notification emails and SMS
+                                    messages. Use merge fields to personalise
+                                    content.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <StatCard
+                            label="Total Templates"
+                            value={templates.length}
+                            colour="bg-primary"
+                            icon={Hash}
+                        />
+                        <StatCard
+                            label="Email Templates"
+                            value={emailTemplates.length}
+                            colour="bg-status-info"
+                            icon={Mail}
+                        />
+                        <StatCard
+                            label="SMS Templates"
+                            value={smsTemplates.length}
+                            colour="bg-status-success"
+                            icon={Smartphone}
+                        />
+                    </div>
+
+                    {/* Tabs */}
+                    <TabsRoot defaultValue="email">
+                        <TabsList className="w-full sm:w-auto">
+                            <TabsTrigger value="email" className="gap-1.5">
+                                <Mail className="h-3.5 w-3.5" />
+                                Email Templates
+                            </TabsTrigger>
+                            <TabsTrigger value="sms" className="gap-1.5">
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                SMS Templates
+                            </TabsTrigger>
+                            <TabsTrigger value="settings" className="gap-1.5">
+                                <Settings2 className="h-3.5 w-3.5" />
+                                Template Settings
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="email">
+                            <TemplateList
+                                templates={emailTemplates}
+                                orgName={org}
+                                onEdit={openEdit}
+                                onPreview={openPreview}
+                                onSendTest={handleSendTest}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="sms">
+                            <TemplateList
+                                templates={smsTemplates}
+                                orgName={org}
+                                onEdit={openEdit}
+                                onPreview={openPreview}
+                                onSendTest={handleSendTest}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="settings">
+                            <TemplateSettings />
+                        </TabsContent>
+                    </TabsRoot>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard label="Total Templates" value={templates.length} colour="bg-primary" icon={Hash} />
-                    <StatCard label="Email Templates" value={emailTemplates.length} colour="bg-status-info" icon={Mail} />
-                    <StatCard label="SMS Templates" value={smsTemplates.length} colour="bg-status-success" icon={Smartphone} />
-                </div>
+                {/* ================================================================ */}
+                {/* Edit Dialog                                                       */}
+                {/* ================================================================ */}
+                <Dialog
+                    open={!!editingTemplate}
+                    onOpenChange={(open) => !open && closeEdit()}
+                >
+                    <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>
+                                Edit Template &mdash; {editingTemplate?.name}
+                            </DialogTitle>
+                            <DialogDescription>
+                                {editingTemplate
+                                    ? (KEY_DESCRIPTIONS[editingTemplate.key] ??
+                                      'Modify the template content and settings below.')
+                                    : ''}
+                            </DialogDescription>
+                        </DialogHeader>
 
-                {/* Tabs */}
-                <TabsRoot defaultValue="email">
-                    <TabsList className="w-full sm:w-auto">
-                        <TabsTrigger value="email" className="gap-1.5">
-                            <Mail className="h-3.5 w-3.5" />
-                            Email Templates
-                        </TabsTrigger>
-                        <TabsTrigger value="sms" className="gap-1.5">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            SMS Templates
-                        </TabsTrigger>
-                        <TabsTrigger value="settings" className="gap-1.5">
-                            <Settings2 className="h-3.5 w-3.5" />
-                            Template Settings
-                        </TabsTrigger>
-                    </TabsList>
+                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+                            {/* Left column: editor (60%) */}
+                            <div className="space-y-4 lg:col-span-3">
+                                {/* Subject (email only) */}
+                                {isEmail && (
+                                    <div>
+                                        <Label htmlFor="edit-subject">
+                                            Subject
+                                        </Label>
+                                        <Input
+                                            id="edit-subject"
+                                            value={editSubject}
+                                            onChange={(e) =>
+                                                setEditSubject(e.target.value)
+                                            }
+                                            className="mt-1.5"
+                                        />
+                                    </div>
+                                )}
 
-                    <TabsContent value="email">
-                        <TemplateList
-                            templates={emailTemplates}
-                            orgName={org}
-                            onEdit={openEdit}
-                            onPreview={openPreview}
-                            onSendTest={handleSendTest}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="sms">
-                        <TemplateList
-                            templates={smsTemplates}
-                            orgName={org}
-                            onEdit={openEdit}
-                            onPreview={openPreview}
-                            onSendTest={handleSendTest}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="settings">
-                        <TemplateSettings />
-                    </TabsContent>
-                </TabsRoot>
-            </div>
-
-            {/* ================================================================ */}
-            {/* Edit Dialog                                                       */}
-            {/* ================================================================ */}
-            <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && closeEdit()}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Template &mdash; {editingTemplate?.name}</DialogTitle>
-                        <DialogDescription>
-                            {editingTemplate ? KEY_DESCRIPTIONS[editingTemplate.key] ?? 'Modify the template content and settings below.' : ''}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-                        {/* Left column: editor (60%) */}
-                        <div className="space-y-4 lg:col-span-3">
-                            {/* Subject (email only) */}
-                            {isEmail && (
+                                {/* Merge fields */}
                                 <div>
-                                    <Label htmlFor="edit-subject">Subject</Label>
-                                    <Input
-                                        id="edit-subject"
-                                        value={editSubject}
-                                        onChange={(e) => setEditSubject(e.target.value)}
-                                        className="mt-1.5"
+                                    <Label className="mb-1.5 block text-xs text-muted-foreground">
+                                        Click a merge field to insert at cursor
+                                        position
+                                    </Label>
+                                    <MergeFieldPills
+                                        fields={editMergeFields}
+                                        registry={registry}
+                                        onInsert={insertMergeField}
                                     />
                                 </div>
-                            )}
 
-                            {/* Merge fields */}
-                            <div>
-                                <Label className="mb-1.5 block text-xs text-muted-foreground">
-                                    Click a merge field to insert at cursor position
-                                </Label>
-                                <MergeFieldPills
-                                    fields={editMergeFields}
-                                    registry={registry}
-                                    onInsert={insertMergeField}
-                                />
-                            </div>
+                                {/* Body */}
+                                <div>
+                                    <Label htmlFor="edit-body">Body</Label>
+                                    <Textarea
+                                        id="edit-body"
+                                        ref={bodyRef}
+                                        value={editBody}
+                                        onChange={(e) =>
+                                            setEditBody(e.target.value)
+                                        }
+                                        rows={isEmail ? 12 : 4}
+                                        className="mt-1.5 font-mono text-sm"
+                                    />
+                                    {/* SMS character counter */}
+                                    {!isEmail && (
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <span
+                                                className={`text-xs font-semibold ${charCountColour(editBody.length)}`}
+                                            >
+                                                {editBody.length} / 160
+                                                characters
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                ({smsSegments(editBody.length)}{' '}
+                                                segment
+                                                {smsSegments(
+                                                    editBody.length,
+                                                ) !== 1
+                                                    ? 's'
+                                                    : ''}
+                                                )
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
 
-                            {/* Body */}
-                            <div>
-                                <Label htmlFor="edit-body">Body</Label>
-                                <Textarea
-                                    id="edit-body"
-                                    ref={bodyRef}
-                                    value={editBody}
-                                    onChange={(e) => setEditBody(e.target.value)}
-                                    rows={isEmail ? 12 : 4}
-                                    className="mt-1.5 font-mono text-sm"
-                                />
-                                {/* SMS character counter */}
-                                {!isEmail && (
-                                    <div className="mt-1.5 flex items-center gap-2">
-                                        <span className={`text-xs font-semibold ${charCountColour(editBody.length)}`}>
-                                            {editBody.length} / 160 characters
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                            ({smsSegments(editBody.length)} segment{smsSegments(editBody.length) !== 1 ? 's' : ''})
-                                        </span>
+                                {/* Active toggle */}
+                                <div className="flex items-center justify-between rounded-lg border p-3">
+                                    <div>
+                                        <Label>Active</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            When disabled, this template will
+                                            not be sent
+                                        </p>
                                     </div>
+                                    <Switch
+                                        checked={editActive}
+                                        onCheckedChange={setEditActive}
+                                    />
+                                </div>
+
+                                {/* Reset to default */}
+                                {editingTemplate?.is_system && (
+                                    <Button
+                                        type="button"
+                                        onClick={handleReset}
+                                        variant="link"
+                                        className="h-auto gap-1.5 p-0 text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                        <RotateCcw className="h-3 w-3" />
+                                        Reset to default
+                                    </Button>
                                 )}
                             </div>
 
-                            {/* Active toggle */}
-                            <div className="flex items-center justify-between rounded-lg border p-3">
-                                <div>
-                                    <Label>Active</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        When disabled, this template will not be sent
-                                    </p>
-                                </div>
-                                <Switch checked={editActive} onCheckedChange={setEditActive} />
+                            {/* Right column: live preview (40%) */}
+                            <div className="lg:col-span-2">
+                                <Label className="mb-2 block">
+                                    Live Preview
+                                </Label>
+                                {isEmail ? (
+                                    <EmailFrame
+                                        subject={livePreviewSubject}
+                                        body={livePreviewBody}
+                                    />
+                                ) : (
+                                    <PhoneMockup
+                                        message={
+                                            livePreviewBody ||
+                                            'Your message preview will appear here...'
+                                        }
+                                    />
+                                )}
+                                <p className="mt-2 text-center text-[10px] text-muted-foreground">
+                                    Merge fields are replaced with sample data
+                                </p>
                             </div>
-
-                            {/* Reset to default */}
-                            {editingTemplate?.is_system && (
-                                <button
-                                    type="button"
-                                    onClick={handleReset}
-                                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                                >
-                                    <RotateCcw className="h-3 w-3" />
-                                    Reset to default
-                                </button>
-                            )}
                         </div>
 
-                        {/* Right column: live preview (40%) */}
-                        <div className="lg:col-span-2">
-                            <Label className="mb-2 block">Live Preview</Label>
-                            {isEmail ? (
-                                <EmailFrame
-                                    subject={livePreviewSubject}
-                                    body={livePreviewBody}
-                                />
-                            ) : (
-                                <PhoneMockup message={livePreviewBody || 'Your message preview will appear here...'} />
-                            )}
-                            <p className="mt-2 text-center text-[10px] text-muted-foreground">
-                                Merge fields are replaced with sample data
-                            </p>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" onClick={closeEdit}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="bg-primary hover:bg-primary"
+                            >
+                                {saving ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* ================================================================ */}
+                {/* Preview Dialog                                                    */}
+                {/* ================================================================ */}
+                <Dialog
+                    open={!!previewTemplate}
+                    onOpenChange={(open) => !open && closePreview()}
+                >
+                    <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>
+                                Preview &mdash; {previewTemplate?.name}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Rendered with your actual data
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        {/* Info banner */}
+                        <div className="rounded-md border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-xs text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
+                            <strong>Note:</strong> This preview is rendered
+                            using your actual account data and merge fields.
                         </div>
-                    </div>
 
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" onClick={closeEdit}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="bg-primary hover:bg-primary"
-                        >
-                            {saving ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                        {previewLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-violet-600" />
+                            </div>
+                        ) : previewTemplate?.type === 'email' ? (
+                            <EmailFrame
+                                subject={previewSubject}
+                                body={previewHtml}
+                            />
+                        ) : (
+                            <PhoneMockup
+                                message={previewHtml || 'No preview available.'}
+                            />
+                        )}
 
-            {/* ================================================================ */}
-            {/* Preview Dialog                                                    */}
-            {/* ================================================================ */}
-            <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && closePreview()}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Preview &mdash; {previewTemplate?.name}</DialogTitle>
-                        <DialogDescription>Rendered with your actual data</DialogDescription>
-                    </DialogHeader>
-
-                    {/* Info banner */}
-                    <div className="rounded-md border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-xs text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
-                        <strong>Note:</strong> This preview is rendered using your actual account data and merge fields.
-                    </div>
-
-                    {previewLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-violet-600" />
-                        </div>
-                    ) : previewTemplate?.type === 'email' ? (
-                        <EmailFrame
-                            subject={previewSubject}
-                            body={previewHtml}
-                        />
-                    ) : (
-                        <PhoneMockup message={previewHtml || 'No preview available.'} />
-                    )}
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={closePreview}>
-                            Close
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={closePreview}>
+                                Close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </SettingsLayout>
         </AppLayout>
     );

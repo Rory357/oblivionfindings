@@ -278,6 +278,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar()
 
   return (
+    /* eslint-disable-next-line no-restricted-syntax -- Sidebar rail is a resize/toggle hit target with custom geometry. */
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"

@@ -1,11 +1,25 @@
 import HeadingSmall from '@/components/heading-small';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -26,7 +40,12 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-type ChannelPref = { enabled: boolean; inapp: boolean; email: boolean; push: boolean };
+type ChannelPref = {
+    enabled: boolean;
+    inapp: boolean;
+    email: boolean;
+    push: boolean;
+};
 type RoleRow = { id: number; name: string; label: string };
 
 type Props = {
@@ -40,7 +59,12 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Notification Defaults', href: '/settings/notification-defaults' },
 ];
 
-const DEFAULT_PREF: ChannelPref = { enabled: true, inapp: true, email: false, push: false };
+const DEFAULT_PREF: ChannelPref = {
+    enabled: true,
+    inapp: true,
+    email: false,
+    push: false,
+};
 
 /** Friendly name map */
 const NOTIFICATION_META: Record<string, { name: string }> = {
@@ -55,28 +79,40 @@ const NOTIFICATION_META: Record<string, { name: string }> = {
     'incidents.reviewed': { name: 'Incident Reviewed' },
     'incidents.high_severity_alert': { name: 'High Severity Alert' },
     'breakglass.daily_report': { name: 'Break Glass Daily Report' },
-    'incidents.high_unreviewed_reminder': { name: 'High Severity Unreviewed Reminder' },
+    'incidents.high_unreviewed_reminder': {
+        name: 'High Severity Unreviewed Reminder',
+    },
     'followups.created': { name: 'Follow-up Created' },
     'followups.updated': { name: 'Follow-up Updated' },
     'followups.completed': { name: 'Follow-up Completed' },
     'followups.overdue_reminder': { name: 'Follow-up Overdue Reminder' },
 };
 
-const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: string[] }> = {
+const MODULE_CONFIG: Record<
+    string,
+    { label: string; icon: typeof Clock; keys: string[] }
+> = {
     operations: {
         label: 'Operations',
         icon: ClipboardList,
         keys: [
-            'timesheets.created', 'timesheets.updated', 'timesheets.submitted',
-            'timesheets.approved', 'timesheets.rejected', 'timesheets.returned',
+            'timesheets.created',
+            'timesheets.updated',
+            'timesheets.submitted',
+            'timesheets.approved',
+            'timesheets.rejected',
+            'timesheets.returned',
         ],
     },
     incidents: {
         label: 'Incidents & Safety',
         icon: Shield,
         keys: [
-            'incidents.draft_created', 'incidents.submitted', 'incidents.reviewed',
-            'incidents.high_severity_alert', 'breakglass.daily_report',
+            'incidents.draft_created',
+            'incidents.submitted',
+            'incidents.reviewed',
+            'incidents.high_severity_alert',
+            'breakglass.daily_report',
             'incidents.high_unreviewed_reminder',
         ],
     },
@@ -84,7 +120,9 @@ const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: s
         label: 'Follow-ups',
         icon: CheckCircle2,
         keys: [
-            'followups.created', 'followups.updated', 'followups.completed',
+            'followups.created',
+            'followups.updated',
+            'followups.completed',
             'followups.overdue_reminder',
         ],
     },
@@ -102,40 +140,66 @@ const ROLE_COLORS: string[] = [
 ];
 
 function humanize(key: string): string {
-    return NOTIFICATION_META[key]?.name ?? key
-        .replace(/\./g, ' ')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return (
+        NOTIFICATION_META[key]?.name ??
+        key
+            .replace(/\./g, ' ')
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
 }
 
-function groupByModule(allKeys: string[]): { moduleKey: string; label: string; icon: typeof Clock; keys: string[] }[] {
+function groupByModule(
+    allKeys: string[],
+): { moduleKey: string; label: string; icon: typeof Clock; keys: string[] }[] {
     const assigned = new Set<string>();
-    const result: { moduleKey: string; label: string; icon: typeof Clock; keys: string[] }[] = [];
+    const result: {
+        moduleKey: string;
+        label: string;
+        icon: typeof Clock;
+        keys: string[];
+    }[] = [];
 
     for (const [moduleKey, config] of Object.entries(MODULE_CONFIG)) {
         const matched = config.keys.filter((k) => allKeys.includes(k));
         if (matched.length > 0) {
-            result.push({ moduleKey, label: config.label, icon: config.icon, keys: matched });
+            result.push({
+                moduleKey,
+                label: config.label,
+                icon: config.icon,
+                keys: matched,
+            });
             matched.forEach((k) => assigned.add(k));
         }
     }
 
     const remaining = allKeys.filter((k) => !assigned.has(k));
     if (remaining.length > 0) {
-        result.push({ moduleKey: 'other', label: 'Other', icon: Bell, keys: remaining });
+        result.push({
+            moduleKey: 'other',
+            label: 'Other',
+            icon: Bell,
+            keys: remaining,
+        });
     }
 
     return result;
 }
 
 /** Channel dot indicator: green if on, grey if off */
-function ChannelDot({ active, channel }: { active: boolean; channel: 'inapp' | 'email' | 'push' }) {
+function ChannelDot({
+    active,
+    channel,
+}: {
+    active: boolean;
+    channel: 'inapp' | 'email' | 'push';
+}) {
     const colors = active
         ? channel === 'inapp'
             ? 'bg-status-success'
             : channel === 'email'
-                ? 'bg-status-info'
-                : 'bg-status-warning'
+              ? 'bg-status-info'
+              : 'bg-status-warning'
         : 'bg-muted-foreground/30';
     return <div className={`h-2 w-2 rounded-full ${colors}`} />;
 }
@@ -147,12 +211,14 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
     });
 
     const [search, setSearch] = useState('');
-    const [openModules, setOpenModules] = useState<Record<string, boolean>>(() => {
-        const initial: Record<string, boolean> = {};
-        Object.keys(MODULE_CONFIG).forEach((k) => (initial[k] = true));
-        initial['other'] = true;
-        return initial;
-    });
+    const [openModules, setOpenModules] = useState<Record<string, boolean>>(
+        () => {
+            const initial: Record<string, boolean> = {};
+            Object.keys(MODULE_CONFIG).forEach((k) => (initial[k] = true));
+            initial['other'] = true;
+            return initial;
+        },
+    );
 
     const modules = useMemo(() => groupByModule(allKeys), [allKeys]);
 
@@ -172,13 +238,21 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
             .filter((mod) => mod.keys.length > 0);
     }, [modules, search]);
 
-    const matchCount = filteredModules.reduce((sum, m) => sum + m.keys.length, 0);
+    const matchCount = filteredModules.reduce(
+        (sum, m) => sum + m.keys.length,
+        0,
+    );
 
     const getCellPref = (roleId: number, key: string): ChannelPref => {
         return (data.matrix as any)?.[roleId]?.[key] ?? DEFAULT_PREF;
     };
 
-    const setCellPref = (roleId: number, key: string, field: keyof ChannelPref, value: boolean) => {
+    const setCellPref = (
+        roleId: number,
+        key: string,
+        field: keyof ChannelPref,
+        value: boolean,
+    ) => {
         const next: any = { ...(data.matrix as any) };
         next[roleId] = { ...(next[roleId] || {}) };
         next[roleId][key] = {
@@ -188,7 +262,11 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
         setData('matrix', next);
     };
 
-    const setCellAllChannels = (roleId: number, key: string, value: boolean) => {
+    const setCellAllChannels = (
+        roleId: number,
+        key: string,
+        value: boolean,
+    ) => {
         const next: any = { ...(data.matrix as any) };
         next[roleId] = { ...(next[roleId] || {}) };
         next[roleId][key] = {
@@ -204,7 +282,12 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
         const next: any = { ...data.matrix };
         next[roleId] = { ...(next[roleId] || {}) };
         allKeys.forEach((k) => {
-            next[roleId][k] = { enabled: true, inapp: true, email: true, push: true };
+            next[roleId][k] = {
+                enabled: true,
+                inapp: true,
+                email: true,
+                push: true,
+            };
         });
         setData('matrix', next);
     };
@@ -213,7 +296,12 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
         const next: any = { ...data.matrix };
         next[roleId] = { ...(next[roleId] || {}) };
         allKeys.forEach((k) => {
-            next[roleId][k] = { enabled: false, inapp: false, email: false, push: false };
+            next[roleId][k] = {
+                enabled: false,
+                inapp: false,
+                email: false,
+                push: false,
+            };
         });
         setData('matrix', next);
     };
@@ -244,35 +332,65 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                     {/* Quick Actions */}
                     <Card>
                         <CardContent className="flex flex-wrap items-center gap-2 pt-6">
-                            <Button type="button" variant="outline" size="sm" onClick={() => {
-                                const next: any = { ...data.matrix };
-                                roles.forEach((r) => {
-                                    next[r.id] = next[r.id] || {};
-                                    allKeys.forEach((k) => {
-                                        next[r.id][k] = { enabled: true, inapp: true, email: true, push: true };
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const next: any = { ...data.matrix };
+                                    roles.forEach((r) => {
+                                        next[r.id] = next[r.id] || {};
+                                        allKeys.forEach((k) => {
+                                            next[r.id][k] = {
+                                                enabled: true,
+                                                inapp: true,
+                                                email: true,
+                                                push: true,
+                                            };
+                                        });
                                     });
-                                });
-                                setData('matrix', next);
-                            }}>
+                                    setData('matrix', next);
+                                }}
+                            >
                                 Enable All
                             </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => {
-                                const next: any = { ...data.matrix };
-                                roles.forEach((r) => {
-                                    next[r.id] = next[r.id] || {};
-                                    allKeys.forEach((k) => {
-                                        next[r.id][k] = { enabled: false, inapp: false, email: false, push: false };
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const next: any = { ...data.matrix };
+                                    roles.forEach((r) => {
+                                        next[r.id] = next[r.id] || {};
+                                        allKeys.forEach((k) => {
+                                            next[r.id][k] = {
+                                                enabled: false,
+                                                inapp: false,
+                                                email: false,
+                                                push: false,
+                                            };
+                                        });
                                     });
-                                });
-                                setData('matrix', next);
-                            }}>
+                                    setData('matrix', next);
+                                }}
+                            >
                                 Disable All
                             </Button>
                             <div className="mx-2 h-6 w-px bg-border" />
-                            <Button type="button" variant="ghost" size="sm" onClick={expandAll}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={expandAll}
+                            >
                                 Expand All
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" onClick={collapseAll}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={collapseAll}
+                            >
                                 Collapse All
                             </Button>
                         </CardContent>
@@ -293,7 +411,9 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                             <div className="h-2 w-2 rounded-full bg-status-warning" />
                             <span>Push</span>
                         </div>
-                        <span className="text-muted-foreground/50">Click a cell to configure channels</span>
+                        <span className="text-muted-foreground/50">
+                            Click a cell to configure channels
+                        </span>
                     </div>
 
                     {/* Search */}
@@ -330,7 +450,10 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                 key={mod.moduleKey}
                                 open={isOpen}
                                 onOpenChange={(open) =>
-                                    setOpenModules((prev) => ({ ...prev, [mod.moduleKey]: open }))
+                                    setOpenModules((prev) => ({
+                                        ...prev,
+                                        [mod.moduleKey]: open,
+                                    }))
                                 }
                             >
                                 <Card>
@@ -342,9 +465,15 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                         <Icon className="h-4 w-4 text-primary dark:text-primary" />
                                                     </div>
                                                     <div>
-                                                        <CardTitle className="text-base">{mod.label}</CardTitle>
+                                                        <CardTitle className="text-base">
+                                                            {mod.label}
+                                                        </CardTitle>
                                                         <CardDescription className="text-xs">
-                                                            {mod.keys.length} {mod.keys.length === 1 ? 'event' : 'events'}
+                                                            {mod.keys.length}{' '}
+                                                            {mod.keys.length ===
+                                                            1
+                                                                ? 'event'
+                                                                : 'events'}
                                                         </CardDescription>
                                                     </div>
                                                 </div>
@@ -365,134 +494,270 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                             <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
                                                                 Event
                                                             </th>
-                                                            {roles.map((role, idx) => (
-                                                                <th key={role.id} className="px-2 py-2 text-center">
-                                                                    <div className="flex flex-col items-center gap-1">
-                                                                        <Badge
-                                                                            variant="secondary"
-                                                                            className={`text-xs ${ROLE_COLORS[idx % ROLE_COLORS.length]}`}
-                                                                        >
-                                                                            {role.label}
-                                                                        </Badge>
-                                                                        <div className="flex gap-0.5">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => { e.stopPropagation(); enableAllForRole(role.id); }}
-                                                                                className="text-[10px] text-primary hover:underline dark:text-primary"
+                                                            {roles.map(
+                                                                (role, idx) => (
+                                                                    <th
+                                                                        key={
+                                                                            role.id
+                                                                        }
+                                                                        className="px-2 py-2 text-center"
+                                                                    >
+                                                                        <div className="flex flex-col items-center gap-1">
+                                                                            <Badge
+                                                                                variant="secondary"
+                                                                                className={`text-xs ${ROLE_COLORS[idx % ROLE_COLORS.length]}`}
                                                                             >
-                                                                                All
-                                                                            </button>
-                                                                            <span className="text-[10px] text-muted-foreground">/</span>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={(e) => { e.stopPropagation(); disableAllForRole(role.id); }}
-                                                                                className="text-[10px] text-muted-foreground hover:underline"
-                                                                            >
-                                                                                None
-                                                                            </button>
+                                                                                {
+                                                                                    role.label
+                                                                                }
+                                                                            </Badge>
+                                                                            <div className="flex gap-0.5">
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) => {
+                                                                                        e.stopPropagation();
+                                                                                        enableAllForRole(
+                                                                                            role.id,
+                                                                                        );
+                                                                                    }}
+                                                                                    variant="link"
+                                                                                    className="h-auto p-0 text-[10px] text-primary dark:text-primary"
+                                                                                >
+                                                                                    All
+                                                                                </Button>
+                                                                                <span className="text-[10px] text-muted-foreground">
+                                                                                    /
+                                                                                </span>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) => {
+                                                                                        e.stopPropagation();
+                                                                                        disableAllForRole(
+                                                                                            role.id,
+                                                                                        );
+                                                                                    }}
+                                                                                    variant="link"
+                                                                                    className="h-auto p-0 text-[10px] text-muted-foreground"
+                                                                                >
+                                                                                    None
+                                                                                </Button>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                </th>
-                                                            ))}
+                                                                    </th>
+                                                                ),
+                                                            )}
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {mod.keys.map((key) => (
-                                                            <tr key={key} className="border-b last:border-0 transition-colors hover:bg-muted/50">
+                                                            <tr
+                                                                key={key}
+                                                                className="border-b transition-colors last:border-0 hover:bg-muted/50"
+                                                            >
                                                                 <td className="py-3 pr-4">
-                                                                    <div className="text-sm font-medium">{humanize(key)}</div>
-                                                                    <div className="text-[11px] text-muted-foreground">{key}</div>
+                                                                    <div className="text-sm font-medium">
+                                                                        {humanize(
+                                                                            key,
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-[11px] text-muted-foreground">
+                                                                        {key}
+                                                                    </div>
                                                                 </td>
-                                                                {roles.map((role) => {
-                                                                    const pref = getCellPref(role.id, key);
+                                                                {roles.map(
+                                                                    (role) => {
+                                                                        const pref =
+                                                                            getCellPref(
+                                                                                role.id,
+                                                                                key,
+                                                                            );
 
-                                                                    return (
-                                                                        <td key={role.id} className="px-2 py-3 text-center">
-                                                                            <Popover>
-                                                                                <PopoverTrigger asChild>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="mx-auto flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/80"
+                                                                        return (
+                                                                            <td
+                                                                                key={
+                                                                                    role.id
+                                                                                }
+                                                                                className="px-2 py-3 text-center"
+                                                                            >
+                                                                                <Popover>
+                                                                                    <PopoverTrigger
+                                                                                        asChild
                                                                                     >
-                                                                                        <ChannelDot active={pref.enabled && pref.inapp} channel="inapp" />
-                                                                                        <ChannelDot active={pref.enabled && pref.email} channel="email" />
-                                                                                        <ChannelDot active={pref.enabled && pref.push} channel="push" />
-                                                                                    </button>
-                                                                                </PopoverTrigger>
-                                                                                <PopoverContent className="w-56 p-3" align="center">
-                                                                                    <div className="space-y-3">
-                                                                                        <div className="flex items-center justify-between">
-                                                                                            <span className="text-xs font-semibold">
-                                                                                                {humanize(key)}
-                                                                                            </span>
-                                                                                            <Switch
-                                                                                                checked={pref.enabled}
-                                                                                                onCheckedChange={(v) =>
-                                                                                                    setCellPref(role.id, key, 'enabled', Boolean(v))
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="mx-auto flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/80"
+                                                                                        >
+                                                                                            <ChannelDot
+                                                                                                active={
+                                                                                                    pref.enabled &&
+                                                                                                    pref.inapp
                                                                                                 }
+                                                                                                channel="inapp"
                                                                                             />
-                                                                                        </div>
-                                                                                        <div className="space-y-2">
-                                                                                            <label className="flex items-center gap-2 text-xs">
-                                                                                                <Checkbox
-                                                                                                    checked={pref.inapp}
-                                                                                                    disabled={!pref.enabled}
-                                                                                                    onCheckedChange={(v) =>
-                                                                                                        setCellPref(role.id, key, 'inapp', Boolean(v))
+                                                                                            <ChannelDot
+                                                                                                active={
+                                                                                                    pref.enabled &&
+                                                                                                    pref.email
+                                                                                                }
+                                                                                                channel="email"
+                                                                                            />
+                                                                                            <ChannelDot
+                                                                                                active={
+                                                                                                    pref.enabled &&
+                                                                                                    pref.push
+                                                                                                }
+                                                                                                channel="push"
+                                                                                            />
+                                                                                        </button>
+                                                                                    </PopoverTrigger>
+                                                                                    <PopoverContent
+                                                                                        className="w-56 p-3"
+                                                                                        align="center"
+                                                                                    >
+                                                                                        <div className="space-y-3">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <span className="text-xs font-semibold">
+                                                                                                    {humanize(
+                                                                                                        key,
+                                                                                                    )}
+                                                                                                </span>
+                                                                                                <Switch
+                                                                                                    checked={
+                                                                                                        pref.enabled
+                                                                                                    }
+                                                                                                    onCheckedChange={(
+                                                                                                        v,
+                                                                                                    ) =>
+                                                                                                        setCellPref(
+                                                                                                            role.id,
+                                                                                                            key,
+                                                                                                            'enabled',
+                                                                                                            Boolean(
+                                                                                                                v,
+                                                                                                            ),
+                                                                                                        )
                                                                                                     }
                                                                                                 />
-                                                                                                <Monitor className="h-3 w-3" />
-                                                                                                In-App
-                                                                                            </label>
-                                                                                            <label className="flex items-center gap-2 text-xs">
-                                                                                                <Checkbox
-                                                                                                    checked={pref.email}
-                                                                                                    disabled={!pref.enabled}
-                                                                                                    onCheckedChange={(v) =>
-                                                                                                        setCellPref(role.id, key, 'email', Boolean(v))
+                                                                                            </div>
+                                                                                            <div className="space-y-2">
+                                                                                                <label className="flex items-center gap-2 text-xs">
+                                                                                                    <Checkbox
+                                                                                                        checked={
+                                                                                                            pref.inapp
+                                                                                                        }
+                                                                                                        disabled={
+                                                                                                            !pref.enabled
+                                                                                                        }
+                                                                                                        onCheckedChange={(
+                                                                                                            v,
+                                                                                                        ) =>
+                                                                                                            setCellPref(
+                                                                                                                role.id,
+                                                                                                                key,
+                                                                                                                'inapp',
+                                                                                                                Boolean(
+                                                                                                                    v,
+                                                                                                                ),
+                                                                                                            )
+                                                                                                        }
+                                                                                                    />
+                                                                                                    <Monitor className="h-3 w-3" />
+                                                                                                    In-App
+                                                                                                </label>
+                                                                                                <label className="flex items-center gap-2 text-xs">
+                                                                                                    <Checkbox
+                                                                                                        checked={
+                                                                                                            pref.email
+                                                                                                        }
+                                                                                                        disabled={
+                                                                                                            !pref.enabled
+                                                                                                        }
+                                                                                                        onCheckedChange={(
+                                                                                                            v,
+                                                                                                        ) =>
+                                                                                                            setCellPref(
+                                                                                                                role.id,
+                                                                                                                key,
+                                                                                                                'email',
+                                                                                                                Boolean(
+                                                                                                                    v,
+                                                                                                                ),
+                                                                                                            )
+                                                                                                        }
+                                                                                                    />
+                                                                                                    <Mail className="h-3 w-3" />
+                                                                                                    Email
+                                                                                                </label>
+                                                                                                <label className="flex items-center gap-2 text-xs opacity-60">
+                                                                                                    <Checkbox
+                                                                                                        checked={
+                                                                                                            pref.push
+                                                                                                        }
+                                                                                                        disabled={
+                                                                                                            !pref.enabled
+                                                                                                        }
+                                                                                                        onCheckedChange={(
+                                                                                                            v,
+                                                                                                        ) =>
+                                                                                                            setCellPref(
+                                                                                                                role.id,
+                                                                                                                key,
+                                                                                                                'push',
+                                                                                                                Boolean(
+                                                                                                                    v,
+                                                                                                                ),
+                                                                                                            )
+                                                                                                        }
+                                                                                                    />
+                                                                                                    <Smartphone className="h-3 w-3" />
+                                                                                                    Push
+                                                                                                </label>
+                                                                                            </div>
+                                                                                            <div className="flex gap-1 border-t pt-2">
+                                                                                                <Button
+                                                                                                    type="button"
+                                                                                                    variant="ghost"
+                                                                                                    size="sm"
+                                                                                                    className="h-6 text-[10px]"
+                                                                                                    onClick={() =>
+                                                                                                        setCellAllChannels(
+                                                                                                            role.id,
+                                                                                                            key,
+                                                                                                            true,
+                                                                                                        )
                                                                                                     }
-                                                                                                />
-                                                                                                <Mail className="h-3 w-3" />
-                                                                                                Email
-                                                                                            </label>
-                                                                                            <label className="flex items-center gap-2 text-xs opacity-60">
-                                                                                                <Checkbox
-                                                                                                    checked={pref.push}
-                                                                                                    disabled={!pref.enabled}
-                                                                                                    onCheckedChange={(v) =>
-                                                                                                        setCellPref(role.id, key, 'push', Boolean(v))
+                                                                                                >
+                                                                                                    All
+                                                                                                    On
+                                                                                                </Button>
+                                                                                                <Button
+                                                                                                    type="button"
+                                                                                                    variant="ghost"
+                                                                                                    size="sm"
+                                                                                                    className="h-6 text-[10px]"
+                                                                                                    onClick={() =>
+                                                                                                        setCellAllChannels(
+                                                                                                            role.id,
+                                                                                                            key,
+                                                                                                            false,
+                                                                                                        )
                                                                                                     }
-                                                                                                />
-                                                                                                <Smartphone className="h-3 w-3" />
-                                                                                                Push
-                                                                                            </label>
+                                                                                                >
+                                                                                                    All
+                                                                                                    Off
+                                                                                                </Button>
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div className="flex gap-1 border-t pt-2">
-                                                                                            <Button
-                                                                                                type="button"
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                className="h-6 text-[10px]"
-                                                                                                onClick={() => setCellAllChannels(role.id, key, true)}
-                                                                                            >
-                                                                                                All On
-                                                                                            </Button>
-                                                                                            <Button
-                                                                                                type="button"
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                className="h-6 text-[10px]"
-                                                                                                onClick={() => setCellAllChannels(role.id, key, false)}
-                                                                                            >
-                                                                                                All Off
-                                                                                            </Button>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </PopoverContent>
-                                                                            </Popover>
-                                                                        </td>
-                                                                    );
-                                                                })}
+                                                                                    </PopoverContent>
+                                                                                </Popover>
+                                                                            </td>
+                                                                        );
+                                                                    },
+                                                                )}
                                                             </tr>
                                                         ))}
                                                     </tbody>

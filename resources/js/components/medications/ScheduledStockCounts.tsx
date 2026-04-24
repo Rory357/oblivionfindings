@@ -20,7 +20,7 @@ import {
 } from '@/lib/medication-scan';
 import axios from 'axios';
 import { AlertCircle, CheckCircle, Package, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface StockCount {
@@ -78,13 +78,7 @@ export default function ScheduledStockCounts({
         emptyMedicationScanCapture(),
     );
 
-    useEffect(() => {
-        if (open) {
-            loadCounts();
-        }
-    }, [open]);
-
-    const loadCounts = async () => {
+    const loadCounts = useCallback(async () => {
         setLoading(true);
         try {
             const response = await axios.get(
@@ -96,7 +90,13 @@ export default function ScheduledStockCounts({
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId, medicationId]);
+
+    useEffect(() => {
+        if (open) {
+            loadCounts();
+        }
+    }, [open, loadCounts]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -225,7 +225,7 @@ export default function ScheduledStockCounts({
                         ? error.response.data.error
                         : validationMessage
                           ? validationMessage
-                        : 'Failed to complete stock count',
+                          : 'Failed to complete stock count',
                 );
                 return;
             }
@@ -240,15 +240,17 @@ export default function ScheduledStockCounts({
 
     const getStatusBadge = (status: string, isOverdue: boolean) => {
         if (isOverdue) {
-            return <Badge className="bg-status-critical-bg text-status-critical">Overdue</Badge>;
+            return (
+                <Badge className="bg-status-critical-bg text-status-critical">
+                    Overdue
+                </Badge>
+            );
         }
         const colors: Record<string, string> = {
             pending: 'bg-status-warning-bg text-status-warning',
             completed: 'bg-status-success-bg text-status-success',
         };
-        return (
-            <Badge className={colors[status] || 'bg-muted'}>{status}</Badge>
-        );
+        return <Badge className={colors[status] || 'bg-muted'}>{status}</Badge>;
     };
 
     const pendingCount = counts.filter(
@@ -537,13 +539,13 @@ export default function ScheduledStockCounts({
                                                         !actualQty ||
                                                         Boolean(
                                                             controlledDrug &&
-                                                                !witnessId,
+                                                            !witnessId,
                                                         ) ||
                                                         Boolean(
                                                             scanVerification &&
-                                                                !hasVerifiedMedicationScan(
-                                                                    scanCapture,
-                                                                ),
+                                                            !hasVerifiedMedicationScan(
+                                                                scanCapture,
+                                                            ),
                                                         )
                                                     }
                                                 >

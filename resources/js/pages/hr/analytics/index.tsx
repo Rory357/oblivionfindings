@@ -1,29 +1,50 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { type BreadcrumbItem } from '@/types';
-import { BarChart2, Users, TrendingDown, Clock, ShieldCheck } from 'lucide-react';
 import {
-    LineChart,
-    Line,
-    BarChart,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head } from '@inertiajs/react';
+import {
+    BarChart2,
+    Clock,
+    ShieldCheck,
+    TrendingDown,
+    Users,
+} from 'lucide-react';
+import {
     Bar,
-    PieChart,
-    Pie,
+    BarChart,
+    CartesianGrid,
     Cell,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
     XAxis,
     YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
 } from 'recharts';
 
 type HeadcountPoint = { month: string; count: number };
-type TurnoverRate = { rate: number; separations: number; avg_headcount: number };
+type TurnoverRate = {
+    rate: number;
+    separations: number;
+    avg_headcount: number;
+};
 type TenureBracket = { bracket: string; count: number };
 type ComplianceScore = { score: number; compliant: number; total: number };
-type LeaveUtilization = { type: string; approved: number; pending: number; declined: number };
+type LeaveUtilization = {
+    type: string;
+    approved: number;
+    pending: number;
+    declined: number;
+};
 type DepartmentBreakdown = { department: string; count: number };
 
 type Props = {
@@ -50,14 +71,14 @@ const breadcrumbs: BreadcrumbItem[] = [
  * still render correctly if the custom properties are absent.
  */
 const CHART_COLORS = [
-    'hsl(var(--chart-1, 217 91% 60%))',   // blue-500
-    'hsl(var(--chart-2, 160 84% 39%))',   // emerald-500
-    'hsl(var(--chart-3, 38 92% 50%))',    // amber-500
-    'hsl(var(--chart-4, 0 84% 60%))',     // red-500
-    'hsl(var(--chart-5, 258 90% 66%))',   // violet-500
-    'hsl(var(--chart-6, 330 81% 60%))',   // pink-500
-    'hsl(var(--chart-7, 189 94% 43%))',   // cyan-500
-    'hsl(var(--chart-8, 84 81% 44%))',    // lime-500
+    'hsl(var(--chart-1, 217 91% 60%))', // blue-500
+    'hsl(var(--chart-2, 160 84% 39%))', // emerald-500
+    'hsl(var(--chart-3, 38 92% 50%))', // amber-500
+    'hsl(var(--chart-4, 0 84% 60%))', // red-500
+    'hsl(var(--chart-5, 258 90% 66%))', // violet-500
+    'hsl(var(--chart-6, 330 81% 60%))', // pink-500
+    'hsl(var(--chart-7, 189 94% 43%))', // cyan-500
+    'hsl(var(--chart-8, 84 81% 44%))', // lime-500
 ];
 
 function ChartEmptyState({ message }: { message: string }) {
@@ -85,7 +106,10 @@ export default function AnalyticsDashboard({
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                     <h1 className="text-2xl font-bold">Workforce Analytics</h1>
-                    <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                    <Badge
+                        variant="outline"
+                        className="text-xs font-normal text-muted-foreground"
+                    >
                         Showing last 12 months
                     </Badge>
                 </div>
@@ -94,48 +118,68 @@ export default function AnalyticsDashboard({
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Headcount</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Headcount
+                            </CardTitle>
                             <Users className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{currentHeadcount}</p>
-                            <p className="text-xs text-muted-foreground">Active employees</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Turnover Rate</CardTitle>
-                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">{turnoverRate.rate}%</p>
+                            <p className="text-2xl font-bold">
+                                {currentHeadcount}
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                                {turnoverRate.separations} separations (12 months)
+                                Active employees
                             </p>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Tenure</CardTitle>
-                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Turnover Rate
+                            </CardTitle>
+                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{avgTenure}</p>
-                            <p className="text-xs text-muted-foreground">Average employee tenure</p>
+                            <p className="text-2xl font-bold">
+                                {turnoverRate.rate}%
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                {turnoverRate.separations} separations (12
+                                months)
+                            </p>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Compliance</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Avg Tenure
+                            </CardTitle>
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold">{avgTenure}</p>
+                            <p className="text-xs text-muted-foreground">
+                                Average employee tenure
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Compliance
+                            </CardTitle>
                             <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{complianceScore.score}%</p>
+                            <p className="text-2xl font-bold">
+                                {complianceScore.score}%
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                                {complianceScore.compliant} of {complianceScore.total} compliant
+                                {complianceScore.compliant} of{' '}
+                                {complianceScore.total} compliant
                             </p>
                         </CardContent>
                     </Card>
@@ -146,21 +190,34 @@ export default function AnalyticsDashboard({
                     {/* Headcount Trend Line Chart */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Headcount Trend</CardTitle>
-                            <CardDescription>Monthly active employee count</CardDescription>
+                            <CardTitle className="text-base">
+                                Headcount Trend
+                            </CardTitle>
+                            <CardDescription>
+                                Monthly active employee count
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {headcountTrend.length > 0 ? (
                                 <div className="h-64">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
                                         <LineChart data={headcountTrend}>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
                                             <XAxis
                                                 dataKey="month"
                                                 tick={{ fontSize: 11 }}
                                                 className="fill-muted-foreground"
                                             />
-                                            <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                            />
                                             <Tooltip />
                                             <Line
                                                 type="monotone"
@@ -182,16 +239,33 @@ export default function AnalyticsDashboard({
                     {/* Department Breakdown Bar Chart */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Department Breakdown</CardTitle>
-                            <CardDescription>Employees per department</CardDescription>
+                            <CardTitle className="text-base">
+                                Department Breakdown
+                            </CardTitle>
+                            <CardDescription>
+                                Employees per department
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {departmentBreakdown.length > 0 ? (
                                 <div className="h-64">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={departmentBreakdown} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                            <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <BarChart
+                                            data={departmentBreakdown}
+                                            layout="vertical"
+                                        >
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
+                                            <XAxis
+                                                type="number"
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                            />
                                             <YAxis
                                                 type="category"
                                                 dataKey="department"
@@ -200,7 +274,12 @@ export default function AnalyticsDashboard({
                                                 className="fill-muted-foreground"
                                             />
                                             <Tooltip />
-                                            <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} name="Employees" />
+                                            <Bar
+                                                dataKey="count"
+                                                fill={CHART_COLORS[0]}
+                                                radius={[0, 4, 4, 0]}
+                                                name="Employees"
+                                            />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -213,13 +292,20 @@ export default function AnalyticsDashboard({
                     {/* Tenure Distribution Pie Chart */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Tenure Distribution</CardTitle>
-                            <CardDescription>Years of service breakdown</CardDescription>
+                            <CardTitle className="text-base">
+                                Tenure Distribution
+                            </CardTitle>
+                            <CardDescription>
+                                Years of service breakdown
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {tenureBrackets.length > 0 ? (
                                 <div className="h-64">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
                                         <PieChart>
                                             <Pie
                                                 data={tenureBrackets}
@@ -228,11 +314,23 @@ export default function AnalyticsDashboard({
                                                 cx="50%"
                                                 cy="50%"
                                                 outerRadius={90}
-                                                label={(props: any) => `${props.name}: ${props.value}`}
+                                                label={(props: any) =>
+                                                    `${props.name}: ${props.value}`
+                                                }
                                             >
-                                                {tenureBrackets.map((_, index) => (
-                                                    <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                                                ))}
+                                                {tenureBrackets.map(
+                                                    (_, index) => (
+                                                        <Cell
+                                                            key={index}
+                                                            fill={
+                                                                CHART_COLORS[
+                                                                    index %
+                                                                        CHART_COLORS.length
+                                                                ]
+                                                            }
+                                                        />
+                                                    ),
+                                                )}
                                             </Pie>
                                             <Tooltip />
                                         </PieChart>
@@ -247,25 +345,41 @@ export default function AnalyticsDashboard({
                     {/* Leave Utilization */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Leave Utilization</CardTitle>
-                            <CardDescription>Requests by type for the current year</CardDescription>
+                            <CardTitle className="text-base">
+                                Leave Utilization
+                            </CardTitle>
+                            <CardDescription>
+                                Requests by type for the current year
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             {leaveUtilization.length > 0 ? (
                                 <div className="space-y-3">
                                     {leaveUtilization.map((item) => (
-                                        <div key={item.type} className="flex items-center justify-between">
+                                        <div
+                                            key={item.type}
+                                            className="flex items-center justify-between"
+                                        >
                                             <span className="text-sm font-medium capitalize">
                                                 {item.type.replace(/_/g, ' ')}
                                             </span>
                                             <div className="flex gap-2">
-                                                <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-success/30 bg-status-success-bg text-status-success"
+                                                >
                                                     {item.approved} approved
                                                 </Badge>
-                                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                                >
                                                     {item.pending} pending
                                                 </Badge>
-                                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-critical/30 bg-status-critical-bg text-status-critical"
+                                                >
                                                     {item.declined} declined
                                                 </Badge>
                                             </div>
@@ -273,7 +387,9 @@ export default function AnalyticsDashboard({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="py-8 text-center text-sm text-muted-foreground">No leave data this year.</p>
+                                <p className="py-8 text-center text-sm text-muted-foreground">
+                                    No leave data this year.
+                                </p>
                             )}
                         </CardContent>
                     </Card>

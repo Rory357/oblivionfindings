@@ -1,13 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -15,18 +18,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
-import { useState, useMemo } from 'react';
-import FullCalendar from '@fullcalendar/react';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import FullCalendar from '@fullcalendar/react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -91,7 +90,12 @@ const eventTypeLabels: Record<string, string> = {
     leave: 'Leave',
 };
 
-export default function CalendarIndex({ events, leaveEvents, sites, can }: Props) {
+export default function CalendarIndex({
+    events,
+    leaveEvents,
+    sites,
+    can,
+}: Props) {
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -153,8 +157,15 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
     function handleDatesSet(info: { startStr: string; endStr: string }) {
         router.get(
             '/hr/calendar',
-            { start: info.startStr.substring(0, 10), end: info.endStr.substring(0, 10) },
-            { preserveState: true, preserveScroll: true, only: ['events', 'leaveEvents'] },
+            {
+                start: info.startStr.substring(0, 10),
+                end: info.endStr.substring(0, 10),
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                only: ['events', 'leaveEvents'],
+            },
         );
     }
 
@@ -174,9 +185,15 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
             <Head title="Company Calendar" />
 
             <PageShell>
-                <PageHeader title="Company Calendar" description="View company events, training, and approved leave.">
+                <PageHeader
+                    title="Company Calendar"
+                    description="View company events, training, and approved leave."
+                >
                     {can.manage && (
-                        <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+                        <Button
+                            size="sm"
+                            onClick={() => setShowCreateDialog(true)}
+                        >
                             <Plus className="mr-1.5 h-4 w-4" />
                             New Event
                         </Button>
@@ -186,10 +203,15 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                 {/* Legend */}
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                     {Object.entries(eventTypeLabels).map(([key, label]) => (
-                        <div key={key} className="flex items-center gap-1.5 text-xs">
+                        <div
+                            key={key}
+                            className="flex items-center gap-1.5 text-xs"
+                        >
                             <span
                                 className="inline-block h-3 w-3 rounded-full"
-                                style={{ backgroundColor: eventTypeColors[key] }}
+                                style={{
+                                    backgroundColor: eventTypeColors[key],
+                                }}
                             />
                             {label}
                         </div>
@@ -216,7 +238,10 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                 </Card>
 
                 {/* Create Event Dialog */}
-                <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                <Dialog
+                    open={showCreateDialog}
+                    onOpenChange={setShowCreateDialog}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
                             <DialogTitle>Create Calendar Event</DialogTitle>
@@ -227,24 +252,44 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                 <Label>Title</Label>
                                 <Input
                                     value={form.data.title}
-                                    onChange={(e) => form.setData('title', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('title', e.target.value)
+                                    }
                                 />
-                                {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
+                                {form.errors.title && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.title}
+                                    </p>
+                                )}
                             </div>
 
                             <div>
                                 <Label>Event Type</Label>
                                 <Select
                                     value={form.data.event_type}
-                                    onValueChange={(v) => form.setData('event_type', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('event_type', v)
+                                    }
                                 >
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="company">Company</SelectItem>
-                                        <SelectItem value="team">Team</SelectItem>
-                                        <SelectItem value="training">Training</SelectItem>
-                                        <SelectItem value="social">Social</SelectItem>
-                                        <SelectItem value="holiday">Holiday</SelectItem>
+                                        <SelectItem value="company">
+                                            Company
+                                        </SelectItem>
+                                        <SelectItem value="team">
+                                            Team
+                                        </SelectItem>
+                                        <SelectItem value="training">
+                                            Training
+                                        </SelectItem>
+                                        <SelectItem value="social">
+                                            Social
+                                        </SelectItem>
+                                        <SelectItem value="holiday">
+                                            Holiday
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -255,7 +300,12 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     <Input
                                         type="datetime-local"
                                         value={form.data.starts_at}
-                                        onChange={(e) => form.setData('starts_at', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'starts_at',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div>
@@ -263,7 +313,12 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     <Input
                                         type="datetime-local"
                                         value={form.data.ends_at}
-                                        onChange={(e) => form.setData('ends_at', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'ends_at',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
@@ -273,17 +328,29 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     type="checkbox"
                                     id="is_all_day"
                                     checked={form.data.is_all_day}
-                                    onChange={(e) => form.setData('is_all_day', e.target.checked)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'is_all_day',
+                                            e.target.checked,
+                                        )
+                                    }
                                     className="rounded border-border"
                                 />
-                                <Label htmlFor="is_all_day">All Day Event</Label>
+                                <Label htmlFor="is_all_day">
+                                    All Day Event
+                                </Label>
                             </div>
 
                             <div>
                                 <Label>Description</Label>
                                 <Textarea
                                     value={form.data.description}
-                                    onChange={(e) => form.setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                 />
                             </div>
@@ -293,14 +360,24 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     <Label>Location</Label>
                                     <Input
                                         value={form.data.location}
-                                        onChange={(e) => form.setData('location', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'location',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div>
                                     <Label>Department</Label>
                                     <Input
                                         value={form.data.department}
-                                        onChange={(e) => form.setData('department', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'department',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
@@ -310,13 +387,24 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     <Label>Site</Label>
                                     <Select
                                         value={form.data.site_id}
-                                        onValueChange={(v) => form.setData('site_id', v)}
+                                        onValueChange={(v) =>
+                                            form.setData('site_id', v)
+                                        }
                                     >
-                                        <SelectTrigger><SelectValue placeholder="Select site (optional)" /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select site (optional)" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">None</SelectItem>
+                                            <SelectItem value="">
+                                                None
+                                            </SelectItem>
                                             {sites.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
+                                                    {s.name}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -324,10 +412,17 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                             )}
 
                             <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShowCreateDialog(false)}
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={form.processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
                                     Create Event
                                 </Button>
                             </DialogFooter>

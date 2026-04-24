@@ -1,11 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -13,8 +12,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Pin, Plus, CheckCircle, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    AlertCircle,
+    AlertTriangle,
+    CheckCircle,
+    Info,
+    Pin,
+    Plus,
+} from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -46,9 +53,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Announcements', href: '/hr/announcements' },
 ];
 
-const priorityConfig: Record<string, { className: string; label: string; icon: React.ComponentType<any> }> = {
+const priorityConfig: Record<
+    string,
+    { className: string; label: string; icon: React.ComponentType<any> }
+> = {
     low: {
-        className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
         label: 'Low',
         icon: Info,
     },
@@ -58,12 +69,14 @@ const priorityConfig: Record<string, { className: string; label: string; icon: R
         icon: Info,
     },
     high: {
-        className: 'border-status-warning/30 text-status-warning bg-status-warning',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'High',
         icon: AlertTriangle,
     },
     urgent: {
-        className: 'border-status-critical/30 text-status-critical bg-status-critical',
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Urgent',
         icon: AlertCircle,
     },
@@ -72,18 +85,37 @@ const priorityConfig: Record<string, { className: string; label: string; icon: R
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
-export default function AnnouncementsIndex({ announcements, acknowledgedIds, filters, can }: Props) {
+export default function AnnouncementsIndex({
+    announcements,
+    acknowledgedIds,
+    filters,
+    can,
+}: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/announcements', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/announcements',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     function handleAcknowledge(id: number) {
-        router.post(`/hr/announcements/${id}/acknowledge`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/announcements/${id}/acknowledge`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -91,7 +123,10 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
             <Head title="Announcements" />
 
             <PageShell>
-                <PageHeader title="Announcements" description="Company-wide announcements and communications.">
+                <PageHeader
+                    title="Announcements"
+                    description="Company-wide announcements and communications."
+                >
                     {can.manage && (
                         <Link href="/hr/announcements/create">
                             <Button size="sm">
@@ -109,18 +144,32 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Priority</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Priority
+                            </Label>
                             <Select
                                 value={filters.priority ?? NONE}
-                                onValueChange={(v) => onFilter({ priority: v === NONE ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        priority: v === NONE ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="All priorities" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All priorities" />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>All Priorities</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        All Priorities
+                                    </SelectItem>
                                     <SelectItem value="low">Low</SelectItem>
-                                    <SelectItem value="normal">Normal</SelectItem>
+                                    <SelectItem value="normal">
+                                        Normal
+                                    </SelectItem>
                                     <SelectItem value="high">High</SelectItem>
-                                    <SelectItem value="urgent">Urgent</SelectItem>
+                                    <SelectItem value="urgent">
+                                        Urgent
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -130,12 +179,23 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                 {/* Announcement Feed */}
                 <div className="space-y-4">
                     {announcements.data.map((announcement) => {
-                        const config = priorityConfig[announcement.priority] ?? priorityConfig.normal;
+                        const config =
+                            priorityConfig[announcement.priority] ??
+                            priorityConfig.normal;
                         const PriorityIcon = config.icon;
-                        const isAcknowledged = acknowledgedIds.includes(announcement.id);
+                        const isAcknowledged = acknowledgedIds.includes(
+                            announcement.id,
+                        );
 
                         return (
-                            <Card key={announcement.id} className={announcement.is_pinned ? 'border-status-warning/30' : ''}>
+                            <Card
+                                key={announcement.id}
+                                className={
+                                    announcement.is_pinned
+                                        ? 'border-status-warning/30'
+                                        : ''
+                                }
+                            >
                                 <CardContent className="p-5">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
@@ -149,12 +209,17 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                                                 >
                                                     {announcement.title}
                                                 </Link>
-                                                <Badge className={config.className}>
+                                                <Badge
+                                                    className={config.className}
+                                                >
                                                     <PriorityIcon className="mr-1 h-3 w-3" />
                                                     {config.label}
                                                 </Badge>
                                                 {announcement.requires_acknowledgement && (
-                                                    <Badge variant="outline" className="text-xs">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-xs"
+                                                    >
                                                         Requires Acknowledgement
                                                     </Badge>
                                                 )}
@@ -163,29 +228,60 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                                                 {announcement.content}
                                             </p>
                                             <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                                                <span>By {announcement.creator?.name ?? 'Unknown'}</span>
-                                                <span>Published {formatDate(announcement.published_at)}</span>
+                                                <span>
+                                                    By{' '}
+                                                    {announcement.creator
+                                                        ?.name ?? 'Unknown'}
+                                                </span>
+                                                <span>
+                                                    Published{' '}
+                                                    {formatDate(
+                                                        announcement.published_at,
+                                                    )}
+                                                </span>
                                                 {announcement.expires_at && (
-                                                    <span>Expires {formatDate(announcement.expires_at)}</span>
+                                                    <span>
+                                                        Expires{' '}
+                                                        {formatDate(
+                                                            announcement.expires_at,
+                                                        )}
+                                                    </span>
                                                 )}
-                                                <span>{announcement.acknowledgements_count} acknowledged</span>
+                                                <span>
+                                                    {
+                                                        announcement.acknowledgements_count
+                                                    }{' '}
+                                                    acknowledged
+                                                </span>
                                             </div>
                                         </div>
 
                                         <div className="flex shrink-0 flex-col items-end gap-2">
-                                            <Link href={`/hr/announcements/${announcement.id}`}>
-                                                <Button size="sm" variant="outline">View</Button>
-                                            </Link>
-                                            {announcement.requires_acknowledgement && !isAcknowledged && (
+                                            <Link
+                                                href={`/hr/announcements/${announcement.id}`}
+                                            >
                                                 <Button
                                                     size="sm"
-                                                    variant="default"
-                                                    onClick={() => handleAcknowledge(announcement.id)}
+                                                    variant="outline"
                                                 >
-                                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                                    Acknowledge
+                                                    View
                                                 </Button>
-                                            )}
+                                            </Link>
+                                            {announcement.requires_acknowledgement &&
+                                                !isAcknowledged && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="default"
+                                                        onClick={() =>
+                                                            handleAcknowledge(
+                                                                announcement.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <CheckCircle className="mr-1 h-3 w-3" />
+                                                        Acknowledge
+                                                    </Button>
+                                                )}
                                             {isAcknowledged && (
                                                 <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
                                                     <CheckCircle className="mr-1 h-3 w-3" />
@@ -209,7 +305,10 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                 </div>
 
                 {/* Pagination */}
-                <LaravelPagination links={announcements?.links ?? []} className="mt-4" />
+                <LaravelPagination
+                    links={announcements?.links ?? []}
+                    className="mt-4"
+                />
             </PageShell>
         </AppLayout>
     );

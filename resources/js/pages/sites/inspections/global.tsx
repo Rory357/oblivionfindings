@@ -1,8 +1,6 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -11,7 +9,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ClipboardCheck, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ClipboardCheck,
+    Clock,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type SiteOption = {
@@ -74,81 +79,148 @@ export default function GlobalSiteInspections({
     inspectionTypes,
     filters,
 }: Props) {
-    const [siteFilter, setSiteFilter] = useState<string>(filters.site_id ? String(filters.site_id) : 'all');
-    const [inspectionTypeFilter, setInspectionTypeFilter] = useState<string>(filters.inspection_type ?? 'all');
-    const [statusFilter, setStatusFilter] = useState<string>(filters.status ?? 'all');
-    const [dueStateFilter, setDueStateFilter] = useState<string>(filters.due_state ?? 'all');
-    const [resultFilter, setResultFilter] = useState<string>(filters.result ?? 'all');
+    const [siteFilter, setSiteFilter] = useState<string>(
+        filters.site_id ? String(filters.site_id) : 'all',
+    );
+    const [inspectionTypeFilter, setInspectionTypeFilter] = useState<string>(
+        filters.inspection_type ?? 'all',
+    );
+    const [statusFilter, setStatusFilter] = useState<string>(
+        filters.status ?? 'all',
+    );
+    const [dueStateFilter, setDueStateFilter] = useState<string>(
+        filters.due_state ?? 'all',
+    );
+    const [resultFilter, setResultFilter] = useState<string>(
+        filters.result ?? 'all',
+    );
 
-    const today = new Date();
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(today.getDate() + 7);
+    const today = useMemo(() => new Date(), []);
+    const sevenDaysFromNow = useMemo(() => {
+        const date = new Date(today);
+        date.setDate(today.getDate() + 7);
+        return date;
+    }, [today]);
 
     const filteredSchedules = useMemo(() => {
         return schedules.filter((s) => {
-            if (siteFilter !== 'all' && String(s.site_id) !== siteFilter) return false;
-            if (inspectionTypeFilter !== 'all' && s.inspection_type !== inspectionTypeFilter) return false;
+            if (siteFilter !== 'all' && String(s.site_id) !== siteFilter)
+                return false;
+            if (
+                inspectionTypeFilter !== 'all' &&
+                s.inspection_type !== inspectionTypeFilter
+            )
+                return false;
             if (statusFilter === 'active' && !s.is_active) return false;
             if (statusFilter === 'inactive' && s.is_active) return false;
             if (dueStateFilter !== 'all' && s.next_due_date) {
                 const due = new Date(s.next_due_date);
                 if (dueStateFilter === 'overdue' && due >= today) return false;
-                if (dueStateFilter === 'due_soon' && (due < today || due > sevenDaysFromNow)) return false;
+                if (
+                    dueStateFilter === 'due_soon' &&
+                    (due < today || due > sevenDaysFromNow)
+                )
+                    return false;
             }
             return true;
         });
-    }, [schedules, siteFilter, inspectionTypeFilter, statusFilter, dueStateFilter, today, sevenDaysFromNow]);
+    }, [
+        schedules,
+        siteFilter,
+        inspectionTypeFilter,
+        statusFilter,
+        dueStateFilter,
+        today,
+        sevenDaysFromNow,
+    ]);
 
     const filteredRecords = useMemo(() => {
         return records.filter((r) => {
-            if (siteFilter !== 'all' && String(r.site_id) !== siteFilter) return false;
-            if (resultFilter !== 'all' && r.result !== resultFilter) return false;
+            if (siteFilter !== 'all' && String(r.site_id) !== siteFilter)
+                return false;
+            if (resultFilter !== 'all' && r.result !== resultFilter)
+                return false;
             return true;
         });
     }, [records, siteFilter, resultFilter]);
 
-    const overdueCount = filteredSchedules.filter((s) => s.next_due_date && new Date(s.next_due_date) < today).length;
-    const dueSoonCount = filteredSchedules.filter((s) => s.next_due_date && new Date(s.next_due_date) >= today && new Date(s.next_due_date) <= sevenDaysFromNow).length;
-    const completedPassCount = filteredRecords.filter((r) => r.result === 'pass').length;
+    const overdueCount = filteredSchedules.filter(
+        (s) => s.next_due_date && new Date(s.next_due_date) < today,
+    ).length;
+    const dueSoonCount = filteredSchedules.filter(
+        (s) =>
+            s.next_due_date &&
+            new Date(s.next_due_date) >= today &&
+            new Date(s.next_due_date) <= sevenDaysFromNow,
+    ).length;
+    const completedPassCount = filteredRecords.filter(
+        (r) => r.result === 'pass',
+    ).length;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: 'Inspections & Maintenance', href: '/sites/inspections' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                {
+                    title: 'Inspections & Maintenance',
+                    href: '/sites/inspections',
+                },
+            ]}
+        >
             <Head title="Inspections & Maintenance" />
 
             <div className="m-4 space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <ClipboardCheck className="w-5 h-5" />
+                        <h1 className="flex items-center gap-2 text-lg font-semibold">
+                            <ClipboardCheck className="h-5 w-5" />
                             Inspections & Maintenance
                         </h1>
-                        <p className="text-sm text-muted-foreground">All sites</p>
+                        <p className="text-sm text-muted-foreground">
+                            All sites
+                        </p>
                     </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{filteredSchedules.length}</div>
-                            <div className="text-sm text-muted-foreground">Schedules</div>
+                            <div className="text-2xl font-bold">
+                                {filteredSchedules.length}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Schedules
+                            </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
+                    <Card className="border-status-critical/20 bg-status-critical">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">{overdueCount}</div>
-                            <div className="text-sm text-muted-foreground">Overdue</div>
+                            <div className="text-2xl font-bold text-status-critical">
+                                {overdueCount}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Overdue
+                            </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-warning border-status-warning/20">
+                    <Card className="border-status-warning/20 bg-status-warning">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning">{dueSoonCount}</div>
-                            <div className="text-sm text-muted-foreground">Due In 7 Days</div>
+                            <div className="text-2xl font-bold text-status-warning">
+                                {dueSoonCount}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Due In 7 Days
+                            </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-success border-status-success/20">
+                    <Card className="border-status-success/20 bg-status-success">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">{completedPassCount}</div>
-                            <div className="text-sm text-muted-foreground">Passed Records</div>
+                            <div className="text-2xl font-bold text-status-success">
+                                {completedPassCount}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Passed Records
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -161,14 +233,22 @@ export default function GlobalSiteInspections({
                         <div className="grid gap-3 md:grid-cols-5">
                             <div>
                                 <Label className="text-xs">Site</Label>
-                                <Select value={siteFilter} onValueChange={setSiteFilter}>
+                                <Select
+                                    value={siteFilter}
+                                    onValueChange={setSiteFilter}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Sites</SelectItem>
+                                        <SelectItem value="all">
+                                            All Sites
+                                        </SelectItem>
                                         {sites.map((site) => (
-                                            <SelectItem key={site.id} value={String(site.id)}>
+                                            <SelectItem
+                                                key={site.id}
+                                                value={String(site.id)}
+                                            >
                                                 {site.name}
                                             </SelectItem>
                                         ))}
@@ -176,13 +256,20 @@ export default function GlobalSiteInspections({
                                 </Select>
                             </div>
                             <div>
-                                <Label className="text-xs">Inspection Type</Label>
-                                <Select value={inspectionTypeFilter} onValueChange={setInspectionTypeFilter}>
+                                <Label className="text-xs">
+                                    Inspection Type
+                                </Label>
+                                <Select
+                                    value={inspectionTypeFilter}
+                                    onValueChange={setInspectionTypeFilter}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
+                                        <SelectItem value="all">
+                                            All Types
+                                        </SelectItem>
                                         {inspectionTypes.map((type) => (
                                             <SelectItem key={type} value={type}>
                                                 {type}
@@ -192,42 +279,67 @@ export default function GlobalSiteInspections({
                                 </Select>
                             </div>
                             <div>
-                                <Label className="text-xs">Schedule Status</Label>
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <Label className="text-xs">
+                                    Schedule Status
+                                </Label>
+                                <Select
+                                    value={statusFilter}
+                                    onValueChange={setStatusFilter}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="active">Active</SelectItem>
-                                        <SelectItem value="inactive">Inactive</SelectItem>
+                                        <SelectItem value="active">
+                                            Active
+                                        </SelectItem>
+                                        <SelectItem value="inactive">
+                                            Inactive
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
                                 <Label className="text-xs">Due State</Label>
-                                <Select value={dueStateFilter} onValueChange={setDueStateFilter}>
+                                <Select
+                                    value={dueStateFilter}
+                                    onValueChange={setDueStateFilter}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="overdue">Overdue</SelectItem>
-                                        <SelectItem value="due_soon">Due Soon</SelectItem>
+                                        <SelectItem value="overdue">
+                                            Overdue
+                                        </SelectItem>
+                                        <SelectItem value="due_soon">
+                                            Due Soon
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
                                 <Label className="text-xs">Record Result</Label>
-                                <Select value={resultFilter} onValueChange={setResultFilter}>
+                                <Select
+                                    value={resultFilter}
+                                    onValueChange={setResultFilter}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="pass">Pass</SelectItem>
-                                        <SelectItem value="fail">Fail</SelectItem>
-                                        <SelectItem value="partial">Partial</SelectItem>
+                                        <SelectItem value="pass">
+                                            Pass
+                                        </SelectItem>
+                                        <SelectItem value="fail">
+                                            Fail
+                                        </SelectItem>
+                                        <SelectItem value="partial">
+                                            Partial
+                                        </SelectItem>
                                         <SelectItem value="na">N/A</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -238,46 +350,81 @@ export default function GlobalSiteInspections({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Schedules ({filteredSchedules.length})</CardTitle>
+                        <CardTitle className="text-base">
+                            Schedules ({filteredSchedules.length})
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {filteredSchedules.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">No inspection schedules match your filters.</div>
+                            <div className="py-8 text-center text-muted-foreground">
+                                No inspection schedules match your filters.
+                            </div>
                         ) : (
                             <div className="space-y-2">
                                 {filteredSchedules.map((schedule) => {
-                                    const overdue = !!schedule.next_due_date && new Date(schedule.next_due_date) < today;
+                                    const overdue =
+                                        !!schedule.next_due_date &&
+                                        new Date(schedule.next_due_date) <
+                                            today;
                                     return (
-                                        <div key={schedule.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
+                                        <div
+                                            key={schedule.id}
+                                            className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                        >
                                             <div>
-                                                <div className="font-medium">{schedule.title}</div>
-                                                <div className="text-sm text-muted-foreground">
-                                                    {schedule.site_name} • {schedule.inspection_type} • {schedule.frequency}
+                                                <div className="font-medium">
+                                                    {schedule.title}
                                                 </div>
-                                                <div className="text-xs text-muted-foreground mt-1">
-                                                    {schedule.assigned_to_name ? `Assigned: ${schedule.assigned_to_name} • ` : ''}
-                                                    Due: {schedule.next_due_date ?? '—'}
+                                                <div className="text-sm text-muted-foreground">
+                                                    {schedule.site_name} •{' '}
+                                                    {schedule.inspection_type} •{' '}
+                                                    {schedule.frequency}
+                                                </div>
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    {schedule.assigned_to_name
+                                                        ? `Assigned: ${schedule.assigned_to_name} • `
+                                                        : ''}
+                                                    Due:{' '}
+                                                    {schedule.next_due_date ??
+                                                        '—'}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {!schedule.is_active && (
-                                                    <Badge variant="outline" className="border-border/30 text-muted-foreground">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-border/30 text-muted-foreground"
+                                                    >
                                                         Inactive
                                                     </Badge>
                                                 )}
                                                 {overdue ? (
-                                                    <Badge variant="outline" className="border-status-critical/30 text-status-critical bg-status-critical">
-                                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-status-critical/30 bg-status-critical text-status-critical"
+                                                    >
+                                                        <AlertTriangle className="mr-1 h-3 w-3" />
                                                         Overdue
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="border-border/30 text-muted-foreground">
-                                                        <Clock className="w-3 h-3 mr-1" />
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-border/30 text-muted-foreground"
+                                                    >
+                                                        <Clock className="mr-1 h-3 w-3" />
                                                         Scheduled
                                                     </Badge>
                                                 )}
-                                                <Button asChild size="sm" variant="outline">
-                                                    <Link href={`/sites/${schedule.site_id}/inspections`}>Open Site</Link>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <Link
+                                                        href={`/sites/${schedule.site_id}/inspections`}
+                                                    >
+                                                        Open Site
+                                                    </Link>
                                                 </Button>
                                             </div>
                                         </div>
@@ -290,34 +437,67 @@ export default function GlobalSiteInspections({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Recent Records ({filteredRecords.length})</CardTitle>
+                        <CardTitle className="text-base">
+                            Recent Records ({filteredRecords.length})
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {filteredRecords.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">No records match your filters.</div>
+                            <div className="py-8 text-center text-muted-foreground">
+                                No records match your filters.
+                            </div>
                         ) : (
                             <div className="space-y-2">
                                 {filteredRecords.map((record) => (
-                                    <div key={record.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
+                                    <div
+                                        key={record.id}
+                                        className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                    >
                                         <div>
-                                            <div className="font-medium">{record.schedule_title || 'Inspection record'}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {record.site_name} • Due {record.due_date ?? '—'}
+                                            <div className="font-medium">
+                                                {record.schedule_title ||
+                                                    'Inspection record'}
                                             </div>
-                                            <div className="text-xs text-muted-foreground mt-1">
-                                                Completed: {record.completed_at ?? '—'}
-                                                {record.completed_by_name ? ` • By ${record.completed_by_name}` : ''}
+                                            <div className="text-sm text-muted-foreground">
+                                                {record.site_name} • Due{' '}
+                                                {record.due_date ?? '—'}
+                                            </div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                Completed:{' '}
+                                                {record.completed_at ?? '—'}
+                                                {record.completed_by_name
+                                                    ? ` • By ${record.completed_by_name}`
+                                                    : ''}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {record.result && (
-                                                <Badge variant="outline" className={resultColors[record.result] || 'border-border/30 text-muted-foreground'}>
-                                                    {record.result === 'pass' ? <CheckCircle2 className="w-3 h-3 mr-1" /> : null}
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        resultColors[
+                                                            record.result
+                                                        ] ||
+                                                        'border-border/30 text-muted-foreground'
+                                                    }
+                                                >
+                                                    {record.result ===
+                                                    'pass' ? (
+                                                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                                                    ) : null}
                                                     {record.result.toUpperCase()}
                                                 </Badge>
                                             )}
-                                            <Button asChild size="sm" variant="outline">
-                                                <Link href={`/sites/${record.site_id}/inspections`}>Open Site</Link>
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="outline"
+                                            >
+                                                <Link
+                                                    href={`/sites/${record.site_id}/inspections`}
+                                                >
+                                                    Open Site
+                                                </Link>
                                             </Button>
                                         </div>
                                     </div>

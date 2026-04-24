@@ -1,14 +1,26 @@
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Head, Link, router } from '@inertiajs/react';
-import { FileText, Search, Plus, CheckCircle, ShieldCheck } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { CheckCircle, FileText, Plus, ShieldCheck } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -47,32 +59,46 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDate = (value?: string | null) => {
     if (!value) return 'Not set';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-        'employment': 'bg-status-info-bg text-status-info border-status-info/30',
-        'health_and_safety': 'bg-status-success-bg text-status-success border-status-success/30',
-        'safeguarding': 'bg-primary/10 text-primary border-primary',
-        'data_protection': 'bg-status-warning-bg text-status-warning border-status-warning/30',
-        'conduct': 'bg-status-critical-bg text-status-critical border-status-critical/30',
-        'leave': 'bg-status-info-bg text-status-info border-status-info/30',
-        'training': 'bg-primary/10 text-primary border-primary',
-        'general': 'bg-muted text-foreground border-border',
+        employment: 'bg-status-info-bg text-status-info border-status-info/30',
+        health_and_safety:
+            'bg-status-success-bg text-status-success border-status-success/30',
+        safeguarding: 'bg-primary/10 text-primary border-primary',
+        data_protection:
+            'bg-status-warning-bg text-status-warning border-status-warning/30',
+        conduct:
+            'bg-status-critical-bg text-status-critical border-status-critical/30',
+        leave: 'bg-status-info-bg text-status-info border-status-info/30',
+        training: 'bg-primary/10 text-primary border-primary',
+        general: 'bg-muted text-foreground border-border',
     };
     return colors[category] || 'bg-muted text-foreground border-border';
 };
 
-export default function PoliciesIndex({ policies, categories, filters, can }: Props) {
+export default function PoliciesIndex({
+    policies,
+    categories,
+    filters,
+    can,
+}: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/policies', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/policies',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -82,9 +108,12 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">Policy Library</h1>
+                        <h1 className="text-lg font-semibold">
+                            Policy Library
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
-                            Organisation policies, procedures, and staff attestations
+                            Organisation policies, procedures, and staff
+                            attestations
                         </div>
                     </div>
 
@@ -112,16 +141,30 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Category</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Category
+                            </Label>
                             <Select
                                 value={filters.category ?? NONE}
-                                onValueChange={(v) => onFilter({ category: v === NONE ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        category: v === NONE ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All categories" />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>All Categories</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        All Categories
+                                    </SelectItem>
                                     {categories.map((c) => (
-                                        <SelectItem key={c} value={c} className="capitalize">
+                                        <SelectItem
+                                            key={c}
+                                            value={c}
+                                            className="capitalize"
+                                        >
                                             {c.replace(/_/g, ' ')}
                                         </SelectItem>
                                     ))}
@@ -130,20 +173,38 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
-                                value={filters.active_only === true || filters.active_only === 'true' ? 'active' : filters.active_only === false || filters.active_only === 'false' ? 'inactive' : NONE}
+                                value={
+                                    filters.active_only === true ||
+                                    filters.active_only === 'true'
+                                        ? 'active'
+                                        : filters.active_only === false ||
+                                            filters.active_only === 'false'
+                                          ? 'inactive'
+                                          : NONE
+                                }
                                 onValueChange={(v) => {
-                                    if (v === NONE) onFilter({ active_only: null });
-                                    else if (v === 'active') onFilter({ active_only: 'true' });
+                                    if (v === NONE)
+                                        onFilter({ active_only: null });
+                                    else if (v === 'active')
+                                        onFilter({ active_only: 'true' });
                                     else onFilter({ active_only: 'false' });
                                 }}
                             >
-                                <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={NONE}>All</SelectItem>
-                                    <SelectItem value="active">Active Only</SelectItem>
-                                    <SelectItem value="inactive">Inactive Only</SelectItem>
+                                    <SelectItem value="active">
+                                        Active Only
+                                    </SelectItem>
+                                    <SelectItem value="inactive">
+                                        Inactive Only
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -170,22 +231,34 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 <FileText className="h-4 w-4 text-muted-foreground" />
-                                                <span className="font-medium">{policy.title}</span>
+                                                <span className="font-medium">
+                                                    {policy.title}
+                                                </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={getCategoryColor(policy.category)}>
-                                                {policy.category.replace(/_/g, ' ')}
+                                            <Badge
+                                                className={getCategoryColor(
+                                                    policy.category,
+                                                )}
+                                            >
+                                                {policy.category.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
                                             {policy.is_active ? (
-                                                <Badge className="bg-status-success-bg text-status-success border-status-success/30">
+                                                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
                                                     <CheckCircle className="mr-1 h-3 w-3" />
                                                     Active
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="text-muted-foreground">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-muted-foreground"
+                                                >
                                                     Inactive
                                                 </Badge>
                                             )}
@@ -193,25 +266,39 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                                         <TableCell>
                                             {policy.current_version ? (
                                                 <span className="text-sm font-medium">
-                                                    v{policy.current_version.version_number}
+                                                    v
+                                                    {
+                                                        policy.current_version
+                                                            .version_number
+                                                    }
                                                 </span>
                                             ) : (
-                                                <span className="text-sm text-muted-foreground">No version</span>
+                                                <span className="text-sm text-muted-foreground">
+                                                    No version
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell>
                                             {policy.current_version
-                                                ? formatDate(policy.current_version.effective_from)
+                                                ? formatDate(
+                                                      policy.current_version
+                                                          .effective_from,
+                                                  )
                                                 : '--'}
                                         </TableCell>
                                         <TableCell>
                                             {policy.requires_attestation ? (
-                                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                                >
                                                     <ShieldCheck className="mr-1 h-3 w-3" />
                                                     Required
                                                 </Badge>
                                             ) : (
-                                                <span className="text-xs text-muted-foreground">Not required</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Not required
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell>
@@ -226,7 +313,10 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                                 ))}
                                 {!policies.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No policies found.
                                         </TableCell>
                                     </TableRow>

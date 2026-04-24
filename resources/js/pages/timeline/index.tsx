@@ -248,7 +248,8 @@ export default function TimelineIndex(props: Props) {
                 )}
 
                 {/* Filters */}
-                <div className="space-y-2 rounded-xl border bg-card p-3 shadow-sm">
+                <Card className="shadow-sm">
+                    <CardContent className="space-y-2 p-3">
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="relative flex-1">
                             <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -315,7 +316,8 @@ export default function TimelineIndex(props: Props) {
                             {filteredEvents.length !== 1 ? 's' : ''}
                         </span>
                     </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Add Note Form */}
                 {showAddNote && (

@@ -359,25 +359,25 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                                     {statusFilter !== 'all' && (
                                         <Badge variant="secondary" className="gap-1">
                                             Status: {statusFilter}
-                                            <button onClick={() => { setStatusFilter('all'); applyFilters(); }}>
+                                            <Button variant="ghost" size="icon" className="size-5" onClick={() => { setStatusFilter('all'); applyFilters(); }}>
                                                 <X className="h-3 w-3" />
-                                            </button>
+                                            </Button>
                                         </Badge>
                                     )}
                                     {typeFilter !== 'all' && (
                                         <Badge variant="secondary" className="gap-1">
                                             Type: {typeFilter}
-                                            <button onClick={() => { setTypeFilter('all'); applyFilters(); }}>
+                                            <Button variant="ghost" size="icon" className="size-5" onClick={() => { setTypeFilter('all'); applyFilters(); }}>
                                                 <X className="h-3 w-3" />
-                                            </button>
+                                            </Button>
                                         </Badge>
                                     )}
                                     {roleFilter !== 'all' && (
                                         <Badge variant="secondary" className="gap-1">
                                             Role: {roles.find((r) => String(r.id) === roleFilter)?.label}
-                                            <button onClick={() => { setRoleFilter('all'); applyFilters(); }}>
+                                            <Button variant="ghost" size="icon" className="size-5" onClick={() => { setRoleFilter('all'); applyFilters(); }}>
                                                 <X className="h-3 w-3" />
-                                            </button>
+                                            </Button>
                                         </Badge>
                                     )}
                                 </div>

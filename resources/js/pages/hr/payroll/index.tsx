@@ -12,14 +12,20 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface PayrollRun {
     id: number;
@@ -32,7 +38,11 @@ interface PayrollRun {
     created_at: string;
     locked_at: string | null;
     exported_at: string | null;
-    export_profile: { id: number; name: string; provider_key: string | null } | null;
+    export_profile: {
+        id: number;
+        name: string;
+        provider_key: string | null;
+    } | null;
     validation_errors: string[];
 }
 
@@ -75,7 +85,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
-        className: 'border-status-warning/30 text-status-warning bg-status-warning',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Draft',
     },
     locked: {
@@ -83,7 +94,8 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         label: 'Locked',
     },
     exported: {
-        className: 'border-status-success/30 text-status-success bg-status-success',
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
         label: 'Exported',
     },
 };
@@ -119,13 +131,24 @@ function formatDate(value: string | null): string {
     }).format(date);
 }
 
-export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }: Props) {
+export default function PayrollIndex({
+    runs,
+    profiles,
+    exportFieldOptions,
+    can,
+}: Props) {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
-    const [editingProfileId, setEditingProfileId] = useState<number | null>(null);
-    const [selectedProfileByRun, setSelectedProfileByRun] = useState<Record<number, string>>({});
+    const [editingProfileId, setEditingProfileId] = useState<number | null>(
+        null,
+    );
+    const [selectedProfileByRun, setSelectedProfileByRun] = useState<
+        Record<number, string>
+    >({});
     const [profileSubmitting, setProfileSubmitting] = useState(false);
-    const [profileJsonError, setProfileJsonError] = useState<string | null>(null);
+    const [profileJsonError, setProfileJsonError] = useState<string | null>(
+        null,
+    );
     const page = usePage<{ errors?: Record<string, string | string[]> }>();
     const { data, setData, post, processing, errors, clearErrors, reset } =
         useForm({
@@ -154,11 +177,16 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
     const lockError = page.props?.errors?.lock;
     const periodError = page.props?.errors?.period;
     const exportError = page.props?.errors?.export;
-    const profileMappingsError = (profileErrors as Record<string, string | undefined>).mappings;
-    const defaultProfile = profiles.find((profile) => profile.is_default) ?? null;
+    const profileMappingsError = (
+        profileErrors as Record<string, string | undefined>
+    ).mappings;
+    const defaultProfile =
+        profiles.find((profile) => profile.is_default) ?? null;
 
     function handleExport(runId: number) {
-        const selectedProfileId = selectedProfileByRun[runId] || (defaultProfile ? String(defaultProfile.id) : '');
+        const selectedProfileId =
+            selectedProfileByRun[runId] ||
+            (defaultProfile ? String(defaultProfile.id) : '');
         router.post(
             `/hr/payroll/runs/${runId}/export`,
             selectedProfileId ? { profile_id: Number(selectedProfileId) } : {},
@@ -216,7 +244,12 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
             description: profile.description ?? '',
             delimiter: profile.delimiter || ',',
             enclosure: profile.enclosure || '"',
-            line_ending: profile.line_ending === '\r\n' ? '\\r\\n' : profile.line_ending === '\r' ? '\\r' : '\\n',
+            line_ending:
+                profile.line_ending === '\r\n'
+                    ? '\\r\\n'
+                    : profile.line_ending === '\r'
+                      ? '\\r'
+                      : '\\n',
             include_headers: profile.include_headers,
             is_default: profile.is_default,
             mappings_json: JSON.stringify(profile.mappings ?? [], null, 2),
@@ -225,7 +258,11 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
     }
 
     function handleSetDefaultProfile(profileId: number) {
-        router.post(`/hr/payroll/export-profiles/${profileId}/set-default`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/payroll/export-profiles/${profileId}/set-default`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     function handleProfileSubmit(event: FormEvent) {
@@ -255,14 +292,18 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
         setProfileSubmitting(true);
 
         if (editingProfileId) {
-            router.put(`/hr/payroll/export-profiles/${editingProfileId}`, payload, {
-                preserveScroll: true,
-                onFinish: () => setProfileSubmitting(false),
-                onSuccess: () => {
-                    setIsProfileDialogOpen(false);
-                    setEditingProfileId(null);
+            router.put(
+                `/hr/payroll/export-profiles/${editingProfileId}`,
+                payload,
+                {
+                    preserveScroll: true,
+                    onFinish: () => setProfileSubmitting(false),
+                    onSuccess: () => {
+                        setIsProfileDialogOpen(false);
+                        setEditingProfileId(null);
+                    },
                 },
-            });
+            );
             return;
         }
 
@@ -417,32 +458,61 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                     </DialogContent>
                 </Dialog>
 
-                <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+                <Dialog
+                    open={isProfileDialogOpen}
+                    onOpenChange={setIsProfileDialogOpen}
+                >
                     <DialogContent className="sm:max-w-2xl">
                         <DialogHeader>
-                            <DialogTitle>{editingProfileId ? 'Edit Export Profile' : 'Create Export Profile'}</DialogTitle>
+                            <DialogTitle>
+                                {editingProfileId
+                                    ? 'Edit Export Profile'
+                                    : 'Create Export Profile'}
+                            </DialogTitle>
                             <DialogDescription>
-                                Configure payroll export columns and separators for your payroll provider.
+                                Configure payroll export columns and separators
+                                for your payroll provider.
                             </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleProfileSubmit} className="space-y-4">
+                        <form
+                            onSubmit={handleProfileSubmit}
+                            className="space-y-4"
+                        >
                             <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="profile_name">Profile name</Label>
+                                    <Label htmlFor="profile_name">
+                                        Profile name
+                                    </Label>
                                     <Input
                                         id="profile_name"
                                         value={profileData.name}
-                                        onChange={(event) => setProfileData('name', event.target.value)}
+                                        onChange={(event) =>
+                                            setProfileData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
                                         required
                                     />
-                                    {profileErrors.name && <p className="text-xs text-status-critical">{profileErrors.name}</p>}
+                                    {profileErrors.name && (
+                                        <p className="text-xs text-status-critical">
+                                            {profileErrors.name}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="provider_key">Provider key (optional)</Label>
+                                    <Label htmlFor="provider_key">
+                                        Provider key (optional)
+                                    </Label>
                                     <Input
                                         id="provider_key"
                                         value={profileData.provider_key}
-                                        onChange={(event) => setProfileData('provider_key', event.target.value)}
+                                        onChange={(event) =>
+                                            setProfileData(
+                                                'provider_key',
+                                                event.target.value,
+                                            )
+                                        }
                                         placeholder="myob, xero, custom"
                                     />
                                 </div>
@@ -451,37 +521,68 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                     <Input
                                         id="delimiter"
                                         value={profileData.delimiter}
-                                        onChange={(event) => setProfileData('delimiter', event.target.value)}
+                                        onChange={(event) =>
+                                            setProfileData(
+                                                'delimiter',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="enclosure">Text enclosure</Label>
+                                    <Label htmlFor="enclosure">
+                                        Text enclosure
+                                    </Label>
                                     <Input
                                         id="enclosure"
                                         value={profileData.enclosure}
-                                        onChange={(event) => setProfileData('enclosure', event.target.value)}
+                                        onChange={(event) =>
+                                            setProfileData(
+                                                'enclosure',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="line_ending">Line ending</Label>
+                                    <Label htmlFor="line_ending">
+                                        Line ending
+                                    </Label>
                                     <Select
                                         value={profileData.line_ending}
-                                        onValueChange={(value) => setProfileData('line_ending', value)}
+                                        onValueChange={(value) =>
+                                            setProfileData('line_ending', value)
+                                        }
                                     >
-                                        <SelectTrigger id="line_ending"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger id="line_ending">
+                                            <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="\\n">LF (\n)</SelectItem>
-                                            <SelectItem value="\\r\\n">CRLF (\r\n)</SelectItem>
-                                            <SelectItem value="\\r">CR (\r)</SelectItem>
+                                            <SelectItem value="\\n">
+                                                LF (\n)
+                                            </SelectItem>
+                                            <SelectItem value="\\r\\n">
+                                                CRLF (\r\n)
+                                            </SelectItem>
+                                            <SelectItem value="\\r">
+                                                CR (\r)
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description">
+                                        Description
+                                    </Label>
                                     <Input
                                         id="description"
                                         value={profileData.description}
-                                        onChange={(event) => setProfileData('description', event.target.value)}
+                                        onChange={(event) =>
+                                            setProfileData(
+                                                'description',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
@@ -489,40 +590,82 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                 <label className="flex items-center gap-2 text-sm">
                                     <Checkbox
                                         checked={profileData.include_headers}
-                                        onCheckedChange={(checked) => setProfileData('include_headers', Boolean(checked))}
+                                        onCheckedChange={(checked) =>
+                                            setProfileData(
+                                                'include_headers',
+                                                Boolean(checked),
+                                            )
+                                        }
                                     />
                                     <span>Include headers</span>
                                 </label>
                                 <label className="flex items-center gap-2 text-sm">
                                     <Checkbox
                                         checked={profileData.is_default}
-                                        onCheckedChange={(checked) => setProfileData('is_default', Boolean(checked))}
+                                        onCheckedChange={(checked) =>
+                                            setProfileData(
+                                                'is_default',
+                                                Boolean(checked),
+                                            )
+                                        }
                                     />
                                     <span>Set as default profile</span>
                                 </label>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="mappings_json">Mappings JSON</Label>
+                                <Label htmlFor="mappings_json">
+                                    Mappings JSON
+                                </Label>
                                 <Textarea
                                     id="mappings_json"
                                     rows={10}
                                     value={profileData.mappings_json}
-                                    onChange={(event) => setProfileData('mappings_json', event.target.value)}
+                                    onChange={(event) =>
+                                        setProfileData(
+                                            'mappings_json',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Use field sources: {exportFieldOptions.map((field) => field.value).join(', ')}, plus <code>static</code>.
+                                    Use field sources:{' '}
+                                    {exportFieldOptions
+                                        .map((field) => field.value)
+                                        .join(', ')}
+                                    , plus <code>static</code>.
                                 </p>
-                                {(profileErrors.mappings_json || profileMappingsError) && (
-                                    <p className="text-xs text-status-critical">{profileErrors.mappings_json || profileMappingsError}</p>
+                                {(profileErrors.mappings_json ||
+                                    profileMappingsError) && (
+                                    <p className="text-xs text-status-critical">
+                                        {profileErrors.mappings_json ||
+                                            profileMappingsError}
+                                    </p>
                                 )}
-                                {profileJsonError && <p className="text-xs text-status-critical">{profileJsonError}</p>}
+                                {profileJsonError && (
+                                    <p className="text-xs text-status-critical">
+                                        {profileJsonError}
+                                    </p>
+                                )}
                             </div>
                             <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setIsProfileDialogOpen(false)}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setIsProfileDialogOpen(false)
+                                    }
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={profileSubmitting}>
-                                    {profileSubmitting ? 'Saving...' : editingProfileId ? 'Update Profile' : 'Create Profile'}
+                                <Button
+                                    type="submit"
+                                    disabled={profileSubmitting}
+                                >
+                                    {profileSubmitting
+                                        ? 'Saving...'
+                                        : editingProfileId
+                                          ? 'Update Profile'
+                                          : 'Create Profile'}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -532,9 +675,14 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                 <Card>
                     <CardContent className="py-4">
                         <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-base font-semibold">Payroll Export Profiles</h2>
+                            <h2 className="text-base font-semibold">
+                                Payroll Export Profiles
+                            </h2>
                             {can.manage && (
-                                <Button variant="outline" onClick={openCreateProfileDialog}>
+                                <Button
+                                    variant="outline"
+                                    onClick={openCreateProfileDialog}
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
                                     New Export Profile
                                 </Button>
@@ -542,33 +690,65 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                         </div>
                         {profiles.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
-                                No export profiles configured yet. The default payroll CSV schema will be used.
+                                No export profiles configured yet. The default
+                                payroll CSV schema will be used.
                             </p>
                         ) : (
                             <div className="space-y-2">
                                 {profiles.map((profile) => (
-                                    <div key={profile.id} className="flex items-center justify-between rounded-md border p-3">
+                                    <div
+                                        key={profile.id}
+                                        className="flex items-center justify-between rounded-md border p-3"
+                                    >
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium">{profile.name}</span>
-                                                {profile.is_default && <Badge variant="outline">Default</Badge>}
+                                                <span className="font-medium">
+                                                    {profile.name}
+                                                </span>
+                                                {profile.is_default && (
+                                                    <Badge variant="outline">
+                                                        Default
+                                                    </Badge>
+                                                )}
                                                 {profile.provider_key ? (
-                                                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-xs text-muted-foreground"
+                                                    >
                                                         {profile.provider_key}
                                                     </Badge>
                                                 ) : null}
                                             </div>
                                             <p className="text-xs text-muted-foreground">
-                                                {profile.mappings?.length ?? 0} mappings, delimiter "{profile.delimiter}", enclosure "{profile.enclosure}"
+                                                {profile.mappings?.length ?? 0}{' '}
+                                                mappings, delimiter "
+                                                {profile.delimiter}", enclosure
+                                                "{profile.enclosure}"
                                             </p>
                                         </div>
                                         {can.manage && (
                                             <div className="flex items-center gap-2">
-                                                <Button variant="outline" size="sm" onClick={() => openEditProfileDialog(profile)}>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openEditProfileDialog(
+                                                            profile,
+                                                        )
+                                                    }
+                                                >
                                                     Edit
                                                 </Button>
                                                 {!profile.is_default && (
-                                                    <Button variant="outline" size="sm" onClick={() => handleSetDefaultProfile(profile.id)}>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleSetDefaultProfile(
+                                                                profile.id,
+                                                            )
+                                                        }
+                                                    >
                                                         Set Default
                                                     </Button>
                                                 )}
@@ -688,28 +868,56 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                                         run.status ===
                                                             'locked' && (
                                                             <div className="flex items-center gap-2">
-                                                                {profiles.length > 0 && (
+                                                                {profiles.length >
+                                                                    0 && (
                                                                     <Select
                                                                         value={
-                                                                            selectedProfileByRun[run.id]
-                                                                            || (defaultProfile ? String(defaultProfile.id) : undefined)
+                                                                            selectedProfileByRun[
+                                                                                run
+                                                                                    .id
+                                                                            ] ||
+                                                                            (defaultProfile
+                                                                                ? String(
+                                                                                      defaultProfile.id,
+                                                                                  )
+                                                                                : undefined)
                                                                         }
-                                                                        onValueChange={(value) =>
-                                                                            setSelectedProfileByRun((previous) => ({
-                                                                                ...previous,
-                                                                                [run.id]: value,
-                                                                            }))
+                                                                        onValueChange={(
+                                                                            value,
+                                                                        ) =>
+                                                                            setSelectedProfileByRun(
+                                                                                (
+                                                                                    previous,
+                                                                                ) => ({
+                                                                                    ...previous,
+                                                                                    [run.id]:
+                                                                                        value,
+                                                                                }),
+                                                                            )
                                                                         }
                                                                     >
                                                                         <SelectTrigger className="h-8 w-[180px]">
                                                                             <SelectValue placeholder="Default mapping" />
                                                                         </SelectTrigger>
                                                                         <SelectContent>
-                                                                            {profiles.map((profile) => (
-                                                                                <SelectItem key={profile.id} value={String(profile.id)}>
-                                                                                    {profile.name}
-                                                                                </SelectItem>
-                                                                            ))}
+                                                                            {profiles.map(
+                                                                                (
+                                                                                    profile,
+                                                                                ) => (
+                                                                                    <SelectItem
+                                                                                        key={
+                                                                                            profile.id
+                                                                                        }
+                                                                                        value={String(
+                                                                                            profile.id,
+                                                                                        )}
+                                                                                    >
+                                                                                        {
+                                                                                            profile.name
+                                                                                        }
+                                                                                    </SelectItem>
+                                                                                ),
+                                                                            )}
                                                                         </SelectContent>
                                                                     </Select>
                                                                 )}

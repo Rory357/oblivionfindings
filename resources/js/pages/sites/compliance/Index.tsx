@@ -1,20 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
+import { OpsStatCard } from '@/components/ops-stat-card';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { OpsStatCard } from '@/components/ops-stat-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -22,21 +11,32 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Head, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-    Shield,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import {
     AlertTriangle,
-    CheckCircle2,
-    Clock,
     Calendar,
-    Plus,
-    FileCheck,
-    Pencil,
-    Trash2,
+    CheckCircle2,
     ChevronDown,
     ChevronUp,
+    Clock,
+    FileCheck,
+    Pencil,
+    Plus,
+    Shield,
+    Trash2,
 } from 'lucide-react';
+import { useState } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -139,7 +139,9 @@ function daysUntil(d?: string | null): number | null {
     now.setHours(0, 0, 0, 0);
     const target = new Date(d);
     target.setHours(0, 0, 0, 0);
-    return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+        (target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
 }
 
 function statusBorderColor(status: string): string {
@@ -192,9 +194,7 @@ function riskBadgeClass(rating?: string): string {
 }
 
 function certTypeLabel(t: string): string {
-    return t
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -222,10 +222,14 @@ export default function SiteComplianceIndex({
     const [showAddCert, setShowAddCert] = useState(false);
     const [showScheduleCheck, setShowScheduleCheck] = useState(false);
     const [showCompleteCheck, setShowCompleteCheck] = useState(false);
-    const [completingCheckId, setCompletingCheckId] = useState<number | null>(null);
+    const [completingCheckId, setCompletingCheckId] = useState<number | null>(
+        null,
+    );
 
     // Expanded findings
-    const [expandedChecks, setExpandedChecks] = useState<Set<number>>(new Set());
+    const [expandedChecks, setExpandedChecks] = useState<Set<number>>(
+        new Set(),
+    );
 
     // Add Certification form
     const [certForm, setCertForm] = useState({
@@ -256,11 +260,13 @@ export default function SiteComplianceIndex({
     });
 
     // Filtered certifications
-    const filteredCerts = certStatusFilter === 'all'
-        ? certifications
-        : certifications.filter(
-              (c) => c.status.toLowerCase() === certStatusFilter.toLowerCase(),
-          );
+    const filteredCerts =
+        certStatusFilter === 'all'
+            ? certifications
+            : certifications.filter(
+                  (c) =>
+                      c.status.toLowerCase() === certStatusFilter.toLowerCase(),
+              );
 
     // ── Handlers ───────────────────────────────────────────────────────
 
@@ -316,7 +322,8 @@ export default function SiteComplianceIndex({
     }
 
     function handleDeleteCert(id: number) {
-        if (!confirm('Are you sure you want to delete this certification?')) return;
+        if (!confirm('Are you sure you want to delete this certification?'))
+            return;
         router.delete(`/sites/${site.id}/compliance/certifications/${id}`, {
             preserveScroll: true,
         });
@@ -385,14 +392,18 @@ export default function SiteComplianceIndex({
                         value={stats.expiring ?? 0}
                         icon={stats.expiring > 0 ? AlertTriangle : Clock}
                         color="amber"
-                        subtitle={stats.expiring > 0 ? 'Needs attention' : undefined}
+                        subtitle={
+                            stats.expiring > 0 ? 'Needs attention' : undefined
+                        }
                     />
                     <OpsStatCard
                         label="Expired"
                         value={stats.expired ?? 0}
                         icon={stats.expired > 0 ? AlertTriangle : Clock}
                         color="red"
-                        subtitle={stats.expired > 0 ? 'Immediate action' : undefined}
+                        subtitle={
+                            stats.expired > 0 ? 'Immediate action' : undefined
+                        }
                     />
                     <OpsStatCard
                         label="Checks Scheduled"
@@ -403,9 +414,13 @@ export default function SiteComplianceIndex({
                     <OpsStatCard
                         label="Checks Overdue"
                         value={stats.checks_overdue ?? 0}
-                        icon={stats.checks_overdue > 0 ? AlertTriangle : FileCheck}
+                        icon={
+                            stats.checks_overdue > 0 ? AlertTriangle : FileCheck
+                        }
                         color="red"
-                        subtitle={stats.checks_overdue > 0 ? 'Overdue' : undefined}
+                        subtitle={
+                            stats.checks_overdue > 0 ? 'Overdue' : undefined
+                        }
                     />
                 </div>
 
@@ -416,13 +431,18 @@ export default function SiteComplianceIndex({
                         <p className="text-sm font-medium text-status-critical">
                             {stats.expired > 0 && (
                                 <span>
-                                    {stats.expired} certification{stats.expired !== 1 ? 's' : ''} expired
+                                    {stats.expired} certification
+                                    {stats.expired !== 1 ? 's' : ''} expired
                                 </span>
                             )}
-                            {stats.expired > 0 && stats.checks_overdue > 0 && ', '}
+                            {stats.expired > 0 &&
+                                stats.checks_overdue > 0 &&
+                                ', '}
                             {stats.checks_overdue > 0 && (
                                 <span>
-                                    {stats.checks_overdue} compliance check{stats.checks_overdue !== 1 ? 's' : ''} overdue
+                                    {stats.checks_overdue} compliance check
+                                    {stats.checks_overdue !== 1 ? 's' : ''}{' '}
+                                    overdue
                                 </span>
                             )}
                             {' \u2014 immediate attention required'}
@@ -460,11 +480,21 @@ export default function SiteComplianceIndex({
                                             <SelectValue placeholder="All Statuses" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Statuses</SelectItem>
-                                            <SelectItem value="current">Current</SelectItem>
-                                            <SelectItem value="expiring">Expiring</SelectItem>
-                                            <SelectItem value="expired">Expired</SelectItem>
-                                            <SelectItem value="pending">Pending</SelectItem>
+                                            <SelectItem value="all">
+                                                All Statuses
+                                            </SelectItem>
+                                            <SelectItem value="current">
+                                                Current
+                                            </SelectItem>
+                                            <SelectItem value="expiring">
+                                                Expiring
+                                            </SelectItem>
+                                            <SelectItem value="expired">
+                                                Expired
+                                            </SelectItem>
+                                            <SelectItem value="pending">
+                                                Pending
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -476,7 +506,9 @@ export default function SiteComplianceIndex({
                                     </p>
                                 ) : (
                                     filteredCerts.map((cert) => {
-                                        const days = daysUntil(cert.expiry_date);
+                                        const days = daysUntil(
+                                            cert.expiry_date,
+                                        );
                                         return (
                                             <div
                                                 key={cert.id}
@@ -486,54 +518,82 @@ export default function SiteComplianceIndex({
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <span className="font-semibold">
-                                                                {cert.name || '\u2014'}
+                                                                {cert.name ||
+                                                                    '\u2014'}
                                                             </span>
                                                             <Badge
                                                                 variant="outline"
                                                                 className="border-primary/30 bg-primary/10 text-primary"
                                                             >
-                                                                {certTypeLabel(cert.certification_type)}
+                                                                {certTypeLabel(
+                                                                    cert.certification_type,
+                                                                )}
                                                             </Badge>
                                                             <Badge
                                                                 variant="outline"
-                                                                className={statusBadgeClass(cert.status)}
+                                                                className={statusBadgeClass(
+                                                                    cert.status,
+                                                                )}
                                                             >
-                                                                {certTypeLabel(cert.status)}
+                                                                {certTypeLabel(
+                                                                    cert.status,
+                                                                )}
                                                             </Badge>
                                                         </div>
 
                                                         <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                                                             {cert.issuing_body && (
                                                                 <div>
-                                                                    <span className="font-medium">Issuing Body:</span>{' '}
-                                                                    {cert.issuing_body}
+                                                                    <span className="font-medium">
+                                                                        Issuing
+                                                                        Body:
+                                                                    </span>{' '}
+                                                                    {
+                                                                        cert.issuing_body
+                                                                    }
                                                                 </div>
                                                             )}
                                                             {cert.reference_number && (
                                                                 <div>
-                                                                    <span className="font-medium">Ref:</span>{' '}
-                                                                    {cert.reference_number}
+                                                                    <span className="font-medium">
+                                                                        Ref:
+                                                                    </span>{' '}
+                                                                    {
+                                                                        cert.reference_number
+                                                                    }
                                                                 </div>
                                                             )}
                                                             <div className="flex flex-wrap gap-4">
                                                                 <span>
-                                                                    <span className="font-medium">Issued:</span>{' '}
-                                                                    {fmtDate(cert.issued_date)}
+                                                                    <span className="font-medium">
+                                                                        Issued:
+                                                                    </span>{' '}
+                                                                    {fmtDate(
+                                                                        cert.issued_date,
+                                                                    )}
                                                                 </span>
                                                                 <span>
-                                                                    <span className="font-medium">Expires:</span>{' '}
-                                                                    {fmtDate(cert.expiry_date)}
-                                                                    {days !== null && (
+                                                                    <span className="font-medium">
+                                                                        Expires:
+                                                                    </span>{' '}
+                                                                    {fmtDate(
+                                                                        cert.expiry_date,
+                                                                    )}
+                                                                    {days !==
+                                                                        null && (
                                                                         <span
                                                                             className={`ml-1 text-xs font-medium ${
-                                                                                days < 0
+                                                                                days <
+                                                                                0
                                                                                     ? 'text-status-critical'
-                                                                                    : days <= 30
+                                                                                    : days <=
+                                                                                        30
                                                                                       ? 'text-status-warning'
                                                                                       : 'text-status-success'
                                                                             }`}
                                                                         >
-                                                                            {days < 0
+                                                                            {days <
+                                                                            0
                                                                                 ? `${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''} overdue`
                                                                                 : `${days} day${days !== 1 ? 's' : ''} remaining`}
                                                                         </span>
@@ -542,18 +602,30 @@ export default function SiteComplianceIndex({
                                                             </div>
                                                             {cert.next_review_date && (
                                                                 <div>
-                                                                    <span className="font-medium">Next Review:</span>{' '}
-                                                                    {fmtDate(cert.next_review_date)}
+                                                                    <span className="font-medium">
+                                                                        Next
+                                                                        Review:
+                                                                    </span>{' '}
+                                                                    {fmtDate(
+                                                                        cert.next_review_date,
+                                                                    )}
                                                                 </div>
                                                             )}
                                                             {cert.reviewed_by && (
                                                                 <div className="text-xs">
                                                                     Reviewed by{' '}
-                                                                    {cert.reviewed_by.name}
+                                                                    {
+                                                                        cert
+                                                                            .reviewed_by
+                                                                            .name
+                                                                    }
                                                                     {cert.reviewed_at && (
                                                                         <span>
                                                                             {' '}
-                                                                            on {fmtDate(cert.reviewed_at)}
+                                                                            on{' '}
+                                                                            {fmtDate(
+                                                                                cert.reviewed_at,
+                                                                            )}
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -577,7 +649,11 @@ export default function SiteComplianceIndex({
                                                             variant="ghost"
                                                             size="sm"
                                                             className="text-status-critical hover:text-status-critical"
-                                                            onClick={() => handleDeleteCert(cert.id)}
+                                                            onClick={() =>
+                                                                handleDeleteCert(
+                                                                    cert.id,
+                                                                )
+                                                            }
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -603,7 +679,9 @@ export default function SiteComplianceIndex({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => setShowScheduleCheck(true)}
+                                        onClick={() =>
+                                            setShowScheduleCheck(true)
+                                        }
                                     >
                                         <Plus className="mr-1 h-4 w-4" />
                                         Schedule Check
@@ -617,47 +695,67 @@ export default function SiteComplianceIndex({
                                     </p>
                                 ) : (
                                     (compliance_checks ?? []).map((check) => {
-                                        const isExpanded = expandedChecks.has(check.id);
+                                        const isExpanded = expandedChecks.has(
+                                            check.id,
+                                        );
                                         const isCompleted =
-                                            check.status?.toLowerCase() === 'completed';
+                                            check.status?.toLowerCase() ===
+                                            'completed';
                                         return (
-                                            <div
+                                            <Card
                                                 key={check.id}
-                                                className="rounded-lg border bg-card p-3"
+                                                className="p-3"
                                             >
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <Badge
                                                         variant="outline"
                                                         className="border-primary/30 bg-primary/10 text-primary"
                                                     >
-                                                        {certTypeLabel(check.check_type)}
+                                                        {certTypeLabel(
+                                                            check.check_type,
+                                                        )}
                                                     </Badge>
                                                     {check.risk_rating && (
                                                         <Badge
                                                             variant="outline"
-                                                            className={riskBadgeClass(check.risk_rating)}
+                                                            className={riskBadgeClass(
+                                                                check.risk_rating,
+                                                            )}
                                                         >
                                                             {check.risk_rating}
                                                         </Badge>
                                                     )}
                                                     <Badge
                                                         variant="outline"
-                                                        className={statusBadgeClass(check.status)}
+                                                        className={statusBadgeClass(
+                                                            check.status,
+                                                        )}
                                                     >
-                                                        {certTypeLabel(check.status)}
+                                                        {certTypeLabel(
+                                                            check.status,
+                                                        )}
                                                     </Badge>
                                                 </div>
 
                                                 <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                                                    {isCompleted && check.completed_date ? (
+                                                    {isCompleted &&
+                                                    check.completed_date ? (
                                                         <div className="flex items-center gap-1">
                                                             <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
                                                             <span>
-                                                                Completed {fmtDate(check.completed_date)}
+                                                                Completed{' '}
+                                                                {fmtDate(
+                                                                    check.completed_date,
+                                                                )}
                                                                 {check.completed_by && (
                                                                     <span>
                                                                         {' '}
-                                                                        by {check.completed_by.name}
+                                                                        by{' '}
+                                                                        {
+                                                                            check
+                                                                                .completed_by
+                                                                                .name
+                                                                        }
                                                                     </span>
                                                                 )}
                                                             </span>
@@ -666,14 +764,20 @@ export default function SiteComplianceIndex({
                                                         <div className="flex items-center gap-1">
                                                             <Calendar className="h-3.5 w-3.5" />
                                                             <span>
-                                                                Scheduled: {fmtDate(check.scheduled_date)}
+                                                                Scheduled:{' '}
+                                                                {fmtDate(
+                                                                    check.scheduled_date,
+                                                                )}
                                                             </span>
                                                         </div>
                                                     )}
 
                                                     {check.follow_up_date && (
                                                         <div className="text-xs">
-                                                            Follow-up: {fmtDate(check.follow_up_date)}
+                                                            Follow-up:{' '}
+                                                            {fmtDate(
+                                                                check.follow_up_date,
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -681,9 +785,15 @@ export default function SiteComplianceIndex({
                                                 {/* Findings (expandable) */}
                                                 {check.findings && (
                                                     <div className="mt-2">
-                                                        <button
-                                                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                                            onClick={() => toggleExpanded(check.id)}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-auto gap-1 p-0 text-xs text-muted-foreground hover:text-foreground"
+                                                            onClick={() =>
+                                                                toggleExpanded(
+                                                                    check.id,
+                                                                )
+                                                            }
                                                             type="button"
                                                         >
                                                             {isExpanded ? (
@@ -691,17 +801,27 @@ export default function SiteComplianceIndex({
                                                             ) : (
                                                                 <ChevronDown className="h-3 w-3" />
                                                             )}
-                                                            {isExpanded ? 'Hide' : 'Show'} Findings
-                                                        </button>
+                                                            {isExpanded
+                                                                ? 'Hide'
+                                                                : 'Show'}{' '}
+                                                            Findings
+                                                        </Button>
                                                         {isExpanded && (
                                                             <div className="mt-1 rounded bg-muted/30 p-2 text-xs text-muted-foreground">
-                                                                <p>{check.findings}</p>
+                                                                <p>
+                                                                    {
+                                                                        check.findings
+                                                                    }
+                                                                </p>
                                                                 {check.corrective_actions && (
                                                                     <p className="mt-1">
                                                                         <span className="font-medium">
-                                                                            Corrective Actions:
+                                                                            Corrective
+                                                                            Actions:
                                                                         </span>{' '}
-                                                                        {check.corrective_actions}
+                                                                        {
+                                                                            check.corrective_actions
+                                                                        }
                                                                     </p>
                                                                 )}
                                                             </div>
@@ -717,7 +837,9 @@ export default function SiteComplianceIndex({
                                                             size="sm"
                                                             className="border-status-success/30 text-status-success hover:bg-status-success"
                                                             onClick={() =>
-                                                                openCompleteDialog(check.id)
+                                                                openCompleteDialog(
+                                                                    check.id,
+                                                                )
                                                             }
                                                         >
                                                             <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
@@ -725,7 +847,7 @@ export default function SiteComplianceIndex({
                                                         </Button>
                                                     </div>
                                                 )}
-                                            </div>
+                                            </Card>
                                         );
                                     })
                                 )}
@@ -746,7 +868,10 @@ export default function SiteComplianceIndex({
                                 <Select
                                     value={certForm.certification_type}
                                     onValueChange={(v) =>
-                                        setCertForm((f) => ({ ...f, certification_type: v }))
+                                        setCertForm((f) => ({
+                                            ...f,
+                                            certification_type: v,
+                                        }))
                                     }
                                 >
                                     <SelectTrigger>
@@ -766,7 +891,10 @@ export default function SiteComplianceIndex({
                                 <Input
                                     value={certForm.name}
                                     onChange={(e) =>
-                                        setCertForm((f) => ({ ...f, name: e.target.value }))
+                                        setCertForm((f) => ({
+                                            ...f,
+                                            name: e.target.value,
+                                        }))
                                     }
                                     placeholder="Certification name"
                                 />
@@ -832,7 +960,8 @@ export default function SiteComplianceIndex({
                                         onChange={(e) =>
                                             setCertForm((f) => ({
                                                 ...f,
-                                                next_review_date: e.target.value,
+                                                next_review_date:
+                                                    e.target.value,
                                             }))
                                         }
                                     />
@@ -843,7 +972,10 @@ export default function SiteComplianceIndex({
                                 <Textarea
                                     value={certForm.notes}
                                     onChange={(e) =>
-                                        setCertForm((f) => ({ ...f, notes: e.target.value }))
+                                        setCertForm((f) => ({
+                                            ...f,
+                                            notes: e.target.value,
+                                        }))
                                     }
                                     rows={3}
                                     placeholder="Additional notes..."
@@ -851,7 +983,10 @@ export default function SiteComplianceIndex({
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="ghost" onClick={() => setShowAddCert(false)}>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setShowAddCert(false)}
+                            >
                                 Cancel
                             </Button>
                             <Button
@@ -865,7 +1000,10 @@ export default function SiteComplianceIndex({
                 </Dialog>
 
                 {/* ── Schedule Check Dialog ─────────────────────────────────── */}
-                <Dialog open={showScheduleCheck} onOpenChange={setShowScheduleCheck}>
+                <Dialog
+                    open={showScheduleCheck}
+                    onOpenChange={setShowScheduleCheck}
+                >
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>Schedule Compliance Check</DialogTitle>
@@ -876,7 +1014,10 @@ export default function SiteComplianceIndex({
                                 <Select
                                     value={checkForm.check_type}
                                     onValueChange={(v) =>
-                                        setCheckForm((f) => ({ ...f, check_type: v }))
+                                        setCheckForm((f) => ({
+                                            ...f,
+                                            check_type: v,
+                                        }))
                                     }
                                 >
                                     <SelectTrigger>
@@ -909,7 +1050,10 @@ export default function SiteComplianceIndex({
                                 <Textarea
                                     value={checkForm.notes}
                                     onChange={(e) =>
-                                        setCheckForm((f) => ({ ...f, notes: e.target.value }))
+                                        setCheckForm((f) => ({
+                                            ...f,
+                                            notes: e.target.value,
+                                        }))
                                     }
                                     rows={3}
                                     placeholder="Additional notes..."
@@ -934,7 +1078,10 @@ export default function SiteComplianceIndex({
                 </Dialog>
 
                 {/* ── Complete Check Dialog ─────────────────────────────────── */}
-                <Dialog open={showCompleteCheck} onOpenChange={setShowCompleteCheck}>
+                <Dialog
+                    open={showCompleteCheck}
+                    onOpenChange={setShowCompleteCheck}
+                >
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>Complete Compliance Check</DialogTitle>
@@ -973,7 +1120,10 @@ export default function SiteComplianceIndex({
                                 <Select
                                     value={completeForm.risk_rating}
                                     onValueChange={(v) =>
-                                        setCompleteForm((f) => ({ ...f, risk_rating: v }))
+                                        setCompleteForm((f) => ({
+                                            ...f,
+                                            risk_rating: v,
+                                        }))
                                     }
                                 >
                                     <SelectTrigger>

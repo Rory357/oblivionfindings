@@ -1,4 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { FlaskConical, ShieldAlert, FileText, Warehouse } from 'lucide-react';
+import { FlaskConical } from 'lucide-react';
 
 type Substance = {
     id: number;
@@ -77,14 +77,21 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
     const ANY = '__any__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/health-safety/substances', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/health-safety/substances',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Chemical Register', href: '/health-safety/substances' },
+                {
+                    title: 'Chemical Register',
+                    href: '/health-safety/substances',
+                },
             ]}
         >
             <Head title="Chemical Register" />
@@ -97,7 +104,10 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                     icon={<FlaskConical className="h-7 w-7 text-white" />}
                     stats={[
                         { label: 'Total', value: stats.total_substances },
-                        { label: 'Controlled', value: stats.controlled_substances },
+                        {
+                            label: 'Controlled',
+                            value: stats.controlled_substances,
+                        },
                         { label: 'Active SDS', value: stats.active_sds },
                         { label: 'Locations', value: stats.storage_locations },
                     ]}
@@ -115,54 +125,94 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Name or HSNO number"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
-                                    <SelectItem value="pending_review">Pending Review</SelectItem>
-                                    <SelectItem value="restricted">Restricted</SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="inactive">
+                                        Inactive
+                                    </SelectItem>
+                                    <SelectItem value="pending_review">
+                                        Pending Review
+                                    </SelectItem>
+                                    <SelectItem value="restricted">
+                                        Restricted
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Physical Form</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Physical Form
+                            </Label>
                             <Select
                                 value={filters.physical_form ?? ANY}
-                                onValueChange={(v) => onFilter({ physical_form: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        physical_form: v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Form" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Form" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="solid">Solid</SelectItem>
-                                    <SelectItem value="liquid">Liquid</SelectItem>
+                                    <SelectItem value="liquid">
+                                        Liquid
+                                    </SelectItem>
                                     <SelectItem value="gas">Gas</SelectItem>
-                                    <SelectItem value="aerosol">Aerosol</SelectItem>
-                                    <SelectItem value="powder">Powder</SelectItem>
+                                    <SelectItem value="aerosol">
+                                        Aerosol
+                                    </SelectItem>
+                                    <SelectItem value="powder">
+                                        Powder
+                                    </SelectItem>
                                     <SelectItem value="paste">Paste</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Controlled</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Controlled
+                            </Label>
                             <Select
                                 value={filters.is_controlled ?? ANY}
-                                onValueChange={(v) => onFilter({ is_controlled: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        is_controlled: v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Controlled" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Controlled" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="yes">Yes</SelectItem>
@@ -180,44 +230,92 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="pb-2 pr-4 font-medium">Name</th>
-                                        <th className="pb-2 pr-4 font-medium">HSNO Classification</th>
-                                        <th className="pb-2 pr-4 font-medium">Physical Form</th>
-                                        <th className="pb-2 pr-4 font-medium">Hazard Pictograms</th>
-                                        <th className="pb-2 pr-4 font-medium">Status</th>
-                                        <th className="pb-2 pr-4 font-medium">SDS</th>
-                                        <th className="pb-2 pr-4 font-medium">Locations</th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Name
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            HSNO Classification
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Physical Form
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Hazard Pictograms
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            SDS
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Locations
+                                        </th>
                                         <th className="pb-2 font-medium"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {substances.data.map((s) => (
-                                        <tr key={s.id} className="border-b last:border-0">
+                                        <tr
+                                            key={s.id}
+                                            className="border-b last:border-0"
+                                        >
                                             <td className="py-2 pr-4">
-                                                <div className="font-medium">{s.name}</div>
+                                                <div className="font-medium">
+                                                    {s.name}
+                                                </div>
                                                 {s.is_controlled_substance && (
-                                                    <Badge variant="destructive" className="mt-1 text-[10px]">
+                                                    <Badge
+                                                        variant="destructive"
+                                                        className="mt-1 text-[10px]"
+                                                    >
                                                         Controlled
                                                     </Badge>
                                                 )}
                                             </td>
-                                            <td className="py-2 pr-4 text-xs">{s.hsno_classification ?? '-'}</td>
-                                            <td className="py-2 pr-4 capitalize">{s.physical_form ?? '-'}</td>
+                                            <td className="py-2 pr-4 text-xs">
+                                                {s.hsno_classification ?? '-'}
+                                            </td>
+                                            <td className="py-2 pr-4 capitalize">
+                                                {s.physical_form ?? '-'}
+                                            </td>
                                             <td className="py-2 pr-4">
                                                 <div className="flex flex-wrap gap-1">
-                                                    {(s.hazard_pictograms ?? []).map((p) => (
-                                                        <Badge key={p} variant="outline" className="text-[10px]">
-                                                            {pictogramLabels[p] ?? p}
+                                                    {(
+                                                        s.hazard_pictograms ??
+                                                        []
+                                                    ).map((p) => (
+                                                        <Badge
+                                                            key={p}
+                                                            variant="outline"
+                                                            className="text-[10px]"
+                                                        >
+                                                            {pictogramLabels[
+                                                                p
+                                                            ] ?? p}
                                                         </Badge>
                                                     ))}
-                                                    {!(s.hazard_pictograms ?? []).length && '-'}
+                                                    {!(
+                                                        s.hazard_pictograms ??
+                                                        []
+                                                    ).length && '-'}
                                                 </div>
                                             </td>
                                             <td className="py-2 pr-4">
-                                                <Badge className={statusColor(s.status)}>{s.status}</Badge>
+                                                <Badge
+                                                    className={statusColor(
+                                                        s.status,
+                                                    )}
+                                                >
+                                                    {s.status}
+                                                </Badge>
                                             </td>
-                                            <td className="py-2 pr-4">{s.sds_count}</td>
-                                            <td className="py-2 pr-4">{s.storage_locations_count}</td>
+                                            <td className="py-2 pr-4">
+                                                {s.sds_count}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {s.storage_locations_count}
+                                            </td>
                                             <td className="py-2">
                                                 <Link
                                                     href={`/health-safety/substances/${s.id}`}
@@ -243,11 +341,24 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
                 {substances?.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {substances.links.map((l) => (
-                            <button
+                            <Button
+                                type="button"
                                 key={l.label}
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
+                                className="text-xs"
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

@@ -56,7 +56,7 @@ export default function ClientsIndex({ clients }) {
             const status = (c.status ?? '').toLowerCase();
             return name.includes(q) || site.includes(q) || status.includes(q);
         });
-    }, [clients, query, onlyIncomplete]);
+    }, [clients, query, onlyIncomplete, respiteFilter]);
 
     const breadcrumbs = useMemo(
         () => [

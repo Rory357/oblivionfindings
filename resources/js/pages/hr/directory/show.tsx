@@ -3,13 +3,19 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
@@ -32,14 +38,29 @@ import {
     Star,
     Target,
     Trophy,
-    Users,
     UserCheck,
+    Users,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 function Loader2({ className }: { className?: string }) {
-    return <svg className={`animate-spin ${className ?? ''}`} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
+    return (
+        <svg
+            className={`animate-spin ${className ?? ''}`}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -97,7 +118,13 @@ interface Props {
     directReports: PersonRef[];
     kudosReceived: KudosItem[];
     kudosCount: number;
-    complianceSummary: { compliant: number; expiring_soon: number; expired: number; not_started: number; total: number } | null;
+    complianceSummary: {
+        compliant: number;
+        expiring_soon: number;
+        expired: number;
+        not_started: number;
+        total: number;
+    } | null;
     goals: GoalItem[] | null;
     kudosCategories: Record<string, string>;
     canManage: boolean;
@@ -115,12 +142,21 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 function getInitials(name: string): string {
-    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+    return name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
 }
 
 function formatDate(d: string | null): string {
     if (!d) return '\u2014';
-    return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(d).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
 }
 
 function formatEmploymentType(t: string | null): string {
@@ -139,10 +175,13 @@ const KUDOS_ICONS: Record<string, typeof Star> = {
 
 const KUDOS_COLORS: Record<string, string> = {
     teamwork: 'bg-status-info-bg text-status-info border-status-info/30',
-    innovation: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    innovation:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     leadership: 'bg-primary/10 text-primary border-primary/30',
-    customer_focus: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    going_above: 'bg-status-success-bg text-status-success border-status-success/30',
+    customer_focus:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    going_above:
+        'bg-status-success-bg text-status-success border-status-success/30',
     other: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
 };
 
@@ -176,43 +215,54 @@ export default function DirectoryShow({
     const [messageSending, setMessageSending] = useState(false);
 
     const isSelf = authUserId === employee.user_id;
-    const complianceRate = complianceSummary && complianceSummary.total > 0
-        ? Math.round((complianceSummary.compliant / complianceSummary.total) * 100)
-        : null;
+    const complianceRate =
+        complianceSummary && complianceSummary.total > 0
+            ? Math.round(
+                  (complianceSummary.compliant / complianceSummary.total) * 100,
+              )
+            : null;
 
     function startConversation() {
         setMessageSending(true);
-        router.post('/operations/messages/create', {
-            participant_ids: [employee.user_id],
-        }, {
-            onSuccess: () => {
-                // Controller redirects back with selected_conversation_id in session
-                router.visit('/operations/messages');
+        router.post(
+            '/operations/messages/create',
+            {
+                participant_ids: [employee.user_id],
             },
-            onError: () => {
-                toast.error('Failed to start conversation');
-                setMessageSending(false);
+            {
+                onSuccess: () => {
+                    // Controller redirects back with selected_conversation_id in session
+                    router.visit('/operations/messages');
+                },
+                onError: () => {
+                    toast.error('Failed to start conversation');
+                    setMessageSending(false);
+                },
             },
-        });
+        );
     }
 
     function sendKudos() {
         if (!kudosMessage.trim()) return;
         setKudosSending(true);
-        router.post('/hr/feed/kudos', {
-            to_user_id: employee.user_id,
-            category: kudosCategory,
-            message: kudosMessage.trim(),
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(`Kudos sent to ${employee.name}!`);
-                setKudosDialogOpen(false);
-                setKudosMessage('');
+        router.post(
+            '/hr/feed/kudos',
+            {
+                to_user_id: employee.user_id,
+                category: kudosCategory,
+                message: kudosMessage.trim(),
             },
-            onError: () => toast.error('Failed to send kudos'),
-            onFinish: () => setKudosSending(false),
-        });
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`Kudos sent to ${employee.name}!`);
+                    setKudosDialogOpen(false);
+                    setKudosMessage('');
+                },
+                onError: () => toast.error('Failed to send kudos'),
+                onFinish: () => setKudosSending(false),
+            },
+        );
     }
 
     return (
@@ -223,12 +273,15 @@ export default function DirectoryShow({
                 {/* ========== HERO BANNER ========== */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 shadow-lg">
                     {/* Decorative shapes */}
-                    <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/5" />
+                    <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/5" />
                     <div className="absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-white/5" />
                     <div className="absolute right-32 bottom-0 h-24 w-24 rounded-full bg-white/5" />
 
                     <div className="relative p-6 md:p-8">
-                        <Link href="/hr/directory" className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors">
+                        <Link
+                            href="/hr/directory"
+                            className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 transition-colors hover:text-white"
+                        >
                             <ArrowLeft className="h-4 w-4" />
                             Back to Directory
                         </Link>
@@ -236,43 +289,62 @@ export default function DirectoryShow({
                         <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
                             {/* Avatar */}
                             <Avatar className="h-32 w-32 border-4 border-white/20 shadow-xl md:h-36 md:w-36">
-                                <AvatarImage src={employee.profile_photo_path ? `/storage/${employee.profile_photo_path}` : undefined} />
-                                <AvatarFallback className="bg-white/20 text-white text-4xl font-bold">
+                                <AvatarImage
+                                    src={
+                                        employee.profile_photo_path
+                                            ? `/storage/${employee.profile_photo_path}`
+                                            : undefined
+                                    }
+                                />
+                                <AvatarFallback className="bg-white/20 text-4xl font-bold text-white">
                                     {getInitials(employee.name)}
                                 </AvatarFallback>
                             </Avatar>
 
                             {/* Info */}
                             <div className="flex-1 text-center text-primary-foreground md:text-left">
-                                <h1 className="text-2xl font-bold md:text-3xl">{employee.name}</h1>
+                                <h1 className="text-2xl font-bold md:text-3xl">
+                                    {employee.name}
+                                </h1>
                                 {employee.full_name !== employee.name && (
-                                    <p className="text-sm text-white/60">({employee.full_name})</p>
+                                    <p className="text-sm text-white/60">
+                                        ({employee.full_name})
+                                    </p>
                                 )}
                                 {employee.position_title && (
-                                    <p className="mt-1 text-lg text-white/80">{employee.position_title}</p>
+                                    <p className="mt-1 text-lg text-white/80">
+                                        {employee.position_title}
+                                    </p>
                                 )}
 
                                 {/* Badges */}
                                 <div className="mt-3 flex flex-wrap justify-center gap-2 md:justify-start">
                                     {employee.department && (
-                                        <Badge className="bg-white/15 text-white border-white/20 hover:bg-white/25 text-xs">{employee.department}</Badge>
+                                        <Badge className="border-white/20 bg-white/15 text-xs text-white hover:bg-white/25">
+                                            {employee.department}
+                                        </Badge>
                                     )}
                                     {employee.team && (
-                                        <Badge className="bg-white/10 text-white/80 border-white/15 text-xs">{employee.team}</Badge>
+                                        <Badge className="border-white/15 bg-white/10 text-xs text-white/80">
+                                            {employee.team}
+                                        </Badge>
                                     )}
                                     {employee.site && (
-                                        <Badge className="bg-white/10 text-white/80 border-white/15 text-xs gap-1">
-                                            <MapPin className="h-3 w-3" />{employee.site}
+                                        <Badge className="gap-1 border-white/15 bg-white/10 text-xs text-white/80">
+                                            <MapPin className="h-3 w-3" />
+                                            {employee.site}
                                         </Badge>
                                     )}
                                     {employee.is_first_aider && (
-                                        <Badge className="bg-status-success-bg text-status-success border-status-success/30 text-xs">
-                                            <Heart className="mr-1 h-3 w-3" /> First Aider
+                                        <Badge className="border-status-success/30 bg-status-success-bg text-xs text-status-success">
+                                            <Heart className="mr-1 h-3 w-3" />{' '}
+                                            First Aider
                                         </Badge>
                                     )}
                                     {employee.is_fire_warden && (
-                                        <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30 text-xs">
-                                            <Flame className="mr-1 h-3 w-3" /> Fire Warden
+                                        <Badge className="border-status-warning/30 bg-status-warning-bg text-xs text-status-warning">
+                                            <Flame className="mr-1 h-3 w-3" />{' '}
+                                            Fire Warden
                                         </Badge>
                                     )}
                                 </div>
@@ -281,7 +353,10 @@ export default function DirectoryShow({
                                 {tenure && (
                                     <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-white/50 md:justify-start">
                                         <Clock className="h-3.5 w-3.5" />
-                                        {tenure.years > 0 ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''} ${tenure.months} month${tenure.months !== 1 ? 's' : ''}` : `${tenure.months} month${tenure.months !== 1 ? 's' : ''}`} at the organisation
+                                        {tenure.years > 0
+                                            ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''} ${tenure.months} month${tenure.months !== 1 ? 's' : ''}`
+                                            : `${tenure.months} month${tenure.months !== 1 ? 's' : ''}`}{' '}
+                                        at the organisation
                                     </p>
                                 )}
 
@@ -289,25 +364,41 @@ export default function DirectoryShow({
                                 <div className="mt-5 flex flex-wrap items-center justify-center gap-2 md:justify-start">
                                     {!isSelf && (
                                         <Button
-                                            onClick={() => setKudosDialogOpen(true)}
+                                            onClick={() =>
+                                                setKudosDialogOpen(true)
+                                            }
                                             size="sm"
-                                            className="gap-2 rounded-full bg-white text-primary font-semibold hover:bg-white/90 shadow-md"
+                                            className="gap-2 rounded-full bg-white font-semibold text-primary shadow-md hover:bg-white/90"
                                         >
                                             <Sparkles className="h-4 w-4" />
                                             Send Kudos
                                         </Button>
                                     )}
                                     {employee.email && (
-                                        <Button asChild size="sm" variant="outline" className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
-                                            <a href={`mailto:${employee.email}`}>
-                                                <Mail className="h-3.5 w-3.5" /> Email
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="outline"
+                                            className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                                        >
+                                            <a
+                                                href={`mailto:${employee.email}`}
+                                            >
+                                                <Mail className="h-3.5 w-3.5" />{' '}
+                                                Email
                                             </a>
                                         </Button>
                                     )}
                                     {employee.phone && (
-                                        <Button asChild size="sm" variant="outline" className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            variant="outline"
+                                            className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                                        >
                                             <a href={`tel:${employee.phone}`}>
-                                                <Phone className="h-3.5 w-3.5" /> Call
+                                                <Phone className="h-3.5 w-3.5" />{' '}
+                                                Call
                                             </a>
                                         </Button>
                                     )}
@@ -319,7 +410,11 @@ export default function DirectoryShow({
                                             variant="outline"
                                             className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
                                         >
-                                            {messageSending ? <Loader2 className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                                            {messageSending ? (
+                                                <Loader2 className="h-3.5 w-3.5" />
+                                            ) : (
+                                                <MessageCircle className="h-3.5 w-3.5" />
+                                            )}
                                             Message
                                         </Button>
                                     )}
@@ -327,24 +422,36 @@ export default function DirectoryShow({
                             </div>
 
                             {/* Right side stats (desktop) */}
-                            <div className="hidden lg:flex items-center gap-4">
+                            <div className="hidden items-center gap-4 lg:flex">
                                 <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
-                                    <Clock className="h-5 w-5 text-white/70 mb-1" />
+                                    <Clock className="mb-1 h-5 w-5 text-white/70" />
                                     <span className="text-2xl font-bold text-white">
-                                        {tenure ? `${tenure.years}.${tenure.months}` : '\u2014'}
+                                        {tenure
+                                            ? `${tenure.years}.${tenure.months}`
+                                            : '\u2014'}
                                     </span>
-                                    <span className="text-[10px] text-white/60">Years</span>
+                                    <span className="text-[10px] text-white/60">
+                                        Years
+                                    </span>
                                 </div>
                                 <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
-                                    <Award className="h-5 w-5 text-status-warning mb-1" />
-                                    <span className="text-2xl font-bold text-white">{kudosCount}</span>
-                                    <span className="text-[10px] text-white/60">Kudos</span>
+                                    <Award className="mb-1 h-5 w-5 text-status-warning" />
+                                    <span className="text-2xl font-bold text-white">
+                                        {kudosCount}
+                                    </span>
+                                    <span className="text-[10px] text-white/60">
+                                        Kudos
+                                    </span>
                                 </div>
                                 {complianceRate != null && (
                                     <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
-                                        <Shield className="h-5 w-5 text-status-success mb-1" />
-                                        <span className="text-2xl font-bold text-white">{complianceRate}%</span>
-                                        <span className="text-[10px] text-white/60">Compliant</span>
+                                        <Shield className="mb-1 h-5 w-5 text-status-success" />
+                                        <span className="text-2xl font-bold text-white">
+                                            {complianceRate}%
+                                        </span>
+                                        <span className="text-[10px] text-white/60">
+                                            Compliant
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -353,132 +460,198 @@ export default function DirectoryShow({
                 </div>
 
                 {/* Mobile stat cards (hidden on lg) */}
-                <div className="grid gap-3 grid-cols-3 lg:hidden">
+                <div className="grid grid-cols-3 gap-3 lg:hidden">
                     <Card className="overflow-hidden">
                         <div className="h-1 bg-status-info" />
                         <CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold">{tenure ? `${tenure.years}.${tenure.months}` : '\u2014'}</p>
-                            <p className="text-[10px] text-muted-foreground">Years</p>
+                            <p className="text-xl font-bold">
+                                {tenure
+                                    ? `${tenure.years}.${tenure.months}`
+                                    : '\u2014'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                                Years
+                            </p>
                         </CardContent>
                     </Card>
                     <Card className="overflow-hidden">
                         <div className="h-1 bg-status-warning" />
                         <CardContent className="p-3 text-center">
                             <p className="text-xl font-bold">{kudosCount}</p>
-                            <p className="text-[10px] text-muted-foreground">Kudos (30d)</p>
+                            <p className="text-[10px] text-muted-foreground">
+                                Kudos (30d)
+                            </p>
                         </CardContent>
                     </Card>
                     <Card className="overflow-hidden">
                         <div className="h-1 bg-status-success" />
                         <CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold">{complianceRate != null ? `${complianceRate}%` : '\u2014'}</p>
-                            <p className="text-[10px] text-muted-foreground">Compliance</p>
+                            <p className="text-xl font-bold">
+                                {complianceRate != null
+                                    ? `${complianceRate}%`
+                                    : '\u2014'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                                Compliance
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
                     {/* ========== MAIN COLUMN ========== */}
-                    <div className="flex flex-col gap-4 order-2 lg:order-1">
+                    <div className="order-2 flex flex-col gap-4 lg:order-1">
                         {/* Contact & Details */}
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">Contact & Details</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Contact & Details
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     {employee.email && (
-                                        <a href={`mailto:${employee.email}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
+                                        <a
+                                            href={`mailto:${employee.email}`}
+                                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
+                                        >
                                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
                                                 <Mail className="h-4 w-4 text-status-info" />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[10px] text-muted-foreground">Email</p>
-                                                <p className="text-sm font-medium truncate">{employee.email}</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Email
+                                                </p>
+                                                <p className="truncate text-sm font-medium">
+                                                    {employee.email}
+                                                </p>
                                             </div>
                                         </a>
                                     )}
                                     {employee.phone && (
-                                        <a href={`tel:${employee.phone}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
+                                        <a
+                                            href={`tel:${employee.phone}`}
+                                            className="flex items-center gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
+                                        >
                                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-success">
                                                 <Phone className="h-4 w-4 text-status-success" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-muted-foreground">Phone</p>
-                                                <p className="text-sm font-medium">{employee.phone}</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Phone
+                                                </p>
+                                                <p className="text-sm font-medium">
+                                                    {employee.phone}
+                                                </p>
                                             </div>
                                         </a>
                                     )}
                                     {employee.site && (
-                                        <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
+                                        <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
                                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                                                 <MapPin className="h-4 w-4 text-primary" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-muted-foreground">Site</p>
-                                                <p className="text-sm font-medium">{employee.site}</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Site
+                                                </p>
+                                                <p className="text-sm font-medium">
+                                                    {employee.site}
+                                                </p>
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
+                                    <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
                                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-warning">
                                             <Calendar className="h-4 w-4 text-status-warning" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-muted-foreground">Start Date</p>
-                                            <p className="text-sm font-medium">{formatDate(employee.start_date)}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Start Date
+                                            </p>
+                                            <p className="text-sm font-medium">
+                                                {formatDate(
+                                                    employee.start_date,
+                                                )}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
+                                    <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
                                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
                                             <Briefcase className="h-4 w-4 text-status-info" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-muted-foreground">Employment</p>
-                                            <p className="text-sm font-medium">{formatEmploymentType(employee.employment_type)}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Employment
+                                            </p>
+                                            <p className="text-sm font-medium">
+                                                {formatEmploymentType(
+                                                    employee.employment_type,
+                                                )}
+                                            </p>
                                         </div>
                                     </div>
                                     {employee.department && (
-                                        <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
+                                        <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
                                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical">
                                                 <Users className="h-4 w-4 text-status-critical" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-muted-foreground">Department</p>
-                                                <p className="text-sm font-medium">{employee.department}</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Department
+                                                </p>
+                                                <p className="text-sm font-medium">
+                                                    {employee.department}
+                                                </p>
                                             </div>
                                         </div>
                                     )}
-                                    {employee.cellphone && employee.cellphone !== employee.phone && (
-                                        <a href={`tel:${employee.cellphone}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
-                                                <Phone className="h-4 w-4 text-status-info" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-muted-foreground">Mobile</p>
-                                                <p className="text-sm font-medium">{employee.cellphone}</p>
-                                            </div>
-                                        </a>
-                                    )}
+                                    {employee.cellphone &&
+                                        employee.cellphone !==
+                                            employee.phone && (
+                                            <a
+                                                href={`tel:${employee.cellphone}`}
+                                                className="flex items-center gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
+                                            >
+                                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                                    <Phone className="h-4 w-4 text-status-info" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        Mobile
+                                                    </p>
+                                                    <p className="text-sm font-medium">
+                                                        {employee.cellphone}
+                                                    </p>
+                                                </div>
+                                            </a>
+                                        )}
                                     {!isSelf && (
-                                        <button
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
                                             onClick={startConversation}
                                             disabled={messageSending}
-                                            className="flex items-center gap-3 rounded-lg p-3 bg-primary/5 hover:bg-primary/10 transition-colors border border-primary/20 text-left"
+                                            className="h-auto justify-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-left hover:bg-primary/10"
                                         >
                                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                                                {messageSending
-                                                    ? <Loader2 className="h-4 w-4 text-primary" />
-                                                    : <MessageCircle className="h-4 w-4 text-primary" />
-                                                }
+                                                {messageSending ? (
+                                                    <Loader2 className="h-4 w-4 text-primary" />
+                                                ) : (
+                                                    <MessageCircle className="h-4 w-4 text-primary" />
+                                                )}
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-muted-foreground">Direct Message</p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Direct Message
+                                                </p>
                                                 <p className="text-sm font-medium text-primary">
-                                                    {messageSending ? 'Opening...' : `Message ${employee.name.split(' ')[0]}`}
+                                                    {messageSending
+                                                        ? 'Opening...'
+                                                        : `Message ${employee.name.split(' ')[0]}`}
                                                 </p>
                                             </div>
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             </CardContent>
@@ -492,12 +665,25 @@ export default function DirectoryShow({
                                         <Sparkles className="h-4 w-4 text-status-warning" />
                                         Recognition
                                         {kudosReceived.length > 0 && (
-                                            <Badge variant="secondary" className="ml-1">{kudosReceived.length}</Badge>
+                                            <Badge
+                                                variant="secondary"
+                                                className="ml-1"
+                                            >
+                                                {kudosReceived.length}
+                                            </Badge>
                                         )}
                                     </CardTitle>
                                     {!isSelf && (
-                                        <Button variant="ghost" size="sm" onClick={() => setKudosDialogOpen(true)} className="text-xs">
-                                            <Sparkles className="mr-1 h-3 w-3" /> Send Kudos
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                                setKudosDialogOpen(true)
+                                            }
+                                            className="text-xs"
+                                        >
+                                            <Sparkles className="mr-1 h-3 w-3" />{' '}
+                                            Send Kudos
                                         </Button>
                                     )}
                                 </div>
@@ -506,22 +692,45 @@ export default function DirectoryShow({
                                 {kudosReceived.length > 0 ? (
                                     <div className="space-y-3">
                                         {kudosReceived.map((k) => {
-                                            const Icon = KUDOS_ICONS[k.category] ?? Star;
-                                            const colorClass = KUDOS_COLORS[k.category] ?? KUDOS_COLORS.other;
+                                            const Icon =
+                                                KUDOS_ICONS[k.category] ?? Star;
+                                            const colorClass =
+                                                KUDOS_COLORS[k.category] ??
+                                                KUDOS_COLORS.other;
                                             return (
-                                                <div key={k.id} className="flex items-start gap-3 rounded-lg border p-3">
-                                                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colorClass.split(' ')[0]}`}>
-                                                        <Icon className={`h-4 w-4 ${colorClass.split(' ')[1]}`} />
+                                                <div
+                                                    key={k.id}
+                                                    className="flex items-start gap-3 rounded-lg border p-3"
+                                                >
+                                                    <div
+                                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colorClass.split(' ')[0]}`}
+                                                    >
+                                                        <Icon
+                                                            className={`h-4 w-4 ${colorClass.split(' ')[1]}`}
+                                                        />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">{k.from_name}</span>
-                                                            <Badge variant="outline" className={`text-[10px] ${colorClass}`}>
-                                                                {kudosCategories[k.category] ?? k.category}
+                                                            <span className="text-sm font-medium">
+                                                                {k.from_name}
+                                                            </span>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`text-[10px] ${colorClass}`}
+                                                            >
+                                                                {kudosCategories[
+                                                                    k.category
+                                                                ] ?? k.category}
                                                             </Badge>
                                                         </div>
-                                                        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{k.message}</p>
-                                                        <p className="mt-1 text-[10px] text-muted-foreground">{formatDate(k.created_at)}</p>
+                                                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                                            {k.message}
+                                                        </p>
+                                                        <p className="mt-1 text-[10px] text-muted-foreground">
+                                                            {formatDate(
+                                                                k.created_at,
+                                                            )}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             );
@@ -530,10 +739,19 @@ export default function DirectoryShow({
                                 ) : (
                                     <div className="flex flex-col items-center gap-2 py-8 text-center">
                                         <Award className="h-8 w-8 text-muted-foreground/30" />
-                                        <p className="text-sm text-muted-foreground">No kudos received yet</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            No kudos received yet
+                                        </p>
                                         {!isSelf && (
-                                            <Button variant="outline" size="sm" onClick={() => setKudosDialogOpen(true)}>
-                                                Be the first to recognise {employee.name.split(' ')[0]}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setKudosDialogOpen(true)
+                                                }
+                                            >
+                                                Be the first to recognise{' '}
+                                                {employee.name.split(' ')[0]}
                                             </Button>
                                         )}
                                     </div>
@@ -542,57 +760,107 @@ export default function DirectoryShow({
                         </Card>
 
                         {/* Compliance (manager-only) */}
-                        {canManage && complianceSummary && complianceSummary.total > 0 && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <Shield className="h-4 w-4" />
-                                        Compliance Overview
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-center gap-6">
-                                        <DonutChart
-                                            data={[
-                                                { label: 'Compliant', value: complianceSummary.compliant, color: '#10b981' },
-                                                { label: 'Expiring', value: complianceSummary.expiring_soon, color: '#f59e0b' },
-                                                { label: 'Expired', value: complianceSummary.expired, color: '#ef4444' },
-                                                { label: 'Not Started', value: complianceSummary.not_started, color: '#94a3b8' },
-                                            ]}
-                                            size={100}
-                                            thickness={14}
-                                            centerValue={`${complianceRate}%`}
-                                        />
-                                        <div className="flex-1 space-y-2">
-                                            {complianceSummary.compliant > 0 && (
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-status-success" />Compliant</span>
-                                                    <span className="font-medium">{complianceSummary.compliant}</span>
-                                                </div>
-                                            )}
-                                            {complianceSummary.expiring_soon > 0 && (
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-status-warning" />Expiring Soon</span>
-                                                    <span className="font-medium text-status-warning">{complianceSummary.expiring_soon}</span>
-                                                </div>
-                                            )}
-                                            {complianceSummary.expired > 0 && (
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-status-critical" />Expired</span>
-                                                    <span className="font-medium text-status-critical">{complianceSummary.expired}</span>
-                                                </div>
-                                            )}
-                                            {complianceSummary.not_started > 0 && (
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-muted" />Not Started</span>
-                                                    <span className="font-medium">{complianceSummary.not_started}</span>
-                                                </div>
-                                            )}
+                        {canManage &&
+                            complianceSummary &&
+                            complianceSummary.total > 0 && (
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center gap-2 text-sm">
+                                            <Shield className="h-4 w-4" />
+                                            Compliance Overview
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex items-center gap-6">
+                                            <DonutChart
+                                                data={[
+                                                    {
+                                                        label: 'Compliant',
+                                                        value: complianceSummary.compliant,
+                                                        color: '#10b981',
+                                                    },
+                                                    {
+                                                        label: 'Expiring',
+                                                        value: complianceSummary.expiring_soon,
+                                                        color: '#f59e0b',
+                                                    },
+                                                    {
+                                                        label: 'Expired',
+                                                        value: complianceSummary.expired,
+                                                        color: '#ef4444',
+                                                    },
+                                                    {
+                                                        label: 'Not Started',
+                                                        value: complianceSummary.not_started,
+                                                        color: '#94a3b8',
+                                                    },
+                                                ]}
+                                                size={100}
+                                                thickness={14}
+                                                centerValue={`${complianceRate}%`}
+                                            />
+                                            <div className="flex-1 space-y-2">
+                                                {complianceSummary.compliant >
+                                                    0 && (
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="h-2.5 w-2.5 rounded-full bg-status-success" />
+                                                            Compliant
+                                                        </span>
+                                                        <span className="font-medium">
+                                                            {
+                                                                complianceSummary.compliant
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {complianceSummary.expiring_soon >
+                                                    0 && (
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="h-2.5 w-2.5 rounded-full bg-status-warning" />
+                                                            Expiring Soon
+                                                        </span>
+                                                        <span className="font-medium text-status-warning">
+                                                            {
+                                                                complianceSummary.expiring_soon
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {complianceSummary.expired >
+                                                    0 && (
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="h-2.5 w-2.5 rounded-full bg-status-critical" />
+                                                            Expired
+                                                        </span>
+                                                        <span className="font-medium text-status-critical">
+                                                            {
+                                                                complianceSummary.expired
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {complianceSummary.not_started >
+                                                    0 && (
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="h-2.5 w-2.5 rounded-full bg-muted" />
+                                                            Not Started
+                                                        </span>
+                                                        <span className="font-medium">
+                                                            {
+                                                                complianceSummary.not_started
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
 
                         {/* Goals (manager-only) */}
                         {canManage && goals && goals.length > 0 && (
@@ -601,24 +869,52 @@ export default function DirectoryShow({
                                     <CardTitle className="flex items-center gap-2 text-sm">
                                         <Target className="h-4 w-4" />
                                         Active Goals
-                                        <Badge variant="secondary" className="ml-1">{goals.length}</Badge>
+                                        <Badge
+                                            variant="secondary"
+                                            className="ml-1"
+                                        >
+                                            {goals.length}
+                                        </Badge>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-3">
                                         {goals.map((g) => {
-                                            const statusCfg = GOAL_STATUS[g.status] ?? GOAL_STATUS.not_started;
+                                            const statusCfg =
+                                                GOAL_STATUS[g.status] ??
+                                                GOAL_STATUS.not_started;
                                             return (
-                                                <div key={g.id} className="rounded-lg border p-3">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <p className="text-sm font-medium">{g.title}</p>
-                                                        <Badge variant="outline" className="text-[10px]" style={{ borderColor: statusCfg.color, color: statusCfg.color }}>
+                                                <div
+                                                    key={g.id}
+                                                    className="rounded-lg border p-3"
+                                                >
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <p className="text-sm font-medium">
+                                                            {g.title}
+                                                        </p>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-[10px]"
+                                                            style={{
+                                                                borderColor:
+                                                                    statusCfg.color,
+                                                                color: statusCfg.color,
+                                                            }}
+                                                        >
                                                             {statusCfg.label}
                                                         </Badge>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <Progress value={g.progress_percent} className="h-1.5 flex-1" />
-                                                        <span className="text-xs text-muted-foreground w-8 text-right">{g.progress_percent}%</span>
+                                                        <Progress
+                                                            value={
+                                                                g.progress_percent
+                                                            }
+                                                            className="h-1.5 flex-1"
+                                                        />
+                                                        <span className="w-8 text-right text-xs text-muted-foreground">
+                                                            {g.progress_percent}
+                                                            %
+                                                        </span>
                                                     </div>
                                                 </div>
                                             );
@@ -630,18 +926,18 @@ export default function DirectoryShow({
                     </div>
 
                     {/* ========== RIGHT SIDEBAR ========== */}
-                    <div className="flex flex-col gap-4 order-1 lg:order-2">
+                    <div className="order-1 flex flex-col gap-4 lg:order-2">
                         {/* About */}
                         {employee.bio && (
                             <Card>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 text-sm">
                                         <MessageSquare className="h-4 w-4" />
                                         About
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                                    <p className="text-sm leading-relaxed whitespace-pre-line text-muted-foreground">
                                         {employee.bio}
                                     </p>
                                 </CardContent>
@@ -651,38 +947,64 @@ export default function DirectoryShow({
                         {/* Employment Details */}
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
                                     <Briefcase className="h-4 w-4" />
                                     Employment
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Position</span>
-                                    <span className="font-medium">{employee.position_title ?? '\u2014'}</span>
+                                    <span className="text-muted-foreground">
+                                        Position
+                                    </span>
+                                    <span className="font-medium">
+                                        {employee.position_title ?? '\u2014'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Department</span>
-                                    <span className="font-medium">{employee.department ?? '\u2014'}</span>
+                                    <span className="text-muted-foreground">
+                                        Department
+                                    </span>
+                                    <span className="font-medium">
+                                        {employee.department ?? '\u2014'}
+                                    </span>
                                 </div>
                                 {employee.team && (
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Team</span>
-                                        <span className="font-medium">{employee.team}</span>
+                                        <span className="text-muted-foreground">
+                                            Team
+                                        </span>
+                                        <span className="font-medium">
+                                            {employee.team}
+                                        </span>
                                     </div>
                                 )}
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Type</span>
-                                    <span className="font-medium">{formatEmploymentType(employee.employment_type)}</span>
+                                    <span className="text-muted-foreground">
+                                        Type
+                                    </span>
+                                    <span className="font-medium">
+                                        {formatEmploymentType(
+                                            employee.employment_type,
+                                        )}
+                                    </span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Start Date</span>
-                                    <span className="font-medium">{formatDate(employee.start_date)}</span>
+                                    <span className="text-muted-foreground">
+                                        Start Date
+                                    </span>
+                                    <span className="font-medium">
+                                        {formatDate(employee.start_date)}
+                                    </span>
                                 </div>
                                 {employee.site && (
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Site</span>
-                                        <span className="font-medium">{employee.site}</span>
+                                        <span className="text-muted-foreground">
+                                            Site
+                                        </span>
+                                        <span className="font-medium">
+                                            {employee.site}
+                                        </span>
                                     </div>
                                 )}
                             </CardContent>
@@ -700,18 +1022,37 @@ export default function DirectoryShow({
                                 <CardContent className="space-y-3">
                                     {manager && (
                                         <div>
-                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">Reports to</p>
-                                            <Link href={`/hr/directory/${manager.id}`} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
+                                            <p className="mb-1.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                                                Reports to
+                                            </p>
+                                            <Link
+                                                href={`/hr/directory/${manager.id}`}
+                                                className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50"
+                                            >
                                                 <Avatar className="h-9 w-9">
-                                                    <AvatarImage src={manager.profile_photo_path ? `/storage/${manager.profile_photo_path}` : undefined} />
-                                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                                                        {getInitials(manager.name)}
+                                                    <AvatarImage
+                                                        src={
+                                                            manager.profile_photo_path
+                                                                ? `/storage/${manager.profile_photo_path}`
+                                                                : undefined
+                                                        }
+                                                    />
+                                                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                                                        {getInitials(
+                                                            manager.name,
+                                                        )}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-medium truncate">{manager.name}</p>
+                                                    <p className="truncate text-sm font-medium">
+                                                        {manager.name}
+                                                    </p>
                                                     {manager.position_title && (
-                                                        <p className="text-[11px] text-muted-foreground truncate">{manager.position_title}</p>
+                                                        <p className="truncate text-[11px] text-muted-foreground">
+                                                            {
+                                                                manager.position_title
+                                                            }
+                                                        </p>
                                                     )}
                                                 </div>
                                                 <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50" />
@@ -721,22 +1062,41 @@ export default function DirectoryShow({
 
                                     {directReports.length > 0 && (
                                         <div>
-                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
-                                                Direct Reports ({directReports.length})
+                                            <p className="mb-1.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                                                Direct Reports (
+                                                {directReports.length})
                                             </p>
                                             <div className="space-y-0.5">
                                                 {directReports.map((r) => (
-                                                    <Link key={r.id} href={`/hr/directory/${r.id}`} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
+                                                    <Link
+                                                        key={r.id}
+                                                        href={`/hr/directory/${r.id}`}
+                                                        className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50"
+                                                    >
                                                         <Avatar className="h-8 w-8">
-                                                            <AvatarImage src={r.profile_photo_path ? `/storage/${r.profile_photo_path}` : undefined} />
+                                                            <AvatarImage
+                                                                src={
+                                                                    r.profile_photo_path
+                                                                        ? `/storage/${r.profile_photo_path}`
+                                                                        : undefined
+                                                                }
+                                                            />
                                                             <AvatarFallback className="bg-muted text-xs font-semibold">
-                                                                {getInitials(r.name)}
+                                                                {getInitials(
+                                                                    r.name,
+                                                                )}
                                                             </AvatarFallback>
                                                         </Avatar>
                                                         <div className="min-w-0">
-                                                            <p className="text-sm truncate">{r.name}</p>
+                                                            <p className="truncate text-sm">
+                                                                {r.name}
+                                                            </p>
                                                             {r.position_title && (
-                                                                <p className="text-[11px] text-muted-foreground truncate">{r.position_title}</p>
+                                                                <p className="truncate text-[11px] text-muted-foreground">
+                                                                    {
+                                                                        r.position_title
+                                                                    }
+                                                                </p>
                                                             )}
                                                         </div>
                                                     </Link>
@@ -751,7 +1111,10 @@ export default function DirectoryShow({
                 </div>
 
                 {/* ========== SEND KUDOS DIALOG ========== */}
-                <Dialog open={kudosDialogOpen} onOpenChange={setKudosDialogOpen}>
+                <Dialog
+                    open={kudosDialogOpen}
+                    onOpenChange={setKudosDialogOpen}
+                >
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2">
@@ -761,44 +1124,84 @@ export default function DirectoryShow({
                         </DialogHeader>
                         <div className="space-y-4">
                             <div>
-                                <Label className="text-xs font-medium">Category</Label>
-                                <RadioGroup value={kudosCategory} onValueChange={setKudosCategory} className="mt-2 grid grid-cols-2 gap-2">
-                                    {Object.entries(kudosCategories).map(([key, label]) => {
-                                        const Icon = KUDOS_ICONS[key] ?? Star;
-                                        const isSelected = kudosCategory === key;
-                                        return (
-                                            <label
-                                                key={key}
-                                                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm transition-all ${
-                                                    isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50'
-                                                }`}
-                                            >
-                                                <RadioGroupItem value={key} className="sr-only" />
-                                                <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
-                                                <span className={isSelected ? 'font-medium' : ''}>{label}</span>
-                                            </label>
-                                        );
-                                    })}
+                                <Label className="text-xs font-medium">
+                                    Category
+                                </Label>
+                                <RadioGroup
+                                    value={kudosCategory}
+                                    onValueChange={setKudosCategory}
+                                    className="mt-2 grid grid-cols-2 gap-2"
+                                >
+                                    {Object.entries(kudosCategories).map(
+                                        ([key, label]) => {
+                                            const Icon =
+                                                KUDOS_ICONS[key] ?? Star;
+                                            const isSelected =
+                                                kudosCategory === key;
+                                            return (
+                                                <label
+                                                    key={key}
+                                                    className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm transition-all ${
+                                                        isSelected
+                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                                            : 'hover:bg-muted/50'
+                                                    }`}
+                                                >
+                                                    <RadioGroupItem
+                                                        value={key}
+                                                        className="sr-only"
+                                                    />
+                                                    <Icon
+                                                        className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}
+                                                    />
+                                                    <span
+                                                        className={
+                                                            isSelected
+                                                                ? 'font-medium'
+                                                                : ''
+                                                        }
+                                                    >
+                                                        {label}
+                                                    </span>
+                                                </label>
+                                            );
+                                        },
+                                    )}
                                 </RadioGroup>
                             </div>
                             <div>
-                                <Label htmlFor="kudos-msg" className="text-xs font-medium">
-                                    Message <span className="text-status-critical">*</span>
+                                <Label
+                                    htmlFor="kudos-msg"
+                                    className="text-xs font-medium"
+                                >
+                                    Message{' '}
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
                                 </Label>
                                 <Textarea
                                     id="kudos-msg"
                                     value={kudosMessage}
-                                    onChange={(e) => setKudosMessage(e.target.value)}
+                                    onChange={(e) =>
+                                        setKudosMessage(e.target.value)
+                                    }
                                     placeholder={`Tell ${employee.name.split(' ')[0]} why they're great...`}
                                     rows={3}
                                     className="mt-1"
                                     maxLength={2000}
                                 />
-                                <p className="mt-1 text-right text-[10px] text-muted-foreground">{kudosMessage.length}/2000</p>
+                                <p className="mt-1 text-right text-[10px] text-muted-foreground">
+                                    {kudosMessage.length}/2000
+                                </p>
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setKudosDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setKudosDialogOpen(false)}
+                            >
+                                Cancel
+                            </Button>
                             <Button
                                 onClick={sendKudos}
                                 disabled={!kudosMessage.trim() || kudosSending}

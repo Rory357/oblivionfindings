@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import {
-    Clock,
     ClipboardList,
+    Clock,
     FileText,
     Home,
     Info,
@@ -16,21 +16,16 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import PrnSheet, { type PrnMedication } from '@/components/prn-sheet';
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import PrnSheet, { type PrnMedication } from '@/components/prn-sheet';
+import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInitials } from '@/hooks/use-initials';
-import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import StaffPageShell from '@/layouts/staff-page-shell';
 
 /* -------------------------------------------------------------------------- */
@@ -171,7 +166,12 @@ export default function ClientCare({
         () => [
             { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
             { key: 'meds', label: 'Meds', icon: Pill, href: '/meds/today' },
-            { key: 'clock', label: 'Clock', icon: Clock, href: '/my-day#clock' },
+            {
+                key: 'clock',
+                label: 'Clock',
+                icon: Clock,
+                href: '/my-day#clock',
+            },
             {
                 key: 'report',
                 label: 'Report',
@@ -204,17 +204,21 @@ export default function ClientCare({
 
             <div className="mx-auto w-full max-w-3xl space-y-4">
                 {/* ── Identity card ─────────────────────────────────────── */}
+                {/* eslint-disable-next-line no-restricted-syntax -- Compact client identity strip has custom avatar/status layout. */}
                 <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
                     <Avatar className="h-14 w-14 shrink-0">
                         {client.photo_url ? (
-                            <AvatarImage src={client.photo_url} alt={fullName} />
+                            <AvatarImage
+                                src={client.photo_url}
+                                alt={fullName}
+                            />
                         ) : null}
                         <AvatarFallback className="bg-muted text-base font-medium">
                             {getInitials(fullName || displayName)}
                         </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-semibold leading-tight">
+                        <p className="truncate text-base leading-tight font-semibold">
                             {fullName}
                         </p>
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
@@ -242,29 +246,30 @@ export default function ClientCare({
                 <ClientSafetyRibbon safety={safety} />
 
                 {/* ── Primary worker action: Give as-needed med ─────────── */}
-                <button
+                <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setPrnOpen(true)}
                     disabled={prnDisabled}
                     aria-label={`Give as-needed med to ${fullName}`}
-                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
+                    className="frontline-focus group h-auto w-full justify-start gap-3 rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold leading-tight">
+                        <p className="text-sm leading-tight font-semibold">
                             Give as-needed med
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {prnCount === 0
                                 ? 'No as-needed meds on their profile yet'
                                 : !can.record_prn
-                                    ? 'You can\u2019t record meds on this profile'
-                                    : `${prnCount} as-needed med${prnCount === 1 ? '' : 's'} ready \u00b7 quick record`}
+                                  ? 'You can\u2019t record meds on this profile'
+                                  : `${prnCount} as-needed med${prnCount === 1 ? '' : 's'} ready \u00b7 quick record`}
                         </p>
                     </div>
-                </button>
+                </Button>
 
                 {/* ── Null-shift context banner ─────────────────────────── */}
                 {/* Explicit, not silent. If the worker isn't clocked in for
@@ -275,11 +280,13 @@ export default function ClientCare({
                         <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-info dark:text-status-info" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-info dark:text-status-info">
-                                You&rsquo;re not on shift for this client right now
+                                You&rsquo;re not on shift for this client right
+                                now
                             </p>
                             <p className="mt-0.5 text-xs text-status-info dark:text-status-info">
-                                You can still give an as-needed med from here. It will save
-                                without a shift link, so note why if the context matters.
+                                You can still give an as-needed med from here.
+                                It will save without a shift link, so note why
+                                if the context matters.
                             </p>
                         </div>
                     </div>
@@ -300,7 +307,7 @@ export default function ClientCare({
 
                         {/* Conditions */}
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Conditions
                             </p>
                             {conditions.length === 0 ? (
@@ -316,7 +323,9 @@ export default function ClientCare({
                                         >
                                             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
                                             <div className="min-w-0">
-                                                <span className="font-medium">{c.label}</span>
+                                                <span className="font-medium">
+                                                    {c.label}
+                                                </span>
                                                 {c.severity && (
                                                     <span className="ml-2 text-xs text-muted-foreground">
                                                         ({c.severity})
@@ -332,7 +341,8 @@ export default function ClientCare({
                                     ))}
                                     {conditions.length > 6 && (
                                         <li className="text-xs text-muted-foreground">
-                                            +{conditions.length - 6} more on the medical page
+                                            +{conditions.length - 6} more on the
+                                            medical page
                                         </li>
                                     )}
                                 </ul>
@@ -342,10 +352,10 @@ export default function ClientCare({
                         {/* Care notes */}
                         {medical_notes && (
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                     Care notes
                                 </p>
-                                <p className="mt-1 whitespace-pre-wrap text-sm text-foreground dark:text-foreground">
+                                <p className="mt-1 text-sm whitespace-pre-wrap text-foreground dark:text-foreground">
                                     {medical_notes}
                                 </p>
                             </div>
@@ -362,7 +372,10 @@ export default function ClientCare({
                                 Risks
                             </span>
                             {active_risks.length > 0 && (
-                                <Badge variant="outline" className="text-[10px]">
+                                <Badge
+                                    variant="outline"
+                                    className="text-[10px]"
+                                >
                                     {active_risks.length} active
                                 </Badge>
                             )}
@@ -370,19 +383,26 @@ export default function ClientCare({
                     </CardHeader>
                     <CardContent className="pt-0 text-sm">
                         {active_risks.length === 0 ? (
-                            <p className="text-muted-foreground">No active risks recorded.</p>
+                            <p className="text-muted-foreground">
+                                No active risks recorded.
+                            </p>
                         ) : (
                             <ul className="space-y-2.5">
                                 {active_risks.slice(0, 5).map((r) => {
                                     const tone = severityTone(r.severity);
                                     return (
-                                        <li key={r.id} className="flex items-start gap-2.5">
+                                        <li
+                                            key={r.id}
+                                            className="flex items-start gap-2.5"
+                                        >
                                             <span
                                                 className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone.dot}`}
                                             />
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                                    <span className="font-medium">{r.label}</span>
+                                                    <span className="font-medium">
+                                                        {r.label}
+                                                    </span>
                                                     <span className="text-xs text-muted-foreground">
                                                         {tone.label}
                                                     </span>
@@ -426,7 +446,9 @@ export default function ClientCare({
                                     className="flex items-start justify-between gap-3"
                                 >
                                     <div className="min-w-0">
-                                        <p className="truncate font-medium">{c.name}</p>
+                                        <p className="truncate font-medium">
+                                            {c.name}
+                                        </p>
                                         {c.relationship && (
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {c.relationship}
@@ -439,7 +461,10 @@ export default function ClientCare({
                                             aria-label={`Call ${c.name}${c.relationship ? ` (${c.relationship})` : ''} at ${c.phone}`}
                                             className="frontline-focus inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
                                         >
-                                            <Phone aria-hidden className="h-4 w-4" />
+                                            <Phone
+                                                aria-hidden
+                                                className="h-4 w-4"
+                                            />
                                             {c.phone}
                                         </a>
                                     )}

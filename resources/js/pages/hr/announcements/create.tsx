@@ -1,12 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -14,6 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -51,33 +51,50 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
             <Head title="Create Announcement" />
 
             <PageShell>
-                <PageHeader title="Create Announcement" description="Publish a new announcement to staff." />
+                <PageHeader
+                    title="Create Announcement"
+                    description="Publish a new announcement to staff."
+                />
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Announcement Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Announcement Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
                                 <Label>Title</Label>
                                 <Input
                                     value={form.data.title}
-                                    onChange={(e) => form.setData('title', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('title', e.target.value)
+                                    }
                                     placeholder="Announcement title"
                                 />
-                                {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
+                                {form.errors.title && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.title}
+                                    </p>
+                                )}
                             </div>
 
                             <div>
                                 <Label>Content</Label>
                                 <Textarea
                                     value={form.data.content}
-                                    onChange={(e) => form.setData('content', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('content', e.target.value)
+                                    }
                                     rows={6}
                                     placeholder="Write your announcement..."
                                 />
-                                {form.errors.content && <p className="mt-1 text-xs text-status-critical">{form.errors.content}</p>}
+                                {form.errors.content && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.content}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -85,12 +102,21 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                     <Label>Priority</Label>
                                     <Select
                                         value={form.data.priority}
-                                        onValueChange={(v) => form.setData('priority', v)}
+                                        onValueChange={(v) =>
+                                            form.setData('priority', v)
+                                        }
                                     >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {priorities.map((p) => (
-                                                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                                <SelectItem
+                                                    key={p.value}
+                                                    value={p.value}
+                                                >
+                                                    {p.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -99,12 +125,21 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                     <Label>Target Audience</Label>
                                     <Select
                                         value={form.data.target_audience}
-                                        onValueChange={(v) => form.setData('target_audience', v)}
+                                        onValueChange={(v) =>
+                                            form.setData('target_audience', v)
+                                        }
                                     >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {audiences.map((a) => (
-                                                <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                                                <SelectItem
+                                                    key={a.value}
+                                                    value={a.value}
+                                                >
+                                                    {a.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -116,7 +151,12 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                     <Label>Target Value</Label>
                                     <Input
                                         value={form.data.target_value}
-                                        onChange={(e) => form.setData('target_value', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'target_value',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder={`Enter ${form.data.target_audience} name or ID`}
                                     />
                                 </div>
@@ -128,18 +168,32 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                     <Input
                                         type="datetime-local"
                                         value={form.data.published_at}
-                                        onChange={(e) => form.setData('published_at', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'published_at',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    <p className="mt-1 text-xs text-muted-foreground">Leave blank to publish immediately.</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Leave blank to publish immediately.
+                                    </p>
                                 </div>
                                 <div>
                                     <Label>Expires At</Label>
                                     <Input
                                         type="datetime-local"
                                         value={form.data.expires_at}
-                                        onChange={(e) => form.setData('expires_at', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'expires_at',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    <p className="mt-1 text-xs text-muted-foreground">Leave blank for no expiry.</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Leave blank for no expiry.
+                                    </p>
                                 </div>
                             </div>
 
@@ -149,20 +203,36 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                         type="checkbox"
                                         id="is_pinned"
                                         checked={form.data.is_pinned}
-                                        onChange={(e) => form.setData('is_pinned', e.target.checked)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'is_pinned',
+                                                e.target.checked,
+                                            )
+                                        }
                                         className="rounded border-border"
                                     />
-                                    <Label htmlFor="is_pinned">Pin this announcement</Label>
+                                    <Label htmlFor="is_pinned">
+                                        Pin this announcement
+                                    </Label>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
                                         id="requires_acknowledgement"
-                                        checked={form.data.requires_acknowledgement}
-                                        onChange={(e) => form.setData('requires_acknowledgement', e.target.checked)}
+                                        checked={
+                                            form.data.requires_acknowledgement
+                                        }
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'requires_acknowledgement',
+                                                e.target.checked,
+                                            )
+                                        }
                                         className="rounded border-border"
                                     />
-                                    <Label htmlFor="requires_acknowledgement">Require staff acknowledgement</Label>
+                                    <Label htmlFor="requires_acknowledgement">
+                                        Require staff acknowledgement
+                                    </Label>
                                 </div>
                             </div>
                         </CardContent>
@@ -172,7 +242,11 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                         <Button type="submit" disabled={form.processing}>
                             Publish Announcement
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => router.get('/hr/announcements')}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => router.get('/hr/announcements')}
+                        >
                             Cancel
                         </Button>
                     </div>

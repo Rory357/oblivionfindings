@@ -1,17 +1,29 @@
-import { useState, FormEvent } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { type BreadcrumbItem } from '@/types';
-import { Plus, AlertTriangle, Grid3X3 } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle, Grid3X3, Plus } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type Skill = {
     id: number;
@@ -47,15 +59,30 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Skills', href: '/hr/skills' },
 ];
 
-export default function SkillsIndex({ skills, categories, skillGaps, filters, can }: Props) {
+export default function SkillsIndex({
+    skills,
+    categories,
+    skillGaps,
+    filters,
+    can,
+}: Props) {
     const [open, setOpen] = useState(false);
-    const [form, setForm] = useState({ name: '', category: '', description: '' });
+    const [form, setForm] = useState({
+        name: '',
+        category: '',
+        description: '',
+    });
     const [processing, setProcessing] = useState(false);
 
-    const set = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
+    const set = (key: string, value: string) =>
+        setForm((p) => ({ ...p, [key]: value }));
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/skills', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/skills',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const handleSubmit = (e: FormEvent) => {
@@ -77,7 +104,9 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold">Skills</h1>
-                        <p className="text-sm text-muted-foreground">Manage organisational skills and competencies</p>
+                        <p className="text-sm text-muted-foreground">
+                            Manage organisational skills and competencies
+                        </p>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" asChild>
@@ -107,7 +136,9 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                     {categories.map((cat) => (
                         <Button
                             key={cat}
-                            variant={filters.category === cat ? 'default' : 'outline'}
+                            variant={
+                                filters.category === cat ? 'default' : 'outline'
+                            }
                             size="sm"
                             onClick={() => onFilter({ category: cat })}
                         >
@@ -134,12 +165,18 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                         <CardContent>
                             <div className="flex flex-wrap gap-2">
                                 {skillGaps.slice(0, 8).map((gap) => (
-                                    <Badge key={gap.skill_id} variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                    <Badge
+                                        key={gap.skill_id}
+                                        variant="outline"
+                                        className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                    >
                                         {gap.name}: {gap.coverage_pct}% coverage
                                     </Badge>
                                 ))}
                                 {skillGaps.length > 8 && (
-                                    <Badge variant="outline">+{skillGaps.length - 8} more</Badge>
+                                    <Badge variant="outline">
+                                        +{skillGaps.length - 8} more
+                                    </Badge>
                                 )}
                             </div>
                         </CardContent>
@@ -155,39 +192,53 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                                     <TableHead>Name</TableHead>
                                     <TableHead>Category</TableHead>
                                     <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Employees</TableHead>
+                                    <TableHead className="text-right">
+                                        Employees
+                                    </TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {skills.data.map((skill) => (
                                     <TableRow key={skill.id}>
-                                        <TableCell className="font-medium">{skill.name}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {skill.name}
+                                        </TableCell>
                                         <TableCell>
-                                            <Badge variant="secondary">{skill.category}</Badge>
+                                            <Badge variant="secondary">
+                                                {skill.category}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell className="max-w-xs truncate text-muted-foreground">
                                             {skill.description || '-'}
                                         </TableCell>
-                                        <TableCell className="text-right">{skill.employee_skills_count}</TableCell>
+                                        <TableCell className="text-right">
+                                            {skill.employee_skills_count}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge
                                                 variant="outline"
                                                 className={
                                                     skill.is_active
-                                                        ? 'border-status-success/30 text-status-success bg-status-success'
-                                                        : 'border-border/30 text-muted-foreground bg-muted-foreground/80/10'
+                                                        ? 'border-status-success/30 bg-status-success text-status-success'
+                                                        : 'bg-muted-foreground/80/10 border-border/30 text-muted-foreground'
                                                 }
                                             >
-                                                {skill.is_active ? 'Active' : 'Inactive'}
+                                                {skill.is_active
+                                                    ? 'Active'
+                                                    : 'Inactive'}
                                             </Badge>
                                         </TableCell>
                                     </TableRow>
                                 ))}
                                 {skills.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                                            No skills found. Create your first skill to get started.
+                                        <TableCell
+                                            colSpan={5}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No skills found. Create your first
+                                            skill to get started.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -211,19 +262,46 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <Label>Name</Label>
-                            <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. First Aid" required />
+                            <Input
+                                value={form.name}
+                                onChange={(e) => set('name', e.target.value)}
+                                placeholder="e.g. First Aid"
+                                required
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>Category</Label>
-                            <Input value={form.category} onChange={(e) => set('category', e.target.value)} placeholder="e.g. Health & Safety" required />
+                            <Input
+                                value={form.category}
+                                onChange={(e) =>
+                                    set('category', e.target.value)
+                                }
+                                placeholder="e.g. Health & Safety"
+                                required
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>Description</Label>
-                            <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} placeholder="Optional description..." />
+                            <Textarea
+                                value={form.description}
+                                onChange={(e) =>
+                                    set('description', e.target.value)
+                                }
+                                rows={3}
+                                placeholder="Optional description..."
+                            />
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                            <Button type="submit" disabled={processing}>{processing ? 'Creating...' : 'Create'}</Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={processing}>
+                                {processing ? 'Creating...' : 'Create'}
+                            </Button>
                         </div>
                     </form>
                 </DialogContent>

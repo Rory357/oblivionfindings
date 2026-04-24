@@ -104,7 +104,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <div className="space-y-2">
                                     <Label htmlFor="user_id">
                                         Subject (Staff Member){' '}
-                                        <span className="text-status-critical">*</span>
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.user_id}
@@ -177,7 +179,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <div className="space-y-2">
                                     <Label htmlFor="case_type">
                                         Case Type{' '}
-                                        <span className="text-status-critical">*</span>
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.case_type}
@@ -216,7 +220,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <div className="space-y-2">
                                     <Label htmlFor="severity">
                                         Severity{' '}
-                                        <span className="text-status-critical">*</span>
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.severity}
@@ -259,7 +265,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                             <div className="space-y-2">
                                 <Label htmlFor="title">
                                     Case Title{' '}
-                                    <span className="text-status-critical">*</span>
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
                                 </Label>
                                 <Input
                                     id="title"
@@ -269,7 +277,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                         setData('title', e.target.value)
                                     }
                                     className={
-                                        errors.title ? 'border-status-critical/30' : ''
+                                        errors.title
+                                            ? 'border-status-critical/30'
+                                            : ''
                                     }
                                 />
                                 {errors.title && (

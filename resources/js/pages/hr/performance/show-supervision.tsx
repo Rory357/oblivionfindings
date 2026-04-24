@@ -1,9 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Calendar, User, CheckCircle, Clock, FileText } from 'lucide-react';
+import {
+    ArrowLeft,
+    Calendar,
+    CheckCircle,
+    Clock,
+    FileText,
+    User,
+} from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -38,17 +45,22 @@ export default function ShowSupervision({ note, can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Performance & Supervision', href: '/hr/performance' },
-        { title: 'Supervision Note', href: `/hr/performance/supervision/${note.id}` },
+        {
+            title: 'Supervision Note',
+            href: `/hr/performance/supervision/${note.id}`,
+        },
     ];
 
     const formatDate = (value?: string | null) => {
         if (!value) return 'Not set';
         const d = new Date(value);
-        return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
+        return Number.isNaN(d.getTime())
+            ? value
+            : d.toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+              });
     };
 
     const getSessionTypeLabel = (type: string) => {
@@ -67,7 +79,7 @@ export default function ShowSupervision({ note, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Supervision Note - ${note.employee.name}`} />
 
-            <div className="space-y-6 max-w-4xl">
+            <div className="max-w-4xl space-y-6">
                 <div className="flex items-center gap-4">
                     <Link href="/hr/performance">
                         <Button variant="outline" size="sm">
@@ -78,15 +90,23 @@ export default function ShowSupervision({ note, can }: Props) {
                     <div>
                         <h1 className="text-2xl font-bold">Supervision Note</h1>
                         <p className="text-muted-foreground">
-                            {getSessionTypeLabel(note.session_type)} with {note.employee.name}
+                            {getSessionTypeLabel(note.session_type)} with{' '}
+                            {note.employee.name}
                         </p>
                     </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <Badge variant={note.employee_acknowledged ? 'default' : 'secondary'}>
+                    <Badge
+                        variant={
+                            note.employee_acknowledged ? 'default' : 'secondary'
+                        }
+                    >
                         {note.employee_acknowledged ? (
-                            <><CheckCircle className="mr-1 h-3 w-3" /> Acknowledged</>
+                            <>
+                                <CheckCircle className="mr-1 h-3 w-3" />{' '}
+                                Acknowledged
+                            </>
                         ) : (
                             'Pending Acknowledgment'
                         )}
@@ -106,12 +126,20 @@ export default function ShowSupervision({ note, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <div className="text-sm text-muted-foreground">Staff Member</div>
-                                <div className="font-medium">{note.employee.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Staff Member
+                                </div>
+                                <div className="font-medium">
+                                    {note.employee.name}
+                                </div>
                             </div>
                             <div>
-                                <div className="text-sm text-muted-foreground">Supervisor</div>
-                                <div className="font-medium">{note.supervisor.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Supervisor
+                                </div>
+                                <div className="font-medium">
+                                    {note.supervisor.name}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -126,24 +154,40 @@ export default function ShowSupervision({ note, can }: Props) {
                         <CardContent className="space-y-3">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Date</div>
-                                    <div className="font-medium">{formatDate(note.session_date)}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Date
+                                    </div>
+                                    <div className="font-medium">
+                                        {formatDate(note.session_date)}
+                                    </div>
                                 </div>
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Duration</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Duration
+                                    </div>
                                     <div className="font-medium">
-                                        {note.duration_minutes ? `${note.duration_minutes} min` : 'Not recorded'}
+                                        {note.duration_minutes
+                                            ? `${note.duration_minutes} min`
+                                            : 'Not recorded'}
                                     </div>
                                 </div>
                             </div>
                             <div>
-                                <div className="text-sm text-muted-foreground">Type</div>
-                                <div className="font-medium">{getSessionTypeLabel(note.session_type)}</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Type
+                                </div>
+                                <div className="font-medium">
+                                    {getSessionTypeLabel(note.session_type)}
+                                </div>
                             </div>
                             {note.next_session_date && (
                                 <div>
-                                    <div className="text-sm text-muted-foreground">Next Session</div>
-                                    <div className="font-medium">{formatDate(note.next_session_date)}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Next Session
+                                    </div>
+                                    <div className="font-medium">
+                                        {formatDate(note.next_session_date)}
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
@@ -159,9 +203,13 @@ export default function ShowSupervision({ note, can }: Props) {
                     </CardHeader>
                     <CardContent>
                         {note.topics_discussed ? (
-                            <div className="whitespace-pre-wrap text-sm">{note.topics_discussed}</div>
+                            <div className="text-sm whitespace-pre-wrap">
+                                {note.topics_discussed}
+                            </div>
                         ) : (
-                            <p className="text-muted-foreground italic">No discussion notes recorded</p>
+                            <p className="text-muted-foreground italic">
+                                No discussion notes recorded
+                            </p>
                         )}
                     </CardContent>
                 </Card>
@@ -177,8 +225,13 @@ export default function ShowSupervision({ note, can }: Props) {
                         <CardContent>
                             <ul className="space-y-2">
                                 {note.actions_agreed.map((action, index) => (
-                                    <li key={index} className="flex items-start gap-2 text-sm">
-                                        <span className="font-medium text-muted-foreground">{index + 1}.</span>
+                                    <li
+                                        key={index}
+                                        className="flex items-start gap-2 text-sm"
+                                    >
+                                        <span className="font-medium text-muted-foreground">
+                                            {index + 1}.
+                                        </span>
                                         <span>{action}</span>
                                     </li>
                                 ))}
@@ -187,28 +240,32 @@ export default function ShowSupervision({ note, can }: Props) {
                     </Card>
                 )}
 
-                {note.employee_acknowledged && note.employee_acknowledged_at && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <CheckCircle className="h-4 w-4 text-status-success" />
-                                Employee Acknowledgment
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Acknowledged on {formatDate(note.employee_acknowledged_at)}
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
+                {note.employee_acknowledged &&
+                    note.employee_acknowledged_at && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <CheckCircle className="h-4 w-4 text-status-success" />
+                                    Employee Acknowledgment
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-sm text-muted-foreground">
+                                    Acknowledged on{' '}
+                                    {formatDate(note.employee_acknowledged_at)}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
 
                 <div className="flex items-center justify-end gap-4 pt-4">
                     <Link href="/hr/performance">
                         <Button variant="outline">Back to List</Button>
                     </Link>
                     {can.manage && (
-                        <Link href={`/hr/performance/supervision/${note.id}/edit`}>
+                        <Link
+                            href={`/hr/performance/supervision/${note.id}/edit`}
+                        >
                             <Button>Edit Note</Button>
                         </Link>
                     )}

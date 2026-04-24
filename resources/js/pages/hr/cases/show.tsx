@@ -1,14 +1,35 @@
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, Briefcase, Calendar, Clock, Plus, User, XCircle } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Briefcase,
+    Calendar,
+    Clock,
+    Plus,
+    User,
+    XCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -80,22 +101,28 @@ const requiredGoodFaithChecks = [
 const badgeClassByStatus: Record<string, string> = {
     open: 'bg-status-info-bg text-status-info border-status-info/30',
     under_investigation: 'bg-primary/10 text-primary border-primary',
-    awaiting_response: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    resolved: 'bg-status-success-bg text-status-success border-status-success/30',
+    awaiting_response:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
+    resolved:
+        'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassByCaseType: Record<string, string> = {
-    disciplinary: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    grievance: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    disciplinary:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    grievance:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     investigation: 'bg-primary/10 text-primary border-primary',
-    welfare: 'bg-status-success-bg text-status-success border-status-success/30',
+    welfare:
+        'bg-status-success-bg text-status-success border-status-success/30',
     complaint: 'bg-status-info-bg text-status-info border-status-info/30',
     other: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassBySeverity: Record<string, string> = {
-    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    critical:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
     high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     low: 'bg-muted text-foreground border-border',
@@ -147,16 +174,25 @@ const getEventDotClass = (eventType: string) => {
 };
 
 const outcomeStages = ['outcome_decided', 'outcome_communicated', 'closed'];
-const visibilityFilterValues = ['all', 'internal', 'restricted', 'full'] as const;
+const visibilityFilterValues = [
+    'all',
+    'internal',
+    'restricted',
+    'full',
+] as const;
 type VisibilityFilter = (typeof visibilityFilterValues)[number];
 
-const visibilityBadgeClass: Record<'internal' | 'restricted' | 'full', string> = {
-    internal: 'bg-muted text-foreground border-border',
-    restricted: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    full: 'bg-status-success-bg text-status-success border-status-success/30',
-};
+const visibilityBadgeClass: Record<'internal' | 'restricted' | 'full', string> =
+    {
+        internal: 'bg-muted text-foreground border-border',
+        restricted:
+            'bg-status-warning-bg text-status-warning border-status-warning/30',
+        full: 'bg-status-success-bg text-status-success border-status-success/30',
+    };
 
-const normalizeVisibility = (value?: string): 'internal' | 'restricted' | 'full' => {
+const normalizeVisibility = (
+    value?: string,
+): 'internal' | 'restricted' | 'full' => {
     if (value === 'restricted') return 'restricted';
     if (value === 'full') return 'full';
     return 'internal';
@@ -172,24 +208,32 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
     const page = usePage<{ errors?: Record<string, string | string[]> }>();
 
     const isClosed = ['closed', 'resolved'].includes(hrCase.status);
-    const disciplinaryActions = hrCase.disciplinary_actions ?? hrCase.disciplinaryActions ?? [];
+    const disciplinaryActions =
+        hrCase.disciplinary_actions ?? hrCase.disciplinaryActions ?? [];
     const assignedTo = hrCase.assigned_to ?? hrCase.assignedTo ?? null;
 
     const goodFaithError = page.props?.errors?.good_faith;
     const stageError = page.props?.errors?.stage;
-    const [timelineVisibilityFilter, setTimelineVisibilityFilter] = useState<VisibilityFilter>('all');
+    const [timelineVisibilityFilter, setTimelineVisibilityFilter] =
+        useState<VisibilityFilter>('all');
 
     const filteredTimeline = useMemo(() => {
         if (timelineVisibilityFilter === 'all') {
             return timeline;
         }
 
-        return timeline.filter((item) => normalizeVisibility(item.visibility) === timelineVisibilityFilter);
+        return timeline.filter(
+            (item) =>
+                normalizeVisibility(item.visibility) ===
+                timelineVisibilityFilter,
+        );
     }, [timeline, timelineVisibilityFilter]);
 
     const [closeCaseDialogOpen, setCloseCaseDialogOpen] = useState(false);
     const [closeCaseOutcome, setCloseCaseOutcome] = useState('');
-    const [closeCaseOutcomeType, setCloseCaseOutcomeType] = useState<'resolved' | 'no_action'>('resolved');
+    const [closeCaseOutcomeType, setCloseCaseOutcomeType] = useState<
+        'resolved' | 'no_action'
+    >('resolved');
 
     function closeCase() {
         setCloseCaseOutcome('');
@@ -199,16 +243,24 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
 
     function submitCloseCase() {
         if (!closeCaseOutcome.trim()) return;
-        router.post(`/hr/cases/${hrCase.id}/close`, {
-            outcome: closeCaseOutcome.trim(),
-            outcome_type: closeCaseOutcomeType,
-        }, {
-            onSuccess: () => setCloseCaseDialogOpen(false),
-        });
+        router.post(
+            `/hr/cases/${hrCase.id}/close`,
+            {
+                outcome: closeCaseOutcome.trim(),
+                outcome_type: closeCaseOutcomeType,
+            },
+            {
+                onSuccess: () => setCloseCaseDialogOpen(false),
+            },
+        );
     }
 
     function advanceDisciplinaryStage(actionId: number) {
-        router.post(`/hr/cases/disciplinary/${actionId}/advance`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/cases/disciplinary/${actionId}/advance`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -223,25 +275,45 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                             {hrCase.case_number}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={badgeClassByStatus[hrCase.status] ?? badgeClassByStatus.closed}>
+                            <Badge
+                                className={
+                                    badgeClassByStatus[hrCase.status] ??
+                                    badgeClassByStatus.closed
+                                }
+                            >
                                 {hrCase.status.replace(/_/g, ' ')}
                             </Badge>
-                            <Badge className={badgeClassByCaseType[hrCase.case_type] ?? badgeClassByCaseType.other}>
+                            <Badge
+                                className={
+                                    badgeClassByCaseType[hrCase.case_type] ??
+                                    badgeClassByCaseType.other
+                                }
+                            >
                                 {hrCase.case_type.replace(/_/g, ' ')}
                             </Badge>
-                            <Badge className={badgeClassBySeverity[hrCase.severity] ?? badgeClassBySeverity.low}>
+                            <Badge
+                                className={
+                                    badgeClassBySeverity[hrCase.severity] ??
+                                    badgeClassBySeverity.low
+                                }
+                            >
                                 {hrCase.severity}
                             </Badge>
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/hr/cases" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                        <Link
+                            href="/hr/cases"
+                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                        >
                             <ArrowLeft className="mr-1 inline h-3.5 w-3.5" />
                             Back to list
                         </Link>
                         {can.manage && !isClosed ? (
                             <>
-                                <Link href={`/hr/cases/${hrCase.id}/events/create`}>
+                                <Link
+                                    href={`/hr/cases/${hrCase.id}/events/create`}
+                                >
                                     <Button size="sm" variant="outline">
                                         <Calendar className="mr-1.5 h-4 w-4" />
                                         Add Event
@@ -266,7 +338,10 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(goodFaithError)
                                 ? goodFaithError.join(' ')
-                                : goodFaithError || (Array.isArray(stageError) ? stageError.join(' ') : stageError)}
+                                : goodFaithError ||
+                                  (Array.isArray(stageError)
+                                      ? stageError.join(' ')
+                                      : stageError)}
                         </CardContent>
                     </Card>
                 ) : null}
@@ -281,28 +356,55 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <div className="text-xs text-muted-foreground">Title</div>
-                                <div className="font-medium">{hrCase.title}</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Title
+                                </div>
+                                <div className="font-medium">
+                                    {hrCase.title}
+                                </div>
                             </div>
-                            <div className="whitespace-pre-wrap text-sm text-foreground">{hrCase.description}</div>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div>
-                                    <div className="text-xs text-muted-foreground">Opened</div>
-                                    <div className="font-medium">{formatDate(hrCase.opened_at)}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-muted-foreground">Closed</div>
-                                    <div className="font-medium">{formatDate(hrCase.closed_at)}</div>
-                                </div>
+                            <div className="text-sm whitespace-pre-wrap text-foreground">
+                                {hrCase.description}
                             </div>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
-                                    <div className="text-xs text-muted-foreground">Outcome Type</div>
-                                    <div className="font-medium">{hrCase.outcome_type ? hrCase.outcome_type.replace(/_/g, ' ') : 'Not set'}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Opened
+                                    </div>
+                                    <div className="font-medium">
+                                        {formatDate(hrCase.opened_at)}
+                                    </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-muted-foreground">Outcome</div>
-                                    <div className="font-medium">{hrCase.outcome || 'Not set'}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Closed
+                                    </div>
+                                    <div className="font-medium">
+                                        {formatDate(hrCase.closed_at)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Outcome Type
+                                    </div>
+                                    <div className="font-medium">
+                                        {hrCase.outcome_type
+                                            ? hrCase.outcome_type.replace(
+                                                  /_/g,
+                                                  ' ',
+                                              )
+                                            : 'Not set'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Outcome
+                                    </div>
+                                    <div className="font-medium">
+                                        {hrCase.outcome || 'Not set'}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -317,17 +419,33 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-muted-foreground">Subject</div>
-                                <div className="font-medium">{hrCase.subject?.name || 'Unknown'}</div>
-                                {hrCase.subject?.email ? <div className="text-xs text-muted-foreground">{hrCase.subject.email}</div> : null}
+                                <div className="text-xs text-muted-foreground">
+                                    Subject
+                                </div>
+                                <div className="font-medium">
+                                    {hrCase.subject?.name || 'Unknown'}
+                                </div>
+                                {hrCase.subject?.email ? (
+                                    <div className="text-xs text-muted-foreground">
+                                        {hrCase.subject.email}
+                                    </div>
+                                ) : null}
                             </div>
                             <div className="text-sm">
-                                <div className="text-xs text-muted-foreground">Opened By</div>
-                                <div className="font-medium">{hrCase.reported_by?.name || 'Unknown'}</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Opened By
+                                </div>
+                                <div className="font-medium">
+                                    {hrCase.reported_by?.name || 'Unknown'}
+                                </div>
                             </div>
                             <div className="text-sm">
-                                <div className="text-xs text-muted-foreground">Assigned To</div>
-                                <div className="font-medium">{assignedTo?.name || 'Unassigned'}</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Assigned To
+                                </div>
+                                <div className="font-medium">
+                                    {assignedTo?.name || 'Unassigned'}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -343,15 +461,24 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                             <div className="w-full sm:w-56">
                                 <Select
                                     value={timelineVisibilityFilter}
-                                    onValueChange={(value) => setTimelineVisibilityFilter(value as VisibilityFilter)}
+                                    onValueChange={(value) =>
+                                        setTimelineVisibilityFilter(
+                                            value as VisibilityFilter,
+                                        )
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Visibility filter" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {visibilityFilterValues.map((value) => (
-                                            <SelectItem key={value} value={value}>
-                                                {value === 'all' ? 'All visible events' : value}
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {value === 'all'
+                                                    ? 'All visible events'
+                                                    : value}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -362,32 +489,69 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     <CardContent>
                         {filteredTimeline.length > 0 ? (
                             <div className="relative space-y-4 pl-6">
-                                <div className="absolute bottom-2 left-[9px] top-2 w-0.5 bg-muted" />
+                                <div className="absolute top-2 bottom-2 left-[9px] w-0.5 bg-muted" />
                                 {filteredTimeline.map((item) => (
-                                    <div key={`${item.type}-${item.id}`} className="relative">
-                                        <div className={`absolute -left-6 top-1.5 h-3 w-3 rounded-full ${getEventDotClass(item.event_type)}`} />
+                                    <div
+                                        key={`${item.type}-${item.id}`}
+                                        className="relative"
+                                    >
+                                        <div
+                                            className={`absolute top-1.5 -left-6 h-3 w-3 rounded-full ${getEventDotClass(item.event_type)}`}
+                                        />
                                         <div className="rounded-md border p-3">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
-                                                    <Badge variant="outline" className="mb-1 mr-1 capitalize">
-                                                        {item.event_type.replace(/_/g, ' ')}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="mr-1 mb-1 capitalize"
+                                                    >
+                                                        {item.event_type.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
-                                                    <Badge className={visibilityBadgeClass[normalizeVisibility(item.visibility)]}>
-                                                        {normalizeVisibility(item.visibility)}
+                                                    <Badge
+                                                        className={
+                                                            visibilityBadgeClass[
+                                                                normalizeVisibility(
+                                                                    item.visibility,
+                                                                )
+                                                            ]
+                                                        }
+                                                    >
+                                                        {normalizeVisibility(
+                                                            item.visibility,
+                                                        )}
                                                     </Badge>
-                                                    <div className="text-sm font-medium">{item.title}</div>
-                                                    {item.description ? <div className="text-sm text-foreground">{item.description}</div> : null}
+                                                    <div className="text-sm font-medium">
+                                                        {item.title}
+                                                    </div>
+                                                    {item.description ? (
+                                                        <div className="text-sm text-foreground">
+                                                            {item.description}
+                                                        </div>
+                                                    ) : null}
                                                 </div>
-                                                <div className="shrink-0 text-xs text-muted-foreground">{formatDateTime(item.occurred_at)}</div>
+                                                <div className="shrink-0 text-xs text-muted-foreground">
+                                                    {formatDateTime(
+                                                        item.occurred_at,
+                                                    )}
+                                                </div>
                                             </div>
-                                            {item.created_by ? <div className="mt-1 text-xs text-muted-foreground">By {item.created_by}</div> : null}
+                                            {item.created_by ? (
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    By {item.created_by}
+                                                </div>
+                                            ) : null}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
                             <div className="py-6 text-center text-sm text-muted-foreground">
-                                {timeline.length > 0 ? 'No timeline events for this visibility filter.' : 'No events recorded yet.'}
+                                {timeline.length > 0
+                                    ? 'No timeline events for this visibility filter.'
+                                    : 'No events recorded yet.'}
                             </div>
                         )}
                     </CardContent>
@@ -402,7 +566,9 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                     Disciplinary Actions
                                 </CardTitle>
                                 {can.disciplinary && !isClosed ? (
-                                    <Link href={`/hr/cases/${hrCase.id}/disciplinary/create`}>
+                                    <Link
+                                        href={`/hr/cases/${hrCase.id}/disciplinary/create`}
+                                    >
                                         <Button size="sm" variant="outline">
                                             <Plus className="mr-1.5 h-4 w-4" />
                                             Add Action
@@ -413,36 +579,84 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {disciplinaryActions.map((action) => {
-                                const checklist = action.good_faith_checklist ?? {};
-                                const missingChecks = requiredGoodFaithChecks.filter((key) => !checklist[key]);
-                                const canAdvance = !isClosed && action.stage !== 'closed';
+                                const checklist =
+                                    action.good_faith_checklist ?? {};
+                                const missingChecks =
+                                    requiredGoodFaithChecks.filter(
+                                        (key) => !checklist[key],
+                                    );
+                                const canAdvance =
+                                    !isClosed && action.stage !== 'closed';
 
                                 return (
-                                    <div key={action.id} className="rounded-md border p-3">
+                                    <div
+                                        key={action.id}
+                                        className="rounded-md border p-3"
+                                    >
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                             <div className="space-y-1">
                                                 <div className="font-medium capitalize">
-                                                    {action.action_type.replace(/_/g, ' ')} - {action.stage.replace(/_/g, ' ')}
+                                                    {action.action_type.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}{' '}
+                                                    -{' '}
+                                                    {action.stage.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
                                                 </div>
-                                                <div className="text-sm text-foreground">{action.allegation_summary}</div>
-                                                {action.outcome ? <div className="text-sm text-muted-foreground">Outcome: {action.outcome}</div> : null}
+                                                <div className="text-sm text-foreground">
+                                                    {action.allegation_summary}
+                                                </div>
+                                                {action.outcome ? (
+                                                    <div className="text-sm text-muted-foreground">
+                                                        Outcome:{' '}
+                                                        {action.outcome}
+                                                    </div>
+                                                ) : null}
                                                 <div className="text-xs text-muted-foreground">
-                                                    Employee: {action.employee?.name ?? 'Unknown'} | Investigator: {action.investigator?.name ?? 'Unassigned'} | Created:{' '}
-                                                    {formatDate(action.created_at)}
+                                                    Employee:{' '}
+                                                    {action.employee?.name ??
+                                                        'Unknown'}{' '}
+                                                    | Investigator:{' '}
+                                                    {action.investigator
+                                                        ?.name ??
+                                                        'Unassigned'}{' '}
+                                                    | Created:{' '}
+                                                    {formatDate(
+                                                        action.created_at,
+                                                    )}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    Response deadline: {formatDate(action.response_deadline)}
+                                                    Response deadline:{' '}
+                                                    {formatDate(
+                                                        action.response_deadline,
+                                                    )}
                                                 </div>
                                             </div>
                                             {can.disciplinary ? (
                                                 <div className="flex items-center gap-2">
-                                                    <Link href={`/hr/cases/disciplinary/${action.id}/edit`}>
-                                                        <Button size="sm" variant="outline">
+                                                    <Link
+                                                        href={`/hr/cases/disciplinary/${action.id}/edit`}
+                                                    >
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                        >
                                                             Edit
                                                         </Button>
                                                     </Link>
                                                     {canAdvance ? (
-                                                        <Button size="sm" variant="outline" onClick={() => advanceDisciplinaryStage(action.id)}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                advanceDisciplinaryStage(
+                                                                    action.id,
+                                                                )
+                                                            }
+                                                        >
                                                             Advance Stage
                                                         </Button>
                                                     ) : null}
@@ -450,55 +664,92 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                             ) : null}
                                         </div>
 
-                                        {outcomeStages.includes(action.stage) ? (
+                                        {outcomeStages.includes(
+                                            action.stage,
+                                        ) ? (
                                             <div className="mt-2 rounded border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
-                                                Good-faith checklist: {missingChecks.length === 0 ? 'complete' : `${missingChecks.length} item(s) missing`}
+                                                Good-faith checklist:{' '}
+                                                {missingChecks.length === 0
+                                                    ? 'complete'
+                                                    : `${missingChecks.length} item(s) missing`}
                                             </div>
                                         ) : null}
                                     </div>
                                 );
                             })}
                             {disciplinaryActions.length === 0 ? (
-                                <p className="py-4 text-center text-sm text-muted-foreground">No disciplinary actions recorded.</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">
+                                    No disciplinary actions recorded.
+                                </p>
                             ) : null}
                         </CardContent>
                     </Card>
                 ) : null}
             </div>
 
-            <Dialog open={closeCaseDialogOpen} onOpenChange={setCloseCaseDialogOpen}>
+            <Dialog
+                open={closeCaseDialogOpen}
+                onOpenChange={setCloseCaseDialogOpen}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Close Case</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="case-outcome">Outcome Summary (required)</Label>
+                            <Label htmlFor="case-outcome">
+                                Outcome Summary (required)
+                            </Label>
                             <Textarea
                                 id="case-outcome"
                                 value={closeCaseOutcome}
-                                onChange={(e) => setCloseCaseOutcome(e.target.value)}
+                                onChange={(e) =>
+                                    setCloseCaseOutcome(e.target.value)
+                                }
                                 placeholder="Enter the final case outcome summary..."
                                 rows={3}
                             />
                         </div>
                         <div className="space-y-2">
                             <Label>Outcome Type</Label>
-                            <RadioGroup value={closeCaseOutcomeType} onValueChange={(v) => setCloseCaseOutcomeType(v as 'resolved' | 'no_action')}>
+                            <RadioGroup
+                                value={closeCaseOutcomeType}
+                                onValueChange={(v) =>
+                                    setCloseCaseOutcomeType(
+                                        v as 'resolved' | 'no_action',
+                                    )
+                                }
+                            >
                                 <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="resolved" id="resolved" />
+                                    <RadioGroupItem
+                                        value="resolved"
+                                        id="resolved"
+                                    />
                                     <Label htmlFor="resolved">Resolved</Label>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="no_action" id="no_action" />
+                                    <RadioGroupItem
+                                        value="no_action"
+                                        id="no_action"
+                                    />
                                     <Label htmlFor="no_action">No Action</Label>
                                 </div>
                             </RadioGroup>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setCloseCaseDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={submitCloseCase} disabled={!closeCaseOutcome.trim()}>Close Case</Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCloseCaseDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={submitCloseCase}
+                            disabled={!closeCaseOutcome.trim()}
+                        >
+                            Close Case
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

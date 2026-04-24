@@ -1,11 +1,11 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { type BreadcrumbItem } from '@/types';
-import { Plus, BarChart3, Eye } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { BarChart3, Eye, Plus } from 'lucide-react';
 
 type Survey = {
     id: number;
@@ -35,9 +35,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
-    active: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Active' },
-    closed: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Closed' },
+    draft: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        label: 'Draft',
+    },
+    active: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Active',
+    },
+    closed: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Closed',
+    },
 };
 
 const typeLabels: Record<string, string> = {
@@ -49,7 +60,11 @@ const typeLabels: Record<string, string> = {
 
 export default function SurveyIndex({ surveys, filters, can }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/surveys', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/surveys',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -59,7 +74,9 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold">Employee Surveys</h1>
-                        <p className="text-sm text-muted-foreground">Create and manage satisfaction surveys</p>
+                        <p className="text-sm text-muted-foreground">
+                            Create and manage satisfaction surveys
+                        </p>
                     </div>
                     {can.create && (
                         <Button asChild size="sm">
@@ -76,9 +93,16 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
                     {['all', 'draft', 'active', 'closed'].map((s) => (
                         <Button
                             key={s}
-                            variant={(!filters.status && s === 'all') || filters.status === s ? 'default' : 'outline'}
+                            variant={
+                                (!filters.status && s === 'all') ||
+                                filters.status === s
+                                    ? 'default'
+                                    : 'outline'
+                            }
                             size="sm"
-                            onClick={() => onFilter({ status: s === 'all' ? null : s })}
+                            onClick={() =>
+                                onFilter({ status: s === 'all' ? null : s })
+                            }
                         >
                             <span className="capitalize">{s}</span>
                         </Button>
@@ -88,36 +112,58 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
                 {/* Survey List */}
                 <div className="grid gap-4">
                     {surveys.data.map((survey) => {
-                        const config = statusConfig[survey.status] || statusConfig.draft;
+                        const config =
+                            statusConfig[survey.status] || statusConfig.draft;
                         return (
                             <Card key={survey.id}>
                                 <CardHeader className="pb-3">
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <CardTitle className="text-base">{survey.title}</CardTitle>
+                                            <CardTitle className="text-base">
+                                                {survey.title}
+                                            </CardTitle>
                                             <div className="mt-1 flex items-center gap-2">
-                                                <Badge variant="outline" className={config.className}>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={config.className}
+                                                >
                                                     {config.label}
                                                 </Badge>
                                                 <Badge variant="secondary">
-                                                    {typeLabels[survey.survey_type] || survey.survey_type}
+                                                    {typeLabels[
+                                                        survey.survey_type
+                                                    ] || survey.survey_type}
                                                 </Badge>
                                                 {survey.is_anonymous && (
-                                                    <Badge variant="secondary">Anonymous</Badge>
+                                                    <Badge variant="secondary">
+                                                        Anonymous
+                                                    </Badge>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
                                             {survey.status === 'active' && (
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/hr/surveys/${survey.id}/respond`}>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/hr/surveys/${survey.id}/respond`}
+                                                    >
                                                         <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
                                                         Respond
                                                     </Link>
                                                 </Button>
                                             )}
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link href={`/hr/surveys/${survey.id}`}>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/hr/surveys/${survey.id}`}
+                                                >
                                                     <Eye className="mr-1.5 h-3.5 w-3.5" />
                                                     Results
                                                 </Link>
@@ -127,10 +173,20 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
                                 </CardHeader>
                                 <CardContent className="pt-0">
                                     <div className="flex gap-6 text-sm text-muted-foreground">
-                                        <span>{survey.responses_count} responses</span>
-                                        {survey.starts_at && <span>Starts: {survey.starts_at}</span>}
-                                        {survey.ends_at && <span>Ends: {survey.ends_at}</span>}
-                                        {survey.created_by && <span>By: {survey.created_by}</span>}
+                                        <span>
+                                            {survey.responses_count} responses
+                                        </span>
+                                        {survey.starts_at && (
+                                            <span>
+                                                Starts: {survey.starts_at}
+                                            </span>
+                                        )}
+                                        {survey.ends_at && (
+                                            <span>Ends: {survey.ends_at}</span>
+                                        )}
+                                        {survey.created_by && (
+                                            <span>By: {survey.created_by}</span>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -139,7 +195,8 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
                     {surveys.data.length === 0 && (
                         <Card>
                             <CardContent className="py-12 text-center text-muted-foreground">
-                                No surveys found. Create your first survey to get started.
+                                No surveys found. Create your first survey to
+                                get started.
                             </CardContent>
                         </Card>
                     )}

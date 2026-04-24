@@ -1,14 +1,26 @@
 import TwoFactorRecoveryCodes from '@/components/two-factor-recovery-codes';
 import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { disable, enable, show } from '@/routes/two-factor';
 import { type BreadcrumbItem } from '@/types';
 import { Form, Head } from '@inertiajs/react';
-import { CheckCircle2, AlertCircle, Shield, ShieldBan, ShieldCheck } from 'lucide-react';
+import {
+    AlertCircle,
+    CheckCircle2,
+    Shield,
+    ShieldBan,
+    ShieldCheck,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface TwoFactorProps {
@@ -72,17 +84,22 @@ export default function TwoFactor({
                         {twoFactorEnabled ? (
                             <div className="space-y-6">
                                 <p className="text-sm text-muted-foreground">
-                                    With two-factor authentication enabled, you will be prompted for
-                                    a secure, random pin during login, which you can retrieve from
-                                    the TOTP-supported application on your phone.
+                                    With two-factor authentication enabled, you
+                                    will be prompted for a secure, random pin
+                                    during login, which you can retrieve from
+                                    the TOTP-supported application on your
+                                    phone.
                                 </p>
 
                                 {/* QR Code display */}
                                 {qrCodeSvg && (
                                     <div className="flex justify-center">
+                                        {/* eslint-disable-next-line no-restricted-syntax -- QR SVG needs a tight white scan surface inside the settings Card. */}
                                         <div
                                             className="rounded-lg border bg-white p-4"
-                                            dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+                                            dangerouslySetInnerHTML={{
+                                                __html: qrCodeSvg,
+                                            }}
                                         />
                                     </div>
                                 )}
@@ -119,8 +136,9 @@ export default function TwoFactor({
                                     Protect your account
                                 </h3>
                                 <p className="mb-6 max-w-sm text-sm text-muted-foreground">
-                                    When you enable two-factor authentication, you will be prompted
-                                    for a secure pin during login. This pin can be retrieved from a
+                                    When you enable two-factor authentication,
+                                    you will be prompted for a secure pin during
+                                    login. This pin can be retrieved from a
                                     TOTP-supported application on your phone.
                                 </p>
 
@@ -135,7 +153,9 @@ export default function TwoFactor({
                                 ) : (
                                     <Form
                                         {...enable.form()}
-                                        onSuccess={() => setShowSetupModal(true)}
+                                        onSuccess={() =>
+                                            setShowSetupModal(true)
+                                        }
                                     >
                                         {({ processing }) => (
                                             <Button

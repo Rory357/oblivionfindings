@@ -1,12 +1,18 @@
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
@@ -84,21 +90,17 @@ export default function EditDisciplinary({
         { title: 'HR', href: '/hr' },
         { title: 'Cases', href: '/hr/cases' },
         { title: hrCase.case_number, href: `/hr/cases/${hrCase.id}` },
-        { title: 'Edit Disciplinary', href: `/hr/cases/disciplinary/${action.id}/edit` },
+        {
+            title: 'Edit Disciplinary',
+            href: `/hr/cases/disciplinary/${action.id}/edit`,
+        },
     ];
 
     const page = usePage<{ errors?: Record<string, string | string[]> }>();
     const goodFaithError = page.props?.errors?.good_faith;
     const stageError = page.props?.errors?.stage;
 
-    const {
-        data,
-        setData,
-        transform,
-        put,
-        processing,
-        errors,
-    } = useForm({
+    const { data, setData, transform, put, processing, errors } = useForm({
         employee_user_id: action.employee_user_id,
         action_type: action.action_type ?? '',
         allegation_summary: action.allegation_summary ?? '',
@@ -123,7 +125,9 @@ export default function EditDisciplinary({
         appeal_outcome: action.appeal_outcome ?? '',
     });
 
-    const currentStageLabel = stageOptions.find((option) => option.value === action.stage)?.label ?? action.stage.replace(/_/g, ' ');
+    const currentStageLabel =
+        stageOptions.find((option) => option.value === action.stage)?.label ??
+        action.stage.replace(/_/g, ' ');
 
     const completedGoodFaithCount = goodFaithRequiredChecks.filter(
         (option) => data.good_faith_checklist?.[option.key],
@@ -144,7 +148,9 @@ export default function EditDisciplinary({
             action_type: values.action_type,
             allegation_summary: values.allegation_summary,
             investigation_notes: values.investigation_notes || null,
-            investigator_user_id: values.investigator_user_id ? Number(values.investigator_user_id) : null,
+            investigator_user_id: values.investigator_user_id
+                ? Number(values.investigator_user_id)
+                : null,
             notice_issued_at: values.notice_issued_at || null,
             notice_document_path: values.notice_document_path || null,
             meeting_scheduled_at: values.meeting_scheduled_at || null,
@@ -174,7 +180,11 @@ export default function EditDisciplinary({
     }
 
     function advanceStage() {
-        router.post(`/hr/cases/disciplinary/${action.id}/advance`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/cases/disciplinary/${action.id}/advance`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -192,9 +202,12 @@ export default function EditDisciplinary({
                     <div className="flex items-center gap-3">
                         <AlertTriangle className="h-6 w-6 text-status-critical" />
                         <div>
-                            <h1 className="text-2xl font-bold">Edit Disciplinary Action</h1>
+                            <h1 className="text-2xl font-bold">
+                                Edit Disciplinary Action
+                            </h1>
                             <p className="text-muted-foreground">
-                                Case: {hrCase.case_number} | Subject: {hrCase.subject?.name ?? 'Unknown'}
+                                Case: {hrCase.case_number} | Subject:{' '}
+                                {hrCase.subject?.name ?? 'Unknown'}
                             </p>
                         </div>
                         <Badge variant="outline" className={stageBadgeClass}>
@@ -208,7 +221,10 @@ export default function EditDisciplinary({
                         <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(goodFaithError)
                                 ? goodFaithError.join(' ')
-                                : goodFaithError || (Array.isArray(stageError) ? stageError.join(' ') : stageError)}
+                                : goodFaithError ||
+                                  (Array.isArray(stageError)
+                                      ? stageError.join(' ')
+                                      : stageError)}
                         </CardContent>
                     </Card>
                 ) : null}
@@ -221,58 +237,104 @@ export default function EditDisciplinary({
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="employee_user_id">Employee</Label>
-                                    <Select value={data.employee_user_id} onValueChange={(value) => setData('employee_user_id', value)}>
+                                    <Label htmlFor="employee_user_id">
+                                        Employee
+                                    </Label>
+                                    <Select
+                                        value={data.employee_user_id}
+                                        onValueChange={(value) =>
+                                            setData('employee_user_id', value)
+                                        }
+                                    >
                                         <SelectTrigger id="employee_user_id">
                                             <SelectValue placeholder="Select employee" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {staff.map((member) => (
-                                                <SelectItem key={member.id} value={String(member.id)}>
+                                                <SelectItem
+                                                    key={member.id}
+                                                    value={String(member.id)}
+                                                >
                                                     {member.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.employee_user_id ? <p className="text-sm text-status-critical">{errors.employee_user_id}</p> : null}
+                                    {errors.employee_user_id ? (
+                                        <p className="text-sm text-status-critical">
+                                            {errors.employee_user_id}
+                                        </p>
+                                    ) : null}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="action_type">Action Type</Label>
-                                    <Select value={data.action_type} onValueChange={(value) => setData('action_type', value)}>
+                                    <Label htmlFor="action_type">
+                                        Action Type
+                                    </Label>
+                                    <Select
+                                        value={data.action_type}
+                                        onValueChange={(value) =>
+                                            setData('action_type', value)
+                                        }
+                                    >
                                         <SelectTrigger id="action_type">
                                             <SelectValue placeholder="Select action type" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {actionTypes.map((type) => (
-                                                <SelectItem key={type.value} value={type.value}>
+                                                <SelectItem
+                                                    key={type.value}
+                                                    value={type.value}
+                                                >
                                                     {type.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.action_type ? <p className="text-sm text-status-critical">{errors.action_type}</p> : null}
+                                    {errors.action_type ? (
+                                        <p className="text-sm text-status-critical">
+                                            {errors.action_type}
+                                        </p>
+                                    ) : null}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="allegation_summary">Allegation Summary</Label>
+                                <Label htmlFor="allegation_summary">
+                                    Allegation Summary
+                                </Label>
                                 <Textarea
                                     id="allegation_summary"
                                     rows={4}
                                     value={data.allegation_summary}
-                                    onChange={(event) => setData('allegation_summary', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'allegation_summary',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
-                                {errors.allegation_summary ? <p className="text-sm text-status-critical">{errors.allegation_summary}</p> : null}
+                                {errors.allegation_summary ? (
+                                    <p className="text-sm text-status-critical">
+                                        {errors.allegation_summary}
+                                    </p>
+                                ) : null}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="investigation_notes">Investigation Notes</Label>
+                                <Label htmlFor="investigation_notes">
+                                    Investigation Notes
+                                </Label>
                                 <Textarea
                                     id="investigation_notes"
                                     rows={4}
                                     value={data.investigation_notes}
-                                    onChange={(event) => setData('investigation_notes', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'investigation_notes',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                         </CardContent>
@@ -285,18 +347,35 @@ export default function EditDisciplinary({
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="investigator_user_id">Investigator</Label>
+                                    <Label htmlFor="investigator_user_id">
+                                        Investigator
+                                    </Label>
                                     <Select
-                                        value={data.investigator_user_id || '__none__'}
-                                        onValueChange={(value) => setData('investigator_user_id', value === '__none__' ? '' : value)}
+                                        value={
+                                            data.investigator_user_id ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'investigator_user_id',
+                                                value === '__none__'
+                                                    ? ''
+                                                    : value,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger id="investigator_user_id">
                                             <SelectValue placeholder="Select investigator" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">Not assigned</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Not assigned
+                                            </SelectItem>
                                             {staff.map((member) => (
-                                                <SelectItem key={member.id} value={String(member.id)}>
+                                                <SelectItem
+                                                    key={member.id}
+                                                    value={String(member.id)}
+                                                >
                                                     {member.name}
                                                 </SelectItem>
                                             ))}
@@ -305,92 +384,157 @@ export default function EditDisciplinary({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="response_deadline">Response Deadline</Label>
+                                    <Label htmlFor="response_deadline">
+                                        Response Deadline
+                                    </Label>
                                     <Input
                                         id="response_deadline"
                                         type="date"
                                         value={data.response_deadline}
-                                        onChange={(event) => setData('response_deadline', event.target.value)}
+                                        onChange={(event) =>
+                                            setData(
+                                                'response_deadline',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="meeting_scheduled_at">Meeting Scheduled</Label>
+                                    <Label htmlFor="meeting_scheduled_at">
+                                        Meeting Scheduled
+                                    </Label>
                                     <Input
                                         id="meeting_scheduled_at"
                                         type="datetime-local"
                                         value={data.meeting_scheduled_at}
-                                        onChange={(event) => setData('meeting_scheduled_at', event.target.value)}
+                                        onChange={(event) =>
+                                            setData(
+                                                'meeting_scheduled_at',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="meeting_held_at">Meeting Held</Label>
+                                    <Label htmlFor="meeting_held_at">
+                                        Meeting Held
+                                    </Label>
                                     <Input
                                         id="meeting_held_at"
                                         type="datetime-local"
                                         value={data.meeting_held_at}
-                                        onChange={(event) => setData('meeting_held_at', event.target.value)}
+                                        onChange={(event) =>
+                                            setData(
+                                                'meeting_held_at',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="meeting_location">Meeting Location</Label>
+                                    <Label htmlFor="meeting_location">
+                                        Meeting Location
+                                    </Label>
                                     <Input
                                         id="meeting_location"
                                         value={data.meeting_location}
-                                        onChange={(event) => setData('meeting_location', event.target.value)}
+                                        onChange={(event) =>
+                                            setData(
+                                                'meeting_location',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="notice_issued_at">Notice Issued</Label>
+                                    <Label htmlFor="notice_issued_at">
+                                        Notice Issued
+                                    </Label>
                                     <Input
                                         id="notice_issued_at"
                                         type="datetime-local"
                                         value={data.notice_issued_at}
-                                        onChange={(event) => setData('notice_issued_at', event.target.value)}
+                                        onChange={(event) =>
+                                            setData(
+                                                'notice_issued_at',
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="meeting_attendees_text">Meeting Attendees (one per line)</Label>
+                                <Label htmlFor="meeting_attendees_text">
+                                    Meeting Attendees (one per line)
+                                </Label>
                                 <Textarea
                                     id="meeting_attendees_text"
                                     rows={3}
                                     value={data.meeting_attendees_text}
-                                    onChange={(event) => setData('meeting_attendees_text', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'meeting_attendees_text',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="meeting_notes">Meeting Notes</Label>
+                                <Label htmlFor="meeting_notes">
+                                    Meeting Notes
+                                </Label>
                                 <Textarea
                                     id="meeting_notes"
                                     rows={4}
                                     value={data.meeting_notes}
-                                    onChange={(event) => setData('meeting_notes', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'meeting_notes',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="employee_response">Employee Response</Label>
+                                <Label htmlFor="employee_response">
+                                    Employee Response
+                                </Label>
                                 <Textarea
                                     id="employee_response"
                                     rows={4}
                                     value={data.employee_response}
-                                    onChange={(event) => setData('employee_response', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'employee_response',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                             </div>
 
                             <div className="flex items-center space-x-2 pt-1">
                                 <Checkbox
                                     id="support_person_advised"
-                                    checked={Boolean(data.support_person_advised)}
-                                    onCheckedChange={(checked) => setData('support_person_advised', Boolean(checked))}
+                                    checked={Boolean(
+                                        data.support_person_advised,
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                        setData(
+                                            'support_person_advised',
+                                            Boolean(checked),
+                                        )
+                                    }
                                 />
-                                <Label htmlFor="support_person_advised">Support person offered and advised</Label>
+                                <Label htmlFor="support_person_advised">
+                                    Support person offered and advised
+                                </Label>
                             </div>
                         </CardContent>
                     </Card>
@@ -398,21 +542,36 @@ export default function EditDisciplinary({
                     <Card>
                         <CardHeader>
                             <CardTitle>
-                                Good Faith Checklist ({completedGoodFaithCount}/{goodFaithRequiredChecks.length})
+                                Good Faith Checklist ({completedGoodFaithCount}/
+                                {goodFaithRequiredChecks.length})
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {goodFaithRequiredChecks.map((option) => (
-                                <label key={option.key} className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                                <label
+                                    key={option.key}
+                                    className="flex items-start gap-3 rounded-md border p-3 text-sm"
+                                >
                                     <Checkbox
-                                        checked={Boolean(data.good_faith_checklist?.[option.key])}
-                                        onCheckedChange={(checked) => toggleGoodFaith(option.key, Boolean(checked))}
+                                        checked={Boolean(
+                                            data.good_faith_checklist?.[
+                                                option.key
+                                            ],
+                                        )}
+                                        onCheckedChange={(checked) =>
+                                            toggleGoodFaith(
+                                                option.key,
+                                                Boolean(checked),
+                                            )
+                                        }
                                     />
                                     <span>{option.label}</span>
                                 </label>
                             ))}
                             {errors.good_faith_checklist ? (
-                                <p className="text-sm text-status-critical">{errors.good_faith_checklist}</p>
+                                <p className="text-sm text-status-critical">
+                                    {errors.good_faith_checklist}
+                                </p>
                             ) : null}
                         </CardContent>
                     </Card>
@@ -428,26 +587,42 @@ export default function EditDisciplinary({
                                     id="outcome"
                                     rows={3}
                                     value={data.outcome}
-                                    onChange={(event) => setData('outcome', event.target.value)}
+                                    onChange={(event) =>
+                                        setData('outcome', event.target.value)
+                                    }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="outcome_rationale">Outcome Rationale</Label>
+                                <Label htmlFor="outcome_rationale">
+                                    Outcome Rationale
+                                </Label>
                                 <Textarea
                                     id="outcome_rationale"
                                     rows={3}
                                     value={data.outcome_rationale}
-                                    onChange={(event) => setData('outcome_rationale', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'outcome_rationale',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="outcome_document_path">Outcome Document Path</Label>
+                                <Label htmlFor="outcome_document_path">
+                                    Outcome Document Path
+                                </Label>
                                 <Input
                                     id="outcome_document_path"
                                     value={data.outcome_document_path}
-                                    onChange={(event) => setData('outcome_document_path', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'outcome_document_path',
+                                            event.target.value,
+                                        )
+                                    }
                                 />
                             </div>
 
@@ -455,29 +630,50 @@ export default function EditDisciplinary({
                                 <Checkbox
                                     id="appeal_received"
                                     checked={Boolean(data.appeal_received)}
-                                    onCheckedChange={(checked) => setData('appeal_received', Boolean(checked))}
+                                    onCheckedChange={(checked) =>
+                                        setData(
+                                            'appeal_received',
+                                            Boolean(checked),
+                                        )
+                                    }
                                 />
-                                <Label htmlFor="appeal_received">Appeal received</Label>
+                                <Label htmlFor="appeal_received">
+                                    Appeal received
+                                </Label>
                             </div>
 
                             {data.appeal_received ? (
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="appeal_notes">Appeal Notes</Label>
+                                        <Label htmlFor="appeal_notes">
+                                            Appeal Notes
+                                        </Label>
                                         <Textarea
                                             id="appeal_notes"
                                             rows={3}
                                             value={data.appeal_notes}
-                                            onChange={(event) => setData('appeal_notes', event.target.value)}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'appeal_notes',
+                                                    event.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="appeal_outcome">Appeal Outcome</Label>
+                                        <Label htmlFor="appeal_outcome">
+                                            Appeal Outcome
+                                        </Label>
                                         <Textarea
                                             id="appeal_outcome"
                                             rows={3}
                                             value={data.appeal_outcome}
-                                            onChange={(event) => setData('appeal_outcome', event.target.value)}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'appeal_outcome',
+                                                    event.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                 </div>
@@ -486,7 +682,11 @@ export default function EditDisciplinary({
                     </Card>
 
                     <div className="flex flex-wrap items-center justify-end gap-3">
-                        <Button type="button" variant="outline" onClick={advanceStage}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={advanceStage}
+                        >
                             Advance Stage
                         </Button>
                         <Button type="submit" disabled={processing}>
@@ -498,4 +698,3 @@ export default function EditDisciplinary({
         </AppLayout>
     );
 }
-

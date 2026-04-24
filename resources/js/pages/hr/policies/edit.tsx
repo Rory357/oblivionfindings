@@ -1,14 +1,27 @@
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Head, Link, useForm, router } from '@inertiajs/react';
-import { ArrowLeft, FileText, Upload, FileCheck, X, Trash2, AlertTriangle } from 'lucide-react';
-import { useState, useRef } from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    FileCheck,
+    FileText,
+    Trash2,
+    Upload,
+} from 'lucide-react';
+import { useRef, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -42,7 +55,11 @@ type Props = {
     defaultCategories: Option[];
 };
 
-export default function EditPolicy({ policy, existingCategories, defaultCategories }: Props) {
+export default function EditPolicy({
+    policy,
+    existingCategories,
+    defaultCategories,
+}: Props) {
     const [showCustomCategory, setShowCustomCategory] = useState(false);
     const [showNewVersionForm, setShowNewVersionForm] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,10 +70,18 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
         custom_category: '',
         is_active: policy.is_active,
         requires_attestation: policy.requires_attestation,
-        attestation_frequency_months: String(policy.attestation_frequency_months ?? 12),
+        attestation_frequency_months: String(
+            policy.attestation_frequency_months ?? 12,
+        ),
     });
 
-    const { data: versionData, setData: setVersionData, post: postVersion, processing: versionProcessing, errors: versionErrors } = useForm({
+    const {
+        data: versionData,
+        setData: setVersionData,
+        post: postVersion,
+        processing: versionProcessing,
+        errors: versionErrors,
+    } = useForm({
         document: null as File | null,
         content_summary: '',
         effective_from: new Date().toISOString().split('T')[0],
@@ -102,7 +127,11 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
     };
 
     const handleDelete = () => {
-        if (confirm('Are you sure you want to delete this policy? This action cannot be undone.')) {
+        if (
+            confirm(
+                'Are you sure you want to delete this policy? This action cannot be undone.',
+            )
+        ) {
             router.delete(`/hr/policies/${policy.id}`);
         }
     };
@@ -118,17 +147,26 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        return (
+            Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+        );
     };
 
-    const allCategories = [...new Set([...existingCategories, ...defaultCategories.map(c => c.value)])];
-    const categoryOptions = allCategories.map(cat => {
-        const defaultCat = defaultCategories.find(c => c.value === cat);
-        return {
-            value: cat,
-            label: defaultCat ? defaultCat.label : cat.replace(/_/g, ' '),
-        };
-    }).sort((a, b) => a.label.localeCompare(b.label));
+    const allCategories = [
+        ...new Set([
+            ...existingCategories,
+            ...defaultCategories.map((c) => c.value),
+        ]),
+    ];
+    const categoryOptions = allCategories
+        .map((cat) => {
+            const defaultCat = defaultCategories.find((c) => c.value === cat);
+            return {
+                value: cat,
+                label: defaultCat ? defaultCat.label : cat.replace(/_/g, ' '),
+            };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
@@ -141,7 +179,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Policy - ${policy.title}`} />
 
-            <div className="space-y-6 max-w-4xl">
+            <div className="max-w-4xl space-y-6">
                 <div className="flex items-center gap-4">
                     <Link href={`/hr/policies/${policy.id}`}>
                         <Button variant="outline" size="sm">
@@ -153,7 +191,9 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                         <FileText className="h-6 w-6 text-status-info" />
                         <div>
                             <h1 className="text-2xl font-bold">Edit Policy</h1>
-                            <p className="text-muted-foreground">Update policy details</p>
+                            <p className="text-muted-foreground">
+                                Update policy details
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -169,10 +209,20 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                 <Input
                                     id="title"
                                     value={data.title}
-                                    onChange={(e) => setData('title', e.target.value)}
-                                    className={errors.title ? 'border-status-critical/30' : ''}
+                                    onChange={(e) =>
+                                        setData('title', e.target.value)
+                                    }
+                                    className={
+                                        errors.title
+                                            ? 'border-status-critical/30'
+                                            : ''
+                                    }
                                 />
-                                {errors.title && <p className="text-sm text-status-critical">{errors.title}</p>}
+                                {errors.title && (
+                                    <p className="text-sm text-status-critical">
+                                        {errors.title}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-3">
@@ -182,20 +232,45 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                         <Checkbox
                                             id="use_existing"
                                             checked={!showCustomCategory}
-                                            onCheckedChange={(checked) => setShowCustomCategory(!checked as boolean)}
+                                            onCheckedChange={(checked) =>
+                                                setShowCustomCategory(
+                                                    !checked as boolean,
+                                                )
+                                            }
                                         />
-                                        <Label htmlFor="use_existing" className="text-sm font-normal">Use existing category</Label>
+                                        <Label
+                                            htmlFor="use_existing"
+                                            className="text-sm font-normal"
+                                        >
+                                            Use existing category
+                                        </Label>
                                     </div>
                                 </div>
 
                                 {!showCustomCategory ? (
-                                    <Select value={data.category} onValueChange={(value) => setData('category', value)}>
-                                        <SelectTrigger className={errors.category ? 'border-status-critical/30' : ''}>
+                                    <Select
+                                        value={data.category}
+                                        onValueChange={(value) =>
+                                            setData('category', value)
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            className={
+                                                errors.category
+                                                    ? 'border-status-critical/30'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select a category" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {categoryOptions.map((cat) => (
-                                                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                                                <SelectItem
+                                                    key={cat.value}
+                                                    value={cat.value}
+                                                >
+                                                    {cat.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -203,8 +278,17 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                     <Input
                                         placeholder="Enter custom category"
                                         value={data.custom_category}
-                                        onChange={(e) => setData('custom_category', e.target.value)}
-                                        className={errors.category ? 'border-status-critical/30' : ''}
+                                        onChange={(e) =>
+                                            setData(
+                                                'custom_category',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={
+                                            errors.category
+                                                ? 'border-status-critical/30'
+                                                : ''
+                                        }
                                     />
                                 )}
                             </div>
@@ -213,9 +297,13 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                 <Checkbox
                                     id="is_active"
                                     checked={data.is_active}
-                                    onCheckedChange={(checked) => setData('is_active', checked as boolean)}
+                                    onCheckedChange={(checked) =>
+                                        setData('is_active', checked as boolean)
+                                    }
                                 />
-                                <Label htmlFor="is_active">Policy is active</Label>
+                                <Label htmlFor="is_active">
+                                    Policy is active
+                                </Label>
                             </div>
                         </CardContent>
                     </Card>
@@ -229,29 +317,57 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                 <Checkbox
                                     id="requires_attestation"
                                     checked={data.requires_attestation}
-                                    onCheckedChange={(checked) => setData('requires_attestation', checked as boolean)}
+                                    onCheckedChange={(checked) =>
+                                        setData(
+                                            'requires_attestation',
+                                            checked as boolean,
+                                        )
+                                    }
                                 />
                                 <div className="space-y-1">
-                                    <Label htmlFor="requires_attestation">Requires staff attestation</Label>
-                                    <p className="text-xs text-muted-foreground">Staff will be required to acknowledge they have read and understood this policy</p>
+                                    <Label htmlFor="requires_attestation">
+                                        Requires staff attestation
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Staff will be required to acknowledge
+                                        they have read and understood this
+                                        policy
+                                    </p>
                                 </div>
                             </div>
 
                             {data.requires_attestation && (
                                 <div className="space-y-2 pl-6">
-                                    <Label>Re-attestation Frequency (months)</Label>
+                                    <Label>
+                                        Re-attestation Frequency (months)
+                                    </Label>
                                     <Select
-                                        value={data.attestation_frequency_months}
-                                        onValueChange={(value) => setData('attestation_frequency_months', value)}
+                                        value={
+                                            data.attestation_frequency_months
+                                        }
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'attestation_frequency_months',
+                                                value,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger className="w-48">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="6">Every 6 months</SelectItem>
-                                            <SelectItem value="12">Every 12 months</SelectItem>
-                                            <SelectItem value="24">Every 24 months</SelectItem>
-                                            <SelectItem value="36">Every 36 months</SelectItem>
+                                            <SelectItem value="6">
+                                                Every 6 months
+                                            </SelectItem>
+                                            <SelectItem value="12">
+                                                Every 12 months
+                                            </SelectItem>
+                                            <SelectItem value="24">
+                                                Every 24 months
+                                            </SelectItem>
+                                            <SelectItem value="36">
+                                                Every 36 months
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -261,7 +377,9 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
 
                     <div className="flex items-center justify-end gap-4">
                         <Link href={`/hr/policies/${policy.id}`}>
-                            <Button type="button" variant="outline">Cancel</Button>
+                            <Button type="button" variant="outline">
+                                Cancel
+                            </Button>
                         </Link>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Saving...' : 'Save Changes'}
@@ -273,16 +391,27 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Document Versions</CardTitle>
-                        <Button type="button" variant="outline" onClick={() => setShowNewVersionForm(!showNewVersionForm)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                                setShowNewVersionForm(!showNewVersionForm)
+                            }
+                        >
                             <Upload className="mr-2 h-4 w-4" />
                             Upload New Version
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {showNewVersionForm && (
-                            <form onSubmit={handleVersionSubmit} className="rounded-lg border p-4 space-y-4">
-                                <h4 className="font-medium">Upload New Version</h4>
-                                
+                            <form
+                                onSubmit={handleVersionSubmit}
+                                className="space-y-4 rounded-lg border p-4"
+                            >
+                                <h4 className="font-medium">
+                                    Upload New Version
+                                </h4>
+
                                 <div className="space-y-2">
                                     <Label>PDF Document</Label>
                                     <input
@@ -293,19 +422,42 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                         className="hidden"
                                     />
                                     <div className="flex items-center gap-4">
-                                        <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                fileInputRef.current?.click()
+                                            }
+                                        >
                                             <Upload className="mr-2 h-4 w-4" />
                                             Choose PDF
                                         </Button>
                                         {versionData.document ? (
                                             <div className="flex items-center gap-2 text-sm">
                                                 <FileCheck className="h-4 w-4 text-status-success" />
-                                                <span>{versionData.document.name}</span>
-                                                <span className="text-muted-foreground">({formatFileSize(versionData.document.size)})</span>
+                                                <span>
+                                                    {versionData.document.name}
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                    (
+                                                    {formatFileSize(
+                                                        versionData.document
+                                                            .size,
+                                                    )}
+                                                    )
+                                                </span>
                                             </div>
-                                        ) : <span className="text-sm text-muted-foreground">No file selected</span>}
+                                        ) : (
+                                            <span className="text-sm text-muted-foreground">
+                                                No file selected
+                                            </span>
+                                        )}
                                     </div>
-                                    {versionErrors.document && <p className="text-sm text-status-critical">{versionErrors.document}</p>}
+                                    {versionErrors.document && (
+                                        <p className="text-sm text-status-critical">
+                                            {versionErrors.document}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">
@@ -313,7 +465,12 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                     <Textarea
                                         placeholder="Brief summary of changes in this version..."
                                         value={versionData.content_summary}
-                                        onChange={(e) => setVersionData('content_summary', e.target.value)}
+                                        onChange={(e) =>
+                                            setVersionData(
+                                                'content_summary',
+                                                e.target.value,
+                                            )
+                                        }
                                         rows={3}
                                     />
                                 </div>
@@ -323,15 +480,34 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                     <Input
                                         type="date"
                                         value={versionData.effective_from}
-                                        onChange={(e) => setVersionData('effective_from', e.target.value)}
+                                        onChange={(e) =>
+                                            setVersionData(
+                                                'effective_from',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <div className="flex gap-2">
-                                    <Button type="submit" disabled={versionProcessing || !versionData.document}>
-                                        {versionProcessing ? 'Uploading...' : 'Upload Version'}
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            versionProcessing ||
+                                            !versionData.document
+                                        }
+                                    >
+                                        {versionProcessing
+                                            ? 'Uploading...'
+                                            : 'Upload Version'}
                                     </Button>
-                                    <Button type="button" variant="ghost" onClick={() => setShowNewVersionForm(false)}>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() =>
+                                            setShowNewVersionForm(false)
+                                        }
+                                    >
                                         Cancel
                                     </Button>
                                 </div>
@@ -340,16 +516,27 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
 
                         <div className="space-y-2">
                             {policy.versions.map((version) => (
-                                <div key={version.id} className={`flex items-center justify-between rounded-lg border p-3 ${version.is_current ? 'border-status-info/30 bg-status-info-bg' : ''}`}>
+                                <div
+                                    key={version.id}
+                                    className={`flex items-center justify-between rounded-lg border p-3 ${version.is_current ? 'border-status-info/30 bg-status-info-bg' : ''}`}
+                                >
                                     <div className="flex items-center gap-3">
                                         <FileText className="h-5 w-5 text-muted-foreground" />
                                         <div>
                                             <div className="font-medium">
                                                 Version {version.version_number}
-                                                {version.is_current && <span className="ml-2 text-xs text-status-info">(Current)</span>}
+                                                {version.is_current && (
+                                                    <span className="ml-2 text-xs text-status-info">
+                                                        (Current)
+                                                    </span>
+                                                )}
                                             </div>
                                             {version.document_path && (
-                                                <div className="text-xs text-muted-foreground">{version.document_path.split('/').pop()}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {version.document_path
+                                                        .split('/')
+                                                        .pop()}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -359,7 +546,9 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                             variant="ghost"
                                             size="sm"
                                             className="text-status-critical hover:text-status-critical"
-                                            onClick={() => handleDeleteVersion(version.id)}
+                                            onClick={() =>
+                                                handleDeleteVersion(version.id)
+                                            }
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -379,10 +568,16 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            Deleting this policy will permanently remove it and all associated versions and attestations. This action cannot be undone.
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Deleting this policy will permanently remove it and
+                            all associated versions and attestations. This
+                            action cannot be undone.
                         </p>
-                        <Button type="button" variant="destructive" onClick={handleDelete}>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleDelete}
+                        >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete Policy
                         </Button>

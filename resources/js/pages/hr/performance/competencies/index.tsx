@@ -1,16 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router, useForm, Link } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Target, Users } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Plus, Target, Users } from 'lucide-react';
 import { useState } from 'react';
 
 interface Competency {
@@ -42,13 +47,24 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Competencies', href: '/hr/performance/competencies' },
 ];
 
-export default function CompetencyIndex({ competencies, grouped, staff, can }: Props) {
+export default function CompetencyIndex({
+    competencies,
+    grouped,
+    staff,
+    can,
+}: Props) {
     const [showForm, setShowForm] = useState(false);
     const form = useForm({
         name: '',
         description: '',
         category: '',
-        proficiency_levels: ['Beginner', 'Developing', 'Competent', 'Advanced', 'Expert'],
+        proficiency_levels: [
+            'Beginner',
+            'Developing',
+            'Competent',
+            'Advanced',
+            'Expert',
+        ],
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -71,7 +87,9 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">Competency Framework</h1>
+                        <h1 className="text-lg font-semibold">
+                            Competency Framework
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
                             Define and manage organisational competencies
                         </div>
@@ -79,7 +97,9 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
 
                     <div className="flex gap-2">
                         <Link href="/hr/performance">
-                            <Button size="sm" variant="outline">Dashboard</Button>
+                            <Button size="sm" variant="outline">
+                                Dashboard
+                            </Button>
                         </Link>
                         {can.manage && (
                             <>
@@ -89,7 +109,10 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                                         Assess
                                     </Link>
                                 </Button>
-                                <Button size="sm" onClick={() => setShowForm(!showForm)}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setShowForm(!showForm)}
+                                >
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     Add Competency
                                 </Button>
@@ -99,32 +122,50 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                 </div>
 
                 {/* KPI Summary Cards */}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                     <Card className="border-l-4 border-l-blue-500 bg-status-info-bg">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-status-info">Total Competencies</p>
-                                <div className="rounded-full bg-status-info-bg p-1.5"><Target className="h-4 w-4 text-status-info" /></div>
+                                <p className="text-xs font-medium text-status-info">
+                                    Total Competencies
+                                </p>
+                                <div className="rounded-full bg-status-info-bg p-1.5">
+                                    <Target className="h-4 w-4 text-status-info" />
+                                </div>
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-status-info">{competencies.length}</span>
+                            <span className="mt-1.5 block text-2xl font-bold text-status-info">
+                                {competencies.length}
+                            </span>
                         </CardContent>
                     </Card>
-                    <Card className="border-l-4 border-l-purple-500 bg-primary/10/40">
+                    <Card className="bg-primary/10/40 border-l-4 border-l-purple-500">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-primary">Categories</p>
-                                <div className="rounded-full bg-primary/10 p-1.5"><Target className="h-4 w-4 text-primary" /></div>
+                                <p className="text-xs font-medium text-primary">
+                                    Categories
+                                </p>
+                                <div className="rounded-full bg-primary/10 p-1.5">
+                                    <Target className="h-4 w-4 text-primary" />
+                                </div>
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-primary">{categories.length}</span>
+                            <span className="mt-1.5 block text-2xl font-bold text-primary">
+                                {categories.length}
+                            </span>
                         </CardContent>
                     </Card>
                     <Card className="border-l-4 border-l-emerald-500 bg-status-success-bg">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-status-success">Staff Profiles</p>
-                                <div className="rounded-full bg-status-success-bg p-1.5"><Users className="h-4 w-4 text-status-success" /></div>
+                                <p className="text-xs font-medium text-status-success">
+                                    Staff Profiles
+                                </p>
+                                <div className="rounded-full bg-status-success-bg p-1.5">
+                                    <Users className="h-4 w-4 text-status-success" />
+                                </div>
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-status-success">{staff.length}</span>
+                            <span className="mt-1.5 block text-2xl font-bold text-status-success">
+                                {staff.length}
+                            </span>
                         </CardContent>
                     </Card>
                 </div>
@@ -132,29 +173,76 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                 {showForm && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">New Competency</CardTitle>
+                            <CardTitle className="text-base">
+                                New Competency
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-3">
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div>
                                         <Label>Name</Label>
-                                        <Input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
-                                        {form.errors.name && <p className="mt-1 text-xs text-status-critical">{form.errors.name}</p>}
+                                        <Input
+                                            value={form.data.name}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'name',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {form.errors.name && (
+                                            <p className="mt-1 text-xs text-status-critical">
+                                                {form.errors.name}
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
                                         <Label>Category</Label>
-                                        <Input value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} placeholder="e.g. Technical, Leadership" />
-                                        {form.errors.category && <p className="mt-1 text-xs text-status-critical">{form.errors.category}</p>}
+                                        <Input
+                                            value={form.data.category}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'category',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g. Technical, Leadership"
+                                        />
+                                        {form.errors.category && (
+                                            <p className="mt-1 text-xs text-status-critical">
+                                                {form.errors.category}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 <div>
                                     <Label>Description</Label>
-                                    <Textarea value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} rows={2} />
+                                    <Textarea
+                                        value={form.data.description}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'description',
+                                                e.target.value,
+                                            )
+                                        }
+                                        rows={2}
+                                    />
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button type="submit" disabled={form.processing}>Save</Button>
-                                    <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setShowForm(false)}
+                                    >
+                                        Cancel
+                                    </Button>
                                 </div>
                             </form>
                         </CardContent>
@@ -164,7 +252,10 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                 {categories.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
-                            No competencies defined yet. {can.manage ? 'Click "Add Competency" to begin.' : ''}
+                            No competencies defined yet.{' '}
+                            {can.manage
+                                ? 'Click "Add Competency" to begin.'
+                                : ''}
                         </CardContent>
                     </Card>
                 ) : (
@@ -188,13 +279,25 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                                     <TableBody>
                                         {grouped[category].map((comp) => (
                                             <TableRow key={comp.id}>
-                                                <TableCell className="font-medium">{comp.name}</TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">{comp.description || '-'}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {comp.name}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {comp.description || '-'}
+                                                </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
-                                                        {comp.proficiency_levels?.map((level, i) => (
-                                                            <Badge key={i} variant="outline" className="text-xs">{level}</Badge>
-                                                        ))}
+                                                        {comp.proficiency_levels?.map(
+                                                            (level, i) => (
+                                                                <Badge
+                                                                    key={i}
+                                                                    variant="outline"
+                                                                    className="text-xs"
+                                                                >
+                                                                    {level}
+                                                                </Badge>
+                                                            ),
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -210,7 +313,9 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                 {staff.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Employee Profiles</CardTitle>
+                            <CardTitle className="text-base">
+                                Employee Profiles
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -218,10 +323,14 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                                     <Link
                                         key={s.id}
                                         href={`/hr/performance/competencies/profile/${s.id}`}
-                                        className="rounded-lg border p-3 text-sm hover:bg-muted transition-colors"
+                                        className="rounded-lg border p-3 text-sm transition-colors hover:bg-muted"
                                     >
-                                        <div className="font-medium">{s.name}</div>
-                                        <div className="text-xs text-muted-foreground">{s.email}</div>
+                                        <div className="font-medium">
+                                            {s.name}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {s.email}
+                                        </div>
                                     </Link>
                                 ))}
                             </div>

@@ -1,23 +1,59 @@
-import AppLayout from '@/layouts/app-layout';
+import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ClipboardList, AlertTriangle, Calendar, Plus, Search, ArrowRight, FileText,
-    Target, Users, TrendingUp, TrendingDown, MessageSquare, ShieldAlert,
-    Star, BarChart3,
+    AlertTriangle,
+    ArrowRight,
+    BarChart3,
+    Calendar,
+    ClipboardList,
+    FileText,
+    MessageSquare,
+    Plus,
+    Search,
+    ShieldAlert,
+    Star,
+    Target,
+    TrendingDown,
+    TrendingUp,
+    Users,
 } from 'lucide-react';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { useState } from 'react';
 import {
-    AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from 'recharts';
-import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -81,10 +117,19 @@ type Props = {
         overdue: number;
         due_next_7_days: number;
     };
-    reviewCompletionTrend: Array<{ month: string; completed: number; total: number }>;
+    reviewCompletionTrend: Array<{
+        month: string;
+        completed: number;
+        total: number;
+    }>;
     notesPerMonth: Array<{ month: string; count: number }>;
     ratingDistribution: Array<{ rating: number; count: number }>;
-    pipSummary: { active: number; completed: number; cancelled: number; total: number };
+    pipSummary: {
+        active: number;
+        completed: number;
+        cancelled: number;
+        total: number;
+    };
     feedbackSummary: { pending: number; completed: number; overdue: number };
     previousMonthNoteCount: number;
     filters: {
@@ -100,25 +145,36 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const RATING_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#3b82f6', '#10b981'];
-const PIP_COLORS = { active: '#ef4444', completed: '#10b981', cancelled: '#94a3b8' };
+const PIP_COLORS = {
+    active: '#ef4444',
+    completed: '#10b981',
+    cancelled: '#94a3b8',
+};
 
 const formatDate = (value?: string | null) => {
     if (!value) return 'Not set';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-NZ', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'completed': return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'scheduled': return 'bg-status-info-bg text-status-info border-status-info/30';
-        case 'overdue': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'in_progress': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        default: return 'bg-muted text-foreground border-border';
+        case 'completed':
+            return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'scheduled':
+            return 'bg-status-info-bg text-status-info border-status-info/30';
+        case 'overdue':
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'in_progress':
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        default:
+            return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -142,12 +198,16 @@ export default function PerformanceIndex({
     const [processing, setProcessing] = useState(false);
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/performance', { ...filters, ...next }, {
-            preserveState: true,
-            preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onFinish: () => setProcessing(false),
-        });
+        router.get(
+            '/hr/performance',
+            { ...filters, ...next },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+            },
+        );
     };
 
     const now = new Date();
@@ -159,12 +219,22 @@ export default function PerformanceIndex({
     }).length;
 
     const overdueReviews = upcomingReviews.filter((r) => {
-        return r.status === 'overdue' || (r.scheduled_at && new Date(r.scheduled_at) < now && r.status !== 'completed');
+        return (
+            r.status === 'overdue' ||
+            (r.scheduled_at &&
+                new Date(r.scheduled_at) < now &&
+                r.status !== 'completed')
+        );
     }).length;
 
-    const notesTrend = previousMonthNoteCount > 0
-        ? Math.round(((notesThisMonth - previousMonthNoteCount) / previousMonthNoteCount) * 100)
-        : null;
+    const notesTrend =
+        previousMonthNoteCount > 0
+            ? Math.round(
+                  ((notesThisMonth - previousMonthNoteCount) /
+                      previousMonthNoteCount) *
+                      100,
+              )
+            : null;
 
     // Data checks for conditional chart rendering
     const hasReviewTrend = reviewCompletionTrend.some((d) => d.total > 0);
@@ -174,15 +244,32 @@ export default function PerformanceIndex({
     const hasPips = pipSummary.total > 0;
     const feedbackTotal = feedbackSummary.pending + feedbackSummary.completed;
     const hasFeedback = feedbackTotal > 0;
-    const hasAnyCharts = hasReviewTrend || hasRatings || hasNotesTrend || hasCompetencyGaps || hasPips || hasFeedback;
+    const hasAnyCharts =
+        hasReviewTrend ||
+        hasRatings ||
+        hasNotesTrend ||
+        hasCompetencyGaps ||
+        hasPips ||
+        hasFeedback;
 
     const pipChartData = [
         { name: 'Active', value: pipSummary.active, color: PIP_COLORS.active },
-        { name: 'Completed', value: pipSummary.completed, color: PIP_COLORS.completed },
-        { name: 'Cancelled', value: pipSummary.cancelled, color: PIP_COLORS.cancelled },
+        {
+            name: 'Completed',
+            value: pipSummary.completed,
+            color: PIP_COLORS.completed,
+        },
+        {
+            name: 'Cancelled',
+            value: pipSummary.cancelled,
+            color: PIP_COLORS.cancelled,
+        },
     ].filter((d) => d.value > 0);
 
-    const feedbackCompletionPct = feedbackTotal > 0 ? Math.round((feedbackSummary.completed / feedbackTotal) * 100) : 0;
+    const feedbackCompletionPct =
+        feedbackTotal > 0
+            ? Math.round((feedbackSummary.completed / feedbackTotal) * 100)
+            : 0;
 
     const competencyChartItems = competencyGaps.slice(0, 8).map((gap) => ({
         label: `${gap.employee_name}: ${gap.competency_area ?? 'General'}`,
@@ -198,25 +285,44 @@ export default function PerformanceIndex({
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-lg font-semibold">Performance & Supervision</h1>
+                        <h1 className="text-lg font-semibold">
+                            Performance & Supervision
+                        </h1>
                         <p className="mt-0.5 text-sm text-muted-foreground">
-                            Supervision notes, performance reviews, and staff development
+                            Supervision notes, performance reviews, and staff
+                            development
                         </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="w-40">
                             <Select
-                                value={filters.staff_id ? String(filters.staff_id) : '__all__'}
-                                onValueChange={(value) => onFilter({ staff_id: value === '__all__' ? null : value })}
+                                value={
+                                    filters.staff_id
+                                        ? String(filters.staff_id)
+                                        : '__all__'
+                                }
+                                onValueChange={(value) =>
+                                    onFilter({
+                                        staff_id:
+                                            value === '__all__' ? null : value,
+                                    })
+                                }
                             >
                                 <SelectTrigger className="h-8 text-xs">
                                     <SelectValue placeholder="All staff" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__all__">All staff</SelectItem>
+                                    <SelectItem value="__all__">
+                                        All staff
+                                    </SelectItem>
                                     {staff.map((row) => (
-                                        <SelectItem key={row.id} value={String(row.id)}>{row.name}</SelectItem>
+                                        <SelectItem
+                                            key={row.id}
+                                            value={String(row.id)}
+                                        >
+                                            {row.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -230,7 +336,11 @@ export default function PerformanceIndex({
                                     </Button>
                                 </Link>
                                 <Link href="/hr/performance/reviews/create">
-                                    <Button size="sm" variant="outline" disabled={processing}>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={processing}
+                                    >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         New Review
                                     </Button>
@@ -241,20 +351,30 @@ export default function PerformanceIndex({
                 </div>
 
                 {/* KPI Cards */}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <Card className="border-l-4 border-l-blue-500 bg-status-info-bg">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-status-info">Notes This Month</p>
+                                <p className="text-xs font-medium text-status-info">
+                                    Notes This Month
+                                </p>
                                 <div className="rounded-full bg-status-info-bg p-1.5">
                                     <ClipboardList className="h-4 w-4 text-status-info" />
                                 </div>
                             </div>
                             <div className="mt-1.5 flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-status-info">{notesThisMonth}</span>
+                                <span className="text-2xl font-bold text-status-info">
+                                    {notesThisMonth}
+                                </span>
                                 {notesTrend !== null && notesTrend !== 0 && (
-                                    <span className={`flex items-center text-xs ${notesTrend > 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                        {notesTrend > 0 ? <TrendingUp className="mr-0.5 h-3 w-3" /> : <TrendingDown className="mr-0.5 h-3 w-3" />}
+                                    <span
+                                        className={`flex items-center text-xs ${notesTrend > 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                    >
+                                        {notesTrend > 0 ? (
+                                            <TrendingUp className="mr-0.5 h-3 w-3" />
+                                        ) : (
+                                            <TrendingDown className="mr-0.5 h-3 w-3" />
+                                        )}
                                         {Math.abs(notesTrend)}%
                                     </span>
                                 )}
@@ -262,41 +382,89 @@ export default function PerformanceIndex({
                         </CardContent>
                     </Card>
                     <Link href="/hr/performance/reviews">
-                        <Card className={`h-full border-l-4 cursor-pointer transition-colors hover:opacity-80 ${overdueReviews > 0 ? 'border-l-red-500 bg-status-critical-bg' : 'border-l-emerald-500 bg-status-success-bg'}`}>
+                        <Card
+                            className={`h-full cursor-pointer border-l-4 transition-colors hover:opacity-80 ${overdueReviews > 0 ? 'border-l-red-500 bg-status-critical-bg' : 'border-l-emerald-500 bg-status-success-bg'}`}
+                        >
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <p className={`text-xs font-medium ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}>Overdue Reviews</p>
-                                    <div className={`rounded-full p-1.5 ${overdueReviews > 0 ? 'bg-status-critical-bg' : 'bg-status-success-bg'}`}>
-                                        <AlertTriangle className={`h-4 w-4 ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`} />
+                                    <p
+                                        className={`text-xs font-medium ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}
+                                    >
+                                        Overdue Reviews
+                                    </p>
+                                    <div
+                                        className={`rounded-full p-1.5 ${overdueReviews > 0 ? 'bg-status-critical-bg' : 'bg-status-success-bg'}`}
+                                    >
+                                        <AlertTriangle
+                                            className={`h-4 w-4 ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}
+                                        />
                                     </div>
                                 </div>
-                                <span className={`mt-1.5 block text-2xl font-bold ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}>{overdueReviews}</span>
+                                <span
+                                    className={`mt-1.5 block text-2xl font-bold ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}
+                                >
+                                    {overdueReviews}
+                                </span>
                             </CardContent>
                         </Card>
                     </Link>
-                    <Card className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-status-warning-bg' : 'border-l-purple-500 bg-primary/10/40'}`}>
+                    <Card
+                        className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-status-warning-bg' : 'bg-primary/10/40 border-l-purple-500'}`}
+                    >
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}>1:1 Overdue</p>
-                                <div className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-status-warning-bg' : 'bg-primary/10'}`}>
-                                    <Users className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`} />
+                                <p
+                                    className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}
+                                >
+                                    1:1 Overdue
+                                </p>
+                                <div
+                                    className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-status-warning-bg' : 'bg-primary/10'}`}
+                                >
+                                    <Users
+                                        className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}
+                                    />
                                 </div>
                             </div>
-                            <span className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}>{oneToOneSla.overdue_count}</span>
-                            <p className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}>{oneToOneSla.due_soon_count} due in 7 days</p>
+                            <span
+                                className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}
+                            >
+                                {oneToOneSla.overdue_count}
+                            </span>
+                            <p
+                                className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}
+                            >
+                                {oneToOneSla.due_soon_count} due in 7 days
+                            </p>
                         </CardContent>
                     </Card>
-                    <Card className={`border-l-4 ${engagementActionPlanSla.overdue > 0 ? 'border-l-orange-500 bg-status-warning-bg' : 'border-l-cyan-500 bg-status-info-bg'}`}>
+                    <Card
+                        className={`border-l-4 ${engagementActionPlanSla.overdue > 0 ? 'border-l-orange-500 bg-status-warning-bg' : 'border-l-cyan-500 bg-status-info-bg'}`}
+                    >
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className={`text-xs font-medium ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}>Open Action Plans</p>
-                                <div className={`rounded-full p-1.5 ${engagementActionPlanSla.overdue > 0 ? 'bg-status-warning-bg' : 'bg-status-info-bg'}`}>
-                                    <Target className={`h-4 w-4 ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`} />
+                                <p
+                                    className={`text-xs font-medium ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}
+                                >
+                                    Open Action Plans
+                                </p>
+                                <div
+                                    className={`rounded-full p-1.5 ${engagementActionPlanSla.overdue > 0 ? 'bg-status-warning-bg' : 'bg-status-info-bg'}`}
+                                >
+                                    <Target
+                                        className={`h-4 w-4 ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}
+                                    />
                                 </div>
                             </div>
-                            <span className={`mt-1.5 block text-2xl font-bold ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}>{engagementActionPlanSla.open_total}</span>
+                            <span
+                                className={`mt-1.5 block text-2xl font-bold ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}
+                            >
+                                {engagementActionPlanSla.open_total}
+                            </span>
                             {engagementActionPlanSla.overdue > 0 && (
-                                <p className="mt-0.5 text-xs text-status-warning">{engagementActionPlanSla.overdue} overdue</p>
+                                <p className="mt-0.5 text-xs text-status-warning">
+                                    {engagementActionPlanSla.overdue} overdue
+                                </p>
                             )}
                         </CardContent>
                     </Card>
@@ -305,23 +473,50 @@ export default function PerformanceIndex({
                 {/* Quick-nav links */}
                 <div className="flex flex-wrap gap-2">
                     <Link href="/hr/performance/reviews">
-                        <Button size="sm" variant="outline" disabled={processing}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={processing}
+                        >
                             <ClipboardList className="mr-1.5 h-4 w-4" /> Reviews
                         </Button>
                     </Link>
                     <Link href="/hr/performance/competencies">
-                        <Button size="sm" variant="outline" disabled={processing}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={processing}
+                        >
                             <Target className="mr-1.5 h-4 w-4" /> Competencies
                         </Button>
                     </Link>
                     <Link href="/hr/performance/pips">
-                        <Button size="sm" variant="outline" disabled={processing}>
-                            <ShieldAlert className="mr-1.5 h-4 w-4" /> PIPs {pipSummary.active > 0 && <Badge className="ml-1.5 bg-status-critical-bg text-status-critical border-status-critical/30 text-[10px] px-1.5">{pipSummary.active}</Badge>}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={processing}
+                        >
+                            <ShieldAlert className="mr-1.5 h-4 w-4" /> PIPs{' '}
+                            {pipSummary.active > 0 && (
+                                <Badge className="ml-1.5 border-status-critical/30 bg-status-critical-bg px-1.5 text-[10px] text-status-critical">
+                                    {pipSummary.active}
+                                </Badge>
+                            )}
                         </Button>
                     </Link>
                     <Link href="/hr/feedback">
-                        <Button size="sm" variant="outline" disabled={processing}>
-                            <MessageSquare className="mr-1.5 h-4 w-4" /> Feedback {feedbackSummary.pending > 0 && <Badge className="ml-1.5 bg-status-warning-bg text-status-warning border-status-warning/30 text-[10px] px-1.5">{feedbackSummary.pending}</Badge>}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={processing}
+                        >
+                            <MessageSquare className="mr-1.5 h-4 w-4" />{' '}
+                            Feedback{' '}
+                            {feedbackSummary.pending > 0 && (
+                                <Badge className="ml-1.5 border-status-warning/30 bg-status-warning-bg px-1.5 text-[10px] text-status-warning">
+                                    {feedbackSummary.pending}
+                                </Badge>
+                            )}
                         </Button>
                     </Link>
                 </div>
@@ -339,14 +534,52 @@ export default function PerformanceIndex({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={220}>
-                                        <AreaChart data={reviewCompletionTrend} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height={220}
+                                    >
+                                        <AreaChart
+                                            data={reviewCompletionTrend}
+                                            margin={{
+                                                top: 5,
+                                                right: 10,
+                                                bottom: 0,
+                                                left: -20,
+                                            }}
+                                        >
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
+                                            <XAxis
+                                                dataKey="month"
+                                                tick={{ fontSize: 11 }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                allowDecimals={false}
+                                            />
                                             <Tooltip />
-                                            <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} name="Total" />
-                                            <Area type="monotone" dataKey="completed" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Completed" />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="total"
+                                                stroke="#3b82f6"
+                                                fill="#3b82f6"
+                                                fillOpacity={0.08}
+                                                name="Total"
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="completed"
+                                                stroke="#10b981"
+                                                fill="#10b981"
+                                                fillOpacity={0.2}
+                                                name="Completed"
+                                            />
                                             <Legend />
                                         </AreaChart>
                                     </ResponsiveContainer>
@@ -364,16 +597,60 @@ export default function PerformanceIndex({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={220}>
-                                        <BarChart data={ratingDistribution} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                            <XAxis dataKey="rating" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                            <Tooltip formatter={(value: any) => [value, 'Reviews']} />
-                                            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48} name="Reviews">
-                                                {ratingDistribution.map((_, idx) => (
-                                                    <Cell key={idx} fill={RATING_COLORS[idx % RATING_COLORS.length]} />
-                                                ))}
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height={220}
+                                    >
+                                        <BarChart
+                                            data={ratingDistribution}
+                                            margin={{
+                                                top: 5,
+                                                right: 10,
+                                                bottom: 0,
+                                                left: -20,
+                                            }}
+                                        >
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
+                                            <XAxis
+                                                dataKey="rating"
+                                                tick={{ fontSize: 11 }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                allowDecimals={false}
+                                            />
+                                            <Tooltip
+                                                formatter={(value: any) => [
+                                                    value,
+                                                    'Reviews',
+                                                ]}
+                                            />
+                                            <Bar
+                                                dataKey="count"
+                                                radius={[4, 4, 0, 0]}
+                                                maxBarSize={48}
+                                                name="Reviews"
+                                            >
+                                                {ratingDistribution.map(
+                                                    (_, idx) => (
+                                                        <Cell
+                                                            key={idx}
+                                                            fill={
+                                                                RATING_COLORS[
+                                                                    idx %
+                                                                        RATING_COLORS.length
+                                                                ]
+                                                            }
+                                                        />
+                                                    ),
+                                                )}
                                             </Bar>
                                         </BarChart>
                                     </ResponsiveContainer>
@@ -391,13 +668,48 @@ export default function PerformanceIndex({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <ResponsiveContainer width="100%" height={200}>
-                                        <BarChart data={notesPerMonth} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                            <Tooltip formatter={(value: any) => [value, 'Notes']} />
-                                            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} name="Notes" />
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height={200}
+                                    >
+                                        <BarChart
+                                            data={notesPerMonth}
+                                            margin={{
+                                                top: 5,
+                                                right: 10,
+                                                bottom: 0,
+                                                left: -20,
+                                            }}
+                                        >
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
+                                            <XAxis
+                                                dataKey="month"
+                                                tick={{ fontSize: 11 }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                allowDecimals={false}
+                                            />
+                                            <Tooltip
+                                                formatter={(value: any) => [
+                                                    value,
+                                                    'Notes',
+                                                ]}
+                                            />
+                                            <Bar
+                                                dataKey="count"
+                                                fill="#3b82f6"
+                                                radius={[4, 4, 0, 0]}
+                                                maxBarSize={40}
+                                                name="Notes"
+                                            />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -414,14 +726,21 @@ export default function PerformanceIndex({
                                             Competency Gaps
                                         </CardTitle>
                                         <Link href="/hr/development/goals">
-                                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-muted-foreground hover:text-foreground"
+                                            >
+                                                View All{' '}
+                                                <ArrowRight className="ml-1 h-3 w-3" />
                                             </Button>
                                         </Link>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <HorizontalBarChart items={competencyChartItems} />
+                                    <HorizontalBarChart
+                                        items={competencyChartItems}
+                                    />
                                 </CardContent>
                             </Card>
                         )}
@@ -436,31 +755,71 @@ export default function PerformanceIndex({
                                             PIP Status
                                         </CardTitle>
                                         <Link href="/hr/performance/pips">
-                                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-muted-foreground hover:text-foreground"
+                                            >
+                                                View All{' '}
+                                                <ArrowRight className="ml-1 h-3 w-3" />
                                             </Button>
                                         </Link>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex items-center gap-6">
-                                        <div style={{ width: 160, height: 160 }}>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie data={pipChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={42} paddingAngle={2}>
-                                                    {pipChartData.map((entry, idx) => (
-                                                        <Cell key={idx} fill={entry.color} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                                        <div
+                                            style={{ width: 160, height: 160 }}
+                                        >
+                                            <ResponsiveContainer
+                                                width="100%"
+                                                height="100%"
+                                            >
+                                                <PieChart>
+                                                    <Pie
+                                                        data={pipChartData}
+                                                        dataKey="value"
+                                                        nameKey="name"
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        outerRadius={70}
+                                                        innerRadius={42}
+                                                        paddingAngle={2}
+                                                    >
+                                                        {pipChartData.map(
+                                                            (entry, idx) => (
+                                                                <Cell
+                                                                    key={idx}
+                                                                    fill={
+                                                                        entry.color
+                                                                    }
+                                                                />
+                                                            ),
+                                                        )}
+                                                    </Pie>
+                                                    <Tooltip />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </div>
                                         <div className="space-y-2 text-sm">
                                             {pipChartData.map((d) => (
-                                                <div key={d.name} className="flex items-center gap-2">
-                                                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                                                    <span className="text-muted-foreground">{d.name}: <span className="font-medium text-foreground">{d.value}</span></span>
+                                                <div
+                                                    key={d.name}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <div
+                                                        className="h-2.5 w-2.5 rounded-full"
+                                                        style={{
+                                                            backgroundColor:
+                                                                d.color,
+                                                        }}
+                                                    />
+                                                    <span className="text-muted-foreground">
+                                                        {d.name}:{' '}
+                                                        <span className="font-medium text-foreground">
+                                                            {d.value}
+                                                        </span>
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -479,28 +838,52 @@ export default function PerformanceIndex({
                                             360 Feedback
                                         </CardTitle>
                                         <Link href="/hr/feedback">
-                                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-muted-foreground hover:text-foreground"
+                                            >
+                                                View All{' '}
+                                                <ArrowRight className="ml-1 h-3 w-3" />
                                             </Button>
                                         </Link>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex items-center gap-6">
-                                        <ProgressRing value={feedbackCompletionPct} size={120} color="#8b5cf6" label="Completed" />
+                                        <ProgressRing
+                                            value={feedbackCompletionPct}
+                                            size={120}
+                                            color="#8b5cf6"
+                                            label="Completed"
+                                        />
                                         <div className="space-y-2 text-sm">
                                             <div className="flex items-center justify-between gap-4">
-                                                <span className="text-muted-foreground">Pending</span>
-                                                <span className="font-medium">{feedbackSummary.pending}</span>
+                                                <span className="text-muted-foreground">
+                                                    Pending
+                                                </span>
+                                                <span className="font-medium">
+                                                    {feedbackSummary.pending}
+                                                </span>
                                             </div>
                                             <div className="flex items-center justify-between gap-4">
-                                                <span className="text-muted-foreground">Completed</span>
-                                                <span className="font-medium text-status-success">{feedbackSummary.completed}</span>
+                                                <span className="text-muted-foreground">
+                                                    Completed
+                                                </span>
+                                                <span className="font-medium text-status-success">
+                                                    {feedbackSummary.completed}
+                                                </span>
                                             </div>
                                             {feedbackSummary.overdue > 0 && (
                                                 <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-muted-foreground">Overdue</span>
-                                                    <span className="font-medium text-status-critical">{feedbackSummary.overdue}</span>
+                                                    <span className="text-muted-foreground">
+                                                        Overdue
+                                                    </span>
+                                                    <span className="font-medium text-status-critical">
+                                                        {
+                                                            feedbackSummary.overdue
+                                                        }
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
@@ -521,8 +904,13 @@ export default function PerformanceIndex({
                                     Upcoming Reviews
                                 </CardTitle>
                                 <Link href="/hr/performance/reviews">
-                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                                        View All <ArrowRight className="ml-1 h-3 w-3" />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-muted-foreground hover:text-foreground"
+                                    >
+                                        View All{' '}
+                                        <ArrowRight className="ml-1 h-3 w-3" />
                                     </Button>
                                 </Link>
                             </div>
@@ -538,23 +926,40 @@ export default function PerformanceIndex({
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {upcomingReviews.slice(0, 5).map((review) => (
-                                            <TableRow key={review.id}>
-                                                <TableCell className="font-medium">{review.staff_user.name}</TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">{formatDate(review.scheduled_at)}</TableCell>
-                                                <TableCell>
-                                                    <Badge className={getStatusColor(review.status)}>
-                                                        {review.status.replace(/_/g, ' ')}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {upcomingReviews
+                                            .slice(0, 5)
+                                            .map((review) => (
+                                                <TableRow key={review.id}>
+                                                    <TableCell className="font-medium">
+                                                        {review.staff_user.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-muted-foreground">
+                                                        {formatDate(
+                                                            review.scheduled_at,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            className={getStatusColor(
+                                                                review.status,
+                                                            )}
+                                                        >
+                                                            {review.status.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
                                     </TableBody>
                                 </Table>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
                                     <Calendar className="mb-2 h-8 w-8 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground">No upcoming reviews</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No upcoming reviews
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -569,8 +974,13 @@ export default function PerformanceIndex({
                                 </CardTitle>
                                 {can.manage && (
                                     <Link href="/hr/performance/supervision/create">
-                                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                                            Schedule <ArrowRight className="ml-1 h-3 w-3" />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-muted-foreground hover:text-foreground"
+                                        >
+                                            Schedule{' '}
+                                            <ArrowRight className="ml-1 h-3 w-3" />
                                         </Button>
                                     </Link>
                                 )}
@@ -579,15 +989,30 @@ export default function PerformanceIndex({
                         <CardContent className="space-y-2">
                             {oneToOneSla.due_rows.length > 0 ? (
                                 oneToOneSla.due_rows.slice(0, 5).map((row) => (
-                                    <div key={row.id} className="flex items-center justify-between rounded-md border p-2.5">
+                                    <div
+                                        key={row.id}
+                                        className="flex items-center justify-between rounded-md border p-2.5"
+                                    >
                                         <div>
-                                            <p className="text-sm font-medium">{row.employee_name}</p>
-                                            <p className="text-xs text-muted-foreground">{row.supervisor_name}</p>
+                                            <p className="text-sm font-medium">
+                                                {row.employee_name}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {row.supervisor_name}
+                                            </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-xs text-muted-foreground">{formatDate(row.next_session_date)}</p>
-                                            <Badge className={`text-[10px] ${row.is_overdue ? 'bg-status-critical-bg text-status-critical border-status-critical/30' : 'bg-status-info-bg text-status-info border-status-info/30'}`}>
-                                                {row.is_overdue ? 'overdue' : 'scheduled'}
+                                            <p className="text-xs text-muted-foreground">
+                                                {formatDate(
+                                                    row.next_session_date,
+                                                )}
+                                            </p>
+                                            <Badge
+                                                className={`text-[10px] ${row.is_overdue ? 'border-status-critical/30 bg-status-critical-bg text-status-critical' : 'border-status-info/30 bg-status-info-bg text-status-info'}`}
+                                            >
+                                                {row.is_overdue
+                                                    ? 'overdue'
+                                                    : 'scheduled'}
                                             </Badge>
                                         </div>
                                     </div>
@@ -595,7 +1020,9 @@ export default function PerformanceIndex({
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
                                     <Users className="mb-2 h-8 w-8 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground">No upcoming 1:1 sessions</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No upcoming 1:1 sessions
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -606,14 +1033,18 @@ export default function PerformanceIndex({
                 <Card>
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm font-medium">Supervision Notes</CardTitle>
+                            <CardTitle className="text-sm font-medium">
+                                Supervision Notes
+                            </CardTitle>
                             <div className="w-56">
                                 <div className="relative">
-                                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                                    <Search className="absolute top-2 left-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Search notes..."
                                         value={filters.q || ''}
-                                        onChange={(e) => onFilter({ q: e.target.value })}
+                                        onChange={(e) =>
+                                            onFilter({ q: e.target.value })
+                                        }
                                         className="h-8 pl-9 text-xs"
                                         disabled={processing}
                                     />
@@ -636,13 +1067,29 @@ export default function PerformanceIndex({
                                 <TableBody>
                                     {supervisionNotes.data.map((note) => (
                                         <TableRow key={note.id}>
-                                            <TableCell className="font-medium">{note.staff_user.name}</TableCell>
-                                            <TableCell>{note.supervisor.name}</TableCell>
-                                            <TableCell>{formatDate(note.date)}</TableCell>
-                                            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{note.summary}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {note.staff_user.name}
+                                            </TableCell>
                                             <TableCell>
-                                                <Link href={`/hr/performance/supervision/${note.id}`}>
-                                                    <Button variant="ghost" size="sm" disabled={processing}>View</Button>
+                                                {note.supervisor.name}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDate(note.date)}
+                                            </TableCell>
+                                            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                                                {note.summary}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link
+                                                    href={`/hr/performance/supervision/${note.id}`}
+                                                >
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={processing}
+                                                    >
+                                                        View
+                                                    </Button>
                                                 </Link>
                                             </TableCell>
                                         </TableRow>
@@ -653,12 +1100,22 @@ export default function PerformanceIndex({
                             <div className="flex flex-col items-center justify-center py-8 text-center">
                                 <FileText className="mb-2 h-8 w-8 text-muted-foreground" />
                                 <p className="text-sm text-muted-foreground">
-                                    {filters.q ? 'No notes match your search.' : 'No supervision notes yet.'}
+                                    {filters.q
+                                        ? 'No notes match your search.'
+                                        : 'No supervision notes yet.'}
                                 </p>
                                 {can.manage && !filters.q && (
-                                    <Link href="/hr/performance/supervision/create" className="mt-2">
-                                        <Button variant="outline" size="sm" disabled={processing}>
-                                            <Plus className="mr-1.5 h-4 w-4" /> Add Note
+                                    <Link
+                                        href="/hr/performance/supervision/create"
+                                        className="mt-2"
+                                    >
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={processing}
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />{' '}
+                                            Add Note
                                         </Button>
                                     </Link>
                                 )}

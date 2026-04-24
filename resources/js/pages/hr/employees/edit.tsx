@@ -1,12 +1,18 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
 interface Profile {
@@ -40,7 +46,14 @@ interface Props {
     payFrequencies: Array<{ value: string; label: string }>;
 }
 
-export default function EmployeeEdit({ profile, sites, departments, employmentTypes, contractTypes, payFrequencies }: Props) {
+export default function EmployeeEdit({
+    profile,
+    sites,
+    departments,
+    employmentTypes,
+    contractTypes,
+    payFrequencies,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr/people' },
         { title: 'People', href: '/hr/people' },
@@ -53,7 +66,9 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
         position_title: profile.position_title || '',
         employment_type: profile.employment_type || '',
         contract_type: profile.contract_type || '',
-        department_id: profile.department_id ? String(profile.department_id) : '',
+        department_id: profile.department_id
+            ? String(profile.department_id)
+            : '',
         is_active: profile.is_active,
         start_date: profile.start_date || '',
         end_date: profile.end_date || '',
@@ -61,10 +76,13 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
         hours_per_week: profile.hours_per_week ?? '',
         pay_rate: profile.pay_rate ?? '',
         pay_frequency: profile.pay_frequency || '',
-        primary_site_id: profile.primary_site_id ? String(profile.primary_site_id) : '',
+        primary_site_id: profile.primary_site_id
+            ? String(profile.primary_site_id)
+            : '',
         emergency_contact_name: profile.emergency_contact_name || '',
         emergency_contact_phone: profile.emergency_contact_phone || '',
-        emergency_contact_relationship: profile.emergency_contact_relationship || '',
+        emergency_contact_relationship:
+            profile.emergency_contact_relationship || '',
         notes: profile.notes || '',
     });
 
@@ -78,7 +96,9 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
             <Head title={`Edit ${profile.user.name}`} />
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Edit {profile.user.name}</h1>
+                    <h1 className="text-2xl font-bold">
+                        Edit {profile.user.name}
+                    </h1>
                     <Button variant="outline" asChild>
                         <Link href={`/hr/people/${profile.id}`}>Cancel</Link>
                     </Button>
@@ -94,22 +114,45 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Name</Label>
-                                    <Input value={profile.user.name} disabled className="bg-muted" />
-                                    <p className="mt-1 text-xs text-muted-foreground">Name is managed in user settings</p>
+                                    <Input
+                                        value={profile.user.name}
+                                        disabled
+                                        className="bg-muted"
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Name is managed in user settings
+                                    </p>
                                 </div>
                                 <div>
                                     <Label>Email</Label>
-                                    <Input value={profile.user.email} disabled className="bg-muted" />
-                                    <p className="mt-1 text-xs text-muted-foreground">Email is managed in user settings</p>
+                                    <Input
+                                        value={profile.user.email}
+                                        disabled
+                                        className="bg-muted"
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Email is managed in user settings
+                                    </p>
                                 </div>
                                 <div>
-                                    <Label htmlFor="employee_number">Employee Number</Label>
+                                    <Label htmlFor="employee_number">
+                                        Employee Number
+                                    </Label>
                                     <Input
                                         id="employee_number"
                                         value={form.data.employee_number}
-                                        onChange={(e) => form.setData('employee_number', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'employee_number',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.employee_number && <p className="mt-1 text-sm text-destructive">{form.errors.employee_number}</p>}
+                                    {form.errors.employee_number && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.employee_number}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -123,73 +166,180 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label htmlFor="position_title">Position Title</Label>
+                                    <Label htmlFor="position_title">
+                                        Position Title
+                                    </Label>
                                     <Input
                                         id="position_title"
                                         value={form.data.position_title}
-                                        onChange={(e) => form.setData('position_title', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'position_title',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.position_title && <p className="mt-1 text-sm text-destructive">{form.errors.position_title}</p>}
+                                    {form.errors.position_title && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.position_title}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Employment Type</Label>
-                                    <Select value={form.data.employment_type || '__none__'} onValueChange={(v) => form.setData('employment_type', v === '__none__' ? '' : v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                                    <Select
+                                        value={
+                                            form.data.employment_type ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'employment_type',
+                                                v === '__none__' ? '' : v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">Select type</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Select type
+                                            </SelectItem>
                                             {employmentTypes.map((t) => (
-                                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
+                                                >
+                                                    {t.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.employment_type && <p className="mt-1 text-sm text-destructive">{form.errors.employment_type}</p>}
+                                    {form.errors.employment_type && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.employment_type}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Contract Type</Label>
-                                    <Select value={form.data.contract_type || '__none__'} onValueChange={(v) => form.setData('contract_type', v === '__none__' ? '' : v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select contract type" /></SelectTrigger>
+                                    <Select
+                                        value={
+                                            form.data.contract_type ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'contract_type',
+                                                v === '__none__' ? '' : v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select contract type" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">Select contract type</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Select contract type
+                                            </SelectItem>
                                             {contractTypes.map((t) => (
-                                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
+                                                >
+                                                    {t.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.contract_type && <p className="mt-1 text-sm text-destructive">{form.errors.contract_type}</p>}
+                                    {form.errors.contract_type && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.contract_type}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Department</Label>
-                                    <Select value={form.data.department_id || '__none__'} onValueChange={(v) => form.setData('department_id', v === '__none__' ? '' : v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                                    <Select
+                                        value={
+                                            form.data.department_id ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'department_id',
+                                                v === '__none__' ? '' : v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select department" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">No department</SelectItem>
+                                            <SelectItem value="__none__">
+                                                No department
+                                            </SelectItem>
                                             {departments.map((d) => (
-                                                <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                                                <SelectItem
+                                                    key={d.id}
+                                                    value={String(d.id)}
+                                                >
+                                                    {d.name}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.department_id && <p className="mt-1 text-sm text-destructive">{form.errors.department_id}</p>}
+                                    {form.errors.department_id && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.department_id}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="hours_per_week">Hours Per Week</Label>
+                                    <Label htmlFor="hours_per_week">
+                                        Hours Per Week
+                                    </Label>
                                     <Input
                                         id="hours_per_week"
                                         type="number"
                                         step="0.5"
                                         value={form.data.hours_per_week}
-                                        onChange={(e) => form.setData('hours_per_week', e.target.value ? Number(e.target.value) : '')}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'hours_per_week',
+                                                e.target.value
+                                                    ? Number(e.target.value)
+                                                    : '',
+                                            )
+                                        }
                                     />
-                                    {form.errors.hours_per_week && <p className="mt-1 text-sm text-destructive">{form.errors.hours_per_week}</p>}
+                                    {form.errors.hours_per_week && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.hours_per_week}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="start_date">Start Date</Label>
+                                    <Label htmlFor="start_date">
+                                        Start Date
+                                    </Label>
                                     <Input
                                         id="start_date"
                                         type="date"
                                         value={form.data.start_date}
-                                        onChange={(e) => form.setData('start_date', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'start_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.start_date && <p className="mt-1 text-sm text-destructive">{form.errors.start_date}</p>}
+                                    {form.errors.start_date && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.start_date}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label htmlFor="end_date">End Date</Label>
@@ -197,19 +347,39 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                                         id="end_date"
                                         type="date"
                                         value={form.data.end_date}
-                                        onChange={(e) => form.setData('end_date', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'end_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.end_date && <p className="mt-1 text-sm text-destructive">{form.errors.end_date}</p>}
+                                    {form.errors.end_date && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.end_date}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="probation_end_date">Probation End Date</Label>
+                                    <Label htmlFor="probation_end_date">
+                                        Probation End Date
+                                    </Label>
                                     <Input
                                         id="probation_end_date"
                                         type="date"
                                         value={form.data.probation_end_date}
-                                        onChange={(e) => form.setData('probation_end_date', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'probation_end_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.probation_end_date && <p className="mt-1 text-sm text-destructive">{form.errors.probation_end_date}</p>}
+                                    {form.errors.probation_end_date && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.probation_end_date}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex items-end gap-3">
                                     <div className="flex items-center gap-2">
@@ -217,10 +387,17 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                                             type="checkbox"
                                             id="is_active"
                                             checked={form.data.is_active}
-                                            onChange={(e) => form.setData('is_active', e.target.checked)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'is_active',
+                                                    e.target.checked,
+                                                )
+                                            }
                                             className="h-4 w-4 rounded border-border"
                                         />
-                                        <Label htmlFor="is_active">Active Employee</Label>
+                                        <Label htmlFor="is_active">
+                                            Active Employee
+                                        </Label>
                                     </div>
                                 </div>
                             </div>
@@ -235,28 +412,65 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label htmlFor="pay_rate">Pay Rate ($)</Label>
+                                    <Label htmlFor="pay_rate">
+                                        Pay Rate ($)
+                                    </Label>
                                     <Input
                                         id="pay_rate"
                                         type="number"
                                         step="0.01"
                                         value={form.data.pay_rate}
-                                        onChange={(e) => form.setData('pay_rate', e.target.value ? Number(e.target.value) : '')}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'pay_rate',
+                                                e.target.value
+                                                    ? Number(e.target.value)
+                                                    : '',
+                                            )
+                                        }
                                     />
-                                    {form.errors.pay_rate && <p className="mt-1 text-sm text-destructive">{form.errors.pay_rate}</p>}
+                                    {form.errors.pay_rate && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.pay_rate}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Pay Frequency</Label>
-                                    <Select value={form.data.pay_frequency || '__none__'} onValueChange={(v) => form.setData('pay_frequency', v === '__none__' ? '' : v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                                    <Select
+                                        value={
+                                            form.data.pay_frequency ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'pay_frequency',
+                                                v === '__none__' ? '' : v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select frequency" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">Select frequency</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Select frequency
+                                            </SelectItem>
                                             {payFrequencies.map((f) => (
-                                                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                                                <SelectItem
+                                                    key={f.value}
+                                                    value={f.value}
+                                                >
+                                                    {f.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.pay_frequency && <p className="mt-1 text-sm text-destructive">{form.errors.pay_frequency}</p>}
+                                    {form.errors.pay_frequency && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.pay_frequency}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -270,16 +484,39 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                         <CardContent>
                             <div className="max-w-sm">
                                 <Label>Primary Site</Label>
-                                <Select value={form.data.primary_site_id || '__none__'} onValueChange={(v) => form.setData('primary_site_id', v === '__none__' ? '' : v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
+                                <Select
+                                    value={
+                                        form.data.primary_site_id || '__none__'
+                                    }
+                                    onValueChange={(v) =>
+                                        form.setData(
+                                            'primary_site_id',
+                                            v === '__none__' ? '' : v,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select site" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__none__">No site assigned</SelectItem>
+                                        <SelectItem value="__none__">
+                                            No site assigned
+                                        </SelectItem>
                                         {sites.map((s) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                            <SelectItem
+                                                key={s.id}
+                                                value={String(s.id)}
+                                            >
+                                                {s.name}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.primary_site_id && <p className="mt-1 text-sm text-destructive">{form.errors.primary_site_id}</p>}
+                                {form.errors.primary_site_id && (
+                                    <p className="mt-1 text-sm text-destructive">
+                                        {form.errors.primary_site_id}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -292,31 +529,76 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div>
-                                    <Label htmlFor="emergency_contact_name">Name</Label>
+                                    <Label htmlFor="emergency_contact_name">
+                                        Name
+                                    </Label>
                                     <Input
                                         id="emergency_contact_name"
                                         value={form.data.emergency_contact_name}
-                                        onChange={(e) => form.setData('emergency_contact_name', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'emergency_contact_name',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.emergency_contact_name && <p className="mt-1 text-sm text-destructive">{form.errors.emergency_contact_name}</p>}
+                                    {form.errors.emergency_contact_name && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.emergency_contact_name}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="emergency_contact_phone">Phone</Label>
+                                    <Label htmlFor="emergency_contact_phone">
+                                        Phone
+                                    </Label>
                                     <Input
                                         id="emergency_contact_phone"
-                                        value={form.data.emergency_contact_phone}
-                                        onChange={(e) => form.setData('emergency_contact_phone', e.target.value)}
+                                        value={
+                                            form.data.emergency_contact_phone
+                                        }
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'emergency_contact_phone',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.emergency_contact_phone && <p className="mt-1 text-sm text-destructive">{form.errors.emergency_contact_phone}</p>}
+                                    {form.errors.emergency_contact_phone && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {
+                                                form.errors
+                                                    .emergency_contact_phone
+                                            }
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="emergency_contact_relationship">Relationship</Label>
+                                    <Label htmlFor="emergency_contact_relationship">
+                                        Relationship
+                                    </Label>
                                     <Input
                                         id="emergency_contact_relationship"
-                                        value={form.data.emergency_contact_relationship}
-                                        onChange={(e) => form.setData('emergency_contact_relationship', e.target.value)}
+                                        value={
+                                            form.data
+                                                .emergency_contact_relationship
+                                        }
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'emergency_contact_relationship',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.emergency_contact_relationship && <p className="mt-1 text-sm text-destructive">{form.errors.emergency_contact_relationship}</p>}
+                                    {form.errors
+                                        .emergency_contact_relationship && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {
+                                                form.errors
+                                                    .emergency_contact_relationship
+                                            }
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -330,11 +612,17 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                         <CardContent>
                             <Textarea
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 rows={4}
                                 placeholder="Internal notes about this employee..."
                             />
-                            {form.errors.notes && <p className="mt-1 text-sm text-destructive">{form.errors.notes}</p>}
+                            {form.errors.notes && (
+                                <p className="mt-1 text-sm text-destructive">
+                                    {form.errors.notes}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -344,7 +632,9 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                             {form.processing ? 'Saving...' : 'Save Changes'}
                         </Button>
                         <Button type="button" variant="outline" asChild>
-                            <Link href={`/hr/people/${profile.id}`}>Cancel</Link>
+                            <Link href={`/hr/people/${profile.id}`}>
+                                Cancel
+                            </Link>
                         </Button>
                     </div>
                 </form>

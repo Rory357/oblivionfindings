@@ -11,32 +11,21 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
 import type { FormDataConvertible } from '@inertiajs/core';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    CheckCircle2,
     Clock,
     Edit2,
-    ExternalLink,
     Plus,
     Shield,
     ShieldAlert,
-    Target,
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -101,9 +90,35 @@ interface Props {
 // --- Constants ---
 
 const SEVERITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const;
-const SOURCE_OPTIONS = ['fleet', 'personal_tracker', 'manual', 'external', 'compliance', 'other'] as const;
-const ALERT_TYPE_OPTIONS = ['geofence_breach', 'sos_alert', 'fall_detected', 'speed_violation', 'wandering', 'device_offline', 'battery_low', 'medication_due', 'check_in_missed', 'other'] as const;
-const DAY_LABELS: Record<number, string> = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' };
+const SOURCE_OPTIONS = [
+    'fleet',
+    'personal_tracker',
+    'manual',
+    'external',
+    'compliance',
+    'other',
+] as const;
+const ALERT_TYPE_OPTIONS = [
+    'geofence_breach',
+    'sos_alert',
+    'fall_detected',
+    'speed_violation',
+    'wandering',
+    'device_offline',
+    'battery_low',
+    'medication_due',
+    'check_in_missed',
+    'other',
+] as const;
+const DAY_LABELS: Record<number, string> = {
+    1: 'Mon',
+    2: 'Tue',
+    3: 'Wed',
+    4: 'Thu',
+    5: 'Fri',
+    6: 'Sat',
+    7: 'Sun',
+};
 
 const severityColors: Record<string, string> = {
     critical: 'bg-status-critical text-white',
@@ -154,9 +169,11 @@ function slaToForm(sla: SlaDefinitionData): FormData {
         alert_types: sla.alert_types,
         severities: sla.severities,
         sources: sla.sources,
-        acknowledge_target_minutes: sla.acknowledge_target_minutes?.toString() ?? '',
+        acknowledge_target_minutes:
+            sla.acknowledge_target_minutes?.toString() ?? '',
         response_target_minutes: sla.response_target_minutes?.toString() ?? '',
-        resolution_target_minutes: sla.resolution_target_minutes?.toString() ?? '',
+        resolution_target_minutes:
+            sla.resolution_target_minutes?.toString() ?? '',
         business_hours_only: sla.business_hours_only,
         business_hours_start: sla.business_hours?.start ?? '08:00',
         business_hours_end: sla.business_hours?.end ?? '18:00',
@@ -171,7 +188,15 @@ function slaToForm(sla: SlaDefinitionData): FormData {
 
 // --- Circular Progress Component ---
 
-function CircularProgress({ value, label, size = 64 }: { value: number | null; label: string; size?: number }) {
+function CircularProgress({
+    value,
+    label,
+    size = 64,
+}: {
+    value: number | null;
+    label: string;
+    size?: number;
+}) {
     const radius = (size - 8) / 2;
     const circumference = 2 * Math.PI * radius;
     const pct = value ?? 0;
@@ -244,18 +269,21 @@ function MultiSelectBadges({
                 const isSelected = selected.includes(opt);
                 const customColor = colorMap?.[opt];
                 return (
-                    <button
+                    <Button
                         key={opt}
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => toggle(opt)}
-                        className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                        className={`h-7 rounded-full px-2.5 text-xs ${
                             isSelected
-                                ? customColor ?? 'border-primary bg-primary text-primary-foreground'
+                                ? (customColor ??
+                                  'border-primary bg-primary text-primary-foreground')
                                 : 'border-border bg-background text-muted-foreground hover:bg-muted'
                         }`}
                     >
                         {opt.replace(/_/g, ' ')}
-                    </button>
+                    </Button>
                 );
             })}
         </div>
@@ -281,14 +309,20 @@ function SlaFormDialog({
     submitting: boolean;
     onSubmit: (e: FormEvent) => void;
 }) {
-    const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
+    const updateField = <K extends keyof FormData>(
+        key: K,
+        value: FormData[K],
+    ) => {
         setFormData({ ...formData, [key]: value });
     };
 
     const toggleDay = (day: number) => {
         const days = formData.business_hours_days;
         if (days.includes(day)) {
-            updateField('business_hours_days', days.filter((d) => d !== day));
+            updateField(
+                'business_hours_days',
+                days.filter((d) => d !== day),
+            );
         } else {
             updateField('business_hours_days', [...days, day].sort());
         }
@@ -298,7 +332,11 @@ function SlaFormDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{editingSla ? 'Edit SLA Definition' : 'Create SLA Definition'}</DialogTitle>
+                    <DialogTitle>
+                        {editingSla
+                            ? 'Edit SLA Definition'
+                            : 'Create SLA Definition'}
+                    </DialogTitle>
                     <DialogDescription>
                         {editingSla
                             ? 'Update the SLA targets and matching criteria.'
@@ -314,7 +352,9 @@ function SlaFormDialog({
                             <Input
                                 id="sla-name"
                                 value={formData.name}
-                                onChange={(e) => updateField('name', e.target.value)}
+                                onChange={(e) =>
+                                    updateField('name', e.target.value)
+                                }
                                 placeholder="e.g. Critical Alert SLA"
                                 required
                             />
@@ -324,7 +364,9 @@ function SlaFormDialog({
                             <Input
                                 id="sla-code"
                                 value={formData.code}
-                                onChange={(e) => updateField('code', e.target.value)}
+                                onChange={(e) =>
+                                    updateField('code', e.target.value)
+                                }
                                 placeholder="e.g. SLA-CRIT"
                                 required
                             />
@@ -336,7 +378,9 @@ function SlaFormDialog({
                         <Textarea
                             id="sla-description"
                             value={formData.description}
-                            onChange={(e) => updateField('description', e.target.value)}
+                            onChange={(e) =>
+                                updateField('description', e.target.value)
+                            }
                             placeholder="Optional description of this SLA policy..."
                             rows={2}
                         />
@@ -344,9 +388,12 @@ function SlaFormDialog({
 
                     {/* Matching Criteria */}
                     <div className="space-y-4 rounded-lg border p-4">
-                        <h4 className="text-sm font-semibold">Matching Criteria</h4>
+                        <h4 className="text-sm font-semibold">
+                            Matching Criteria
+                        </h4>
                         <p className="text-xs text-muted-foreground">
-                            Leave a section empty to match all values for that criteria.
+                            Leave a section empty to match all values for that
+                            criteria.
                         </p>
 
                         <div className="space-y-2">
@@ -380,7 +427,9 @@ function SlaFormDialog({
 
                     {/* Target Times */}
                     <div className="space-y-4 rounded-lg border p-4">
-                        <h4 className="text-sm font-semibold">Target Times (minutes)</h4>
+                        <h4 className="text-sm font-semibold">
+                            Target Times (minutes)
+                        </h4>
                         <div className="grid gap-4 sm:grid-cols-3">
                             <div className="space-y-2">
                                 <Label htmlFor="ack-target">Acknowledge</Label>
@@ -389,7 +438,12 @@ function SlaFormDialog({
                                     type="number"
                                     min={1}
                                     value={formData.acknowledge_target_minutes}
-                                    onChange={(e) => updateField('acknowledge_target_minutes', e.target.value)}
+                                    onChange={(e) =>
+                                        updateField(
+                                            'acknowledge_target_minutes',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="e.g. 5"
                                 />
                             </div>
@@ -400,7 +454,12 @@ function SlaFormDialog({
                                     type="number"
                                     min={1}
                                     value={formData.response_target_minutes}
-                                    onChange={(e) => updateField('response_target_minutes', e.target.value)}
+                                    onChange={(e) =>
+                                        updateField(
+                                            'response_target_minutes',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="e.g. 15"
                                 />
                             </div>
@@ -411,7 +470,12 @@ function SlaFormDialog({
                                     type="number"
                                     min={1}
                                     value={formData.resolution_target_minutes}
-                                    onChange={(e) => updateField('resolution_target_minutes', e.target.value)}
+                                    onChange={(e) =>
+                                        updateField(
+                                            'resolution_target_minutes',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="e.g. 60"
                                 />
                             </div>
@@ -422,14 +486,18 @@ function SlaFormDialog({
                     <div className="space-y-4 rounded-lg border p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h4 className="text-sm font-semibold">Business Hours Only</h4>
+                                <h4 className="text-sm font-semibold">
+                                    Business Hours Only
+                                </h4>
                                 <p className="text-xs text-muted-foreground">
                                     SLA timers only count during business hours.
                                 </p>
                             </div>
                             <Switch
                                 checked={formData.business_hours_only}
-                                onCheckedChange={(v) => updateField('business_hours_only', v)}
+                                onCheckedChange={(v) =>
+                                    updateField('business_hours_only', v)
+                                }
                             />
                         </div>
 
@@ -440,8 +508,15 @@ function SlaFormDialog({
                                         <Label>Start Time</Label>
                                         <Input
                                             type="time"
-                                            value={formData.business_hours_start}
-                                            onChange={(e) => updateField('business_hours_start', e.target.value)}
+                                            value={
+                                                formData.business_hours_start
+                                            }
+                                            onChange={(e) =>
+                                                updateField(
+                                                    'business_hours_start',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -449,27 +524,40 @@ function SlaFormDialog({
                                         <Input
                                             type="time"
                                             value={formData.business_hours_end}
-                                            onChange={(e) => updateField('business_hours_end', e.target.value)}
+                                            onChange={(e) =>
+                                                updateField(
+                                                    'business_hours_end',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Days</Label>
                                     <div className="flex flex-wrap gap-1.5">
-                                        {([1, 2, 3, 4, 5, 6, 7] as const).map((day) => (
-                                            <button
-                                                key={day}
-                                                type="button"
-                                                onClick={() => toggleDay(day)}
-                                                className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors ${
-                                                    formData.business_hours_days.includes(day)
-                                                        ? 'border-primary bg-primary text-primary-foreground'
-                                                        : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                                                }`}
-                                            >
-                                                {DAY_LABELS[day]}
-                                            </button>
-                                        ))}
+                                        {([1, 2, 3, 4, 5, 6, 7] as const).map(
+                                            (day) => (
+                                                <Button
+                                                    key={day}
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        toggleDay(day)
+                                                    }
+                                                    className={`h-8 px-3 text-xs ${
+                                                        formData.business_hours_days.includes(
+                                                            day,
+                                                        )
+                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                                                    }`}
+                                                >
+                                                    {DAY_LABELS[day]}
+                                                </Button>
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -478,49 +566,91 @@ function SlaFormDialog({
 
                     {/* Escalation */}
                     <div className="space-y-4 rounded-lg border p-4">
-                        <h4 className="text-sm font-semibold">Escalation on Breach</h4>
+                        <h4 className="text-sm font-semibold">
+                            Escalation on Breach
+                        </h4>
                         <div className="space-y-3">
                             <div className="flex items-center gap-3">
                                 <Checkbox
                                     id="esc-ack"
-                                    checked={formData.escalate_on_acknowledge_breach}
-                                    onCheckedChange={(v) => updateField('escalate_on_acknowledge_breach', !!v)}
+                                    checked={
+                                        formData.escalate_on_acknowledge_breach
+                                    }
+                                    onCheckedChange={(v) =>
+                                        updateField(
+                                            'escalate_on_acknowledge_breach',
+                                            !!v,
+                                        )
+                                    }
                                 />
-                                <Label htmlFor="esc-ack" className="text-sm font-normal">
+                                <Label
+                                    htmlFor="esc-ack"
+                                    className="text-sm font-normal"
+                                >
                                     Escalate on acknowledge breach
                                 </Label>
                             </div>
                             <div className="flex items-center gap-3">
                                 <Checkbox
                                     id="esc-resp"
-                                    checked={formData.escalate_on_response_breach}
-                                    onCheckedChange={(v) => updateField('escalate_on_response_breach', !!v)}
+                                    checked={
+                                        formData.escalate_on_response_breach
+                                    }
+                                    onCheckedChange={(v) =>
+                                        updateField(
+                                            'escalate_on_response_breach',
+                                            !!v,
+                                        )
+                                    }
                                 />
-                                <Label htmlFor="esc-resp" className="text-sm font-normal">
+                                <Label
+                                    htmlFor="esc-resp"
+                                    className="text-sm font-normal"
+                                >
                                     Escalate on response breach
                                 </Label>
                             </div>
                             <div className="flex items-center gap-3">
                                 <Checkbox
                                     id="esc-res"
-                                    checked={formData.escalate_on_resolution_breach}
-                                    onCheckedChange={(v) => updateField('escalate_on_resolution_breach', !!v)}
+                                    checked={
+                                        formData.escalate_on_resolution_breach
+                                    }
+                                    onCheckedChange={(v) =>
+                                        updateField(
+                                            'escalate_on_resolution_breach',
+                                            !!v,
+                                        )
+                                    }
                                 />
-                                <Label htmlFor="esc-res" className="text-sm font-normal">
+                                <Label
+                                    htmlFor="esc-res"
+                                    className="text-sm font-normal"
+                                >
                                     Escalate on resolution breach
                                 </Label>
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="notify-roles">Breach Notification Roles</Label>
+                            <Label htmlFor="notify-roles">
+                                Breach Notification Roles
+                            </Label>
                             <Input
                                 id="notify-roles"
                                 value={formData.breach_notify_roles}
-                                onChange={(e) => updateField('breach_notify_roles', e.target.value)}
+                                onChange={(e) =>
+                                    updateField(
+                                        'breach_notify_roles',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. admin, coordinator, manager"
                             />
-                            <p className="text-xs text-muted-foreground">Comma-separated list of roles to notify on breach.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Comma-separated list of roles to notify on
+                                breach.
+                            </p>
                         </div>
                     </div>
 
@@ -539,11 +669,19 @@ function SlaFormDialog({
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={submitting}>
-                            {submitting ? 'Saving...' : editingSla ? 'Update SLA' : 'Create SLA'}
+                            {submitting
+                                ? 'Saving...'
+                                : editingSla
+                                  ? 'Update SLA'
+                                  : 'Create SLA'}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -571,18 +709,29 @@ function SlaCard({
                 <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                            <CardTitle className="text-base">{sla.name}</CardTitle>
-                            <Badge variant="outline" className="shrink-0 font-mono text-xs">
+                            <CardTitle className="text-base">
+                                {sla.name}
+                            </CardTitle>
+                            <Badge
+                                variant="outline"
+                                className="shrink-0 font-mono text-xs"
+                            >
                                 {sla.code}
                             </Badge>
                         </div>
                         {sla.description && (
-                            <p className="mt-1 text-xs text-muted-foreground">{sla.description}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {sla.description}
+                            </p>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
                         {canManage && (
-                            <Button variant="ghost" size="sm" onClick={() => onEdit(sla)}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onEdit(sla)}
+                            >
                                 <Edit2 className="h-3.5 w-3.5" />
                             </Button>
                         )}
@@ -593,7 +742,11 @@ function SlaCard({
                             />
                         )}
                         {!canManage && (
-                            <Badge variant={sla.is_active ? 'default' : 'secondary'}>
+                            <Badge
+                                variant={
+                                    sla.is_active ? 'default' : 'secondary'
+                                }
+                            >
                                 {sla.is_active ? 'Active' : 'Inactive'}
                             </Badge>
                         )}
@@ -604,37 +757,64 @@ function SlaCard({
                 {/* Target Times */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-md bg-muted/50 p-2 text-center">
-                        <p className="text-[10px] font-medium uppercase text-muted-foreground">Acknowledge</p>
-                        <p className="text-sm font-semibold">{formatMinutes(sla.acknowledge_target_minutes)}</p>
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Acknowledge
+                        </p>
+                        <p className="text-sm font-semibold">
+                            {formatMinutes(sla.acknowledge_target_minutes)}
+                        </p>
                     </div>
                     <div className="rounded-md bg-muted/50 p-2 text-center">
-                        <p className="text-[10px] font-medium uppercase text-muted-foreground">Response</p>
-                        <p className="text-sm font-semibold">{formatMinutes(sla.response_target_minutes)}</p>
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Response
+                        </p>
+                        <p className="text-sm font-semibold">
+                            {formatMinutes(sla.response_target_minutes)}
+                        </p>
                     </div>
                     <div className="rounded-md bg-muted/50 p-2 text-center">
-                        <p className="text-[10px] font-medium uppercase text-muted-foreground">Resolution</p>
-                        <p className="text-sm font-semibold">{formatMinutes(sla.resolution_target_minutes)}</p>
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Resolution
+                        </p>
+                        <p className="text-sm font-semibold">
+                            {formatMinutes(sla.resolution_target_minutes)}
+                        </p>
                     </div>
                 </div>
 
                 {/* Compliance Gauges */}
                 <div className="flex items-center justify-center gap-6 py-2">
-                    <CircularProgress value={sla.compliance.acknowledge_pct} label="Ack" />
-                    <CircularProgress value={sla.compliance.response_pct} label="Response" />
-                    <CircularProgress value={sla.compliance.resolution_pct} label="Resolution" />
+                    <CircularProgress
+                        value={sla.compliance.acknowledge_pct}
+                        label="Ack"
+                    />
+                    <CircularProgress
+                        value={sla.compliance.response_pct}
+                        label="Response"
+                    />
+                    <CircularProgress
+                        value={sla.compliance.resolution_pct}
+                        label="Resolution"
+                    />
                 </div>
 
                 <div className="text-center text-xs text-muted-foreground">
-                    {sla.total_alerts} alert{sla.total_alerts !== 1 ? 's' : ''} matched
+                    {sla.total_alerts} alert{sla.total_alerts !== 1 ? 's' : ''}{' '}
+                    matched
                 </div>
 
                 {/* Matching Criteria */}
                 <div className="space-y-2">
                     {sla.severities.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-xs text-muted-foreground">Severities:</span>
+                            <span className="text-xs text-muted-foreground">
+                                Severities:
+                            </span>
                             {sla.severities.map((s) => (
-                                <Badge key={s} className={`text-[10px] ${severityColors[s] ?? ''}`}>
+                                <Badge
+                                    key={s}
+                                    className={`text-[10px] ${severityColors[s] ?? ''}`}
+                                >
                                     {s}
                                 </Badge>
                             ))}
@@ -642,9 +822,15 @@ function SlaCard({
                     )}
                     {sla.sources.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-xs text-muted-foreground">Sources:</span>
+                            <span className="text-xs text-muted-foreground">
+                                Sources:
+                            </span>
                             {sla.sources.map((s) => (
-                                <Badge key={s} variant="outline" className="text-[10px]">
+                                <Badge
+                                    key={s}
+                                    variant="outline"
+                                    className="text-[10px]"
+                                >
                                     {s}
                                 </Badge>
                             ))}
@@ -652,17 +838,27 @@ function SlaCard({
                     )}
                     {sla.alert_types.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-xs text-muted-foreground">Types:</span>
+                            <span className="text-xs text-muted-foreground">
+                                Types:
+                            </span>
                             {sla.alert_types.map((t) => (
-                                <Badge key={t} variant="secondary" className="text-[10px]">
+                                <Badge
+                                    key={t}
+                                    variant="secondary"
+                                    className="text-[10px]"
+                                >
                                     {t.replace(/_/g, ' ')}
                                 </Badge>
                             ))}
                         </div>
                     )}
-                    {sla.severities.length === 0 && sla.sources.length === 0 && sla.alert_types.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic">Matches all alerts</p>
-                    )}
+                    {sla.severities.length === 0 &&
+                        sla.sources.length === 0 &&
+                        sla.alert_types.length === 0 && (
+                            <p className="text-xs text-muted-foreground italic">
+                                Matches all alerts
+                            </p>
+                        )}
                 </div>
 
                 {/* Flags */}
@@ -673,7 +869,9 @@ function SlaCard({
                             Business hours only
                         </Badge>
                     )}
-                    {(sla.escalate_on_acknowledge_breach || sla.escalate_on_response_breach || sla.escalate_on_resolution_breach) && (
+                    {(sla.escalate_on_acknowledge_breach ||
+                        sla.escalate_on_response_breach ||
+                        sla.escalate_on_resolution_breach) && (
                         <Badge variant="outline" className="gap-1">
                             <ShieldAlert className="h-3 w-3" />
                             Auto-escalate
@@ -689,7 +887,9 @@ function SlaCard({
 
 export default function SlaIndex({ slaDefinitions, can }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingSla, setEditingSla] = useState<SlaDefinitionData | null>(null);
+    const [editingSla, setEditingSla] = useState<SlaDefinitionData | null>(
+        null,
+    );
     const [formData, setFormData] = useState<FormData>(emptyForm());
     const [submitting, setSubmitting] = useState(false);
 
@@ -706,9 +906,13 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
     };
 
     const handleToggleActive = (sla: SlaDefinitionData) => {
-        router.post(`/control-room/sla/${sla.id}/toggle-active`, {}, {
-            preserveScroll: true,
-        });
+        router.post(
+            `/control-room/sla/${sla.id}/toggle-active`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
     };
 
     const handleSubmit = (e: FormEvent) => {
@@ -719,12 +923,20 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
             name: formData.name,
             code: formData.code,
             description: formData.description || null,
-            alert_types: formData.alert_types.length > 0 ? formData.alert_types : null,
-            severities: formData.severities.length > 0 ? formData.severities : null,
+            alert_types:
+                formData.alert_types.length > 0 ? formData.alert_types : null,
+            severities:
+                formData.severities.length > 0 ? formData.severities : null,
             sources: formData.sources.length > 0 ? formData.sources : null,
-            acknowledge_target_minutes: formData.acknowledge_target_minutes ? parseInt(formData.acknowledge_target_minutes) : null,
-            response_target_minutes: formData.response_target_minutes ? parseInt(formData.response_target_minutes) : null,
-            resolution_target_minutes: formData.resolution_target_minutes ? parseInt(formData.resolution_target_minutes) : null,
+            acknowledge_target_minutes: formData.acknowledge_target_minutes
+                ? parseInt(formData.acknowledge_target_minutes)
+                : null,
+            response_target_minutes: formData.response_target_minutes
+                ? parseInt(formData.response_target_minutes)
+                : null,
+            resolution_target_minutes: formData.resolution_target_minutes
+                ? parseInt(formData.resolution_target_minutes)
+                : null,
             business_hours_only: formData.business_hours_only,
             business_hours: formData.business_hours_only
                 ? {
@@ -733,11 +945,16 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
                       days: formData.business_hours_days,
                   }
                 : null,
-            escalate_on_acknowledge_breach: formData.escalate_on_acknowledge_breach,
+            escalate_on_acknowledge_breach:
+                formData.escalate_on_acknowledge_breach,
             escalate_on_response_breach: formData.escalate_on_response_breach,
-            escalate_on_resolution_breach: formData.escalate_on_resolution_breach,
+            escalate_on_resolution_breach:
+                formData.escalate_on_resolution_breach,
             breach_notify_roles: formData.breach_notify_roles
-                ? formData.breach_notify_roles.split(',').map((r) => r.trim()).filter(Boolean)
+                ? formData.breach_notify_roles
+                      .split(',')
+                      .map((r) => r.trim())
+                      .filter(Boolean)
                 : null,
             is_active: formData.is_active,
         };
@@ -757,7 +974,11 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
         const requestPayload = payload as Record<string, FormDataConvertible>;
 
         if (editingSla) {
-            router.put(`/control-room/sla/${editingSla.id}`, requestPayload, options);
+            router.put(
+                `/control-room/sla/${editingSla.id}`,
+                requestPayload,
+                options,
+            );
             return;
         }
 
@@ -765,7 +986,10 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
     };
 
     const activeCount = slaDefinitions.filter((s) => s.is_active).length;
-    const totalAlerts = slaDefinitions.reduce((sum, s) => sum + s.total_alerts, 0);
+    const totalAlerts = slaDefinitions.reduce(
+        (sum, s) => sum + s.total_alerts,
+        0,
+    );
 
     return (
         <AppLayout
@@ -806,7 +1030,9 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{slaDefinitions.length}</p>
+                            <p className="text-2xl font-bold">
+                                {slaDefinitions.length}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -816,7 +1042,9 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-status-success">{activeCount}</p>
+                            <p className="text-2xl font-bold text-status-success">
+                                {activeCount}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -848,9 +1076,12 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16">
                             <Shield className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                            <p className="text-lg font-medium text-muted-foreground">No SLA definitions configured</p>
+                            <p className="text-lg font-medium text-muted-foreground">
+                                No SLA definitions configured
+                            </p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Create your first SLA definition to begin tracking alert response times.
+                                Create your first SLA definition to begin
+                                tracking alert response times.
                             </p>
                             {can.manage && (
                                 <Button className="mt-4" onClick={handleCreate}>

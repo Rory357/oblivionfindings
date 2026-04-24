@@ -1,22 +1,37 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDate, formatDateTime } from '@/lib/date-format';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/date-format';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Heart, Siren, Link2, Plus } from 'lucide-react';
+import { Heart, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
     records: { data: any[]; links: any[] };
-    stats: { records_30d: number; ambulance_calls_30d: number; linked_to_incidents: number };
+    stats: {
+        records_30d: number;
+        ambulance_calls_30d: number;
+        linked_to_incidents: number;
+    };
     staff: Array<{ id: number; name: string }>;
     sites: Array<{ id: number; name: string }>;
     can_create: boolean;
@@ -59,7 +74,13 @@ const OUTCOMES = [
     { value: 'other', label: 'Other' },
 ];
 
-export default function FirstAidIndex({ records, stats, staff, sites, can_create }: Props) {
+export default function FirstAidIndex({
+    records,
+    stats,
+    staff,
+    sites,
+    can_create,
+}: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
 
     const form = useForm({
@@ -88,7 +109,12 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'First Aid', href: '/health-safety/first-aid' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'First Aid', href: '/health-safety/first-aid' },
+            ]}
+        >
             <Head title="First Aid Records" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -99,140 +125,319 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                     icon={<Heart className="h-7 w-7 text-white" />}
                     stats={[
                         { label: 'Records (30d)', value: stats.records_30d },
-                        { label: 'Ambulance Calls', value: stats.ambulance_calls_30d },
-                        { label: 'Linked to Incidents', value: stats.linked_to_incidents },
+                        {
+                            label: 'Ambulance Calls',
+                            value: stats.ambulance_calls_30d,
+                        },
+                        {
+                            label: 'Linked to Incidents',
+                            value: stats.linked_to_incidents,
+                        },
                     ]}
-                    actions={can_create ? (
-                        <Button size="sm" onClick={() => setDialogOpen(true)}>
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Record First Aid
-                        </Button>
-                    ) : undefined}
+                    actions={
+                        can_create ? (
+                            <Button
+                                size="sm"
+                                onClick={() => setDialogOpen(true)}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Record First Aid
+                            </Button>
+                        ) : undefined
+                    }
                 />
 
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Record First Aid Treatment</DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={submit} className="space-y-4">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Site</Label>
-                                        <Select value={form.data.site_id} onValueChange={(v) => form.setData('site_id', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
-                                            <SelectContent>
-                                                {sites.map((s) => (
-                                                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.site_id && <p className="mt-1 text-xs text-status-critical">{form.errors.site_id}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>Treatment Date & Time</Label>
-                                        <Input type="datetime-local" value={form.data.treatment_date} onChange={(e) => form.setData('treatment_date', e.target.value)} />
-                                        {form.errors.treatment_date && <p className="mt-1 text-xs text-status-critical">{form.errors.treatment_date}</p>}
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Person Treated</Label>
-                                        <Input value={form.data.treated_person_name} onChange={(e) => form.setData('treated_person_name', e.target.value)} placeholder="Full name" />
-                                        {form.errors.treated_person_name && <p className="mt-1 text-xs text-status-critical">{form.errors.treated_person_name}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>Person Type</Label>
-                                        <Select value={form.data.treated_person_type} onValueChange={(v) => form.setData('treated_person_type', v)}>
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                {PERSON_TYPES.map((t) => (
-                                                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Injury / Illness Type</Label>
-                                        <Select value={form.data.injury_illness_type} onValueChange={(v) => form.setData('injury_illness_type', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                                            <SelectContent>
-                                                {INJURY_TYPES.map((t) => (
-                                                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.injury_illness_type && <p className="mt-1 text-xs text-status-critical">{form.errors.injury_illness_type}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>Body Part</Label>
-                                        <Input value={form.data.body_part} onChange={(e) => form.setData('body_part', e.target.value)} placeholder="e.g. Left hand, Head" />
-                                    </div>
-                                </div>
-
+                    <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>
+                                Record First Aid Treatment
+                            </DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={submit} className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
-                                    <Label>Description of Injury / Illness</Label>
-                                    <Textarea value={form.data.injury_illness_description} onChange={(e) => form.setData('injury_illness_description', e.target.value)} rows={2} />
+                                    <Label>Site</Label>
+                                    <Select
+                                        value={form.data.site_id}
+                                        onValueChange={(v) =>
+                                            form.setData('site_id', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select site" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {sites.map((s) => (
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
+                                                    {s.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.site_id && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.site_id}
+                                        </p>
+                                    )}
                                 </div>
-
                                 <div>
-                                    <Label>Treatment Given</Label>
-                                    <Textarea value={form.data.treatment_given} onChange={(e) => form.setData('treatment_given', e.target.value)} rows={2} />
-                                    {form.errors.treatment_given && <p className="mt-1 text-xs text-status-critical">{form.errors.treatment_given}</p>}
-                                </div>
-
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Treatment Outcome</Label>
-                                        <Select value={form.data.treatment_outcome} onValueChange={(v) => form.setData('treatment_outcome', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select outcome" /></SelectTrigger>
-                                            <SelectContent>
-                                                {OUTCOMES.map((o) => (
-                                                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.treatment_outcome && <p className="mt-1 text-xs text-status-critical">{form.errors.treatment_outcome}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>First Aider</Label>
-                                        <Select value={form.data.first_aider_id} onValueChange={(v) => form.setData('first_aider_id', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select first aider" /></SelectTrigger>
-                                            <SelectContent>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.first_aider_id && <p className="mt-1 text-xs text-status-critical">{form.errors.first_aider_id}</p>}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="ambulance_called"
-                                        checked={form.data.ambulance_called}
-                                        onCheckedChange={(v) => form.setData('ambulance_called', !!v)}
+                                    <Label>Treatment Date & Time</Label>
+                                    <Input
+                                        type="datetime-local"
+                                        value={form.data.treatment_date}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'treatment_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    <Label htmlFor="ambulance_called" className="text-sm">Ambulance was called</Label>
+                                    {form.errors.treatment_date && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.treatment_date}
+                                        </p>
+                                    )}
                                 </div>
+                            </div>
 
+                            <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
-                                    <Label>First Aider Notes</Label>
-                                    <Textarea value={form.data.first_aider_notes} onChange={(e) => form.setData('first_aider_notes', e.target.value)} rows={2} />
+                                    <Label>Person Treated</Label>
+                                    <Input
+                                        value={form.data.treated_person_name}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'treated_person_name',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Full name"
+                                    />
+                                    {form.errors.treated_person_name && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.treated_person_name}
+                                        </p>
+                                    )}
                                 </div>
+                                <div>
+                                    <Label>Person Type</Label>
+                                    <Select
+                                        value={form.data.treated_person_type}
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'treated_person_type',
+                                                v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {PERSON_TYPES.map((t) => (
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
+                                                >
+                                                    {t.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
 
-                                <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                                    <Button type="submit" disabled={form.processing}>Save Record</Button>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <Label>Injury / Illness Type</Label>
+                                    <Select
+                                        value={form.data.injury_illness_type}
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'injury_illness_type',
+                                                v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {INJURY_TYPES.map((t) => (
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
+                                                >
+                                                    {t.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.injury_illness_type && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.injury_illness_type}
+                                        </p>
+                                    )}
                                 </div>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                                <div>
+                                    <Label>Body Part</Label>
+                                    <Input
+                                        value={form.data.body_part}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'body_part',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. Left hand, Head"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label>Description of Injury / Illness</Label>
+                                <Textarea
+                                    value={form.data.injury_illness_description}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'injury_illness_description',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div>
+                                <Label>Treatment Given</Label>
+                                <Textarea
+                                    value={form.data.treatment_given}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'treatment_given',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                />
+                                {form.errors.treatment_given && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.treatment_given}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <Label>Treatment Outcome</Label>
+                                    <Select
+                                        value={form.data.treatment_outcome}
+                                        onValueChange={(v) =>
+                                            form.setData('treatment_outcome', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select outcome" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {OUTCOMES.map((o) => (
+                                                <SelectItem
+                                                    key={o.value}
+                                                    value={o.value}
+                                                >
+                                                    {o.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.treatment_outcome && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.treatment_outcome}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label>First Aider</Label>
+                                    <Select
+                                        value={form.data.first_aider_id}
+                                        onValueChange={(v) =>
+                                            form.setData('first_aider_id', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select first aider" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {staff.map((s) => (
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
+                                                    {s.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.first_aider_id && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.first_aider_id}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="ambulance_called"
+                                    checked={form.data.ambulance_called}
+                                    onCheckedChange={(v) =>
+                                        form.setData('ambulance_called', !!v)
+                                    }
+                                />
+                                <Label
+                                    htmlFor="ambulance_called"
+                                    className="text-sm"
+                                >
+                                    Ambulance was called
+                                </Label>
+                            </div>
+
+                            <div>
+                                <Label>First Aider Notes</Label>
+                                <Textarea
+                                    value={form.data.first_aider_notes}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'first_aider_notes',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setDialogOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
+                                    Save Record
+                                </Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Table */}
                 <Card>
@@ -241,41 +446,93 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="pb-2 font-medium">Date</th>
-                                        <th className="pb-2 font-medium">Person Treated</th>
-                                        <th className="pb-2 font-medium">Injury / Illness</th>
-                                        <th className="pb-2 font-medium">Treatment Given</th>
-                                        <th className="pb-2 font-medium">Outcome</th>
-                                        <th className="pb-2 font-medium">First Aider</th>
-                                        <th className="pb-2 font-medium">Incident</th>
+                                        <th className="pb-2 font-medium">
+                                            Date
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Person Treated
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Injury / Illness
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Treatment Given
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Outcome
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            First Aider
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Incident
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {records.data.map((r: any) => (
-                                        <tr key={r.id} className="border-b last:border-0">
-                                            <td className="py-2 whitespace-nowrap">{formatDateTime(r.treatment_date)}</td>
+                                        <tr
+                                            key={r.id}
+                                            className="border-b last:border-0"
+                                        >
+                                            <td className="py-2 whitespace-nowrap">
+                                                {formatDateTime(
+                                                    r.treatment_date,
+                                                )}
+                                            </td>
                                             <td className="py-2">
                                                 <div className="flex items-center gap-1.5">
                                                     {r.treated_person_name}
-                                                    <Badge variant="outline" className="text-[10px]">{r.treated_person_type}</Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-[10px]"
+                                                    >
+                                                        {r.treated_person_type}
+                                                    </Badge>
                                                 </div>
                                             </td>
-                                            <td className="py-2 capitalize">{r.injury_illness_type?.replace(/_/g, ' ') ?? '-'}</td>
-                                            <td className="max-w-[200px] truncate py-2">{r.treatment_given ?? '-'}</td>
-                                            <td className="py-2 capitalize">{r.treatment_outcome?.replace(/_/g, ' ') ?? '-'}</td>
-                                            <td className="py-2">{r.first_aider?.name ?? '-'}</td>
+                                            <td className="py-2 capitalize">
+                                                {r.injury_illness_type?.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                ) ?? '-'}
+                                            </td>
+                                            <td className="max-w-[200px] truncate py-2">
+                                                {r.treatment_given ?? '-'}
+                                            </td>
+                                            <td className="py-2 capitalize">
+                                                {r.treatment_outcome?.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                ) ?? '-'}
+                                            </td>
+                                            <td className="py-2">
+                                                {r.first_aider?.name ?? '-'}
+                                            </td>
                                             <td className="py-2 text-center">
                                                 {r.incident_id ? (
-                                                    <Badge className="bg-status-success-bg text-status-success border-status-success/30">Y</Badge>
+                                                    <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
+                                                        Y
+                                                    </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-muted-foreground">N</Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-muted-foreground"
+                                                    >
+                                                        N
+                                                    </Badge>
                                                 )}
                                             </td>
                                         </tr>
                                     ))}
                                     {!records.data.length && (
                                         <tr>
-                                            <td colSpan={7} className="py-8 text-center text-muted-foreground">No first aid records found.</td>
+                                            <td
+                                                colSpan={7}
+                                                className="py-8 text-center text-muted-foreground"
+                                            >
+                                                No first aid records found.
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -288,11 +545,24 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                 {records.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {records.links.map((l: any) => (
-                            <button
+                            <Button
+                                type="button"
                                 key={l.label}
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
+                                className="text-xs"
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

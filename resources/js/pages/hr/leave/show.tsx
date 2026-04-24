@@ -1,12 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { type BreadcrumbItem } from '@/types';
-import { ArrowLeft, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { ArrowLeft, CheckCircle, FileText, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface LeaveRequest {
@@ -35,10 +35,14 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    approved: 'bg-status-success-bg text-status-success border-status-success/30',
-    declined: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    cancelled: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
+    pending:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
+    approved:
+        'bg-status-success-bg text-status-success border-status-success/30',
+    declined:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    cancelled:
+        'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
 };
 
 export default function ShowLeave({ request, can }: Props) {
@@ -73,14 +77,16 @@ export default function ShowLeave({ request, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Leave Request #${request.id}`} />
-            <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
+            <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
                 <div className="flex items-center gap-4">
                     <Link href="/hr/leave">
                         <Button variant="outline" size="icon">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                     </Link>
-                    <h1 className="text-2xl font-bold">Leave Request #{request.id}</h1>
+                    <h1 className="text-2xl font-bold">
+                        Leave Request #{request.id}
+                    </h1>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-3">
@@ -91,47 +97,81 @@ export default function ShowLeave({ request, can }: Props) {
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Staff Member</p>
-                                    <p className="font-medium">{request.staff_name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Staff Member
+                                    </p>
+                                    <p className="font-medium">
+                                        {request.staff_name}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Status</p>
-                                    <Badge 
-                                        variant="outline" 
-                                        className={statusColors[request.status] || statusColors.pending}
+                                    <p className="text-sm text-muted-foreground">
+                                        Status
+                                    </p>
+                                    <Badge
+                                        variant="outline"
+                                        className={
+                                            statusColors[request.status] ||
+                                            statusColors.pending
+                                        }
                                     >
-                                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                        {request.status
+                                            .charAt(0)
+                                            .toUpperCase() +
+                                            request.status.slice(1)}
                                     </Badge>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Leave Type</p>
-                                    <p className="font-medium capitalize">{request.leave_type.replace('_', ' ')}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Leave Type
+                                    </p>
+                                    <p className="font-medium capitalize">
+                                        {request.leave_type.replace('_', ' ')}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Hours</p>
-                                    <p className="font-medium">{request.hours} hours</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Hours
+                                    </p>
+                                    <p className="font-medium">
+                                        {request.hours} hours
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Start Date</p>
-                                    <p className="font-medium">{request.start_date}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Start Date
+                                    </p>
+                                    <p className="font-medium">
+                                        {request.start_date}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">End Date</p>
-                                    <p className="font-medium">{request.end_date}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        End Date
+                                    </p>
+                                    <p className="font-medium">
+                                        {request.end_date}
+                                    </p>
                                 </div>
                             </div>
 
                             {request.reason && (
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Reason</p>
-                                    <p className="mt-1 text-sm">{request.reason}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Reason
+                                    </p>
+                                    <p className="mt-1 text-sm">
+                                        {request.reason}
+                                    </p>
                                 </div>
                             )}
 
                             {request.supporting_doc_path && (
                                 <div className="flex items-center gap-2">
                                     <FileText className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm text-muted-foreground">Supporting document attached</span>
+                                    <span className="text-sm text-muted-foreground">
+                                        Supporting document attached
+                                    </span>
                                 </div>
                             )}
                         </CardContent>
@@ -143,25 +183,49 @@ export default function ShowLeave({ request, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <p className="text-sm text-muted-foreground">Submitted</p>
-                                <p className="font-medium">{request.submitted_at ? new Date(request.submitted_at).toLocaleString() : 'N/A'}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Submitted
+                                </p>
+                                <p className="font-medium">
+                                    {request.submitted_at
+                                        ? new Date(
+                                              request.submitted_at,
+                                          ).toLocaleString()
+                                        : 'N/A'}
+                                </p>
                             </div>
                             {request.reviewed_by && (
                                 <>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Reviewed By</p>
-                                        <p className="font-medium">{request.reviewed_by}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Reviewed By
+                                        </p>
+                                        <p className="font-medium">
+                                            {request.reviewed_by}
+                                        </p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Reviewed At</p>
-                                        <p className="font-medium">{request.reviewed_at ? new Date(request.reviewed_at).toLocaleString() : 'N/A'}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Reviewed At
+                                        </p>
+                                        <p className="font-medium">
+                                            {request.reviewed_at
+                                                ? new Date(
+                                                      request.reviewed_at,
+                                                  ).toLocaleString()
+                                                : 'N/A'}
+                                        </p>
                                     </div>
                                 </>
                             )}
                             {request.review_notes && (
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Review Notes</p>
-                                    <p className="mt-1 text-sm">{request.review_notes}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Review Notes
+                                    </p>
+                                    <p className="mt-1 text-sm">
+                                        {request.review_notes}
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -175,26 +239,30 @@ export default function ShowLeave({ request, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="review_notes">Review Notes</Label>
+                                <Label htmlFor="review_notes">
+                                    Review Notes
+                                </Label>
                                 <Textarea
                                     id="review_notes"
                                     value={reviewNotes}
-                                    onChange={(e) => setReviewNotes(e.target.value)}
+                                    onChange={(e) =>
+                                        setReviewNotes(e.target.value)
+                                    }
                                     placeholder="Add notes about your decision..."
                                     rows={3}
                                 />
                             </div>
                             <div className="flex gap-3">
-                                <Button 
-                                    variant="default" 
+                                <Button
+                                    variant="default"
                                     onClick={handleApprove}
                                     className="bg-status-success hover:bg-status-success"
                                 >
                                     <CheckCircle className="mr-2 h-4 w-4" />
                                     Approve
                                 </Button>
-                                <Button 
-                                    variant="destructive" 
+                                <Button
+                                    variant="destructive"
                                     onClick={handleDecline}
                                 >
                                     <XCircle className="mr-2 h-4 w-4" />

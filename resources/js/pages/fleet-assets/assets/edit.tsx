@@ -108,20 +108,22 @@ export default function AssetEdit({ asset, categories, sites }: Props) {
                     {/* Step Progress Indicator */}
                     <div className="flex items-center gap-2 mb-6 flex-wrap">
                         {steps.map((s, i) => (
-                            <button
+                            <Button
                                 key={i}
                                 type="button"
+                                variant={step === i + 1 ? 'default' : 'secondary'}
+                                size="sm"
                                 onClick={() => setStep(i + 1)}
                                 className={cn(
-                                    "flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                                    "h-auto rounded-full px-4 py-1.5",
                                     step === i + 1
-                                        ? "bg-primary text-white"
-                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                        ? "text-white"
+                                        : "text-muted-foreground"
                                 )}
                             >
                                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs">{i + 1}</span>
                                 {s}
-                            </button>
+                            </Button>
                         ))}
                     </div>
 

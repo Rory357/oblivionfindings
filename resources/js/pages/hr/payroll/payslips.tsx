@@ -1,15 +1,21 @@
-import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { type BreadcrumbItem } from '@/types';
-import { FileText, Download, Plus } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Download, FileText, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 interface Payslip {
     id: number;
@@ -21,7 +27,11 @@ interface Payslip {
     paye: string;
     status: 'draft' | 'approved' | 'paid';
     user?: { id: number; name: string };
-    employee_profile?: { id: number; employee_number: string; position_title: string };
+    employee_profile?: {
+        id: number;
+        employee_number: string;
+        position_title: string;
+    };
 }
 
 interface Employee {
@@ -57,16 +67,35 @@ const breadcrumbs: BreadcrumbItem[] = [
 const ALL_FILTER_VALUE = '__all__';
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Draft' },
-    approved: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Approved' },
-    paid: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Paid' },
+    draft: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Draft',
+    },
+    approved: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Approved',
+    },
+    paid: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Paid',
+    },
 };
 
 function formatCurrency(amount: string | number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(Number(amount));
 }
 
-export default function PayslipsIndex({ payslips, employees, filters, can }: Props) {
+export default function PayslipsIndex({
+    payslips,
+    employees,
+    filters,
+    can,
+}: Props) {
     const [showGenerate, setShowGenerate] = useState(false);
     const [generateForm, setGenerateForm] = useState({
         period_start: '',
@@ -75,10 +104,14 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
     });
 
     function applyFilters(key: string, value: string) {
-        router.get('/hr/payroll/payslips', {
-            ...filters,
-            [key]: value && value !== ALL_FILTER_VALUE ? value : undefined,
-        }, { preserveState: true });
+        router.get(
+            '/hr/payroll/payslips',
+            {
+                ...filters,
+                [key]: value && value !== ALL_FILTER_VALUE ? value : undefined,
+            },
+            { preserveState: true },
+        );
     }
 
     function handleGenerate() {
@@ -113,7 +146,12 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                     <Input
                                         type="date"
                                         value={generateForm.period_start}
-                                        onChange={(e) => setGenerateForm({ ...generateForm, period_start: e.target.value })}
+                                        onChange={(e) =>
+                                            setGenerateForm({
+                                                ...generateForm,
+                                                period_start: e.target.value,
+                                            })
+                                        }
                                     />
                                 </div>
                                 <div>
@@ -121,13 +159,21 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                     <Input
                                         type="date"
                                         value={generateForm.period_end}
-                                        onChange={(e) => setGenerateForm({ ...generateForm, period_end: e.target.value })}
+                                        onChange={(e) =>
+                                            setGenerateForm({
+                                                ...generateForm,
+                                                period_end: e.target.value,
+                                            })
+                                        }
                                     />
                                 </div>
                                 <div className="flex items-end">
                                     <Button
                                         onClick={handleGenerate}
-                                        disabled={!generateForm.period_start || !generateForm.period_end}
+                                        disabled={
+                                            !generateForm.period_start ||
+                                            !generateForm.period_end
+                                        }
                                     >
                                         Generate
                                     </Button>
@@ -145,14 +191,26 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                 <Label>Status</Label>
                                 <Select
                                     value={filters.status ?? ALL_FILTER_VALUE}
-                                    onValueChange={(v) => applyFilters('status', v)}
+                                    onValueChange={(v) =>
+                                        applyFilters('status', v)
+                                    }
                                 >
-                                    <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All statuses" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
-                                        <SelectItem value="draft">Draft</SelectItem>
-                                        <SelectItem value="approved">Approved</SelectItem>
-                                        <SelectItem value="paid">Paid</SelectItem>
+                                        <SelectItem value={ALL_FILTER_VALUE}>
+                                            All
+                                        </SelectItem>
+                                        <SelectItem value="draft">
+                                            Draft
+                                        </SelectItem>
+                                        <SelectItem value="approved">
+                                            Approved
+                                        </SelectItem>
+                                        <SelectItem value="paid">
+                                            Paid
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -160,13 +218,22 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                 <Label>Employee</Label>
                                 <Select
                                     value={filters.user_id ?? ALL_FILTER_VALUE}
-                                    onValueChange={(v) => applyFilters('user_id', v)}
+                                    onValueChange={(v) =>
+                                        applyFilters('user_id', v)
+                                    }
                                 >
-                                    <SelectTrigger><SelectValue placeholder="All employees" /></SelectTrigger>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All employees" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
+                                        <SelectItem value={ALL_FILTER_VALUE}>
+                                            All
+                                        </SelectItem>
                                         {employees.map((emp) => (
-                                            <SelectItem key={emp.id} value={String(emp.id)}>
+                                            <SelectItem
+                                                key={emp.id}
+                                                value={String(emp.id)}
+                                            >
                                                 {emp.name}
                                             </SelectItem>
                                         ))}
@@ -178,7 +245,12 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                 <Input
                                     type="date"
                                     value={filters.period_start ?? ''}
-                                    onChange={(e) => applyFilters('period_start', e.target.value)}
+                                    onChange={(e) =>
+                                        applyFilters(
+                                            'period_start',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                             <div>
@@ -186,7 +258,12 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                 <Input
                                     type="date"
                                     value={filters.period_end ?? ''}
-                                    onChange={(e) => applyFilters('period_end', e.target.value)}
+                                    onChange={(e) =>
+                                        applyFilters(
+                                            'period_end',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
@@ -199,53 +276,95 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">Employee</th>
-                                    <th className="px-4 py-3 text-left font-medium">Period</th>
-                                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    <th className="px-4 py-3 text-right font-medium">Gross</th>
-                                    <th className="px-4 py-3 text-right font-medium">PAYE</th>
-                                    <th className="px-4 py-3 text-right font-medium">Net Pay</th>
-                                    <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Employee
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Period
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Gross
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        PAYE
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Net Pay
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {payslips.data.map((payslip) => {
-                                    const config = statusConfig[payslip.status] || statusConfig.draft;
+                                    const config =
+                                        statusConfig[payslip.status] ||
+                                        statusConfig.draft;
                                     return (
-                                        <tr key={payslip.id} className="hover:bg-muted/30">
+                                        <tr
+                                            key={payslip.id}
+                                            className="hover:bg-muted/30"
+                                        >
                                             <td className="px-4 py-3">
-                                                <div className="font-medium">{payslip.user?.name ?? '-'}</div>
+                                                <div className="font-medium">
+                                                    {payslip.user?.name ?? '-'}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {payslip.employee_profile?.employee_number ?? ''}
+                                                    {payslip.employee_profile
+                                                        ?.employee_number ?? ''}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
-                                                {payslip.pay_period_start} &mdash; {payslip.pay_period_end}
+                                                {payslip.pay_period_start}{' '}
+                                                &mdash; {payslip.pay_period_end}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <Badge variant="outline" className={config.className}>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={config.className}
+                                                >
                                                     {config.label}
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3 text-right font-medium">
-                                                {formatCurrency(payslip.gross_pay)}
+                                                {formatCurrency(
+                                                    payslip.gross_pay,
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-right text-muted-foreground">
                                                 {formatCurrency(payslip.paye)}
                                             </td>
                                             <td className="px-4 py-3 text-right font-medium">
-                                                {formatCurrency(payslip.net_pay)}
+                                                {formatCurrency(
+                                                    payslip.net_pay,
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={`/hr/payroll/payslips/${payslip.id}`}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/hr/payroll/payslips/${payslip.id}`}
+                                                        >
                                                             <FileText className="mr-1 h-3 w-3" />
                                                             View
                                                         </Link>
                                                     </Button>
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link href={`/hr/payroll/payslips/${payslip.id}/download`}>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/hr/payroll/payslips/${payslip.id}/download`}
+                                                        >
                                                             <Download className="mr-1 h-3 w-3" />
                                                         </Link>
                                                     </Button>
@@ -256,7 +375,10 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                                 })}
                                 {payslips.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={7}
+                                            className="px-4 py-8 text-center text-muted-foreground"
+                                        >
                                             No payslips found.
                                         </td>
                                     </tr>
@@ -270,9 +392,15 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                 {payslips.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(payslips.current_page - 1) * payslips.per_page + 1} to{' '}
-                            {Math.min(payslips.current_page * payslips.per_page, payslips.total)} of{' '}
-                            {payslips.total} results
+                            Showing{' '}
+                            {(payslips.current_page - 1) * payslips.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                payslips.current_page * payslips.per_page,
+                                payslips.total,
+                            )}{' '}
+                            of {payslips.total} results
                         </p>
                         <LaravelPagination links={payslips.links} />
                     </div>

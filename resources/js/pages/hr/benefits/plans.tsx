@@ -1,20 +1,36 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus } from 'lucide-react';
-import { useState, FormEvent } from 'react';
-import { type BreadcrumbItem } from '@/types';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 interface PlanType {
     value: string;
@@ -61,12 +77,21 @@ const emptyForm = {
     is_active: true,
 };
 
-export default function BenefitPlans({ plans, filters, planTypes, can }: Props) {
+export default function BenefitPlans({
+    plans,
+    filters,
+    planTypes,
+    can,
+}: Props) {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState<typeof emptyForm>(emptyForm);
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/benefits/plans', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/benefits/plans',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const submit = (e: FormEvent) => {
@@ -79,7 +104,8 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
         });
     };
 
-    const set = (key: string, value: string | boolean) => setForm((prev) => ({ ...prev, [key]: value }));
+    const set = (key: string, value: string | boolean) =>
+        setForm((prev) => ({ ...prev, [key]: value }));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -95,7 +121,13 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                     </div>
 
                     {can.manage && (
-                        <Button size="sm" onClick={() => { setForm(emptyForm); setOpen(true); }}>
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                setForm(emptyForm);
+                                setOpen(true);
+                            }}
+                        >
                             <Plus className="mr-1.5 h-4 w-4" />
                             New Plan
                         </Button>
@@ -109,18 +141,29 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                     </CardHeader>
                     <CardContent>
                         <div className="max-w-xs">
-                            <Label className="text-xs text-muted-foreground">Plan Type</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Plan Type
+                            </Label>
                             <Select
                                 value={filters.type || 'all'}
-                                onValueChange={(val) => onFilter({ type: val === 'all' ? null : val })}
+                                onValueChange={(val) =>
+                                    onFilter({
+                                        type: val === 'all' ? null : val,
+                                    })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="All types" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Types</SelectItem>
+                                    <SelectItem value="all">
+                                        All Types
+                                    </SelectItem>
                                     {planTypes.map((pt) => (
-                                        <SelectItem key={pt.value} value={pt.value}>
+                                        <SelectItem
+                                            key={pt.value}
+                                            value={pt.value}
+                                        >
                                             {pt.label}
                                         </SelectItem>
                                     ))}
@@ -147,25 +190,45 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                             <TableBody>
                                 {plans.data.map((plan) => (
                                     <TableRow key={plan.id}>
-                                        <TableCell className="font-medium">{plan.name}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {plan.name}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant="outline">
-                                                {typeLabels[plan.type] || plan.type}
+                                                {typeLabels[plan.type] ||
+                                                    plan.type}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{plan.provider || '-'}</TableCell>
-                                        <TableCell>{plan.employer_contribution_rate}%</TableCell>
-                                        <TableCell>{plan.enrollments_count}</TableCell>
                                         <TableCell>
-                                            <Badge variant={plan.is_active ? 'default' : 'secondary'}>
-                                                {plan.is_active ? 'Active' : 'Inactive'}
+                                            {plan.provider || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {plan.employer_contribution_rate}%
+                                        </TableCell>
+                                        <TableCell>
+                                            {plan.enrollments_count}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                variant={
+                                                    plan.is_active
+                                                        ? 'default'
+                                                        : 'secondary'
+                                                }
+                                            >
+                                                {plan.is_active
+                                                    ? 'Active'
+                                                    : 'Inactive'}
                                             </Badge>
                                         </TableCell>
                                     </TableRow>
                                 ))}
                                 {!plans.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={6}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No benefit plans found.
                                         </TableCell>
                                     </TableRow>
@@ -189,17 +252,27 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                     <form onSubmit={submit} className="space-y-4">
                         <div>
                             <Label>Plan Name</Label>
-                            <Input value={form.name} onChange={(e) => set('name', e.target.value)} required />
+                            <Input
+                                value={form.name}
+                                onChange={(e) => set('name', e.target.value)}
+                                required
+                            />
                         </div>
                         <div>
                             <Label>Type</Label>
-                            <Select value={form.type} onValueChange={(val) => set('type', val)}>
+                            <Select
+                                value={form.type}
+                                onValueChange={(val) => set('type', val)}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {planTypes.map((pt) => (
-                                        <SelectItem key={pt.value} value={pt.value}>
+                                        <SelectItem
+                                            key={pt.value}
+                                            value={pt.value}
+                                        >
                                             {pt.label}
                                         </SelectItem>
                                     ))}
@@ -208,7 +281,12 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                         </div>
                         <div>
                             <Label>Provider</Label>
-                            <Input value={form.provider} onChange={(e) => set('provider', e.target.value)} />
+                            <Input
+                                value={form.provider}
+                                onChange={(e) =>
+                                    set('provider', e.target.value)
+                                }
+                            />
                         </div>
                         <div>
                             <Label>Employer Contribution Rate (%)</Label>
@@ -216,16 +294,32 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                                 type="number"
                                 step="0.01"
                                 value={form.employer_contribution_rate}
-                                onChange={(e) => set('employer_contribution_rate', e.target.value)}
+                                onChange={(e) =>
+                                    set(
+                                        'employer_contribution_rate',
+                                        e.target.value,
+                                    )
+                                }
                                 required
                             />
                         </div>
                         <div>
                             <Label>Description</Label>
-                            <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} />
+                            <Textarea
+                                value={form.description}
+                                onChange={(e) =>
+                                    set('description', e.target.value)
+                                }
+                            />
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
+                                Cancel
+                            </Button>
                             <Button type="submit">Create Plan</Button>
                         </div>
                     </form>

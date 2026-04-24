@@ -1,6 +1,6 @@
+import FleetHero from '@/components/fleet-hero';
 import DrugInteractionManager from '@/components/medications/DrugInteractionManager';
 import MedicationVersionHistory from '@/components/medications/MedicationVersionHistory';
-import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +32,15 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, Ban, Clock, FileUp, Pencil, Pill, Plus } from 'lucide-react';
+import {
+    AlertTriangle,
+    Ban,
+    Clock,
+    FileUp,
+    Pencil,
+    Pill,
+    Plus,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -1069,7 +1077,7 @@ export default function Medications({
             .finally(() => {
                 setLoadingAllergies(false);
             });
-    }, [selectedClient?.id]);
+    }, [selectedClient]);
 
     function updateFilter(key: string, value: string) {
         router.get(

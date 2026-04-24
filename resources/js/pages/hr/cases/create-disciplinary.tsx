@@ -111,7 +111,9 @@ export default function CreateDisciplinary({
                                 <div className="space-y-2">
                                     <Label htmlFor="employee_user_id">
                                         Employee{' '}
-                                        <span className="text-status-critical">*</span>
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.employee_user_id}
@@ -150,7 +152,9 @@ export default function CreateDisciplinary({
                                 <div className="space-y-2">
                                     <Label htmlFor="action_type">
                                         Action Type{' '}
-                                        <span className="text-status-critical">*</span>
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.action_type}
@@ -254,7 +258,9 @@ export default function CreateDisciplinary({
                             <div className="space-y-2">
                                 <Label htmlFor="allegation_summary">
                                     Allegation Summary{' '}
-                                    <span className="text-status-critical">*</span>
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
                                 </Label>
                                 <Textarea
                                     id="allegation_summary"

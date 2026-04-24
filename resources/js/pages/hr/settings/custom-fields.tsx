@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Select,
     SelectContent,
@@ -16,14 +22,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogFooter,
-} from '@/components/ui/dialog';
-import {
     Table,
     TableBody,
     TableCell,
@@ -31,7 +29,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Pencil, Settings2 } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -85,7 +85,14 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
 
     const openCreate = () => {
         form.reset();
-        form.setData({ name: '', field_type: 'text', options: [], is_required: false, is_active: true, sort_order: 0 });
+        form.setData({
+            name: '',
+            field_type: 'text',
+            options: [],
+            is_required: false,
+            is_active: true,
+            sort_order: 0,
+        });
         setEditingId(null);
         setOptionInput('');
         setOpen(true);
@@ -126,11 +133,18 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
     };
 
     const removeOption = (index: number) => {
-        form.setData('options', form.data.options.filter((_, i) => i !== index));
+        form.setData(
+            'options',
+            form.data.options.filter((_, i) => i !== index),
+        );
     };
 
     const deleteDefinition = (id: number) => {
-        if (confirm('Are you sure? This will also delete all custom field values for employees.')) {
+        if (
+            confirm(
+                'Are you sure? This will also delete all custom field values for employees.',
+            )
+        ) {
             router.delete(`/hr/settings/custom-fields/${id}`);
         }
     };
@@ -139,7 +153,10 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Custom Fields - HR Settings" />
             <PageShell>
-                <PageHeader title="Custom Fields" description="Define custom fields for employee profiles.">
+                <PageHeader
+                    title="Custom Fields"
+                    description="Define custom fields for employee profiles."
+                >
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogTrigger asChild>
                             <Button onClick={openCreate}>
@@ -149,7 +166,9 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
-                                <DialogTitle>{editingId ? 'Edit Field' : 'Create Field'}</DialogTitle>
+                                <DialogTitle>
+                                    {editingId ? 'Edit Field' : 'Create Field'}
+                                </DialogTitle>
                             </DialogHeader>
                             <form onSubmit={submit} className="space-y-4">
                                 <div>
@@ -157,23 +176,38 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                     <Input
                                         id="name"
                                         value={form.data.name}
-                                        onChange={(e) => form.setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData('name', e.target.value)
+                                        }
                                         placeholder="e.g. T-Shirt Size"
                                         required
                                     />
-                                    {form.errors.name && <p className="text-sm text-status-critical mt-1">{form.errors.name}</p>}
+                                    {form.errors.name && (
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {form.errors.name}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
                                     <Label>Field Type</Label>
-                                    <Select value={form.data.field_type} onValueChange={(v) => form.setData('field_type', v)}>
+                                    <Select
+                                        value={form.data.field_type}
+                                        onValueChange={(v) =>
+                                            form.setData('field_type', v)
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {fieldTypes.map((type) => (
-                                                <SelectItem key={type} value={type}>
-                                                    {fieldTypeLabels[type] ?? type}
+                                                <SelectItem
+                                                    key={type}
+                                                    value={type}
+                                                >
+                                                    {fieldTypeLabels[type] ??
+                                                        type}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -183,10 +217,14 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                 {form.data.field_type === 'select' && (
                                     <div>
                                         <Label>Options</Label>
-                                        <div className="flex gap-2 mt-1">
+                                        <div className="mt-1 flex gap-2">
                                             <Input
                                                 value={optionInput}
-                                                onChange={(e) => setOptionInput(e.target.value)}
+                                                onChange={(e) =>
+                                                    setOptionInput(
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="Add an option"
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') {
@@ -195,11 +233,24 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                                     }
                                                 }}
                                             />
-                                            <Button type="button" variant="outline" onClick={addOption}>Add</Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={addOption}
+                                            >
+                                                Add
+                                            </Button>
                                         </div>
-                                        <div className="flex flex-wrap gap-1 mt-2">
+                                        <div className="mt-2 flex flex-wrap gap-1">
                                             {form.data.options.map((opt, i) => (
-                                                <Badge key={i} variant="secondary" className="cursor-pointer" onClick={() => removeOption(i)}>
+                                                <Badge
+                                                    key={i}
+                                                    variant="secondary"
+                                                    className="cursor-pointer"
+                                                    onClick={() =>
+                                                        removeOption(i)
+                                                    }
+                                                >
                                                     {opt} &times;
                                                 </Badge>
                                             ))}
@@ -211,7 +262,12 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                     <label className="flex items-center gap-2 text-sm">
                                         <Checkbox
                                             checked={form.data.is_required}
-                                            onCheckedChange={(checked) => form.setData('is_required', !!checked)}
+                                            onCheckedChange={(checked) =>
+                                                form.setData(
+                                                    'is_required',
+                                                    !!checked,
+                                                )
+                                            }
                                         />
                                         Required
                                     </label>
@@ -219,7 +275,12 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                         <label className="flex items-center gap-2 text-sm">
                                             <Checkbox
                                                 checked={form.data.is_active}
-                                                onCheckedChange={(checked) => form.setData('is_active', !!checked)}
+                                                onCheckedChange={(checked) =>
+                                                    form.setData(
+                                                        'is_active',
+                                                        !!checked,
+                                                    )
+                                                }
                                             />
                                             Active
                                         </label>
@@ -227,18 +288,28 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                 </div>
 
                                 <div>
-                                    <Label htmlFor="sort_order">Sort Order</Label>
+                                    <Label htmlFor="sort_order">
+                                        Sort Order
+                                    </Label>
                                     <Input
                                         id="sort_order"
                                         type="number"
                                         min={0}
                                         value={form.data.sort_order}
-                                        onChange={(e) => form.setData('sort_order', parseInt(e.target.value) || 0)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'sort_order',
+                                                parseInt(e.target.value) || 0,
+                                            )
+                                        }
                                     />
                                 </div>
 
                                 <DialogFooter>
-                                    <Button type="submit" disabled={form.processing}>
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
+                                    >
                                         {editingId ? 'Update' : 'Create'}
                                     </Button>
                                 </DialogFooter>
@@ -256,7 +327,9 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                     </CardHeader>
                     <CardContent>
                         {definitions.length === 0 ? (
-                            <p className="text-muted-foreground text-center py-8">No custom fields defined yet.</p>
+                            <p className="py-8 text-center text-muted-foreground">
+                                No custom fields defined yet.
+                            </p>
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -267,36 +340,76 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                         <TableHead>Required</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Order</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {definitions.map((def) => (
                                         <TableRow key={def.id}>
-                                            <TableCell className="font-medium">{def.name}</TableCell>
-                                            <TableCell className="font-mono text-xs text-muted-foreground">{def.field_key}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {def.name}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs text-muted-foreground">
+                                                {def.field_key}
+                                            </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">{fieldTypeLabels[def.field_type] ?? def.field_type}</Badge>
+                                                <Badge variant="outline">
+                                                    {fieldTypeLabels[
+                                                        def.field_type
+                                                    ] ?? def.field_type}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 {def.is_required ? (
-                                                    <Badge variant="default">Required</Badge>
+                                                    <Badge variant="default">
+                                                        Required
+                                                    </Badge>
                                                 ) : (
-                                                    <span className="text-muted-foreground">Optional</span>
+                                                    <span className="text-muted-foreground">
+                                                        Optional
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant={def.is_active ? 'default' : 'secondary'}>
-                                                    {def.is_active ? 'Active' : 'Inactive'}
+                                                <Badge
+                                                    variant={
+                                                        def.is_active
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                >
+                                                    {def.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>{def.sort_order}</TableCell>
+                                            <TableCell>
+                                                {def.sort_order}
+                                            </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(def)} title="Edit">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            openEdit(def)
+                                                        }
+                                                        title="Edit"
+                                                    >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => deleteDefinition(def.id)} title="Delete">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            deleteDefinition(
+                                                                def.id,
+                                                            )
+                                                        }
+                                                        title="Delete"
+                                                    >
                                                         <Trash2 className="h-4 w-4 text-status-critical" />
                                                     </Button>
                                                 </div>

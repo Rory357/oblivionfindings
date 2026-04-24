@@ -11,8 +11,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Grid3X3,
@@ -103,7 +103,12 @@ function getAvatarColor(id: number): string {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function DirectoryIndex({ employees, departments, sites, filters }: Props) {
+export default function DirectoryIndex({
+    employees,
+    departments,
+    sites,
+    filters,
+}: Props) {
     const [searchValue, setSearchValue] = useState(filters.q ?? '');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -123,7 +128,10 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
         if (value === null || value === 'all') {
             delete newFilters[key as keyof typeof newFilters];
         }
-        router.get('/hr/directory', newFilters, { preserveState: true, replace: true });
+        router.get('/hr/directory', newFilters, {
+            preserveState: true,
+            replace: true,
+        });
     }
 
     function clearAll() {
@@ -143,65 +151,87 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                             <Users className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold md:text-2xl">Employee Directory</h1>
+                            <h1 className="text-xl font-bold md:text-2xl">
+                                Employee Directory
+                            </h1>
                             <p className="text-sm text-muted-foreground">
-                                {employees.total} team member{employees.total !== 1 ? 's' : ''} across the organisation
+                                {employees.total} team member
+                                {employees.total !== 1 ? 's' : ''} across the
+                                organisation
                             </p>
                         </div>
                     </div>
 
                     {/* View toggle */}
                     <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-0.5">
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setViewMode('grid')}
-                            className={`rounded-md p-1.5 transition-all ${
+                            className={`h-auto w-auto rounded-md p-1.5 ${
                                 viewMode === 'grid'
-                                    ? 'bg-background shadow-sm text-foreground'
+                                    ? 'bg-background text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground'
                             }`}
                             title="Grid view"
                         >
                             <Grid3X3 className="h-4 w-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setViewMode('list')}
-                            className={`rounded-md p-1.5 transition-all ${
+                            className={`h-auto w-auto rounded-md p-1.5 ${
                                 viewMode === 'list'
-                                    ? 'bg-background shadow-sm text-foreground'
+                                    ? 'bg-background text-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground'
                             }`}
                             title="List view"
                         >
                             <LayoutList className="h-4 w-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
                 {/* Search & Filters */}
                 <div className="flex flex-wrap items-center gap-3">
-                    <form onSubmit={handleSearch} className="relative flex-1 min-w-[250px]">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <form
+                        onSubmit={handleSearch}
+                        className="relative min-w-[250px] flex-1"
+                    >
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search by name, position, or email..."
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
-                            className="pl-9 pr-9"
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
+                            className="pr-9 pl-9"
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && handleSearch(e)
+                            }
                         />
                         {searchValue && (
-                            <button
+                            <Button
                                 type="button"
-                                onClick={() => { setSearchValue(''); updateFilter('q', null); }}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                    setSearchValue('');
+                                    updateFilter('q', null);
+                                }}
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-1/2 right-2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                             >
                                 <X className="h-3.5 w-3.5" />
-                            </button>
+                            </Button>
                         )}
                     </form>
 
                     <Select
                         value={filters.department ?? 'all'}
-                        onValueChange={(v) => updateFilter('department', v === 'all' ? null : v)}
+                        onValueChange={(v) =>
+                            updateFilter('department', v === 'all' ? null : v)
+                        }
                     >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Departments" />
@@ -209,7 +239,12 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                         <SelectContent>
                             <SelectItem value="all">All Departments</SelectItem>
                             {departments.map((dept) => (
-                                <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                                <SelectItem
+                                    key={dept.id}
+                                    value={String(dept.id)}
+                                >
+                                    {dept.name}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -217,7 +252,9 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                     {sites.length > 0 && (
                         <Select
                             value={filters.site ?? 'all'}
-                            onValueChange={(v) => updateFilter('site', v === 'all' ? null : v)}
+                            onValueChange={(v) =>
+                                updateFilter('site', v === 'all' ? null : v)
+                            }
                         >
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="All Sites" />
@@ -225,14 +262,24 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                             <SelectContent>
                                 <SelectItem value="all">All Sites</SelectItem>
                                 {sites.map((site) => (
-                                    <SelectItem key={site.id} value={String(site.id)}>{site.name}</SelectItem>
+                                    <SelectItem
+                                        key={site.id}
+                                        value={String(site.id)}
+                                    >
+                                        {site.name}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     )}
 
                     {hasFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearAll} className="text-muted-foreground">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearAll}
+                            className="text-muted-foreground"
+                        >
                             <X className="mr-1 h-3 w-3" />
                             Clear
                         </Button>
@@ -245,25 +292,48 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                         {filters.q && (
                             <Badge variant="secondary" className="gap-1">
                                 Search: "{filters.q}"
-                                <button onClick={() => { setSearchValue(''); updateFilter('q', null); }}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-auto p-0 hover:bg-transparent"
+                                    onClick={() => {
+                                        setSearchValue('');
+                                        updateFilter('q', null);
+                                    }}
+                                >
                                     <X className="h-3 w-3" />
-                                </button>
+                                </Button>
                             </Badge>
                         )}
                         {filters.department && (
                             <Badge variant="secondary" className="gap-1">
                                 Dept: {filters.department}
-                                <button onClick={() => updateFilter('department', null)}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-auto p-0 hover:bg-transparent"
+                                    onClick={() =>
+                                        updateFilter('department', null)
+                                    }
+                                >
                                     <X className="h-3 w-3" />
-                                </button>
+                                </Button>
                             </Badge>
                         )}
                         {filters.site && (
                             <Badge variant="secondary" className="gap-1">
-                                Site: {sites.find((s) => String(s.id) === filters.site)?.name ?? filters.site}
-                                <button onClick={() => updateFilter('site', null)}>
+                                Site:{' '}
+                                {sites.find(
+                                    (s) => String(s.id) === filters.site,
+                                )?.name ?? filters.site}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-auto p-0 hover:bg-transparent"
+                                    onClick={() => updateFilter('site', null)}
+                                >
                                     <X className="h-3 w-3" />
-                                </button>
+                                </Button>
                             </Badge>
                         )}
                     </div>
@@ -277,7 +347,9 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                                 <Users className="h-8 w-8 text-muted-foreground/40" />
                             </div>
                             <div className="text-center">
-                                <p className="text-lg font-medium">No employees found</p>
+                                <p className="text-lg font-medium">
+                                    No employees found
+                                </p>
                                 <p className="mt-1 text-sm text-muted-foreground">
                                     {hasFilters
                                         ? 'Try adjusting your search or filters'
@@ -285,7 +357,11 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                                 </p>
                             </div>
                             {hasFilters && (
-                                <Button variant="outline" size="sm" onClick={clearAll}>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearAll}
+                                >
                                     Clear all filters
                                 </Button>
                             )}
@@ -295,26 +371,38 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                     /* ---- GRID VIEW ---- */
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {employees.data.map((emp) => (
-                            <Link key={emp.id} href={`/hr/directory/${emp.id}`} className="group block">
-                                <Card className="h-full overflow-hidden transition-all group-hover:shadow-lg group-hover:border-primary/40 group-hover:-translate-y-0.5">
+                            <Link
+                                key={emp.id}
+                                href={`/hr/directory/${emp.id}`}
+                                className="group block"
+                            >
+                                <Card className="h-full overflow-hidden transition-all group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-lg">
                                     {/* Coloured header strip */}
                                     <div className="h-16 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" />
 
                                     <CardContent className="-mt-10 flex flex-col items-center px-5 pb-5 text-center">
                                         {/* Avatar */}
                                         <Avatar className="h-20 w-20 border-4 border-background shadow-md">
-                                            <AvatarImage src={emp.profile_photo_path ? `/storage/${emp.profile_photo_path}` : undefined} />
-                                            <AvatarFallback className={`text-xl font-bold ${getAvatarColor(emp.id)}`}>
+                                            <AvatarImage
+                                                src={
+                                                    emp.profile_photo_path
+                                                        ? `/storage/${emp.profile_photo_path}`
+                                                        : undefined
+                                                }
+                                            />
+                                            <AvatarFallback
+                                                className={`text-xl font-bold ${getAvatarColor(emp.id)}`}
+                                            >
                                                 {getInitials(emp.name)}
                                             </AvatarFallback>
                                         </Avatar>
 
                                         {/* Info */}
-                                        <h3 className="mt-3 font-semibold text-sm group-hover:text-primary transition-colors">
+                                        <h3 className="mt-3 text-sm font-semibold transition-colors group-hover:text-primary">
                                             {emp.name}
                                         </h3>
                                         {emp.position_title && (
-                                            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                                                 {emp.position_title}
                                             </p>
                                         )}
@@ -322,12 +410,18 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                                         {/* Tags */}
                                         <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
                                             {emp.department && (
-                                                <Badge variant="secondary" className="text-[10px] px-2 py-0">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="px-2 py-0 text-[10px]"
+                                                >
                                                     {emp.department}
                                                 </Badge>
                                             )}
                                             {emp.site && (
-                                                <Badge variant="outline" className="text-[10px] px-2 py-0 gap-0.5">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="gap-0.5 px-2 py-0 text-[10px]"
+                                                >
                                                     <MapPin className="h-2.5 w-2.5" />
                                                     {emp.site}
                                                 </Badge>
@@ -337,12 +431,18 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                                         {/* Contact icons */}
                                         <div className="mt-3 flex items-center gap-3">
                                             {emp.email && (
-                                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary" title={emp.email}>
+                                                <span
+                                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary"
+                                                    title={emp.email}
+                                                >
                                                     <Mail className="h-3.5 w-3.5" />
                                                 </span>
                                             )}
                                             {emp.phone && (
-                                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary" title={emp.phone}>
+                                                <span
+                                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary"
+                                                    title={emp.phone}
+                                                >
                                                     <Phone className="h-3.5 w-3.5" />
                                                 </span>
                                             )}
@@ -355,7 +455,7 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                 ) : (
                     /* ---- LIST VIEW ---- */
                     <Card>
-                        <CardContent className="p-0 divide-y">
+                        <CardContent className="divide-y p-0">
                             {employees.data.map((emp) => (
                                 <Link
                                     key={emp.id}
@@ -363,22 +463,39 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                                     className="flex items-center gap-4 p-4 transition-colors hover:bg-muted/30"
                                 >
                                     <Avatar className="h-12 w-12 shrink-0">
-                                        <AvatarImage src={emp.profile_photo_path ? `/storage/${emp.profile_photo_path}` : undefined} />
-                                        <AvatarFallback className={`font-semibold ${getAvatarColor(emp.id)}`}>
+                                        <AvatarImage
+                                            src={
+                                                emp.profile_photo_path
+                                                    ? `/storage/${emp.profile_photo_path}`
+                                                    : undefined
+                                            }
+                                        />
+                                        <AvatarFallback
+                                            className={`font-semibold ${getAvatarColor(emp.id)}`}
+                                        >
                                             {getInitials(emp.name)}
                                         </AvatarFallback>
                                     </Avatar>
 
                                     <div className="min-w-0 flex-1">
-                                        <p className="font-semibold text-sm">{emp.name}</p>
+                                        <p className="text-sm font-semibold">
+                                            {emp.name}
+                                        </p>
                                         {emp.position_title && (
-                                            <p className="text-xs text-muted-foreground">{emp.position_title}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {emp.position_title}
+                                            </p>
                                         )}
                                     </div>
 
-                                    <div className="hidden sm:flex items-center gap-4">
+                                    <div className="hidden items-center gap-4 sm:flex">
                                         {emp.department && (
-                                            <Badge variant="secondary" className="text-[10px]">{emp.department}</Badge>
+                                            <Badge
+                                                variant="secondary"
+                                                className="text-[10px]"
+                                            >
+                                                {emp.department}
+                                            </Badge>
                                         )}
                                         {emp.site && (
                                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -388,11 +505,13 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                                         )}
                                     </div>
 
-                                    <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground">
+                                    <div className="hidden items-center gap-3 text-xs text-muted-foreground md:flex">
                                         {emp.email && (
                                             <span className="flex items-center gap-1">
                                                 <Mail className="h-3 w-3" />
-                                                <span className="max-w-[180px] truncate">{emp.email}</span>
+                                                <span className="max-w-[180px] truncate">
+                                                    {emp.email}
+                                                </span>
                                             </span>
                                         )}
                                         {emp.phone && (
@@ -412,11 +531,20 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                 {employees.total > 0 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(employees.current_page - 1) * employees.per_page + 1} to{' '}
-                            {Math.min(employees.current_page * employees.per_page, employees.total)} of{' '}
-                            {employees.total} employee{employees.total !== 1 ? 's' : ''}
+                            Showing{' '}
+                            {(employees.current_page - 1) * employees.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                employees.current_page * employees.per_page,
+                                employees.total,
+                            )}{' '}
+                            of {employees.total} employee
+                            {employees.total !== 1 ? 's' : ''}
                         </p>
-                        {employees.last_page > 1 && <LaravelPagination links={employees.links} />}
+                        {employees.last_page > 1 && (
+                            <LaravelPagination links={employees.links} />
+                        )}
                     </div>
                 )}
             </div>

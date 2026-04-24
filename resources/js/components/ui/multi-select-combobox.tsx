@@ -52,7 +52,7 @@ export function MultiSelectCombobox({
         }
     };
 
-    const handleRemove = (value: string, e: React.MouseEvent) => {
+    const handleRemove = (value: string, e: React.SyntheticEvent) => {
         e.stopPropagation();
         onChange(selected.filter((v) => v !== value));
     };
@@ -92,13 +92,20 @@ export function MultiSelectCombobox({
                                 <Badge key={value} variant="secondary" className="text-xs">
                                     {getLabel(value)}
                                     {!disabled && (
-                                        <button
-                                            type="button"
+                                        <span
+                                            role="button"
+                                            tabIndex={disabled ? -1 : 0}
                                             className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                             onClick={(e) => handleRemove(value, e)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleRemove(value, e);
+                                                }
+                                            }}
                                         >
                                             <X className="h-3 w-3" />
-                                        </button>
+                                        </span>
                                     )}
                                 </Badge>
                             ))

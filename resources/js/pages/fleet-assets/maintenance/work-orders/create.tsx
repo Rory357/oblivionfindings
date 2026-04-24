@@ -39,7 +39,7 @@ const PRIORITY_OPTIONS = [
 ];
 
 export default function WorkOrderCreate({ assets, users, checklist_runs, prefill_asset_id, prefill_checklist_run_id }: Props) {
-    const safeAssets = assets ?? [];
+    const safeAssets = useMemo(() => assets ?? [], [assets]);
     const safeUsers = users ?? [];
     const safeChecklistRuns = checklist_runs ?? [];
 
@@ -102,12 +102,13 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                                 {PRIORITY_OPTIONS.map((opt) => {
                                     const IconComp = opt.icon;
                                     return (
-                                        <button
+                                        <Button
                                             key={opt.value}
                                             type="button"
+                                            variant="outline"
                                             onClick={() => form.setData('priority', opt.value)}
                                             className={cn(
-                                                "flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm font-semibold transition-all",
+                                                "h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all",
                                                 form.data.priority === opt.value
                                                     ? `${opt.color} shadow-md`
                                                     : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80'
@@ -115,7 +116,7 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                                         >
                                             <IconComp className="h-6 w-6" />
                                             {opt.label}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>

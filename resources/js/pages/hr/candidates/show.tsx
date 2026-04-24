@@ -1,12 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { useRef, useState } from 'react';
+import { ActivityItem } from '@/components/recruitment/activity-item';
+import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -16,17 +20,44 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { type BreadcrumbItem } from '@/types';
 import {
-    User, Mail, Phone, Briefcase, Calendar, MessageSquare,
-    CheckCircle2, Clock, ArrowRight, FileText, UserCheck,
-    Star, Send, Gift, ExternalLink, Shield,
-    Upload, Download, Trash2, FolderOpen, AlertTriangle, File, FileImage, Plus,
-    ChevronDown, ChevronUp, Activity, StickyNote,
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import {
+    Activity,
+    ArrowRight,
+    Briefcase,
+    Calendar,
+    CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    Clock,
+    Download,
+    ExternalLink,
+    File,
+    FileImage,
+    FileText,
+    FolderOpen,
+    Gift,
+    Mail,
+    MessageSquare,
+    Phone,
+    Send,
+    Shield,
+    Star,
+    StickyNote,
+    Trash2,
+    Upload,
+    UserCheck,
 } from 'lucide-react';
-import { StatusBadge } from '@/components/recruitment/status-badge';
-import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
-import { ActivityItem } from '@/components/recruitment/activity-item';
+import { useRef, useState } from 'react';
 
 interface Interview {
     id: number;
@@ -38,7 +69,11 @@ interface Interview {
     notes: string | null;
     scores: Array<{
         id: number;
-        criteria_scores: Array<{ label: string; score: number; weight?: number | null }>;
+        criteria_scores: Array<{
+            label: string;
+            score: number;
+            weight?: number | null;
+        }>;
         overall_score: number | null;
         recommendation: string | null;
         notes: string | null;
@@ -98,7 +133,12 @@ interface Application {
     position_role: string | null;
     stage: string;
     status: 'active' | 'offered' | 'hired' | 'rejected' | 'withdrawn';
-    interview_kit: { id: number; name: string; role: string | null; criteria: Array<{ label: string; weight?: number }> } | null;
+    interview_kit: {
+        id: number;
+        name: string;
+        role: string | null;
+        criteria: Array<{ label: string; weight?: number }>;
+    } | null;
     applied_at: string;
     target_site: { id: number; name: string } | null;
     interviews: Interview[];
@@ -155,13 +195,23 @@ interface Props {
     stages?: string[];
 }
 
-const interviewStatusVariants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    scheduled: 'outline', completed: 'default', cancelled: 'secondary', no_show: 'destructive',
+const interviewStatusVariants: Record<
+    string,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
+    scheduled: 'outline',
+    completed: 'default',
+    cancelled: 'secondary',
+    no_show: 'destructive',
 };
 
 const recColors: Record<string, string> = {
-    strong_yes: 'text-status-success', yes: 'text-status-success', maybe: 'text-status-warning',
-    neutral: 'text-status-warning', no: 'text-status-warning', strong_no: 'text-status-critical',
+    strong_yes: 'text-status-success',
+    yes: 'text-status-success',
+    maybe: 'text-status-warning',
+    neutral: 'text-status-warning',
+    no: 'text-status-warning',
+    strong_no: 'text-status-critical',
 };
 
 function formatNZDate(dateStr: string): string {
@@ -187,12 +237,26 @@ function isExpired(dateStr: string | null): boolean {
     return new Date(dateStr) < new Date();
 }
 
-export default function CandidateShow({ candidate, activityLog, totalDaysInPipeline, can, documents, documentCategories, stages }: Props) {
+export default function CandidateShow({
+    candidate,
+    activityLog,
+    totalDaysInPipeline,
+    can,
+    documents,
+    documentCategories,
+    stages,
+}: Props) {
     const fullName = `${candidate.first_name} ${candidate.last_name}`;
-    const initials = ((candidate.first_name?.[0] ?? '') + (candidate.last_name?.[0] ?? '')).toUpperCase();
+    const initials = (
+        (candidate.first_name?.[0] ?? '') + (candidate.last_name?.[0] ?? '')
+    ).toUpperCase();
     const [noteText, setNoteText] = useState('');
-    const [expandedCoverLetters, setExpandedCoverLetters] = useState<Record<number, boolean>>({});
-    const [expandedScreening, setExpandedScreening] = useState<Record<number, boolean>>({});
+    const [expandedCoverLetters, setExpandedCoverLetters] = useState<
+        Record<number, boolean>
+    >({});
+    const [expandedScreening, setExpandedScreening] = useState<
+        Record<number, boolean>
+    >({});
     const [showUploadDialog, setShowUploadDialog] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -233,81 +297,141 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
     });
 
     function advanceStage(applicationId: number) {
-        router.post(`/hr/recruitment/applications/${applicationId}/advance`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/recruitment/applications/${applicationId}/advance`,
+            {},
+            { preserveScroll: true },
+        );
     }
     function rejectApplication(applicationId: number) {
         if (confirm('Are you sure you want to reject this application?')) {
-            router.post(`/hr/recruitment/applications/${applicationId}/reject`, {}, { preserveScroll: true });
+            router.post(
+                `/hr/recruitment/applications/${applicationId}/reject`,
+                {},
+                { preserveScroll: true },
+            );
         }
     }
-    function updateInterviewStatus(interviewId: number, status: 'completed' | 'cancelled' | 'no_show') {
-        router.put(`/hr/recruitment/interviews/${interviewId}`, { status }, { preserveScroll: true });
+    function updateInterviewStatus(
+        interviewId: number,
+        status: 'completed' | 'cancelled' | 'no_show',
+    ) {
+        router.put(
+            `/hr/recruitment/interviews/${interviewId}`,
+            { status },
+            { preserveScroll: true },
+        );
     }
-    function updateReferenceStatus(referenceId: number, status: 'contacted' | 'completed') {
-        router.put(`/hr/recruitment/references/${referenceId}`, { status }, { preserveScroll: true });
+    function updateReferenceStatus(
+        referenceId: number,
+        status: 'contacted' | 'completed',
+    ) {
+        router.put(
+            `/hr/recruitment/references/${referenceId}`,
+            { status },
+            { preserveScroll: true },
+        );
     }
     function approveOffer(offerId: number) {
-        router.post(`/hr/recruitment/offers/${offerId}/approve`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/recruitment/offers/${offerId}/approve`,
+            {},
+            { preserveScroll: true },
+        );
     }
     function sendOffer(offerId: number) {
-        router.post(`/hr/recruitment/offers/${offerId}/send`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/recruitment/offers/${offerId}/send`,
+            {},
+            { preserveScroll: true },
+        );
     }
-    function recordOfferResponse(offerId: number, response: 'accepted' | 'declined' | 'withdrawn') {
-        const notes = response !== 'accepted' ? (prompt('Optional notes:') ?? '').trim() : '';
-        router.post(`/hr/recruitment/offers/${offerId}/respond`, { response, response_notes: notes || null }, { preserveScroll: true });
+    function recordOfferResponse(
+        offerId: number,
+        response: 'accepted' | 'declined' | 'withdrawn',
+    ) {
+        const notes =
+            response !== 'accepted'
+                ? (prompt('Optional notes:') ?? '').trim()
+                : '';
+        router.post(
+            `/hr/recruitment/offers/${offerId}/respond`,
+            { response, response_notes: notes || null },
+            { preserveScroll: true },
+        );
     }
     function convertOffer(offerId: number) {
-        router.post(`/hr/recruitment/offers/${offerId}/convert`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/recruitment/offers/${offerId}/convert`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     function handleDocumentUpload(e: React.FormEvent) {
         e.preventDefault();
         if (!documentForm.data.file || !documentForm.data.category) return;
-        documentForm.post(`/hr/recruitment/candidates/${candidate.id}/documents`, {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                documentForm.reset();
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                }
+        documentForm.post(
+            `/hr/recruitment/candidates/${candidate.id}/documents`,
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onSuccess: () => {
+                    documentForm.reset();
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                    }
+                },
             },
-        });
+        );
     }
 
     function deleteDocument(docId: number) {
         if (confirm('Are you sure you want to delete this document?')) {
-            router.delete(`/hr/recruitment/documents/${docId}`, { preserveScroll: true });
+            router.delete(`/hr/recruitment/documents/${docId}`, {
+                preserveScroll: true,
+            });
         }
     }
 
     function handleScheduleInterview(applicationId: number) {
-        interviewForm.post(`/hr/recruitment/applications/${applicationId}/interviews`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                interviewForm.reset();
+        interviewForm.post(
+            `/hr/recruitment/applications/${applicationId}/interviews`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    interviewForm.reset();
+                },
             },
-        });
+        );
     }
 
     function handleAddReference(applicationId: number) {
-        referenceForm.post(`/hr/recruitment/applications/${applicationId}/references`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                referenceForm.reset();
+        referenceForm.post(
+            `/hr/recruitment/applications/${applicationId}/references`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    referenceForm.reset();
+                },
             },
-        });
+        );
     }
 
     const formatCurrency = (amount: number | null) => {
         if (!amount) return '-';
-        return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+        return new Intl.NumberFormat('en-NZ', {
+            style: 'currency',
+            currency: 'NZD',
+        }).format(amount);
     };
 
     const { flash } = usePage().props as any;
 
     // Group documents by category
-    const groupedDocuments = (documents ?? []).reduce<Record<string, CandidateDocument[]>>((acc, doc) => {
+    const groupedDocuments = (documents ?? []).reduce<
+        Record<string, CandidateDocument[]>
+    >((acc, doc) => {
         const cat = doc.category || 'uncategorised';
         if (!acc[cat]) acc[cat] = [];
         acc[cat].push(doc);
@@ -316,12 +440,17 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
 
     // Get the primary (first) application for workflow
     const primaryApp = candidate.applications[0] ?? null;
-    const upcomingInterview = primaryApp?.interviews.find((i) => i.status === 'scheduled') ?? null;
+    const upcomingInterview =
+        primaryApp?.interviews.find((i) => i.status === 'scheduled') ?? null;
     const allReferencesComplete = primaryApp
-        ? primaryApp.reference_checks.length > 0 && primaryApp.reference_checks.every((r) => r.status === 'completed')
+        ? primaryApp.reference_checks.length > 0 &&
+          primaryApp.reference_checks.every((r) => r.status === 'completed')
         : false;
 
-    const totalInterviews = candidate.applications.reduce((sum, app) => sum + app.interviews.length, 0);
+    const totalInterviews = candidate.applications.reduce(
+        (sum, app) => sum + app.interviews.length,
+        0,
+    );
 
     function toggleCoverLetter(appId: number) {
         setExpandedCoverLetters((prev) => ({ ...prev, [appId]: !prev[appId] }));
@@ -338,7 +467,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
         return (
             <Card className="h-full">
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
                         <ArrowRight className="h-4 w-4" />
                         Next Steps
                     </CardTitle>
@@ -347,13 +476,17 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {/* Stage: new */}
                     {app.stage === 'new' && (
                         <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground">Review the application and move to screening when ready.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Review the application and move to screening
+                                when ready.
+                            </p>
                             <Button
                                 size="sm"
                                 className="w-full"
                                 onClick={() => advanceStage(app.id)}
                             >
-                                <ArrowRight className="mr-1 h-3.5 w-3.5" /> Move to Screening
+                                <ArrowRight className="mr-1 h-3.5 w-3.5" /> Move
+                                to Screening
                             </Button>
                         </div>
                     )}
@@ -361,58 +494,117 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {/* Stage: screening */}
                     {app.stage === 'screening' && (
                         <div className="space-y-3">
-                            <p className="text-xs text-muted-foreground">Schedule an interview to proceed.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Schedule an interview to proceed.
+                            </p>
                             <div className="space-y-2 rounded-lg border p-3">
-                                <h5 className="text-xs font-semibold">Schedule Interview</h5>
+                                <h5 className="text-xs font-semibold">
+                                    Schedule Interview
+                                </h5>
                                 <div className="space-y-2">
                                     <div className="space-y-1">
-                                        <Label htmlFor={`interview-type-${app.id}`} className="text-xs">Type</Label>
-                                        <Select
-                                            value={interviewForm.data.interview_type}
-                                            onValueChange={(value) => interviewForm.setData('interview_type', value)}
+                                        <Label
+                                            htmlFor={`interview-type-${app.id}`}
+                                            className="text-xs"
                                         >
-                                            <SelectTrigger id={`interview-type-${app.id}`} className="h-8 text-xs">
+                                            Type
+                                        </Label>
+                                        <Select
+                                            value={
+                                                interviewForm.data
+                                                    .interview_type
+                                            }
+                                            onValueChange={(value) =>
+                                                interviewForm.setData(
+                                                    'interview_type',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id={`interview-type-${app.id}`}
+                                                className="h-8 text-xs"
+                                            >
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="phone">Phone</SelectItem>
-                                                <SelectItem value="video">Video</SelectItem>
-                                                <SelectItem value="in_person">In Person</SelectItem>
-                                                <SelectItem value="panel">Panel</SelectItem>
+                                                <SelectItem value="phone">
+                                                    Phone
+                                                </SelectItem>
+                                                <SelectItem value="video">
+                                                    Video
+                                                </SelectItem>
+                                                <SelectItem value="in_person">
+                                                    In Person
+                                                </SelectItem>
+                                                <SelectItem value="panel">
+                                                    Panel
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor={`interview-datetime-${app.id}`} className="text-xs">Date & Time</Label>
+                                        <Label
+                                            htmlFor={`interview-datetime-${app.id}`}
+                                            className="text-xs"
+                                        >
+                                            Date & Time
+                                        </Label>
                                         <Input
                                             id={`interview-datetime-${app.id}`}
                                             type="datetime-local"
                                             className="h-8 text-xs"
-                                            value={interviewForm.data.scheduled_at}
-                                            onChange={(e) => interviewForm.setData('scheduled_at', e.target.value)}
+                                            value={
+                                                interviewForm.data.scheduled_at
+                                            }
+                                            onChange={(e) =>
+                                                interviewForm.setData(
+                                                    'scheduled_at',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor={`interview-location-${app.id}`} className="text-xs">Location</Label>
+                                        <Label
+                                            htmlFor={`interview-location-${app.id}`}
+                                            className="text-xs"
+                                        >
+                                            Location
+                                        </Label>
                                         <Input
                                             id={`interview-location-${app.id}`}
                                             type="text"
                                             className="h-8 text-xs"
                                             placeholder="e.g. Office, Zoom link..."
                                             value={interviewForm.data.location}
-                                            onChange={(e) => interviewForm.setData('location', e.target.value)}
+                                            onChange={(e) =>
+                                                interviewForm.setData(
+                                                    'location',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <Button
                                         size="sm"
-                                        className="w-full h-7 text-xs"
-                                        disabled={!interviewForm.data.scheduled_at || interviewForm.processing}
-                                        onClick={() => handleScheduleInterview(app.id)}
+                                        className="h-7 w-full text-xs"
+                                        disabled={
+                                            !interviewForm.data.scheduled_at ||
+                                            interviewForm.processing
+                                        }
+                                        onClick={() =>
+                                            handleScheduleInterview(app.id)
+                                        }
                                     >
-                                        {interviewForm.processing ? 'Scheduling...' : 'Schedule Interview'}
+                                        {interviewForm.processing
+                                            ? 'Scheduling...'
+                                            : 'Schedule Interview'}
                                     </Button>
                                     {interviewForm.errors.scheduled_at && (
-                                        <p className="text-xs text-status-critical">{interviewForm.errors.scheduled_at}</p>
+                                        <p className="text-xs text-status-critical">
+                                            {interviewForm.errors.scheduled_at}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -420,103 +612,205 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     )}
 
                     {/* Stage: interview_scheduled */}
-                    {app.stage === 'interview_scheduled' && (() => {
-                        const upcoming = app.interviews.find((i) => i.status === 'scheduled') ?? null;
-                        return (
-                            <div className="space-y-2">
-                                {upcoming ? (
-                                    <div className="rounded-lg border p-3 space-y-2">
-                                        <p className="text-xs font-semibold">Upcoming Interview</p>
-                                        <div className="text-xs text-muted-foreground space-y-1">
-                                            <p className="capitalize">{upcoming.type.replace('_', ' ')}</p>
-                                            <p>{formatNZDateTime(upcoming.scheduled_at)}</p>
-                                            {upcoming.interviewer_name && <p>with {upcoming.interviewer_name}</p>}
+                    {app.stage === 'interview_scheduled' &&
+                        (() => {
+                            const upcoming =
+                                app.interviews.find(
+                                    (i) => i.status === 'scheduled',
+                                ) ?? null;
+                            return (
+                                <div className="space-y-2">
+                                    {upcoming ? (
+                                        <div className="space-y-2 rounded-lg border p-3">
+                                            <p className="text-xs font-semibold">
+                                                Upcoming Interview
+                                            </p>
+                                            <div className="space-y-1 text-xs text-muted-foreground">
+                                                <p className="capitalize">
+                                                    {upcoming.type.replace(
+                                                        '_',
+                                                        ' ',
+                                                    )}
+                                                </p>
+                                                <p>
+                                                    {formatNZDateTime(
+                                                        upcoming.scheduled_at,
+                                                    )}
+                                                </p>
+                                                {upcoming.interviewer_name && (
+                                                    <p>
+                                                        with{' '}
+                                                        {
+                                                            upcoming.interviewer_name
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-1 pt-1">
+                                                <Button
+                                                    size="sm"
+                                                    className="h-7 flex-1 text-xs"
+                                                    onClick={() =>
+                                                        updateInterviewStatus(
+                                                            upcoming.id,
+                                                            'completed',
+                                                        )
+                                                    }
+                                                >
+                                                    <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
+                                                    Mark Completed
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="h-7 text-xs"
+                                                    onClick={() =>
+                                                        updateInterviewStatus(
+                                                            upcoming.id,
+                                                            'no_show',
+                                                        )
+                                                    }
+                                                >
+                                                    No Show
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1 pt-1">
-                                            <Button
-                                                size="sm"
-                                                className="h-7 text-xs flex-1"
-                                                onClick={() => updateInterviewStatus(upcoming.id, 'completed')}
-                                            >
-                                                <CheckCircle2 className="mr-1 h-3 w-3" /> Mark Completed
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="destructive"
-                                                className="h-7 text-xs"
-                                                onClick={() => updateInterviewStatus(upcoming.id, 'no_show')}
-                                            >
-                                                No Show
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-xs text-muted-foreground">No upcoming interviews found. Check the interview list below.</p>
-                                )}
-                            </div>
-                        );
-                    })()}
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            No upcoming interviews found. Check
+                                            the interview list below.
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                     {/* Stage: interview_completed */}
                     {app.stage === 'interview_completed' && (
                         <div className="space-y-3">
-                            <p className="text-xs text-muted-foreground">Add reference checks to proceed.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Add reference checks to proceed.
+                            </p>
                             <div className="space-y-2 rounded-lg border p-3">
-                                <h5 className="text-xs font-semibold">Add Reference</h5>
+                                <h5 className="text-xs font-semibold">
+                                    Add Reference
+                                </h5>
                                 <div className="space-y-2">
                                     <div className="space-y-1">
-                                        <Label htmlFor={`ref-name-${app.id}`} className="text-xs">Referee Name</Label>
+                                        <Label
+                                            htmlFor={`ref-name-${app.id}`}
+                                            className="text-xs"
+                                        >
+                                            Referee Name
+                                        </Label>
                                         <Input
                                             id={`ref-name-${app.id}`}
                                             type="text"
                                             className="h-8 text-xs"
                                             placeholder="Full name"
-                                            value={referenceForm.data.referee_name}
-                                            onChange={(e) => referenceForm.setData('referee_name', e.target.value)}
+                                            value={
+                                                referenceForm.data.referee_name
+                                            }
+                                            onChange={(e) =>
+                                                referenceForm.setData(
+                                                    'referee_name',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor={`ref-email-${app.id}`} className="text-xs">Email</Label>
+                                        <Label
+                                            htmlFor={`ref-email-${app.id}`}
+                                            className="text-xs"
+                                        >
+                                            Email
+                                        </Label>
                                         <Input
                                             id={`ref-email-${app.id}`}
                                             type="email"
                                             className="h-8 text-xs"
                                             placeholder="referee@example.com"
-                                            value={referenceForm.data.referee_email}
-                                            onChange={(e) => referenceForm.setData('referee_email', e.target.value)}
+                                            value={
+                                                referenceForm.data.referee_email
+                                            }
+                                            onChange={(e) =>
+                                                referenceForm.setData(
+                                                    'referee_email',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label htmlFor={`ref-relationship-${app.id}`} className="text-xs">Relationship</Label>
-                                        <Select
-                                            value={referenceForm.data.referee_relationship}
-                                            onValueChange={(value) => referenceForm.setData('referee_relationship', value)}
+                                        <Label
+                                            htmlFor={`ref-relationship-${app.id}`}
+                                            className="text-xs"
                                         >
-                                            <SelectTrigger id={`ref-relationship-${app.id}`} className="h-8 text-xs">
+                                            Relationship
+                                        </Label>
+                                        <Select
+                                            value={
+                                                referenceForm.data
+                                                    .referee_relationship
+                                            }
+                                            onValueChange={(value) =>
+                                                referenceForm.setData(
+                                                    'referee_relationship',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id={`ref-relationship-${app.id}`}
+                                                className="h-8 text-xs"
+                                            >
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="professional">Professional</SelectItem>
-                                                <SelectItem value="manager">Manager</SelectItem>
-                                                <SelectItem value="colleague">Colleague</SelectItem>
-                                                <SelectItem value="academic">Academic</SelectItem>
-                                                <SelectItem value="personal">Personal</SelectItem>
+                                                <SelectItem value="professional">
+                                                    Professional
+                                                </SelectItem>
+                                                <SelectItem value="manager">
+                                                    Manager
+                                                </SelectItem>
+                                                <SelectItem value="colleague">
+                                                    Colleague
+                                                </SelectItem>
+                                                <SelectItem value="academic">
+                                                    Academic
+                                                </SelectItem>
+                                                <SelectItem value="personal">
+                                                    Personal
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <Button
                                         size="sm"
-                                        className="w-full h-7 text-xs"
-                                        disabled={!referenceForm.data.referee_name || !referenceForm.data.referee_email || referenceForm.processing}
-                                        onClick={() => handleAddReference(app.id)}
+                                        className="h-7 w-full text-xs"
+                                        disabled={
+                                            !referenceForm.data.referee_name ||
+                                            !referenceForm.data.referee_email ||
+                                            referenceForm.processing
+                                        }
+                                        onClick={() =>
+                                            handleAddReference(app.id)
+                                        }
                                     >
-                                        {referenceForm.processing ? 'Adding...' : 'Add Reference'}
+                                        {referenceForm.processing
+                                            ? 'Adding...'
+                                            : 'Add Reference'}
                                     </Button>
                                     {referenceForm.errors.referee_name && (
-                                        <p className="text-xs text-status-critical">{referenceForm.errors.referee_name}</p>
+                                        <p className="text-xs text-status-critical">
+                                            {referenceForm.errors.referee_name}
+                                        </p>
                                     )}
                                     {referenceForm.errors.referee_email && (
-                                        <p className="text-xs text-status-critical">{referenceForm.errors.referee_email}</p>
+                                        <p className="text-xs text-status-critical">
+                                            {referenceForm.errors.referee_email}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -526,50 +820,81 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {/* Stage: reference_check */}
                     {app.stage === 'reference_check' && (
                         <div className="space-y-2">
-                            <p className="text-xs font-semibold">Reference Progress</p>
+                            <p className="text-xs font-semibold">
+                                Reference Progress
+                            </p>
                             {app.reference_checks.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">No references added yet.</p>
+                                <p className="text-xs text-muted-foreground">
+                                    No references added yet.
+                                </p>
                             ) : (
                                 <div className="space-y-1.5">
                                     {app.reference_checks.map((ref) => (
-                                        <div key={ref.id} className="flex items-center gap-2 text-xs">
+                                        <div
+                                            key={ref.id}
+                                            className="flex items-center gap-2 text-xs"
+                                        >
                                             {ref.status === 'completed' ? (
-                                                <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
+                                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-status-success" />
                                             ) : (
-                                                <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                             )}
-                                            <span className={ref.status === 'completed' ? 'line-through text-muted-foreground' : ''}>
+                                            <span
+                                                className={
+                                                    ref.status === 'completed'
+                                                        ? 'text-muted-foreground line-through'
+                                                        : ''
+                                                }
+                                            >
                                                 {ref.referee_name}
                                             </span>
-                                            <Badge variant={ref.status === 'completed' ? 'default' : 'outline'} className="text-[10px] capitalize ml-auto">
+                                            <Badge
+                                                variant={
+                                                    ref.status === 'completed'
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
+                                                className="ml-auto text-[10px] capitalize"
+                                            >
                                                 {ref.status}
                                             </Badge>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                            {allReferencesComplete && app.id === primaryApp?.id && (
-                                <Button
-                                    size="sm"
-                                    className="w-full mt-2"
-                                    onClick={() => advanceStage(app.id)}
-                                >
-                                    <Gift className="mr-1 h-3.5 w-3.5" /> Prepare Offer
-                                </Button>
-                            )}
-                            {!allReferencesComplete && app.reference_checks.length > 0 && (
-                                <p className="text-xs text-status-warning">Complete all references to prepare an offer.</p>
-                            )}
+                            {allReferencesComplete &&
+                                app.id === primaryApp?.id && (
+                                    <Button
+                                        size="sm"
+                                        className="mt-2 w-full"
+                                        onClick={() => advanceStage(app.id)}
+                                    >
+                                        <Gift className="mr-1 h-3.5 w-3.5" />{' '}
+                                        Prepare Offer
+                                    </Button>
+                                )}
+                            {!allReferencesComplete &&
+                                app.reference_checks.length > 0 && (
+                                    <p className="text-xs text-status-warning">
+                                        Complete all references to prepare an
+                                        offer.
+                                    </p>
+                                )}
                         </div>
                     )}
 
                     {/* Stage: offer_pending */}
                     {app.stage === 'offer_pending' && (
                         <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground">Create an offer for this candidate.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Create an offer for this candidate.
+                            </p>
                             <Button size="sm" className="w-full" asChild>
-                                <Link href={`/hr/recruitment/applications/${app.id}/offer/create`}>
-                                    <Gift className="mr-1 h-3.5 w-3.5" /> Create Offer
+                                <Link
+                                    href={`/hr/recruitment/applications/${app.id}/offer/create`}
+                                >
+                                    <Gift className="mr-1 h-3.5 w-3.5" /> Create
+                                    Offer
                                 </Link>
                             </Button>
                         </div>
@@ -579,11 +904,14 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {app.stage === 'offer_sent' && (
                         <div className="space-y-2">
                             <div className="rounded-lg border p-3 text-center">
-                                <Send className="mx-auto h-6 w-6 text-primary mb-1.5" />
-                                <p className="text-xs font-medium">Awaiting Response</p>
+                                <Send className="mx-auto mb-1.5 h-6 w-6 text-primary" />
+                                <p className="text-xs font-medium">
+                                    Awaiting Response
+                                </p>
                                 {app.offer?.sent_at && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                        Sent on {formatNZDate(app.offer.sent_at)}
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        Sent on{' '}
+                                        {formatNZDate(app.offer.sent_at)}
                                     </p>
                                 )}
                             </div>
@@ -593,29 +921,48 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {/* Stage: offer_accepted */}
                     {app.stage === 'offer_accepted' && (
                         <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground">Offer accepted. Convert to employee record.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Offer accepted. Convert to employee record.
+                            </p>
                             {app.offer && (
                                 <Button
                                     size="sm"
                                     className="w-full"
                                     onClick={() => convertOffer(app.offer!.id)}
                                 >
-                                    <UserCheck className="mr-1 h-3.5 w-3.5" /> Convert to Employee
+                                    <UserCheck className="mr-1 h-3.5 w-3.5" />{' '}
+                                    Convert to Employee
                                 </Button>
                             )}
                         </div>
                     )}
 
                     {/* Persistent action links */}
-                    <div className="border-t pt-3 space-y-2">
-                        <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                            <Link href={`/hr/recruitment/candidates/${candidate.id}`}>
-                                <Mail className="mr-2 h-3.5 w-3.5" /> Email Candidate
+                    <div className="space-y-2 border-t pt-3">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start"
+                            asChild
+                        >
+                            <Link
+                                href={`/hr/recruitment/candidates/${candidate.id}`}
+                            >
+                                <Mail className="mr-2 h-3.5 w-3.5" /> Email
+                                Candidate
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                            <Link href={`/hr/recruitment/applications/${app.id}/scorecard-summary`}>
-                                <Star className="mr-2 h-3.5 w-3.5" /> View Scorecards
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start"
+                            asChild
+                        >
+                            <Link
+                                href={`/hr/recruitment/applications/${app.id}/scorecard-summary`}
+                            >
+                                <Star className="mr-2 h-3.5 w-3.5" /> View
+                                Scorecards
                             </Link>
                         </Button>
                     </div>
@@ -642,42 +989,53 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                 {/* Hero Header - Gradient Purple Banner */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
                     {/* Decorative circles */}
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-white/5" />
 
                     <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                             {/* Avatar */}
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white/20 text-2xl font-bold shadow-xl bg-primary-foreground/20">
+                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white/20 bg-primary-foreground/20 text-2xl font-bold shadow-xl">
                                 {initials}
                             </div>
                             <div className="min-w-0">
-                                <h1 className="text-2xl font-bold md:text-3xl">{fullName}</h1>
+                                <h1 className="text-2xl font-bold md:text-3xl">
+                                    {fullName}
+                                </h1>
                                 {candidate.preferred_name && (
-                                    <p className="mt-0.5 text-sm text-white/70">Goes by &ldquo;{candidate.preferred_name}&rdquo;</p>
+                                    <p className="mt-0.5 text-sm text-white/70">
+                                        Goes by &ldquo;
+                                        {candidate.preferred_name}&rdquo;
+                                    </p>
                                 )}
                                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/80">
-                                    <a href={`mailto:${candidate.personal_email}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                                    <a
+                                        href={`mailto:${candidate.personal_email}`}
+                                        className="flex items-center gap-1.5 transition-colors hover:text-white"
+                                    >
                                         <Mail className="h-3.5 w-3.5" />
                                         {candidate.personal_email}
                                     </a>
                                     {candidate.personal_phone && (
-                                        <a href={`tel:${candidate.personal_phone}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                                        <a
+                                            href={`tel:${candidate.personal_phone}`}
+                                            className="flex items-center gap-1.5 transition-colors hover:text-white"
+                                        >
                                             <Phone className="h-3.5 w-3.5" />
                                             {candidate.personal_phone}
                                         </a>
                                     )}
                                 </div>
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <Badge className="bg-white/10 text-white/90 border-white/20 capitalize">
+                                    <Badge className="border-white/20 bg-white/10 text-white/90 capitalize">
                                         {currentStatus.replace(/_/g, ' ')}
                                     </Badge>
-                                    <Badge className="bg-white/10 text-white/90 border-white/20 capitalize">
+                                    <Badge className="border-white/20 bg-white/10 text-white/90 capitalize">
                                         {candidate.source.replace(/_/g, ' ')}
                                     </Badge>
                                     {candidate.source_detail && (
-                                        <Badge className="bg-white/10 text-white/90 border-white/20">
+                                        <Badge className="border-white/20 bg-white/10 text-white/90">
                                             {candidate.source_detail}
                                         </Badge>
                                     )}
@@ -687,40 +1045,72 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
 
                         <div className="flex flex-col items-end gap-4">
                             {/* Action buttons */}
-                            {can.manage && candidate.applications[0]?.status === 'active' && (
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        size="sm"
-                                        className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                                        variant="outline"
-                                        onClick={() => advanceStage(candidate.applications[0].id)}
-                                    >
-                                        Advance <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                                        variant="outline"
-                                        onClick={() => rejectApplication(candidate.applications[0].id)}
-                                    >
-                                        Reject
-                                    </Button>
-                                </div>
-                            )}
+                            {can.manage &&
+                                candidate.applications[0]?.status ===
+                                    'active' && (
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            size="sm"
+                                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                            variant="outline"
+                                            onClick={() =>
+                                                advanceStage(
+                                                    candidate.applications[0]
+                                                        .id,
+                                                )
+                                            }
+                                        >
+                                            Advance{' '}
+                                            <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                            variant="outline"
+                                            onClick={() =>
+                                                rejectApplication(
+                                                    candidate.applications[0]
+                                                        .id,
+                                                )
+                                            }
+                                        >
+                                            Reject
+                                        </Button>
+                                    </div>
+                                )}
 
                             {/* Right side KPIs */}
-                            <div className="hidden md:flex items-center gap-6">
+                            <div className="hidden items-center gap-6 md:flex">
                                 <div className="text-center">
-                                    <p className="text-2xl font-bold">{totalDaysInPipeline ?? Math.round((Date.now() - new Date(candidate.created_at).getTime()) / 86400000)}</p>
-                                    <p className="text-xs text-white/70">Days in Pipeline</p>
+                                    <p className="text-2xl font-bold">
+                                        {totalDaysInPipeline ??
+                                            Math.round(
+                                                (Date.now() -
+                                                    new Date(
+                                                        candidate.created_at,
+                                                    ).getTime()) /
+                                                    86400000,
+                                            )}
+                                    </p>
+                                    <p className="text-xs text-white/70">
+                                        Days in Pipeline
+                                    </p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-2xl font-bold">{candidate.applications.length}</p>
-                                    <p className="text-xs text-white/70">Applications</p>
+                                    <p className="text-2xl font-bold">
+                                        {candidate.applications.length}
+                                    </p>
+                                    <p className="text-xs text-white/70">
+                                        Applications
+                                    </p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-2xl font-bold">{totalInterviews}</p>
-                                    <p className="text-xs text-white/70">Interviews</p>
+                                    <p className="text-2xl font-bold">
+                                        {totalInterviews}
+                                    </p>
+                                    <p className="text-xs text-white/70">
+                                        Interviews
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -729,7 +1119,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
 
                 {/* Tab bar - Full width, no sidebar */}
                 <Tabs defaultValue="applications" className="space-y-4">
-                    <TabsList className="flex flex-wrap h-auto gap-1 w-full">
+                    <TabsList className="flex h-auto w-full flex-wrap gap-1">
                         <TabsTrigger value="applications" className="gap-1.5">
                             <Briefcase className="h-4 w-4" />
                             Applications
@@ -769,93 +1159,179 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                         ) : (
                             candidate.applications.map((app) => (
                                 <Card key={app.id} className="overflow-hidden">
-                                    <CardHeader className="bg-muted/30 border-b">
+                                    <CardHeader className="border-b bg-muted/30">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
                                                 <CardTitle className="flex items-center gap-2 text-base">
                                                     <Briefcase className="h-4 w-4" />
                                                     {app.position_title}
-                                                    {app.position_role && <Badge variant="outline" className="text-xs">{app.position_role}</Badge>}
+                                                    {app.position_role && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-xs"
+                                                        >
+                                                            {app.position_role}
+                                                        </Badge>
+                                                    )}
                                                 </CardTitle>
                                                 {/* Job posting link */}
                                                 {app.job_posting ? (
                                                     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
                                                         <Link
                                                             href={`/hr/job-postings/${app.job_posting.id}`}
-                                                            className="text-primary hover:underline font-medium"
+                                                            className="font-medium text-primary hover:underline"
                                                         >
-                                                            {app.job_posting.title}
+                                                            {
+                                                                app.job_posting
+                                                                    .title
+                                                            }
                                                         </Link>
-                                                        {app.job_posting.department && (
-                                                            <Badge variant="secondary" className="text-xs">{app.job_posting.department}</Badge>
+                                                        {app.job_posting
+                                                            .department && (
+                                                            <Badge
+                                                                variant="secondary"
+                                                                className="text-xs"
+                                                            >
+                                                                {
+                                                                    app
+                                                                        .job_posting
+                                                                        .department
+                                                                }
+                                                            </Badge>
                                                         )}
-                                                        {app.job_posting.location && (
-                                                            <span className="text-xs text-muted-foreground">{app.job_posting.location}</span>
+                                                        {app.job_posting
+                                                            .location && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {
+                                                                    app
+                                                                        .job_posting
+                                                                        .location
+                                                                }
+                                                            </span>
                                                         )}
                                                     </div>
                                                 ) : (
                                                     <div className="mt-1.5">
-                                                        <Badge variant="outline" className="text-xs">Direct Application</Badge>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-xs"
+                                                        >
+                                                            Direct Application
+                                                        </Badge>
                                                     </div>
                                                 )}
                                                 <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{app.applied_at}</span>
-                                                    {app.target_site && <span>Site: {app.target_site.name}</span>}
-                                                    {app.interview_kit && <span>Kit: {app.interview_kit.name}</span>}
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {app.applied_at}
+                                                    </span>
+                                                    {app.target_site && (
+                                                        <span>
+                                                            Site:{' '}
+                                                            {
+                                                                app.target_site
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                    )}
+                                                    {app.interview_kit && (
+                                                        <span>
+                                                            Kit:{' '}
+                                                            {
+                                                                app
+                                                                    .interview_kit
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                    )}
                                                     {app.cv_original_name && (
                                                         <span className="flex items-center gap-1">
                                                             <FileText className="h-3 w-3" />
-                                                            {app.cv_original_name}
+                                                            {
+                                                                app.cv_original_name
+                                                            }
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Badge variant={app.status === 'active' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{app.status}</Badge>
-                                                {can.manage && app.status === 'active' && (
-                                                    <>
-                                                        {app.stage === 'offer_pending' && !app.offer && (
-                                                            <Button size="sm" variant="outline" asChild>
-                                                                <Link href={`/hr/recruitment/applications/${app.id}/offer/create`}>
-                                                                    <Gift className="mr-1 h-3 w-3" /> Create Offer
-                                                                </Link>
-                                                            </Button>
-                                                        )}
-                                                    </>
-                                                )}
+                                                <Badge
+                                                    variant={
+                                                        app.status === 'active'
+                                                            ? 'default'
+                                                            : app.status ===
+                                                                'rejected'
+                                                              ? 'destructive'
+                                                              : 'secondary'
+                                                    }
+                                                    className="capitalize"
+                                                >
+                                                    {app.status}
+                                                </Badge>
+                                                {can.manage &&
+                                                    app.status === 'active' && (
+                                                        <>
+                                                            {app.stage ===
+                                                                'offer_pending' &&
+                                                                !app.offer && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        asChild
+                                                                    >
+                                                                        <Link
+                                                                            href={`/hr/recruitment/applications/${app.id}/offer/create`}
+                                                                        >
+                                                                            <Gift className="mr-1 h-3 w-3" />{' '}
+                                                                            Create
+                                                                            Offer
+                                                                        </Link>
+                                                                    </Button>
+                                                                )}
+                                                        </>
+                                                    )}
                                             </div>
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="p-5 space-y-5">
+                                    <CardContent className="space-y-5 p-5">
                                         {/* Pipeline + Next Steps side by side */}
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                             <div>
-                                                <PipelineStepper currentStage={app.stage} />
+                                                <PipelineStepper
+                                                    currentStage={app.stage}
+                                                />
                                             </div>
-                                            <div>
-                                                {renderNextSteps(app)}
-                                            </div>
+                                            <div>{renderNextSteps(app)}</div>
                                         </div>
 
                                         {/* Cover Letter (collapsible) */}
                                         {app.cover_letter && (
                                             <div className="rounded-lg border">
-                                                <button
+                                                <Button
                                                     type="button"
-                                                    onClick={() => toggleCoverLetter(app.id)}
-                                                    className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors"
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        toggleCoverLetter(
+                                                            app.id,
+                                                        )
+                                                    }
+                                                    className="h-auto w-full justify-between rounded-none px-4 py-2.5 text-sm font-medium"
                                                 >
                                                     <span className="flex items-center gap-1.5">
                                                         <FileText className="h-3.5 w-3.5" />
                                                         Cover Letter
                                                     </span>
-                                                    {expandedCoverLetters[app.id] ? (
+                                                    {expandedCoverLetters[
+                                                        app.id
+                                                    ] ? (
                                                         <ChevronUp className="h-4 w-4" />
                                                     ) : (
                                                         <ChevronDown className="h-4 w-4" />
                                                     )}
-                                                </button>
-                                                {expandedCoverLetters[app.id] && (
+                                                </Button>
+                                                {expandedCoverLetters[
+                                                    app.id
+                                                ] && (
                                                     <div className="border-t px-4 py-3 text-sm whitespace-pre-wrap text-muted-foreground">
                                                         {app.cover_letter}
                                                     </div>
@@ -864,93 +1340,233 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                         )}
 
                                         {/* Screening Answers (collapsible) */}
-                                        {app.screening_answers && Object.keys(app.screening_answers).length > 0 && (
-                                            <div className="rounded-lg border">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => toggleScreening(app.id)}
-                                                    className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors"
-                                                >
-                                                    <span className="flex items-center gap-1.5">
-                                                        <MessageSquare className="h-3.5 w-3.5" />
-                                                        Screening Answers ({Object.keys(app.screening_answers).length})
-                                                    </span>
-                                                    {expandedScreening[app.id] ? (
-                                                        <ChevronUp className="h-4 w-4" />
-                                                    ) : (
-                                                        <ChevronDown className="h-4 w-4" />
+                                        {app.screening_answers &&
+                                            Object.keys(app.screening_answers)
+                                                .length > 0 && (
+                                                <div className="rounded-lg border">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            toggleScreening(
+                                                                app.id,
+                                                            )
+                                                        }
+                                                        className="h-auto w-full justify-between rounded-none px-4 py-2.5 text-sm font-medium"
+                                                    >
+                                                        <span className="flex items-center gap-1.5">
+                                                            <MessageSquare className="h-3.5 w-3.5" />
+                                                            Screening Answers (
+                                                            {
+                                                                Object.keys(
+                                                                    app.screening_answers,
+                                                                ).length
+                                                            }
+                                                            )
+                                                        </span>
+                                                        {expandedScreening[
+                                                            app.id
+                                                        ] ? (
+                                                            <ChevronUp className="h-4 w-4" />
+                                                        ) : (
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                    {expandedScreening[
+                                                        app.id
+                                                    ] && (
+                                                        <div className="space-y-3 border-t px-4 py-3">
+                                                            {Object.entries(
+                                                                app.screening_answers,
+                                                            ).map(
+                                                                ([
+                                                                    question,
+                                                                    answer,
+                                                                ]) => (
+                                                                    <div
+                                                                        key={
+                                                                            question
+                                                                        }
+                                                                    >
+                                                                        <p className="text-xs font-medium text-muted-foreground">
+                                                                            {
+                                                                                question
+                                                                            }
+                                                                        </p>
+                                                                        <p className="mt-0.5 text-sm">
+                                                                            {
+                                                                                answer
+                                                                            }
+                                                                        </p>
+                                                                    </div>
+                                                                ),
+                                                            )}
+                                                        </div>
                                                     )}
-                                                </button>
-                                                {expandedScreening[app.id] && (
-                                                    <div className="border-t px-4 py-3 space-y-3">
-                                                        {Object.entries(app.screening_answers).map(([question, answer]) => (
-                                                            <div key={question}>
-                                                                <p className="text-xs font-medium text-muted-foreground">{question}</p>
-                                                                <p className="mt-0.5 text-sm">{answer}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                                </div>
+                                            )}
 
                                         {/* Interviews */}
                                         {app.interviews.length > 0 && (
                                             <div>
-                                                <h4 className="mb-3 text-sm font-semibold flex items-center gap-1.5">
+                                                <h4 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
                                                     <UserCheck className="h-4 w-4" />
-                                                    Interviews ({app.interviews.length})
+                                                    Interviews (
+                                                    {app.interviews.length})
                                                 </h4>
                                                 <div className="space-y-2">
-                                                    {app.interviews.map((interview) => (
-                                                        <div key={interview.id} className="rounded-lg border p-3 hover:bg-muted/30 transition-colors">
-                                                            <div className="flex items-start justify-between gap-3">
-                                                                <div className="min-w-0">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="font-medium text-sm capitalize">{interview.type.replace('_', ' ')}</span>
-                                                                        <Badge variant={interviewStatusVariants[interview.status] || 'outline'} className="capitalize text-xs">
-                                                                            {interview.status.replace('_', ' ')}
-                                                                        </Badge>
+                                                    {app.interviews.map(
+                                                        (interview) => (
+                                                            <div
+                                                                key={
+                                                                    interview.id
+                                                                }
+                                                                className="rounded-lg border p-3 transition-colors hover:bg-muted/30"
+                                                            >
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="min-w-0">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-sm font-medium capitalize">
+                                                                                {interview.type.replace(
+                                                                                    '_',
+                                                                                    ' ',
+                                                                                )}
+                                                                            </span>
+                                                                            <Badge
+                                                                                variant={
+                                                                                    interviewStatusVariants[
+                                                                                        interview
+                                                                                            .status
+                                                                                    ] ||
+                                                                                    'outline'
+                                                                                }
+                                                                                className="text-xs capitalize"
+                                                                            >
+                                                                                {interview.status.replace(
+                                                                                    '_',
+                                                                                    ' ',
+                                                                                )}
+                                                                            </Badge>
+                                                                        </div>
+                                                                        <div className="mt-1 text-xs text-muted-foreground">
+                                                                            <span>
+                                                                                {
+                                                                                    interview.scheduled_at
+                                                                                }
+                                                                            </span>
+                                                                            {interview.interviewer_name && (
+                                                                                <span>
+                                                                                    {' '}
+                                                                                    with{' '}
+                                                                                    {
+                                                                                        interview.interviewer_name
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {interview
+                                                                            .scores
+                                                                            .length >
+                                                                            0 && (
+                                                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                                                {interview.scores.map(
+                                                                                    (
+                                                                                        score,
+                                                                                    ) => (
+                                                                                        <div
+                                                                                            key={
+                                                                                                score.id
+                                                                                            }
+                                                                                            className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs"
+                                                                                        >
+                                                                                            <Star className="h-3 w-3 fill-amber-400 text-status-warning" />
+                                                                                            <span>
+                                                                                                {score.overall_score ??
+                                                                                                    '-'}
+                                                                                            </span>
+                                                                                            {score.recommendation && (
+                                                                                                <span
+                                                                                                    className={
+                                                                                                        recColors[
+                                                                                                            score
+                                                                                                                .recommendation
+                                                                                                        ] ??
+                                                                                                        'text-muted-foreground'
+                                                                                                    }
+                                                                                                >
+                                                                                                    {score.recommendation.replace(
+                                                                                                        '_',
+                                                                                                        ' ',
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            )}
+                                                                                            {score.interviewer_name && (
+                                                                                                <span className="text-muted-foreground">
+                                                                                                    -{' '}
+                                                                                                    {
+                                                                                                        score.interviewer_name
+                                                                                                    }
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    ),
+                                                                                )}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                        <span>{interview.scheduled_at}</span>
-                                                                        {interview.interviewer_name && <span> with {interview.interviewer_name}</span>}
-                                                                    </div>
-                                                                    {interview.scores.length > 0 && (
-                                                                        <div className="mt-2 flex flex-wrap gap-2">
-                                                                            {interview.scores.map((score) => (
-                                                                                <div key={score.id} className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs">
-                                                                                    <Star className="h-3 w-3 fill-amber-400 text-status-warning" />
-                                                                                    <span>{score.overall_score ?? '-'}</span>
-                                                                                    {score.recommendation && (
-                                                                                        <span className={recColors[score.recommendation] ?? 'text-muted-foreground'}>
-                                                                                            {score.recommendation.replace('_', ' ')}
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {score.interviewer_name && <span className="text-muted-foreground">- {score.interviewer_name}</span>}
-                                                                                </div>
-                                                                            ))}
+                                                                    {can.manage && (
+                                                                        <div className="flex shrink-0 items-center gap-1">
+                                                                            {interview.status ===
+                                                                                'scheduled' && (
+                                                                                <>
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        className="h-7 text-xs"
+                                                                                        onClick={() =>
+                                                                                            updateInterviewStatus(
+                                                                                                interview.id,
+                                                                                                'completed',
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        Complete
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="ghost"
+                                                                                        className="h-7 text-xs"
+                                                                                        onClick={() =>
+                                                                                            updateInterviewStatus(
+                                                                                                interview.id,
+                                                                                                'no_show',
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        No
+                                                                                        Show
+                                                                                    </Button>
+                                                                                </>
+                                                                            )}
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-7 text-xs"
+                                                                                asChild
+                                                                            >
+                                                                                <Link
+                                                                                    href={`/hr/recruitment/interviews/${interview.id}/scorecard`}
+                                                                                >
+                                                                                    <Star className="mr-1 h-3 w-3" />{' '}
+                                                                                    Score
+                                                                                </Link>
+                                                                            </Button>
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                {can.manage && (
-                                                                    <div className="flex items-center gap-1 shrink-0">
-                                                                        {interview.status === 'scheduled' && (
-                                                                            <>
-                                                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateInterviewStatus(interview.id, 'completed')}>Complete</Button>
-                                                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => updateInterviewStatus(interview.id, 'no_show')}>No Show</Button>
-                                                                            </>
-                                                                        )}
-                                                                        <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                                                            <Link href={`/hr/recruitment/interviews/${interview.id}/scorecard`}>
-                                                                                <Star className="mr-1 h-3 w-3" /> Score
-                                                                            </Link>
-                                                                        </Button>
-                                                                    </div>
-                                                                )}
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ),
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -958,31 +1574,92 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                         {/* References */}
                                         {app.reference_checks.length > 0 && (
                                             <div>
-                                                <h4 className="mb-3 text-sm font-semibold flex items-center gap-1.5">
+                                                <h4 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
                                                     <Shield className="h-4 w-4" />
-                                                    Reference Checks ({app.reference_checks.length})
+                                                    Reference Checks (
+                                                    {
+                                                        app.reference_checks
+                                                            .length
+                                                    }
+                                                    )
                                                 </h4>
                                                 <div className="space-y-2">
-                                                    {app.reference_checks.map((ref) => (
-                                                        <div key={ref.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-medium text-sm">{ref.referee_name}</span>
-                                                                    <Badge variant={ref.status === 'completed' ? 'default' : 'outline'} className="capitalize text-xs">{ref.status}</Badge>
+                                                    {app.reference_checks.map(
+                                                        (ref) => (
+                                                            <div
+                                                                key={ref.id}
+                                                                className="flex items-start justify-between gap-3 rounded-lg border p-3"
+                                                            >
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-medium">
+                                                                            {
+                                                                                ref.referee_name
+                                                                            }
+                                                                        </span>
+                                                                        <Badge
+                                                                            variant={
+                                                                                ref.status ===
+                                                                                'completed'
+                                                                                    ? 'default'
+                                                                                    : 'outline'
+                                                                            }
+                                                                            className="text-xs capitalize"
+                                                                        >
+                                                                            {
+                                                                                ref.status
+                                                                            }
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="mt-1 text-xs text-muted-foreground">
+                                                                        {
+                                                                            ref.referee_relationship
+                                                                        }
+                                                                        {ref.referee_phone && (
+                                                                            <span>
+                                                                                {' '}
+                                                                                -{' '}
+                                                                                {
+                                                                                    ref.referee_phone
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                                    {ref.referee_relationship}
-                                                                    {ref.referee_phone && <span> - {ref.referee_phone}</span>}
-                                                                </div>
+                                                                {can.manage &&
+                                                                    ref.status !==
+                                                                        'completed' && (
+                                                                        <div className="flex shrink-0 gap-1">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-7 text-xs"
+                                                                                onClick={() =>
+                                                                                    updateReferenceStatus(
+                                                                                        ref.id,
+                                                                                        'contacted',
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Contacted
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                className="h-7 text-xs"
+                                                                                onClick={() =>
+                                                                                    updateReferenceStatus(
+                                                                                        ref.id,
+                                                                                        'completed',
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Complete
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
                                                             </div>
-                                                            {can.manage && ref.status !== 'completed' && (
-                                                                <div className="flex gap-1 shrink-0">
-                                                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateReferenceStatus(ref.id, 'contacted')}>Contacted</Button>
-                                                                    <Button size="sm" className="h-7 text-xs" onClick={() => updateReferenceStatus(ref.id, 'completed')}>Complete</Button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                        ),
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -990,60 +1667,270 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                         {/* Offer */}
                                         {app.offer && (
                                             <div className="rounded-xl border-2 border-status-success/20 bg-status-success p-4">
-                                                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                                <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                                                     <Gift className="h-4 w-4 text-status-success" />
                                                     Employment Offer
                                                 </h4>
-                                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-                                                    <div><span className="text-xs text-muted-foreground block">Position</span>{app.offer.position_title}</div>
-                                                    <div><span className="text-xs text-muted-foreground block">Type</span><span className="capitalize">{app.offer.employment_type.replace('_', ' ')}</span></div>
-                                                    <div><span className="text-xs text-muted-foreground block">Start Date</span>{app.offer.proposed_start_date}</div>
-                                                    {app.offer.annual_salary && <div><span className="text-xs text-muted-foreground block">Annual Salary</span>{formatCurrency(app.offer.annual_salary)}</div>}
-                                                    {app.offer.hourly_rate && <div><span className="text-xs text-muted-foreground block">Hourly Rate</span>{formatCurrency(app.offer.hourly_rate)}</div>}
-                                                    {app.offer.hours_per_week && <div><span className="text-xs text-muted-foreground block">Hours/Week</span>{app.offer.hours_per_week}h</div>}
-                                                    {app.offer.primary_site && <div><span className="text-xs text-muted-foreground block">Site</span>{app.offer.primary_site.name}</div>}
+                                                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                                                    <div>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Position
+                                                        </span>
+                                                        {
+                                                            app.offer
+                                                                .position_title
+                                                        }
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Type
+                                                        </span>
+                                                        <span className="capitalize">
+                                                            {app.offer.employment_type.replace(
+                                                                '_',
+                                                                ' ',
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-xs text-muted-foreground">
+                                                            Start Date
+                                                        </span>
+                                                        {
+                                                            app.offer
+                                                                .proposed_start_date
+                                                        }
+                                                    </div>
+                                                    {app.offer
+                                                        .annual_salary && (
+                                                        <div>
+                                                            <span className="block text-xs text-muted-foreground">
+                                                                Annual Salary
+                                                            </span>
+                                                            {formatCurrency(
+                                                                app.offer
+                                                                    .annual_salary,
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {app.offer.hourly_rate && (
+                                                        <div>
+                                                            <span className="block text-xs text-muted-foreground">
+                                                                Hourly Rate
+                                                            </span>
+                                                            {formatCurrency(
+                                                                app.offer
+                                                                    .hourly_rate,
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {app.offer
+                                                        .hours_per_week && (
+                                                        <div>
+                                                            <span className="block text-xs text-muted-foreground">
+                                                                Hours/Week
+                                                            </span>
+                                                            {
+                                                                app.offer
+                                                                    .hours_per_week
+                                                            }
+                                                            h
+                                                        </div>
+                                                    )}
+                                                    {app.offer.primary_site && (
+                                                        <div>
+                                                            <span className="block text-xs text-muted-foreground">
+                                                                Site
+                                                            </span>
+                                                            {
+                                                                app.offer
+                                                                    .primary_site
+                                                                    .name
+                                                            }
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                    <Badge variant={app.offer.approval_status === 'approved' ? 'default' : 'secondary'} className="capitalize">{app.offer.approval_status}</Badge>
-                                                    {app.offer.sent_at && <Badge variant="outline"><Send className="mr-1 h-3 w-3" />Sent {app.offer.sent_at}</Badge>}
+                                                    <Badge
+                                                        variant={
+                                                            app.offer
+                                                                .approval_status ===
+                                                            'approved'
+                                                                ? 'default'
+                                                                : 'secondary'
+                                                        }
+                                                        className="capitalize"
+                                                    >
+                                                        {
+                                                            app.offer
+                                                                .approval_status
+                                                        }
+                                                    </Badge>
+                                                    {app.offer.sent_at && (
+                                                        <Badge variant="outline">
+                                                            <Send className="mr-1 h-3 w-3" />
+                                                            Sent{' '}
+                                                            {app.offer.sent_at}
+                                                        </Badge>
+                                                    )}
                                                     {app.offer.response && (
-                                                        <Badge variant={app.offer.response === 'accepted' ? 'default' : 'destructive'} className="capitalize">{app.offer.response}</Badge>
+                                                        <Badge
+                                                            variant={
+                                                                app.offer
+                                                                    .response ===
+                                                                'accepted'
+                                                                    ? 'default'
+                                                                    : 'destructive'
+                                                            }
+                                                            className="capitalize"
+                                                        >
+                                                            {app.offer.response}
+                                                        </Badge>
                                                     )}
                                                     {app.offer.portal_url && (
-                                                        <a href={app.offer.portal_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                                                            <ExternalLink className="h-3 w-3" /> Candidate Portal
+                                                        <a
+                                                            href={
+                                                                app.offer
+                                                                    .portal_url
+                                                            }
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                                        >
+                                                            <ExternalLink className="h-3 w-3" />{' '}
+                                                            Candidate Portal
                                                         </a>
                                                     )}
-                                                    {app.offer.offer_letter_name && (
-                                                        <a href={`/hr/recruitment/offers/${app.offer.id}/letter`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                                                            <FileText className="h-3 w-3" /> {app.offer.offer_letter_name}
+                                                    {app.offer
+                                                        .offer_letter_name && (
+                                                        <a
+                                                            href={`/hr/recruitment/offers/${app.offer.id}/letter`}
+                                                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                                        >
+                                                            <FileText className="h-3 w-3" />{' '}
+                                                            {
+                                                                app.offer
+                                                                    .offer_letter_name
+                                                            }
                                                         </a>
                                                     )}
                                                 </div>
                                                 {can.manage && (
                                                     <div className="mt-3 flex flex-wrap gap-2">
-                                                        {app.offer.approval_status !== 'approved' && (
-                                                            <Button size="sm" variant="outline" onClick={() => approveOffer(app.offer!.id)}>Approve</Button>
+                                                        {app.offer
+                                                            .approval_status !==
+                                                            'approved' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() =>
+                                                                    approveOffer(
+                                                                        app
+                                                                            .offer!
+                                                                            .id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                Approve
+                                                            </Button>
                                                         )}
-                                                        {app.offer.approval_status === 'approved' && !app.offer.sent_at && (
-                                                            <Button size="sm" onClick={() => sendOffer(app.offer!.id)}><Send className="mr-1 h-3.5 w-3.5" />Send Offer</Button>
-                                                        )}
-                                                        {app.offer.sent_at && !app.offer.response && (
-                                                            <>
-                                                                <Button size="sm" onClick={() => recordOfferResponse(app.offer!.id, 'accepted')}>Mark Accepted</Button>
-                                                                <Button size="sm" variant="secondary" onClick={() => recordOfferResponse(app.offer!.id, 'declined')}>Declined</Button>
-                                                                <Button size="sm" variant="ghost" onClick={() => recordOfferResponse(app.offer!.id, 'withdrawn')}>Withdrawn</Button>
-                                                            </>
-                                                        )}
-                                                        {app.offer.response === 'accepted' && (
-                                                            <Button size="sm" variant="outline" onClick={() => convertOffer(app.offer!.id)}>
-                                                                <UserCheck className="mr-1 h-3.5 w-3.5" /> Convert to Employee
+                                                        {app.offer
+                                                            .approval_status ===
+                                                            'approved' &&
+                                                            !app.offer
+                                                                .sent_at && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        sendOffer(
+                                                                            app
+                                                                                .offer!
+                                                                                .id,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Send className="mr-1 h-3.5 w-3.5" />
+                                                                    Send Offer
+                                                                </Button>
+                                                            )}
+                                                        {app.offer.sent_at &&
+                                                            !app.offer
+                                                                .response && (
+                                                                <>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            recordOfferResponse(
+                                                                                app
+                                                                                    .offer!
+                                                                                    .id,
+                                                                                'accepted',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Mark
+                                                                        Accepted
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="secondary"
+                                                                        onClick={() =>
+                                                                            recordOfferResponse(
+                                                                                app
+                                                                                    .offer!
+                                                                                    .id,
+                                                                                'declined',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Declined
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() =>
+                                                                            recordOfferResponse(
+                                                                                app
+                                                                                    .offer!
+                                                                                    .id,
+                                                                                'withdrawn',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Withdrawn
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        {app.offer.response ===
+                                                            'accepted' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() =>
+                                                                    convertOffer(
+                                                                        app
+                                                                            .offer!
+                                                                            .id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <UserCheck className="mr-1 h-3.5 w-3.5" />{' '}
+                                                                Convert to
+                                                                Employee
                                                             </Button>
                                                         )}
                                                     </div>
                                                 )}
                                                 {app.offer.signed_full_name && (
-                                                    <p className="mt-2 text-xs text-muted-foreground">Signed by: {app.offer.signed_full_name} {app.offer.signed_at && `on ${app.offer.signed_at}`}</p>
+                                                    <p className="mt-2 text-xs text-muted-foreground">
+                                                        Signed by:{' '}
+                                                        {
+                                                            app.offer
+                                                                .signed_full_name
+                                                        }{' '}
+                                                        {app.offer.signed_at &&
+                                                            `on ${app.offer.signed_at}`}
+                                                    </p>
                                                 )}
                                             </div>
                                         )}
@@ -1058,12 +1945,21 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                         {/* Header with upload button */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="text-lg font-semibold">Documents</h3>
-                                <p className="text-sm text-muted-foreground">{documents.length} document{documents.length !== 1 ? 's' : ''} on file</p>
+                                <h3 className="text-lg font-semibold">
+                                    Documents
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {documents.length} document
+                                    {documents.length !== 1 ? 's' : ''} on file
+                                </p>
                             </div>
                             {can.manage && (
-                                <Button onClick={() => setShowUploadDialog(true)} className="gap-1.5">
-                                    <Upload className="h-4 w-4" /> Upload Document
+                                <Button
+                                    onClick={() => setShowUploadDialog(true)}
+                                    className="gap-1.5"
+                                >
+                                    <Upload className="h-4 w-4" /> Upload
+                                    Document
                                 </Button>
                             )}
                         </div>
@@ -1071,9 +1967,56 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                         {/* Summary stat cards */}
                         {documents.length > 0 && (
                             <div className="grid grid-cols-3 gap-3">
-                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-primary">{documents.length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p></CardContent></Card>
-                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-status-warning">{documents.filter(d => d.expires_at && !isExpired(d.expires_at) && new Date(d.expires_at) <= new Date(Date.now() + 30 * 86400000)).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expiring</p></CardContent></Card>
-                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-status-critical">{documents.filter(d => d.is_expired).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expired</p></CardContent></Card>
+                                <Card>
+                                    <CardContent className="pt-4 text-center">
+                                        <p className="text-2xl font-bold text-primary">
+                                            {documents.length}
+                                        </p>
+                                        <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                            Total
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 text-center">
+                                        <p className="text-2xl font-bold text-status-warning">
+                                            {
+                                                documents.filter(
+                                                    (d) =>
+                                                        d.expires_at &&
+                                                        !isExpired(
+                                                            d.expires_at,
+                                                        ) &&
+                                                        new Date(
+                                                            d.expires_at,
+                                                        ) <=
+                                                            new Date(
+                                                                Date.now() +
+                                                                    30 *
+                                                                        86400000,
+                                                            ),
+                                                ).length
+                                            }
+                                        </p>
+                                        <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                            Expiring
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 text-center">
+                                        <p className="text-2xl font-bold text-status-critical">
+                                            {
+                                                documents.filter(
+                                                    (d) => d.is_expired,
+                                                ).length
+                                            }
+                                        </p>
+                                        <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                            Expired
+                                        </p>
+                                    </CardContent>
+                                </Card>
                             </div>
                         )}
 
@@ -1082,11 +2025,24 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                             <Card>
                                 <CardContent className="py-12 text-center text-muted-foreground">
                                     <FolderOpen className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                    <p className="font-medium">No documents uploaded yet</p>
-                                    <p className="text-sm mt-1">Upload CVs, qualifications, police vetting, and other documents.</p>
+                                    <p className="font-medium">
+                                        No documents uploaded yet
+                                    </p>
+                                    <p className="mt-1 text-sm">
+                                        Upload CVs, qualifications, police
+                                        vetting, and other documents.
+                                    </p>
                                     {can.manage && (
-                                        <Button onClick={() => setShowUploadDialog(true)} variant="outline" size="sm" className="mt-4 gap-1.5">
-                                            <Upload className="h-4 w-4" /> Upload Document
+                                        <Button
+                                            onClick={() =>
+                                                setShowUploadDialog(true)
+                                            }
+                                            variant="outline"
+                                            size="sm"
+                                            className="mt-4 gap-1.5"
+                                        >
+                                            <Upload className="h-4 w-4" />{' '}
+                                            Upload Document
                                         </Button>
                                     )}
                                 </CardContent>
@@ -1094,78 +2050,230 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                         ) : (
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                 {documents.map((doc) => {
-                                    const docExpired = isExpired(doc.expires_at);
-                                    const iconClass = doc.mime_type?.includes('pdf') ? 'text-status-critical' : doc.mime_type?.includes('image') ? 'text-status-info' : 'text-muted-foreground';
-                                    const IconComp = doc.mime_type?.includes('pdf') ? FileText : doc.mime_type?.includes('image') ? FileImage : File;
+                                    const docExpired = isExpired(
+                                        doc.expires_at,
+                                    );
+                                    const iconClass = doc.mime_type?.includes(
+                                        'pdf',
+                                    )
+                                        ? 'text-status-critical'
+                                        : doc.mime_type?.includes('image')
+                                          ? 'text-status-info'
+                                          : 'text-muted-foreground';
+                                    const IconComp = doc.mime_type?.includes(
+                                        'pdf',
+                                    )
+                                        ? FileText
+                                        : doc.mime_type?.includes('image')
+                                          ? FileImage
+                                          : File;
                                     return (
-                                        <div key={doc.id} className="group relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50">
-                                            <IconComp className={`h-8 w-8 ${iconClass}`} />
-                                            <p className="text-xs font-medium text-center truncate w-full">{doc.original_name}</p>
+                                        <Card
+                                            key={doc.id}
+                                            className="group relative flex flex-col items-center gap-2 p-4 transition-colors hover:bg-muted/50"
+                                        >
+                                            <IconComp
+                                                className={`h-8 w-8 ${iconClass}`}
+                                            />
+                                            <p className="w-full truncate text-center text-xs font-medium">
+                                                {doc.original_name}
+                                            </p>
                                             <div className="flex flex-wrap justify-center gap-1">
-                                                <Badge variant="outline" className="text-[10px]">{doc.category_label}</Badge>
-                                                {docExpired && <Badge variant="outline" className="text-[10px] border-status-critical/30 bg-status-critical-bg text-status-critical">Expired</Badge>}
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[10px]"
+                                                >
+                                                    {doc.category_label}
+                                                </Badge>
+                                                {docExpired && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
+                                                    >
+                                                        Expired
+                                                    </Badge>
+                                                )}
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground">{doc.formatted_size}</p>
-                                            {doc.notes && <p className="text-[10px] text-muted-foreground italic text-center truncate w-full">{doc.notes}</p>}
+                                            <p className="text-[10px] text-muted-foreground">
+                                                {doc.formatted_size}
+                                            </p>
+                                            {doc.notes && (
+                                                <p className="w-full truncate text-center text-[10px] text-muted-foreground italic">
+                                                    {doc.notes}
+                                                </p>
+                                            )}
                                             {/* Hover actions */}
-                                            <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                                <a href={`/hr/recruitment/documents/${doc.id}/download`}>
-                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3 w-3" /></Button>
+                                            <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <a
+                                                    href={`/hr/recruitment/documents/${doc.id}/download`}
+                                                >
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0"
+                                                    >
+                                                        <Download className="h-3 w-3" />
+                                                    </Button>
                                                 </a>
                                                 {can.manage && (
-                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-status-critical" onClick={() => deleteDocument(doc.id)}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 text-status-critical"
+                                                        onClick={() =>
+                                                            deleteDocument(
+                                                                doc.id,
+                                                            )
+                                                        }
+                                                    >
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>
                                                 )}
                                             </div>
-                                        </div>
+                                        </Card>
                                     );
                                 })}
                             </div>
                         )}
 
                         {/* Upload Dialog */}
-                        <Dialog open={showUploadDialog} onOpenChange={v => !v && setShowUploadDialog(false)}>
+                        <Dialog
+                            open={showUploadDialog}
+                            onOpenChange={(v) =>
+                                !v && setShowUploadDialog(false)
+                            }
+                        >
                             <DialogContent className="sm:max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>Upload Document</DialogTitle>
-                                    <DialogDescription>Upload a document for {fullName}. Accepted formats: PDF, DOC, DOCX, JPG, PNG (max 20MB).</DialogDescription>
+                                    <DialogDescription>
+                                        Upload a document for {fullName}.
+                                        Accepted formats: PDF, DOC, DOCX, JPG,
+                                        PNG (max 20MB).
+                                    </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={(e) => { e.preventDefault(); handleDocumentUpload(e); setShowUploadDialog(false); }} className="space-y-4">
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleDocumentUpload(e);
+                                        setShowUploadDialog(false);
+                                    }}
+                                    className="space-y-4"
+                                >
                                     <div className="space-y-2">
                                         <Label>File *</Label>
-                                        <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center hover:border-primary/50 transition-colors">
-                                            <Upload className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
-                                            <Input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="mx-auto max-w-xs" onChange={(e) => documentForm.setData('file', e.target.files?.[0] ?? null)} />
+                                        <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center transition-colors hover:border-primary/50">
+                                            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+                                            <Input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                className="mx-auto max-w-xs"
+                                                onChange={(e) =>
+                                                    documentForm.setData(
+                                                        'file',
+                                                        e.target.files?.[0] ??
+                                                            null,
+                                                    )
+                                                }
+                                            />
                                         </div>
-                                        {documentForm.errors.file && <p className="text-xs text-status-critical">{documentForm.errors.file}</p>}
+                                        {documentForm.errors.file && (
+                                            <p className="text-xs text-status-critical">
+                                                {documentForm.errors.file}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <div className="space-y-2">
                                             <Label>Category *</Label>
-                                            <Select value={documentForm.data.category} onValueChange={(value) => documentForm.setData('category', value)}>
-                                                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                            <Select
+                                                value={
+                                                    documentForm.data.category
+                                                }
+                                                onValueChange={(value) =>
+                                                    documentForm.setData(
+                                                        'category',
+                                                        value,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select category" />
+                                                </SelectTrigger>
                                                 <SelectContent>
-                                                    {Object.entries(documentCategories ?? {}).map(([key, label]) => (
-                                                        <SelectItem key={key} value={key}>{label as string}</SelectItem>
+                                                    {Object.entries(
+                                                        documentCategories ??
+                                                            {},
+                                                    ).map(([key, label]) => (
+                                                        <SelectItem
+                                                            key={key}
+                                                            value={key}
+                                                        >
+                                                            {label as string}
+                                                        </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {documentForm.errors.category && <p className="text-xs text-status-critical">{documentForm.errors.category}</p>}
+                                            {documentForm.errors.category && (
+                                                <p className="text-xs text-status-critical">
+                                                    {
+                                                        documentForm.errors
+                                                            .category
+                                                    }
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Expiry Date</Label>
-                                            <Input type="date" value={documentForm.data.expires_at} onChange={(e) => documentForm.setData('expires_at', e.target.value)} />
+                                            <Input
+                                                type="date"
+                                                value={
+                                                    documentForm.data.expires_at
+                                                }
+                                                onChange={(e) =>
+                                                    documentForm.setData(
+                                                        'expires_at',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Notes</Label>
-                                        <Input placeholder="Brief description or context..." value={documentForm.data.notes} onChange={(e) => documentForm.setData('notes', e.target.value)} />
+                                        <Input
+                                            placeholder="Brief description or context..."
+                                            value={documentForm.data.notes}
+                                            onChange={(e) =>
+                                                documentForm.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
                                     </div>
                                     <DialogFooter>
-                                        <Button type="button" variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
-                                        <Button type="submit" disabled={!documentForm.data.file || !documentForm.data.category || documentForm.processing}>
-                                            {documentForm.processing ? 'Uploading...' : 'Upload'}
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setShowUploadDialog(false)
+                                            }
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            disabled={
+                                                !documentForm.data.file ||
+                                                !documentForm.data.category ||
+                                                documentForm.processing
+                                            }
+                                        >
+                                            {documentForm.processing
+                                                ? 'Uploading...'
+                                                : 'Upload'}
                                         </Button>
                                     </DialogFooter>
                                 </form>
@@ -1176,16 +2284,28 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {/* Timeline Tab */}
                     <TabsContent value="timeline" className="space-y-4">
                         <Card>
-                            <CardHeader><CardTitle className="text-base">Activity Timeline</CardTitle></CardHeader>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Activity Timeline
+                                </CardTitle>
+                            </CardHeader>
                             <CardContent>
                                 {activityLog && activityLog.length > 0 ? (
                                     <div className="space-y-0">
                                         {activityLog.map((entry, i) => (
-                                            <ActivityItem key={i} type={entry.type} description={entry.description} timestamp={entry.timestamp} actor={entry.actor} />
+                                            <ActivityItem
+                                                key={i}
+                                                type={entry.type}
+                                                description={entry.description}
+                                                timestamp={entry.timestamp}
+                                                actor={entry.actor}
+                                            />
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No activity recorded yet.
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
@@ -1194,18 +2314,51 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                     {/* Notes Tab */}
                     <TabsContent value="notes" className="space-y-4">
                         <Card>
-                            <CardHeader><CardTitle className="text-base">Candidate Notes</CardTitle></CardHeader>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Candidate Notes
+                                </CardTitle>
+                            </CardHeader>
                             <CardContent className="space-y-4">
                                 {candidate.notes && (
-                                    <div className="rounded-lg bg-muted/50 p-4 text-sm whitespace-pre-wrap">{candidate.notes}</div>
+                                    <div className="rounded-lg bg-muted/50 p-4 text-sm whitespace-pre-wrap">
+                                        {candidate.notes}
+                                    </div>
                                 )}
                                 {can.manage && (
                                     <div className="space-y-2">
-                                        <Textarea placeholder="Add a note..." value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} />
-                                        <Button size="sm" disabled={!noteText.trim()} onClick={() => {
-                                            router.put(`/hr/recruitment/candidates/${candidate.id}`, { notes: (candidate.notes ? candidate.notes + '\n\n' : '') + noteText.trim() }, { preserveScroll: true, onSuccess: () => setNoteText('') });
-                                        }}>
-                                            <MessageSquare className="mr-1 h-3.5 w-3.5" /> Add Note
+                                        <Textarea
+                                            placeholder="Add a note..."
+                                            value={noteText}
+                                            onChange={(e) =>
+                                                setNoteText(e.target.value)
+                                            }
+                                            rows={3}
+                                        />
+                                        <Button
+                                            size="sm"
+                                            disabled={!noteText.trim()}
+                                            onClick={() => {
+                                                router.put(
+                                                    `/hr/recruitment/candidates/${candidate.id}`,
+                                                    {
+                                                        notes:
+                                                            (candidate.notes
+                                                                ? candidate.notes +
+                                                                  '\n\n'
+                                                                : '') +
+                                                            noteText.trim(),
+                                                    },
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess: () =>
+                                                            setNoteText(''),
+                                                    },
+                                                );
+                                            }}
+                                        >
+                                            <MessageSquare className="mr-1 h-3.5 w-3.5" />{' '}
+                                            Add Note
                                         </Button>
                                     </div>
                                 )}

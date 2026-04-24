@@ -1,15 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import { CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface Milestone {
@@ -65,7 +69,13 @@ const milestoneIcons: Record<string, React.ReactNode> = {
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 export default function PipShow({ pip, can }: Props) {
@@ -80,17 +90,28 @@ export default function PipShow({ pip, can }: Props) {
     ];
 
     const handleMilestoneUpdate = (milestoneId: number, status: string) => {
-        router.put(`/hr/performance/pips/milestones/${milestoneId}`, { status }, { preserveScroll: true });
+        router.put(
+            `/hr/performance/pips/milestones/${milestoneId}`,
+            { status },
+            { preserveScroll: true },
+        );
     };
 
     const handleComplete = (e: React.FormEvent) => {
         e.preventDefault();
-        completeForm.post(`/hr/performance/pips/${pip.id}/complete`, { preserveScroll: true });
+        completeForm.post(`/hr/performance/pips/${pip.id}/complete`, {
+            preserveScroll: true,
+        });
     };
 
     const totalMilestones = pip.milestones.length;
-    const metMilestones = pip.milestones.filter((m) => m.status === 'met').length;
-    const progressPct = totalMilestones > 0 ? Math.round((metMilestones / totalMilestones) * 100) : 0;
+    const metMilestones = pip.milestones.filter(
+        (m) => m.status === 'met',
+    ).length;
+    const progressPct =
+        totalMilestones > 0
+            ? Math.round((metMilestones / totalMilestones) * 100)
+            : 0;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -103,15 +124,27 @@ export default function PipShow({ pip, can }: Props) {
                         <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                             <span>{pip.employee?.name}</span>
                             <span>|</span>
-                            <span>{formatDate(pip.start_date)} - {formatDate(pip.end_date)}</span>
-                            <Badge className={statusColors[pip.status] || 'bg-muted'} variant="outline">
+                            <span>
+                                {formatDate(pip.start_date)} -{' '}
+                                {formatDate(pip.end_date)}
+                            </span>
+                            <Badge
+                                className={
+                                    statusColors[pip.status] || 'bg-muted'
+                                }
+                                variant="outline"
+                            >
                                 {pip.status.replace('_', ' ')}
                             </Badge>
                         </div>
                     </div>
 
                     {can.manage && pip.status !== 'completed' && (
-                        <Button size="sm" variant="outline" onClick={() => setCompleting(!completing)}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCompleting(!completing)}
+                        >
                             Complete PIP
                         </Button>
                     )}
@@ -120,45 +153,78 @@ export default function PipShow({ pip, can }: Props) {
                 {/* Overview */}
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Plan Details</CardTitle></CardHeader>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Plan Details
+                            </CardTitle>
+                        </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div>
-                                <span className="font-medium text-muted-foreground">Manager:</span>{' '}
+                                <span className="font-medium text-muted-foreground">
+                                    Manager:
+                                </span>{' '}
                                 {pip.manager?.name ?? '-'}
                             </div>
                             <div>
-                                <span className="font-medium text-muted-foreground">Review Date:</span>{' '}
+                                <span className="font-medium text-muted-foreground">
+                                    Review Date:
+                                </span>{' '}
                                 {formatDate(pip.review_date)}
                             </div>
                             <div>
-                                <span className="font-medium text-muted-foreground">Reason:</span>
-                                <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.reason}</p>
+                                <span className="font-medium text-muted-foreground">
+                                    Reason:
+                                </span>
+                                <p className="mt-1 whitespace-pre-wrap text-foreground">
+                                    {pip.reason}
+                                </p>
                             </div>
                             <div>
-                                <span className="font-medium text-muted-foreground">Expectations:</span>
-                                <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.expectations}</p>
+                                <span className="font-medium text-muted-foreground">
+                                    Expectations:
+                                </span>
+                                <p className="mt-1 whitespace-pre-wrap text-foreground">
+                                    {pip.expectations}
+                                </p>
                             </div>
                             {pip.support_offered && (
                                 <div>
-                                    <span className="font-medium text-muted-foreground">Support Offered:</span>
-                                    <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.support_offered}</p>
+                                    <span className="font-medium text-muted-foreground">
+                                        Support Offered:
+                                    </span>
+                                    <p className="mt-1 whitespace-pre-wrap text-foreground">
+                                        {pip.support_offered}
+                                    </p>
                                 </div>
                             )}
                             {pip.consequences && (
                                 <div>
-                                    <span className="font-medium text-muted-foreground">Consequences:</span>
-                                    <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.consequences}</p>
+                                    <span className="font-medium text-muted-foreground">
+                                        Consequences:
+                                    </span>
+                                    <p className="mt-1 whitespace-pre-wrap text-foreground">
+                                        {pip.consequences}
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
 
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Progress</CardTitle></CardHeader>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Progress
+                            </CardTitle>
+                        </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-center">
-                                <div className="text-3xl font-bold">{progressPct}%</div>
-                                <div className="text-sm text-muted-foreground">{metMilestones} of {totalMilestones} milestones met</div>
+                                <div className="text-3xl font-bold">
+                                    {progressPct}%
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    {metMilestones} of {totalMilestones}{' '}
+                                    milestones met
+                                </div>
                             </div>
                             <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                                 <div
@@ -168,10 +234,16 @@ export default function PipShow({ pip, can }: Props) {
                             </div>
                             {pip.outcome && (
                                 <div className="mt-4 rounded-lg border p-3">
-                                    <span className="text-sm font-medium text-muted-foreground">Outcome:</span>
-                                    <Badge className="ml-2" variant="outline">{pip.outcome}</Badge>
+                                    <span className="text-sm font-medium text-muted-foreground">
+                                        Outcome:
+                                    </span>
+                                    <Badge className="ml-2" variant="outline">
+                                        {pip.outcome}
+                                    </Badge>
                                     {pip.outcome_notes && (
-                                        <p className="mt-2 text-sm text-foreground">{pip.outcome_notes}</p>
+                                        <p className="mt-2 text-sm text-foreground">
+                                            {pip.outcome_notes}
+                                        </p>
                                     )}
                                 </div>
                             )}
@@ -182,17 +254,37 @@ export default function PipShow({ pip, can }: Props) {
                 {/* Complete PIP Form */}
                 {completing && (
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Complete PIP</CardTitle></CardHeader>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Complete PIP
+                            </CardTitle>
+                        </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleComplete} className="space-y-3">
+                            <form
+                                onSubmit={handleComplete}
+                                className="space-y-3"
+                            >
                                 <div>
                                     <Label>Outcome</Label>
-                                    <Select value={completeForm.data.outcome} onValueChange={(val) => completeForm.setData('outcome', val)}>
-                                        <SelectTrigger><SelectValue placeholder="Select outcome..." /></SelectTrigger>
+                                    <Select
+                                        value={completeForm.data.outcome}
+                                        onValueChange={(val) =>
+                                            completeForm.setData('outcome', val)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select outcome..." />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="successful">Successful</SelectItem>
-                                            <SelectItem value="unsuccessful">Unsuccessful</SelectItem>
-                                            <SelectItem value="extended">Extended</SelectItem>
+                                            <SelectItem value="successful">
+                                                Successful
+                                            </SelectItem>
+                                            <SelectItem value="unsuccessful">
+                                                Unsuccessful
+                                            </SelectItem>
+                                            <SelectItem value="extended">
+                                                Extended
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -200,13 +292,29 @@ export default function PipShow({ pip, can }: Props) {
                                     <Label>Notes</Label>
                                     <Textarea
                                         value={completeForm.data.outcome_notes}
-                                        onChange={(e) => completeForm.setData('outcome_notes', e.target.value)}
+                                        onChange={(e) =>
+                                            completeForm.setData(
+                                                'outcome_notes',
+                                                e.target.value,
+                                            )
+                                        }
                                         rows={3}
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button type="submit" disabled={completeForm.processing}>Save Outcome</Button>
-                                    <Button type="button" variant="outline" onClick={() => setCompleting(false)}>Cancel</Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={completeForm.processing}
+                                    >
+                                        Save Outcome
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setCompleting(false)}
+                                    >
+                                        Cancel
+                                    </Button>
                                 </div>
                             </form>
                         </CardContent>
@@ -215,59 +323,106 @@ export default function PipShow({ pip, can }: Props) {
 
                 {/* Milestone Timeline */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Milestones</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className="text-base">Milestones</CardTitle>
+                    </CardHeader>
                     <CardContent>
                         {pip.milestones.length === 0 ? (
-                            <p className="text-center text-sm text-muted-foreground">No milestones defined</p>
+                            <p className="text-center text-sm text-muted-foreground">
+                                No milestones defined
+                            </p>
                         ) : (
                             <div className="space-y-4">
                                 {pip.milestones.map((milestone, index) => (
-                                    <div key={milestone.id} className="flex gap-4">
+                                    <div
+                                        key={milestone.id}
+                                        className="flex gap-4"
+                                    >
                                         <div className="flex flex-col items-center">
-                                            {milestoneIcons[milestone.status] || milestoneIcons.pending}
-                                            {index < pip.milestones.length - 1 && (
+                                            {milestoneIcons[milestone.status] ||
+                                                milestoneIcons.pending}
+                                            {index <
+                                                pip.milestones.length - 1 && (
                                                 <div className="mt-1 h-full w-0.5 bg-muted" />
                                             )}
                                         </div>
                                         <div className="flex-1 pb-4">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
-                                                    <div className="font-medium">{milestone.title}</div>
-                                                    <div className="text-sm text-muted-foreground">Due: {formatDate(milestone.due_date)}</div>
+                                                    <div className="font-medium">
+                                                        {milestone.title}
+                                                    </div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        Due:{' '}
+                                                        {formatDate(
+                                                            milestone.due_date,
+                                                        )}
+                                                    </div>
                                                     {milestone.description && (
-                                                        <p className="mt-1 text-sm text-muted-foreground">{milestone.description}</p>
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            {
+                                                                milestone.description
+                                                            }
+                                                        </p>
                                                     )}
                                                     {milestone.reviewer_notes && (
-                                                        <p className="mt-1 text-sm italic text-muted-foreground">
-                                                            Review: {milestone.reviewer_notes}
-                                                            {milestone.reviewer && <> - {milestone.reviewer.name}</>}
+                                                        <p className="mt-1 text-sm text-muted-foreground italic">
+                                                            Review:{' '}
+                                                            {
+                                                                milestone.reviewer_notes
+                                                            }
+                                                            {milestone.reviewer && (
+                                                                <>
+                                                                    {' '}
+                                                                    -{' '}
+                                                                    {
+                                                                        milestone
+                                                                            .reviewer
+                                                                            .name
+                                                                    }
+                                                                </>
+                                                            )}
                                                         </p>
                                                     )}
                                                 </div>
-                                                {can.manage && pip.status !== 'completed' && (
-                                                    <div className="flex gap-1">
-                                                        {milestone.status !== 'met' && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="text-status-success"
-                                                                onClick={() => handleMilestoneUpdate(milestone.id, 'met')}
-                                                            >
-                                                                Met
-                                                            </Button>
-                                                        )}
-                                                        {milestone.status !== 'not_met' && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="text-status-critical"
-                                                                onClick={() => handleMilestoneUpdate(milestone.id, 'not_met')}
-                                                            >
-                                                                Not Met
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                {can.manage &&
+                                                    pip.status !==
+                                                        'completed' && (
+                                                        <div className="flex gap-1">
+                                                            {milestone.status !==
+                                                                'met' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="text-status-success"
+                                                                    onClick={() =>
+                                                                        handleMilestoneUpdate(
+                                                                            milestone.id,
+                                                                            'met',
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Met
+                                                                </Button>
+                                                            )}
+                                                            {milestone.status !==
+                                                                'not_met' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="text-status-critical"
+                                                                    onClick={() =>
+                                                                        handleMilestoneUpdate(
+                                                                            milestone.id,
+                                                                            'not_met',
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Not Met
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                             </div>
                                         </div>
                                     </div>

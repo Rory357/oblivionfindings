@@ -22,21 +22,16 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import {
-    Calendar,
-    Layers,
-    Pencil,
-    Plus,
-    Radio,
-    Settings2,
-    Trash2,
-    X,
-    Zap,
-} from 'lucide-react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 // --- TypeScript Interfaces ---
@@ -136,18 +131,40 @@ interface Props {
     maintenanceWindows: MaintenanceWindowData[];
     playbooks: PlaybookOption[];
     sites: SiteOption[];
-    configOptions: Record<string, Array<{
-        id: number; group: string; value: string; label: string;
-        color: string | null; description: string | null;
-        sort_order: number; is_active: boolean;
-    }>>;
+    configOptions: Record<
+        string,
+        Array<{
+            id: number;
+            group: string;
+            value: string;
+            label: string;
+            color: string | null;
+            description: string | null;
+            sort_order: number;
+            is_active: boolean;
+        }>
+    >;
 }
 
 // --- Helpers ---
 
 const severityOptions = ['low', 'medium', 'high', 'critical'] as const;
-const sourceOptions = ['fleet', 'compliance', 'medication', 'incident', 'device', 'manual', 'integration'] as const;
-const roleOptions = ['control_room_operator', 'control_room_supervisor', 'site_manager', 'clinical_lead', 'on_call_manager'] as const;
+const sourceOptions = [
+    'fleet',
+    'compliance',
+    'medication',
+    'incident',
+    'device',
+    'manual',
+    'integration',
+] as const;
+const roleOptions = [
+    'control_room_operator',
+    'control_room_supervisor',
+    'site_manager',
+    'clinical_lead',
+    'on_call_manager',
+] as const;
 
 const severityColors: Record<string, string> = {
     low: 'bg-muted text-foreground',
@@ -235,9 +252,12 @@ function SignalRuleDialog({
         signal_type_id: rule?.signal_type_id?.toString() ?? '',
         signal_source_id: rule?.signal_source_id?.toString() ?? '',
         priority: rule?.priority?.toString() ?? '100',
-        conditions: rule?.conditions ? JSON.stringify(rule.conditions, null, 2) : '',
+        conditions: rule?.conditions
+            ? JSON.stringify(rule.conditions, null, 2)
+            : '',
         output_severity: rule?.output_severity ?? '',
-        output_escalation_level: rule?.output_escalation_level?.toString() ?? '0',
+        output_escalation_level:
+            rule?.output_escalation_level?.toString() ?? '0',
         output_tier: rule?.output_tier?.toString() ?? '1',
         dedup_window_minutes: rule?.dedup_window_minutes?.toString() ?? '',
         deduplicate: rule?.deduplicate ?? false,
@@ -263,17 +283,26 @@ function SignalRuleDialog({
 
         const data = {
             name: form.name,
-            signal_type_id: form.signal_type_id ? Number(form.signal_type_id) : null,
-            signal_type_code: form.signal_type_id
-                ? signalTypes.find((t) => t.id === Number(form.signal_type_id))?.code ?? null
+            signal_type_id: form.signal_type_id
+                ? Number(form.signal_type_id)
                 : null,
-            signal_source_id: form.signal_source_id ? Number(form.signal_source_id) : null,
+            signal_type_code: form.signal_type_id
+                ? (signalTypes.find((t) => t.id === Number(form.signal_type_id))
+                      ?.code ?? null)
+                : null,
+            signal_source_id: form.signal_source_id
+                ? Number(form.signal_source_id)
+                : null,
             priority: Number(form.priority),
             conditions: parsedConditions,
             output_severity: form.output_severity || null,
-            output_escalation_level: form.output_escalation_level ? Number(form.output_escalation_level) : null,
+            output_escalation_level: form.output_escalation_level
+                ? Number(form.output_escalation_level)
+                : null,
             output_tier: form.output_tier ? Number(form.output_tier) : null,
-            dedup_window_minutes: form.dedup_window_minutes ? Number(form.dedup_window_minutes) : null,
+            dedup_window_minutes: form.dedup_window_minutes
+                ? Number(form.dedup_window_minutes)
+                : null,
             deduplicate: form.deduplicate,
             suppress_in_maintenance: form.suppress_in_maintenance,
             playbook_id: form.playbook_id ? Number(form.playbook_id) : null,
@@ -296,7 +325,9 @@ function SignalRuleDialog({
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{isEdit ? 'Edit Signal Rule' : 'Create Signal Rule'}</DialogTitle>
+                    <DialogTitle>
+                        {isEdit ? 'Edit Signal Rule' : 'Create Signal Rule'}
+                    </DialogTitle>
                     <DialogDescription>
                         {isEdit
                             ? 'Update the configuration for this signal rule.'
@@ -309,7 +340,9 @@ function SignalRuleDialog({
                         <Input
                             id="rule-name"
                             value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, name: e.target.value })
+                            }
                             required
                         />
                     </div>
@@ -319,14 +352,19 @@ function SignalRuleDialog({
                             <Label>Signal Type</Label>
                             <Select
                                 value={form.signal_type_id}
-                                onValueChange={(v) => setForm({ ...form, signal_type_id: v })}
+                                onValueChange={(v) =>
+                                    setForm({ ...form, signal_type_id: v })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Any type" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {signalTypes.map((t) => (
-                                        <SelectItem key={t.id} value={t.id.toString()}>
+                                        <SelectItem
+                                            key={t.id}
+                                            value={t.id.toString()}
+                                        >
                                             {t.name}
                                         </SelectItem>
                                     ))}
@@ -337,14 +375,19 @@ function SignalRuleDialog({
                             <Label>Signal Source</Label>
                             <Select
                                 value={form.signal_source_id}
-                                onValueChange={(v) => setForm({ ...form, signal_source_id: v })}
+                                onValueChange={(v) =>
+                                    setForm({ ...form, signal_source_id: v })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Any source" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {signalSources.map((s) => (
-                                        <SelectItem key={s.id} value={s.id.toString()}>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={s.id.toString()}
+                                        >
                                             {s.name}
                                         </SelectItem>
                                     ))}
@@ -362,7 +405,12 @@ function SignalRuleDialog({
                                 min={0}
                                 max={1000}
                                 value={form.priority}
-                                onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        priority: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -370,7 +418,9 @@ function SignalRuleDialog({
                             <Label>Output Severity</Label>
                             <Select
                                 value={form.output_severity}
-                                onValueChange={(v) => setForm({ ...form, output_severity: v })}
+                                onValueChange={(v) =>
+                                    setForm({ ...form, output_severity: v })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Inherit" />
@@ -378,14 +428,17 @@ function SignalRuleDialog({
                                 <SelectContent>
                                     {severityOptions.map((s) => (
                                         <SelectItem key={s} value={s}>
-                                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                                            {s.charAt(0).toUpperCase() +
+                                                s.slice(1)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="rule-escalation">Escalation Level</Label>
+                            <Label htmlFor="rule-escalation">
+                                Escalation Level
+                            </Label>
                             <Input
                                 id="rule-escalation"
                                 type="number"
@@ -393,7 +446,10 @@ function SignalRuleDialog({
                                 max={10}
                                 value={form.output_escalation_level}
                                 onChange={(e) =>
-                                    setForm({ ...form, output_escalation_level: e.target.value })
+                                    setForm({
+                                        ...form,
+                                        output_escalation_level: e.target.value,
+                                    })
                                 }
                             />
                         </div>
@@ -401,14 +457,19 @@ function SignalRuleDialog({
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="rule-dedup">Dedup Window (min)</Label>
+                            <Label htmlFor="rule-dedup">
+                                Dedup Window (min)
+                            </Label>
                             <Input
                                 id="rule-dedup"
                                 type="number"
                                 min={0}
                                 value={form.dedup_window_minutes}
                                 onChange={(e) =>
-                                    setForm({ ...form, dedup_window_minutes: e.target.value })
+                                    setForm({
+                                        ...form,
+                                        dedup_window_minutes: e.target.value,
+                                    })
                                 }
                                 placeholder="No dedup"
                             />
@@ -417,14 +478,19 @@ function SignalRuleDialog({
                             <Label>Playbook</Label>
                             <Select
                                 value={form.playbook_id}
-                                onValueChange={(v) => setForm({ ...form, playbook_id: v })}
+                                onValueChange={(v) =>
+                                    setForm({ ...form, playbook_id: v })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="None" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {playbooks.map((p) => (
-                                        <SelectItem key={p.id} value={p.id.toString()}>
+                                        <SelectItem
+                                            key={p.id}
+                                            value={p.id.toString()}
+                                        >
                                             {p.name}
                                         </SelectItem>
                                     ))}
@@ -434,13 +500,17 @@ function SignalRuleDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="rule-conditions">Conditions (JSON)</Label>
+                        <Label htmlFor="rule-conditions">
+                            Conditions (JSON)
+                        </Label>
                         <Textarea
                             id="rule-conditions"
                             rows={4}
                             className="font-mono text-sm"
                             value={form.conditions}
-                            onChange={(e) => setForm({ ...form, conditions: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, conditions: e.target.value })
+                            }
                             placeholder='{"site_id": 1, "severity_hint": "critical"}'
                         />
                     </div>
@@ -451,35 +521,54 @@ function SignalRuleDialog({
                                 id="rule-suppress"
                                 checked={form.suppress_in_maintenance}
                                 onCheckedChange={(v) =>
-                                    setForm({ ...form, suppress_in_maintenance: v })
+                                    setForm({
+                                        ...form,
+                                        suppress_in_maintenance: v,
+                                    })
                                 }
                             />
-                            <Label htmlFor="rule-suppress">Suppress during maintenance</Label>
+                            <Label htmlFor="rule-suppress">
+                                Suppress during maintenance
+                            </Label>
                         </div>
                         <div className="flex items-center gap-2">
                             <Switch
                                 id="rule-dedup-toggle"
                                 checked={form.deduplicate}
-                                onCheckedChange={(v) => setForm({ ...form, deduplicate: v })}
+                                onCheckedChange={(v) =>
+                                    setForm({ ...form, deduplicate: v })
+                                }
                             />
-                            <Label htmlFor="rule-dedup-toggle">Deduplicate</Label>
+                            <Label htmlFor="rule-dedup-toggle">
+                                Deduplicate
+                            </Label>
                         </div>
                         <div className="flex items-center gap-2">
                             <Switch
                                 id="rule-active"
                                 checked={form.is_active}
-                                onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+                                onCheckedChange={(v) =>
+                                    setForm({ ...form, is_active: v })
+                                }
                             />
                             <Label htmlFor="rule-active">Active</Label>
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : isEdit ? 'Update Rule' : 'Create Rule'}
+                            {processing
+                                ? 'Saving...'
+                                : isEdit
+                                  ? 'Update Rule'
+                                  : 'Create Rule'}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -511,16 +600,22 @@ function TriageQueueDialog({
         handle_severities: queue?.handle_severities ?? [],
         handle_sources: queue?.handle_sources ?? [],
         assigned_roles: queue?.assigned_roles ?? [],
-        auto_escalate_after_minutes: queue?.auto_escalate_after_minutes?.toString() ?? '',
+        auto_escalate_after_minutes:
+            queue?.auto_escalate_after_minutes?.toString() ?? '',
         escalate_to_queue_id: queue?.escalate_to_queue_id?.toString() ?? '',
         is_active: queue?.is_active ?? true,
     });
     const [processing, setProcessing] = useState(false);
 
-    function toggleArrayItem(field: 'handle_severities' | 'handle_sources' | 'assigned_roles', value: string) {
+    function toggleArrayItem(
+        field: 'handle_severities' | 'handle_sources' | 'assigned_roles',
+        value: string,
+    ) {
         setForm((prev) => {
             const arr = prev[field];
-            const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+            const next = arr.includes(value)
+                ? arr.filter((v) => v !== value)
+                : [...arr, value];
             return { ...prev, [field]: next };
         });
     }
@@ -564,7 +659,9 @@ function TriageQueueDialog({
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{isEdit ? 'Edit Triage Queue' : 'Create Triage Queue'}</DialogTitle>
+                    <DialogTitle>
+                        {isEdit ? 'Edit Triage Queue' : 'Create Triage Queue'}
+                    </DialogTitle>
                     <DialogDescription>
                         {isEdit
                             ? 'Update queue configuration and routing rules.'
@@ -578,7 +675,9 @@ function TriageQueueDialog({
                             <Input
                                 id="queue-name"
                                 value={form.name}
-                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, name: e.target.value })
+                                }
                                 required
                             />
                         </div>
@@ -587,7 +686,9 @@ function TriageQueueDialog({
                             <Input
                                 id="queue-code"
                                 value={form.code}
-                                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, code: e.target.value })
+                                }
                                 required
                                 placeholder="e.g. tier-1-general"
                             />
@@ -603,19 +704,27 @@ function TriageQueueDialog({
                                 min={1}
                                 max={5}
                                 value={form.tier}
-                                onChange={(e) => setForm({ ...form, tier: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({ ...form, tier: e.target.value })
+                                }
                                 required
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="queue-escalate-mins">Auto-Escalate After (min)</Label>
+                            <Label htmlFor="queue-escalate-mins">
+                                Auto-Escalate After (min)
+                            </Label>
                             <Input
                                 id="queue-escalate-mins"
                                 type="number"
                                 min={1}
                                 value={form.auto_escalate_after_minutes}
                                 onChange={(e) =>
-                                    setForm({ ...form, auto_escalate_after_minutes: e.target.value })
+                                    setForm({
+                                        ...form,
+                                        auto_escalate_after_minutes:
+                                            e.target.value,
+                                    })
                                 }
                                 placeholder="Disabled"
                             />
@@ -628,7 +737,12 @@ function TriageQueueDialog({
                             id="queue-desc"
                             rows={2}
                             value={form.description}
-                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    description: e.target.value,
+                                })
+                            }
                         />
                     </div>
 
@@ -636,10 +750,20 @@ function TriageQueueDialog({
                         <Label>Handle Severities</Label>
                         <div className="flex flex-wrap gap-3">
                             {severityOptions.map((s) => (
-                                <label key={s} className="flex items-center gap-1.5 text-sm">
+                                <label
+                                    key={s}
+                                    className="flex items-center gap-1.5 text-sm"
+                                >
                                     <Checkbox
-                                        checked={form.handle_severities.includes(s)}
-                                        onCheckedChange={() => toggleArrayItem('handle_severities', s)}
+                                        checked={form.handle_severities.includes(
+                                            s,
+                                        )}
+                                        onCheckedChange={() =>
+                                            toggleArrayItem(
+                                                'handle_severities',
+                                                s,
+                                            )
+                                        }
                                     />
                                     {s.charAt(0).toUpperCase() + s.slice(1)}
                                 </label>
@@ -651,10 +775,17 @@ function TriageQueueDialog({
                         <Label>Handle Sources</Label>
                         <div className="flex flex-wrap gap-3">
                             {sourceOptions.map((s) => (
-                                <label key={s} className="flex items-center gap-1.5 text-sm">
+                                <label
+                                    key={s}
+                                    className="flex items-center gap-1.5 text-sm"
+                                >
                                     <Checkbox
-                                        checked={form.handle_sources.includes(s)}
-                                        onCheckedChange={() => toggleArrayItem('handle_sources', s)}
+                                        checked={form.handle_sources.includes(
+                                            s,
+                                        )}
+                                        onCheckedChange={() =>
+                                            toggleArrayItem('handle_sources', s)
+                                        }
                                     />
                                     {s.charAt(0).toUpperCase() + s.slice(1)}
                                 </label>
@@ -666,10 +797,17 @@ function TriageQueueDialog({
                         <Label>Assigned Roles</Label>
                         <div className="flex flex-wrap gap-3">
                             {roleOptions.map((r) => (
-                                <label key={r} className="flex items-center gap-1.5 text-sm">
+                                <label
+                                    key={r}
+                                    className="flex items-center gap-1.5 text-sm"
+                                >
                                     <Checkbox
-                                        checked={form.assigned_roles.includes(r)}
-                                        onCheckedChange={() => toggleArrayItem('assigned_roles', r)}
+                                        checked={form.assigned_roles.includes(
+                                            r,
+                                        )}
+                                        onCheckedChange={() =>
+                                            toggleArrayItem('assigned_roles', r)
+                                        }
                                     />
                                     {r.replace(/_/g, ' ')}
                                 </label>
@@ -681,14 +819,19 @@ function TriageQueueDialog({
                         <Label>Escalate To Queue</Label>
                         <Select
                             value={form.escalate_to_queue_id}
-                            onValueChange={(v) => setForm({ ...form, escalate_to_queue_id: v })}
+                            onValueChange={(v) =>
+                                setForm({ ...form, escalate_to_queue_id: v })
+                            }
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>
                                 {otherQueues.map((q) => (
-                                    <SelectItem key={q.id} value={q.id.toString()}>
+                                    <SelectItem
+                                        key={q.id}
+                                        value={q.id.toString()}
+                                    >
                                         {q.name} (Tier {q.tier})
                                     </SelectItem>
                                 ))}
@@ -700,17 +843,27 @@ function TriageQueueDialog({
                         <Switch
                             id="queue-active"
                             checked={form.is_active}
-                            onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+                            onCheckedChange={(v) =>
+                                setForm({ ...form, is_active: v })
+                            }
                         />
                         <Label htmlFor="queue-active">Active</Label>
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : isEdit ? 'Update Queue' : 'Create Queue'}
+                            {processing
+                                ? 'Saving...'
+                                : isEdit
+                                  ? 'Update Queue'
+                                  : 'Create Queue'}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -753,9 +906,13 @@ function MaintenanceWindowDialog({
         const data = {
             name: form.name,
             description: form.description || null,
-            signal_source_id: form.signal_source_id ? Number(form.signal_source_id) : null,
+            signal_source_id: form.signal_source_id
+                ? Number(form.signal_source_id)
+                : null,
             site_id: form.site_id ? Number(form.site_id) : null,
-            starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
+            starts_at: form.starts_at
+                ? new Date(form.starts_at).toISOString()
+                : null,
             ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
         };
 
@@ -776,10 +933,13 @@ function MaintenanceWindowDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {isEdit ? 'Edit Maintenance Window' : 'Schedule Maintenance Window'}
+                        {isEdit
+                            ? 'Edit Maintenance Window'
+                            : 'Schedule Maintenance Window'}
                     </DialogTitle>
                     <DialogDescription>
-                        Signals from the selected source/site will be suppressed during this window.
+                        Signals from the selected source/site will be suppressed
+                        during this window.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -788,7 +948,9 @@ function MaintenanceWindowDialog({
                         <Input
                             id="mw-name"
                             value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            onChange={(e) =>
+                                setForm({ ...form, name: e.target.value })
+                            }
                             required
                             placeholder="e.g. Server patching - March"
                         />
@@ -800,7 +962,12 @@ function MaintenanceWindowDialog({
                             id="mw-desc"
                             rows={2}
                             value={form.description}
-                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    description: e.target.value,
+                                })
+                            }
                         />
                     </div>
 
@@ -809,14 +976,19 @@ function MaintenanceWindowDialog({
                             <Label>Signal Source</Label>
                             <Select
                                 value={form.signal_source_id}
-                                onValueChange={(v) => setForm({ ...form, signal_source_id: v })}
+                                onValueChange={(v) =>
+                                    setForm({ ...form, signal_source_id: v })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="All sources" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {signalSources.map((s) => (
-                                        <SelectItem key={s.id} value={s.id.toString()}>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={s.id.toString()}
+                                        >
                                             {s.name}
                                         </SelectItem>
                                     ))}
@@ -827,14 +999,19 @@ function MaintenanceWindowDialog({
                             <Label>Site</Label>
                             <Select
                                 value={form.site_id}
-                                onValueChange={(v) => setForm({ ...form, site_id: v })}
+                                onValueChange={(v) =>
+                                    setForm({ ...form, site_id: v })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="All sites" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {sites.map((s) => (
-                                        <SelectItem key={s.id} value={s.id.toString()}>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={s.id.toString()}
+                                        >
                                             {s.name}
                                         </SelectItem>
                                     ))}
@@ -850,7 +1027,12 @@ function MaintenanceWindowDialog({
                                 id="mw-starts"
                                 type="datetime-local"
                                 value={form.starts_at}
-                                onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        starts_at: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -860,14 +1042,23 @@ function MaintenanceWindowDialog({
                                 id="mw-ends"
                                 type="datetime-local"
                                 value={form.ends_at}
-                                onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        ends_at: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
@@ -950,15 +1141,23 @@ export default function ControlRoomSettings({
 
     // Queue state
     const [queueDialogOpen, setQueueDialogOpen] = useState(false);
-    const [editingQueue, setEditingQueue] = useState<TriageQueueData | null>(null);
+    const [editingQueue, setEditingQueue] = useState<TriageQueueData | null>(
+        null,
+    );
 
     // Maintenance window state
     const [mwDialogOpen, setMwDialogOpen] = useState(false);
-    const [editingMw, setEditingMw] = useState<MaintenanceWindowData | null>(null);
+    const [editingMw, setEditingMw] = useState<MaintenanceWindowData | null>(
+        null,
+    );
 
     function handleTabChange(newTab: string) {
         setTab(newTab);
-        router.get('/control-room/settings', { tab: newTab }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/control-room/settings',
+            { tab: newTab },
+            { preserveState: true, preserveScroll: true },
+        );
     }
 
     function handleDeleteRule() {
@@ -973,7 +1172,10 @@ export default function ControlRoomSettings({
             `/control-room/settings/rules/${rule.id}`,
             {
                 ...rule,
-                conditions: (rule.conditions ?? {}) as Record<string, string | number | boolean | null>,
+                conditions: (rule.conditions ?? {}) as Record<
+                    string,
+                    string | number | boolean | null
+                >,
                 is_active: !rule.is_active,
             },
             { preserveScroll: true },
@@ -989,7 +1191,11 @@ export default function ControlRoomSettings({
     }
 
     function handleCancelWindow(windowId: number) {
-        router.post(`/control-room/settings/maintenance/${windowId}/cancel`, {}, { preserveScroll: true });
+        router.post(
+            `/control-room/settings/maintenance/${windowId}/cancel`,
+            {},
+            { preserveScroll: true },
+        );
     }
 
     const breadcrumbs = [
@@ -1006,20 +1212,32 @@ export default function ControlRoomSettings({
                     description="Configure signal rules, triage queues, sources, and maintenance windows."
                 />
 
-                <Tabs defaultValue={tab} onValueChange={handleTabChange} className="mt-6">
+                <Tabs
+                    defaultValue={tab}
+                    onValueChange={handleTabChange}
+                    className="mt-6"
+                >
                     <TabsList>
                         <TabsTrigger value="rules">Signal Rules</TabsTrigger>
                         <TabsTrigger value="queues">Triage Queues</TabsTrigger>
-                        <TabsTrigger value="sources">Signal Sources</TabsTrigger>
-                        <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-                        <TabsTrigger value="ticket-options">Ticket Options</TabsTrigger>
+                        <TabsTrigger value="sources">
+                            Signal Sources
+                        </TabsTrigger>
+                        <TabsTrigger value="maintenance">
+                            Maintenance
+                        </TabsTrigger>
+                        <TabsTrigger value="ticket-options">
+                            Ticket Options
+                        </TabsTrigger>
                     </TabsList>
 
                     {/* --- Tab 1: Signal Rules --- */}
                     <TabsContent value="rules" className="mt-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">Signal Rules</CardTitle>
+                                <CardTitle className="text-base">
+                                    Signal Rules
+                                </CardTitle>
                                 <Button
                                     size="sm"
                                     onClick={() => {
@@ -1034,45 +1252,74 @@ export default function ControlRoomSettings({
                             <CardContent>
                                 {signalRules.length === 0 ? (
                                     <p className="py-8 text-center text-sm text-muted-foreground">
-                                        No signal rules configured yet. Create one to get started.
+                                        No signal rules configured yet. Create
+                                        one to get started.
                                     </p>
                                 ) : (
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pb-2 pr-4 font-medium">Name</th>
-                                                    <th className="pb-2 pr-4 font-medium">Signal Type</th>
-                                                    <th className="pb-2 pr-4 font-medium">Source</th>
-                                                    <th className="pb-2 pr-4 font-medium">Priority</th>
-                                                    <th className="pb-2 pr-4 font-medium">Severity</th>
-                                                    <th className="pb-2 pr-4 font-medium">Dedup</th>
-                                                    <th className="pb-2 pr-4 font-medium">Active</th>
-                                                    <th className="pb-2 font-medium">Actions</th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Name
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Signal Type
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Source
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Priority
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Severity
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Dedup
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Active
+                                                    </th>
+                                                    <th className="pb-2 font-medium">
+                                                        Actions
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {signalRules.map((rule) => (
-                                                    <tr key={rule.id} className="border-b last:border-0">
+                                                    <tr
+                                                        key={rule.id}
+                                                        className="border-b last:border-0"
+                                                    >
                                                         <td className="py-2.5 pr-4 font-medium">
                                                             {rule.name}
                                                         </td>
                                                         <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {rule.signal_type_name ?? 'Any'}
+                                                            {rule.signal_type_name ??
+                                                                'Any'}
                                                         </td>
                                                         <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {rule.signal_source_name ?? 'Any'}
+                                                            {rule.signal_source_name ??
+                                                                'Any'}
                                                         </td>
-                                                        <td className="py-2.5 pr-4">{rule.priority}</td>
+                                                        <td className="py-2.5 pr-4">
+                                                            {rule.priority}
+                                                        </td>
                                                         <td className="py-2.5 pr-4">
                                                             {rule.output_severity ? (
                                                                 <Badge
                                                                     variant="outline"
                                                                     className={
-                                                                        severityColors[rule.output_severity] ?? ''
+                                                                        severityColors[
+                                                                            rule
+                                                                                .output_severity
+                                                                        ] ?? ''
                                                                     }
                                                                 >
-                                                                    {rule.output_severity}
+                                                                    {
+                                                                        rule.output_severity
+                                                                    }
                                                                 </Badge>
                                                             ) : (
                                                                 <span className="text-muted-foreground">
@@ -1087,9 +1334,13 @@ export default function ControlRoomSettings({
                                                         </td>
                                                         <td className="py-2.5 pr-4">
                                                             <Switch
-                                                                checked={rule.is_active}
+                                                                checked={
+                                                                    rule.is_active
+                                                                }
                                                                 onCheckedChange={() =>
-                                                                    handleToggleRuleActive(rule)
+                                                                    handleToggleRuleActive(
+                                                                        rule,
+                                                                    )
                                                                 }
                                                             />
                                                         </td>
@@ -1099,8 +1350,12 @@ export default function ControlRoomSettings({
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     onClick={() => {
-                                                                        setEditingRule(rule);
-                                                                        setRuleDialogOpen(true);
+                                                                        setEditingRule(
+                                                                            rule,
+                                                                        );
+                                                                        setRuleDialogOpen(
+                                                                            true,
+                                                                        );
                                                                     }}
                                                                 >
                                                                     <Pencil className="h-3.5 w-3.5" />
@@ -1109,7 +1364,9 @@ export default function ControlRoomSettings({
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                        setDeleteRuleId(rule.id)
+                                                                        setDeleteRuleId(
+                                                                            rule.id,
+                                                                        )
                                                                     }
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5 text-status-critical" />
@@ -1130,7 +1387,9 @@ export default function ControlRoomSettings({
                     <TabsContent value="queues" className="mt-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">Triage Queues</CardTitle>
+                                <CardTitle className="text-base">
+                                    Triage Queues
+                                </CardTitle>
                                 <Button
                                     size="sm"
                                     onClick={() => {
@@ -1152,16 +1411,36 @@ export default function ControlRoomSettings({
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pb-2 pr-4 font-medium">Name</th>
-                                                    <th className="pb-2 pr-4 font-medium">Code</th>
-                                                    <th className="pb-2 pr-4 font-medium">Tier</th>
-                                                    <th className="pb-2 pr-4 font-medium">Severities</th>
-                                                    <th className="pb-2 pr-4 font-medium">Sources</th>
-                                                    <th className="pb-2 pr-4 font-medium">Auto-Escalate</th>
-                                                    <th className="pb-2 pr-4 font-medium">Next Queue</th>
-                                                    <th className="pb-2 pr-4 font-medium">Open</th>
-                                                    <th className="pb-2 pr-4 font-medium">Active</th>
-                                                    <th className="pb-2 font-medium">Actions</th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Name
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Code
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Tier
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Severities
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Sources
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Auto-Escalate
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Next Queue
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Open
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Active
+                                                    </th>
+                                                    <th className="pb-2 font-medium">
+                                                        Actions
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1177,20 +1456,29 @@ export default function ControlRoomSettings({
                                                             {queue.code}
                                                         </td>
                                                         <td className="py-2.5 pr-4">
-                                                            <Badge variant="outline">T{queue.tier}</Badge>
+                                                            <Badge variant="outline">
+                                                                T{queue.tier}
+                                                            </Badge>
                                                         </td>
                                                         <td className="py-2.5 pr-4">
                                                             <div className="flex flex-wrap gap-1">
-                                                                {queue.handle_severities.map((s) => (
-                                                                    <Badge
-                                                                        key={s}
-                                                                        variant="outline"
-                                                                        className={`text-xs ${severityColors[s] ?? ''}`}
-                                                                    >
-                                                                        {s}
-                                                                    </Badge>
-                                                                ))}
-                                                                {queue.handle_severities.length === 0 && (
+                                                                {queue.handle_severities.map(
+                                                                    (s) => (
+                                                                        <Badge
+                                                                            key={
+                                                                                s
+                                                                            }
+                                                                            variant="outline"
+                                                                            className={`text-xs ${severityColors[s] ?? ''}`}
+                                                                        >
+                                                                            {s}
+                                                                        </Badge>
+                                                                    ),
+                                                                )}
+                                                                {queue
+                                                                    .handle_severities
+                                                                    .length ===
+                                                                    0 && (
                                                                     <span className="text-muted-foreground">
                                                                         All
                                                                     </span>
@@ -1199,16 +1487,23 @@ export default function ControlRoomSettings({
                                                         </td>
                                                         <td className="py-2.5 pr-4">
                                                             <div className="flex flex-wrap gap-1">
-                                                                {queue.handle_sources.map((s) => (
-                                                                    <Badge
-                                                                        key={s}
-                                                                        variant="outline"
-                                                                        className="text-xs"
-                                                                    >
-                                                                        {s}
-                                                                    </Badge>
-                                                                ))}
-                                                                {queue.handle_sources.length === 0 && (
+                                                                {queue.handle_sources.map(
+                                                                    (s) => (
+                                                                        <Badge
+                                                                            key={
+                                                                                s
+                                                                            }
+                                                                            variant="outline"
+                                                                            className="text-xs"
+                                                                        >
+                                                                            {s}
+                                                                        </Badge>
+                                                                    ),
+                                                                )}
+                                                                {queue
+                                                                    .handle_sources
+                                                                    .length ===
+                                                                    0 && (
                                                                     <span className="text-muted-foreground">
                                                                         All
                                                                     </span>
@@ -1221,25 +1516,33 @@ export default function ControlRoomSettings({
                                                                 : '-'}
                                                         </td>
                                                         <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {queue.escalate_to_queue_name ?? '-'}
+                                                            {queue.escalate_to_queue_name ??
+                                                                '-'}
                                                         </td>
                                                         <td className="py-2.5 pr-4">
                                                             <Badge
                                                                 variant="outline"
                                                                 className={
-                                                                    queue.open_alert_count > 0
+                                                                    queue.open_alert_count >
+                                                                    0
                                                                         ? 'bg-status-warning-bg text-status-warning'
                                                                         : ''
                                                                 }
                                                             >
-                                                                {queue.open_alert_count}
+                                                                {
+                                                                    queue.open_alert_count
+                                                                }
                                                             </Badge>
                                                         </td>
                                                         <td className="py-2.5 pr-4">
                                                             <Switch
-                                                                checked={queue.is_active}
+                                                                checked={
+                                                                    queue.is_active
+                                                                }
                                                                 onCheckedChange={() =>
-                                                                    handleToggleQueueActive(queue)
+                                                                    handleToggleQueueActive(
+                                                                        queue,
+                                                                    )
                                                                 }
                                                             />
                                                         </td>
@@ -1248,8 +1551,12 @@ export default function ControlRoomSettings({
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 onClick={() => {
-                                                                    setEditingQueue(queue);
-                                                                    setQueueDialogOpen(true);
+                                                                    setEditingQueue(
+                                                                        queue,
+                                                                    );
+                                                                    setQueueDialogOpen(
+                                                                        true,
+                                                                    );
                                                                 }}
                                                             >
                                                                 <Pencil className="h-3.5 w-3.5" />
@@ -1291,7 +1598,11 @@ export default function ControlRoomSettings({
                                                 </div>
                                                 <Badge
                                                     variant="outline"
-                                                    className={statusColors[source.status] ?? ''}
+                                                    className={
+                                                        statusColors[
+                                                            source.status
+                                                        ] ?? ''
+                                                    }
                                                 >
                                                     {source.status}
                                                 </Badge>
@@ -1306,7 +1617,9 @@ export default function ControlRoomSettings({
                                                     <p
                                                         className={`font-medium ${heartbeatColor(source.last_heartbeat_at)}`}
                                                     >
-                                                        {formatRelativeTime(source.last_heartbeat_at)}
+                                                        {formatRelativeTime(
+                                                            source.last_heartbeat_at,
+                                                        )}
                                                     </p>
                                                 </div>
                                                 <div>
@@ -1314,7 +1627,9 @@ export default function ControlRoomSettings({
                                                         Last Signal
                                                     </p>
                                                     <p className="font-medium">
-                                                        {formatRelativeTime(source.last_signal_at)}
+                                                        {formatRelativeTime(
+                                                            source.last_signal_at,
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1332,15 +1647,17 @@ export default function ControlRoomSettings({
                                                         Capabilities
                                                     </p>
                                                     <div className="flex flex-wrap gap-1">
-                                                        {source.capabilities.map((cap) => (
-                                                            <Badge
-                                                                key={cap}
-                                                                variant="secondary"
-                                                                className="text-xs"
-                                                            >
-                                                                {cap}
-                                                            </Badge>
-                                                        ))}
+                                                        {source.capabilities.map(
+                                                            (cap) => (
+                                                                <Badge
+                                                                    key={cap}
+                                                                    variant="secondary"
+                                                                    className="text-xs"
+                                                                >
+                                                                    {cap}
+                                                                </Badge>
+                                                            ),
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -1355,7 +1672,9 @@ export default function ControlRoomSettings({
                     <TabsContent value="maintenance" className="mt-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">Maintenance Windows</CardTitle>
+                                <CardTitle className="text-base">
+                                    Maintenance Windows
+                                </CardTitle>
                                 <Button
                                     size="sm"
                                     onClick={() => {
@@ -1377,78 +1696,109 @@ export default function ControlRoomSettings({
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pb-2 pr-4 font-medium">Name</th>
-                                                    <th className="pb-2 pr-4 font-medium">
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Name
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
                                                         Source / Site
                                                     </th>
-                                                    <th className="pb-2 pr-4 font-medium">Starts At</th>
-                                                    <th className="pb-2 pr-4 font-medium">Ends At</th>
-                                                    <th className="pb-2 pr-4 font-medium">Status</th>
-                                                    <th className="pb-2 pr-4 font-medium">Created By</th>
-                                                    <th className="pb-2 font-medium">Actions</th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Starts At
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Ends At
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Status
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Created By
+                                                    </th>
+                                                    <th className="pb-2 font-medium">
+                                                        Actions
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {maintenanceWindows.map((mw) => (
-                                                    <tr
-                                                        key={mw.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2.5 pr-4 font-medium">
-                                                            {mw.name}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {mw.signal_source_name ?? 'All sources'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {formatDateTime(mw.starts_at)}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {formatDateTime(mw.ends_at)}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={
-                                                                    windowStatusColors[mw.status] ?? ''
-                                                                }
-                                                            >
-                                                                {mw.status}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">
-                                                            {mw.created_by_name ?? '-'}
-                                                        </td>
-                                                        <td className="py-2.5">
-                                                            <div className="flex gap-1">
-                                                                {(mw.status === 'scheduled' ||
-                                                                    mw.status === 'active') && (
-                                                                    <>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => {
-                                                                                setEditingMw(mw);
-                                                                                setMwDialogOpen(true);
-                                                                            }}
-                                                                        >
-                                                                            <Pencil className="h-3.5 w-3.5" />
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() =>
-                                                                                handleCancelWindow(mw.id)
-                                                                            }
-                                                                        >
-                                                                            <X className="h-3.5 w-3.5 text-status-critical" />
-                                                                        </Button>
-                                                                    </>
+                                                {maintenanceWindows.map(
+                                                    (mw) => (
+                                                        <tr
+                                                            key={mw.id}
+                                                            className="border-b last:border-0"
+                                                        >
+                                                            <td className="py-2.5 pr-4 font-medium">
+                                                                {mw.name}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                {mw.signal_source_name ??
+                                                                    'All sources'}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4">
+                                                                {formatDateTime(
+                                                                    mw.starts_at,
                                                                 )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4">
+                                                                {formatDateTime(
+                                                                    mw.ends_at,
+                                                                )}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={
+                                                                        windowStatusColors[
+                                                                            mw
+                                                                                .status
+                                                                        ] ?? ''
+                                                                    }
+                                                                >
+                                                                    {mw.status}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">
+                                                                {mw.created_by_name ??
+                                                                    '-'}
+                                                            </td>
+                                                            <td className="py-2.5">
+                                                                <div className="flex gap-1">
+                                                                    {(mw.status ===
+                                                                        'scheduled' ||
+                                                                        mw.status ===
+                                                                            'active') && (
+                                                                        <>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    setEditingMw(
+                                                                                        mw,
+                                                                                    );
+                                                                                    setMwDialogOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <Pencil className="h-3.5 w-3.5" />
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={() =>
+                                                                                    handleCancelWindow(
+                                                                                        mw.id,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <X className="h-3.5 w-3.5 text-status-critical" />
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ),
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -1457,8 +1807,17 @@ export default function ControlRoomSettings({
                         </Card>
                     </TabsContent>
                     {/* --- Tab 5: Ticket Options --- */}
-                    <TabsContent value="ticket-options" className="mt-4 space-y-6">
-                        {(['category', 'resolution_code', 'task_category'] as const).map((group) => {
+                    <TabsContent
+                        value="ticket-options"
+                        className="mt-4 space-y-6"
+                    >
+                        {(
+                            [
+                                'category',
+                                'resolution_code',
+                                'task_category',
+                            ] as const
+                        ).map((group) => {
                             const groupLabels: Record<string, string> = {
                                 category: 'Alert Categories',
                                 resolution_code: 'Resolution Codes',
@@ -1468,7 +1827,9 @@ export default function ControlRoomSettings({
                             return (
                                 <Card key={group}>
                                     <CardHeader className="flex flex-row items-center justify-between">
-                                        <CardTitle className="text-base">{groupLabels[group] ?? group}</CardTitle>
+                                        <CardTitle className="text-base">
+                                            {groupLabels[group] ?? group}
+                                        </CardTitle>
                                         <Button
                                             size="sm"
                                             onClick={() => {
@@ -1480,42 +1841,84 @@ export default function ControlRoomSettings({
                                                 setOptionDialogOpen(true);
                                             }}
                                         >
-                                            <Plus className="mr-1 h-4 w-4" /> Add
+                                            <Plus className="mr-1 h-4 w-4" />{' '}
+                                            Add
                                         </Button>
                                     </CardHeader>
                                     <CardContent>
                                         {items.length === 0 ? (
-                                            <p className="py-4 text-center text-sm text-muted-foreground">No options configured. Click Add to create one.</p>
+                                            <p className="py-4 text-center text-sm text-muted-foreground">
+                                                No options configured. Click Add
+                                                to create one.
+                                            </p>
                                         ) : (
                                             <div className="space-y-2">
                                                 {items.map((opt) => (
-                                                    <div key={opt.id} className="flex items-center justify-between rounded-lg border px-4 py-2.5">
+                                                    <div
+                                                        key={opt.id}
+                                                        className="flex items-center justify-between rounded-lg border px-4 py-2.5"
+                                                    >
                                                         <div className="flex items-center gap-3">
                                                             {opt.color && (
-                                                                <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: opt.color }} />
+                                                                <span
+                                                                    className="inline-block h-3 w-3 rounded-full"
+                                                                    style={{
+                                                                        backgroundColor:
+                                                                            opt.color,
+                                                                    }}
+                                                                />
                                                             )}
                                                             <div>
-                                                                <span className="text-sm font-medium">{opt.label}</span>
-                                                                <span className="ml-2 text-xs text-muted-foreground">({opt.value})</span>
+                                                                <span className="text-sm font-medium">
+                                                                    {opt.label}
+                                                                </span>
+                                                                <span className="ml-2 text-xs text-muted-foreground">
+                                                                    ({opt.value}
+                                                                    )
+                                                                </span>
                                                                 {opt.description && (
-                                                                    <p className="text-xs text-muted-foreground">{opt.description}</p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {
+                                                                            opt.description
+                                                                        }
+                                                                    </p>
                                                                 )}
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={() => router.put(`/control-room/settings/options/${opt.id}`, { is_active: !opt.is_active }, { preserveScroll: true })}
-                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${opt.is_active ? 'bg-primary' : 'bg-muted'}`}
-                                                            >
-                                                                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${opt.is_active ? 'translate-x-4' : 'translate-x-1'}`} />
-                                                            </button>
+                                                            <Switch
+                                                                checked={
+                                                                    opt.is_active
+                                                                }
+                                                                onCheckedChange={() =>
+                                                                    router.put(
+                                                                        `/control-room/settings/options/${opt.id}`,
+                                                                        {
+                                                                            is_active:
+                                                                                !opt.is_active,
+                                                                        },
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-7 w-7 text-status-critical hover:text-status-critical"
                                                                 onClick={() => {
-                                                                    if (confirm('Delete this option?')) {
-                                                                        router.delete(`/control-room/settings/options/${opt.id}`, { preserveScroll: true });
+                                                                    if (
+                                                                        confirm(
+                                                                            'Delete this option?',
+                                                                        )
+                                                                    ) {
+                                                                        router.delete(
+                                                                            `/control-room/settings/options/${opt.id}`,
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        );
                                                                     }
                                                                 }}
                                                             >
@@ -1535,7 +1938,10 @@ export default function ControlRoomSettings({
 
                 {/* Add Option Dialog */}
                 {optionDialogOpen && (
-                    <Dialog open={optionDialogOpen} onOpenChange={setOptionDialogOpen}>
+                    <Dialog
+                        open={optionDialogOpen}
+                        onOpenChange={setOptionDialogOpen}
+                    >
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Add Option</DialogTitle>
@@ -1543,36 +1949,94 @@ export default function ControlRoomSettings({
                             <div className="space-y-3 py-2">
                                 <div>
                                     <Label>Value (slug)</Label>
-                                    <Input value={optionValue} onChange={(e) => setOptionValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} placeholder="e.g. incident" />
+                                    <Input
+                                        value={optionValue}
+                                        onChange={(e) =>
+                                            setOptionValue(
+                                                e.target.value
+                                                    .toLowerCase()
+                                                    .replace(
+                                                        /[^a-z0-9_]/g,
+                                                        '_',
+                                                    ),
+                                            )
+                                        }
+                                        placeholder="e.g. incident"
+                                    />
                                 </div>
                                 <div>
                                     <Label>Display Label</Label>
-                                    <Input value={optionLabel} onChange={(e) => setOptionLabel(e.target.value)} placeholder="e.g. Incident" />
+                                    <Input
+                                        value={optionLabel}
+                                        onChange={(e) =>
+                                            setOptionLabel(e.target.value)
+                                        }
+                                        placeholder="e.g. Incident"
+                                    />
                                 </div>
                                 <div>
                                     <Label>Color (hex)</Label>
                                     <div className="flex items-center gap-2">
-                                        <Input value={optionColor} onChange={(e) => setOptionColor(e.target.value)} placeholder="#ef4444" className="flex-1" />
-                                        {optionColor && <span className="inline-block h-6 w-6 rounded-full border" style={{ backgroundColor: optionColor }} />}
+                                        <Input
+                                            value={optionColor}
+                                            onChange={(e) =>
+                                                setOptionColor(e.target.value)
+                                            }
+                                            placeholder="#ef4444"
+                                            className="flex-1"
+                                        />
+                                        {optionColor && (
+                                            <span
+                                                className="inline-block h-6 w-6 rounded-full border"
+                                                style={{
+                                                    backgroundColor:
+                                                        optionColor,
+                                                }}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                                 <div>
                                     <Label>Description (optional)</Label>
-                                    <Input value={optionDesc} onChange={(e) => setOptionDesc(e.target.value)} placeholder="Brief description..." />
+                                    <Input
+                                        value={optionDesc}
+                                        onChange={(e) =>
+                                            setOptionDesc(e.target.value)
+                                        }
+                                        placeholder="Brief description..."
+                                    />
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button variant="ghost" onClick={() => setOptionDialogOpen(false)}>Cancel</Button>
                                 <Button
-                                    disabled={!optionValue.trim() || !optionLabel.trim()}
+                                    variant="ghost"
+                                    onClick={() => setOptionDialogOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    disabled={
+                                        !optionValue.trim() ||
+                                        !optionLabel.trim()
+                                    }
                                     onClick={() => {
-                                        router.post('/control-room/settings/options', {
-                                            group: optionGroup,
-                                            value: optionValue.trim(),
-                                            label: optionLabel.trim(),
-                                            color: optionColor.trim() || null,
-                                            description: optionDesc.trim() || null,
-                                        }, { preserveScroll: true, onSuccess: () => setOptionDialogOpen(false) });
+                                        router.post(
+                                            '/control-room/settings/options',
+                                            {
+                                                group: optionGroup,
+                                                value: optionValue.trim(),
+                                                label: optionLabel.trim(),
+                                                color:
+                                                    optionColor.trim() || null,
+                                                description:
+                                                    optionDesc.trim() || null,
+                                            },
+                                            {
+                                                preserveScroll: true,
+                                                onSuccess: () =>
+                                                    setOptionDialogOpen(false),
+                                            },
+                                        );
                                     }}
                                 >
                                     Create

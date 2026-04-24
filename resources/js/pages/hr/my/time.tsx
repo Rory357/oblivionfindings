@@ -106,21 +106,25 @@ const defaultStatusConfig = {
 const statusConfig: Record<string, { className: string; label: string }> = {
     active: defaultStatusConfig,
     submitted: {
-        className: 'border-status-warning/30 text-status-warning bg-status-warning',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Submitted',
     },
     approved: {
-        className: 'border-status-success/30 text-status-success bg-status-success',
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
         label: 'Approved',
     },
     rejected: {
-        className: 'border-status-critical/30 text-status-critical bg-status-critical',
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Rejected',
     },
 };
 
 const defaultShiftTypeConfig = {
-    className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    className:
+        'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
     label: 'Standard',
 };
 
@@ -139,7 +143,8 @@ const shiftTypeConfig: Record<string, { className: string; label: string }> = {
         label: 'Split',
     },
     travel: {
-        className: 'border-status-warning/30 text-status-warning bg-status-warning',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Travel',
     },
 };

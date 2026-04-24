@@ -89,7 +89,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
         if (!fleetLoaded) {
             router.reload({ only: ['fleet'], onSuccess: () => setFleetLoaded(true) });
         }
-    }, []);
+    }, [fleetLoaded]);
 
     return (
         <AppLayout breadcrumbs={[{ title: staffLabel, href: '/staff' }, { title: user.name, href: `/staff/${user.id}` }]}>

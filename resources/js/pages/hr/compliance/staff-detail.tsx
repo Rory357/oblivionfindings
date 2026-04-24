@@ -1,10 +1,18 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { User, CheckCircle2, AlertTriangle, Clock, XCircle, Shield, ExternalLink } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    Clock,
+    ExternalLink,
+    Shield,
+    User,
+    XCircle,
+} from 'lucide-react';
 
 interface ComplianceStatus {
     id: number;
@@ -39,28 +47,69 @@ interface Props {
     summary: Summary;
 }
 
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2; color: string }> = {
-    compliant: { label: 'Compliant', variant: 'default', icon: CheckCircle2, color: 'text-status-success' },
-    expiring_soon: { label: 'Expiring Soon', variant: 'outline', icon: Clock, color: 'text-status-warning' },
-    expired: { label: 'Expired', variant: 'destructive', icon: AlertTriangle, color: 'text-destructive' },
-    not_started: { label: 'Not Started', variant: 'secondary', icon: XCircle, color: 'text-muted-foreground' },
+const statusConfig: Record<
+    string,
+    {
+        label: string;
+        variant: 'default' | 'secondary' | 'destructive' | 'outline';
+        icon: typeof CheckCircle2;
+        color: string;
+    }
+> = {
+    compliant: {
+        label: 'Compliant',
+        variant: 'default',
+        icon: CheckCircle2,
+        color: 'text-status-success',
+    },
+    expiring_soon: {
+        label: 'Expiring Soon',
+        variant: 'outline',
+        icon: Clock,
+        color: 'text-status-warning',
+    },
+    expired: {
+        label: 'Expired',
+        variant: 'destructive',
+        icon: AlertTriangle,
+        color: 'text-destructive',
+    },
+    not_started: {
+        label: 'Not Started',
+        variant: 'secondary',
+        icon: XCircle,
+        color: 'text-muted-foreground',
+    },
 };
 
-export default function StaffComplianceDetail({ staff, complianceStatuses, summary }: Props) {
+export default function StaffComplianceDetail({
+    staff,
+    complianceStatuses,
+    summary,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr/people' },
         { title: 'Compliance', href: '/hr/compliance' },
         { title: staff.name, href: `/hr/compliance/staff/${staff.id}` },
     ];
 
-    const total = summary.compliant + summary.expiring_soon + summary.expired + summary.not_started;
-    const compliancePercent = total > 0 ? Math.round((summary.compliant / total) * 100) : 0;
+    const total =
+        summary.compliant +
+        summary.expiring_soon +
+        summary.expired +
+        summary.not_started;
+    const compliancePercent =
+        total > 0 ? Math.round((summary.compliant / total) * 100) : 0;
 
     // Group by status for organized display
     const groupedStatuses = {
         expired: complianceStatuses.filter((s) => s.status === 'expired'),
-        expiring_soon: complianceStatuses.filter((s) => s.status === 'expiring_soon'),
-        not_started: complianceStatuses.filter((s) => s.status === 'not_started'),
+        expiring_soon: complianceStatuses.filter(
+            (s) => s.status === 'expiring_soon',
+        ),
+        not_started: complianceStatuses.filter(
+            (s) => s.status === 'not_started',
+        ),
         compliant: complianceStatuses.filter((s) => s.status === 'compliant'),
     };
 
@@ -76,7 +125,9 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold">{staff.name}</h1>
-                            <p className="text-muted-foreground">{staff.email}</p>
+                            <p className="text-muted-foreground">
+                                {staff.email}
+                            </p>
                         </div>
                     </div>
                     <Button variant="outline" asChild>
@@ -89,42 +140,69 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                     <Card>
                         <CardContent className="pt-6 text-center">
                             <Shield className="mx-auto h-6 w-6 text-primary" />
-                            <p className="mt-2 text-2xl font-bold">{compliancePercent}%</p>
-                            <p className="text-sm text-muted-foreground">Overall</p>
+                            <p className="mt-2 text-2xl font-bold">
+                                {compliancePercent}%
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Overall
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6 text-center">
                             <CheckCircle2 className="mx-auto h-6 w-6 text-status-success" />
-                            <p className="mt-2 text-2xl font-bold">{summary.compliant}</p>
-                            <p className="text-sm text-muted-foreground">Compliant</p>
+                            <p className="mt-2 text-2xl font-bold">
+                                {summary.compliant}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Compliant
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6 text-center">
                             <Clock className="mx-auto h-6 w-6 text-status-warning" />
-                            <p className="mt-2 text-2xl font-bold">{summary.expiring_soon}</p>
-                            <p className="text-sm text-muted-foreground">Expiring Soon</p>
+                            <p className="mt-2 text-2xl font-bold">
+                                {summary.expiring_soon}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Expiring Soon
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6 text-center">
                             <AlertTriangle className="mx-auto h-6 w-6 text-destructive" />
-                            <p className="mt-2 text-2xl font-bold">{summary.expired}</p>
-                            <p className="text-sm text-muted-foreground">Expired</p>
+                            <p className="mt-2 text-2xl font-bold">
+                                {summary.expired}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Expired
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6 text-center">
                             <XCircle className="mx-auto h-6 w-6 text-muted-foreground" />
-                            <p className="mt-2 text-2xl font-bold">{summary.not_started}</p>
-                            <p className="text-sm text-muted-foreground">Not Started</p>
+                            <p className="mt-2 text-2xl font-bold">
+                                {summary.not_started}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Not Started
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
 
                 {/* Compliance Items */}
-                {(['expired', 'expiring_soon', 'not_started', 'compliant'] as const).map((statusKey) => {
+                {(
+                    [
+                        'expired',
+                        'expiring_soon',
+                        'not_started',
+                        'compliant',
+                    ] as const
+                ).map((statusKey) => {
                     const items = groupedStatuses[statusKey];
                     if (items.length === 0) return null;
                     const config = statusConfig[statusKey];
@@ -134,7 +212,9 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                         <Card key={statusKey}>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <StatusIcon className={`h-5 w-5 ${config.color}`} />
+                                    <StatusIcon
+                                        className={`h-5 w-5 ${config.color}`}
+                                    />
                                     {config.label} ({items.length})
                                 </CardTitle>
                             </CardHeader>
@@ -142,52 +222,102 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-muted/50">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-medium">Requirement</th>
-                                            <th className="px-4 py-3 text-left font-medium">Type</th>
-                                            <th className="px-4 py-3 text-center font-medium">Priority</th>
-                                            <th className="px-4 py-3 text-left font-medium">Completed</th>
-                                            <th className="px-4 py-3 text-left font-medium">Expiry</th>
-                                            <th className="px-4 py-3 text-left font-medium">Renewal</th>
-                                            <th className="px-4 py-3 text-left font-medium">Evidence</th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Requirement
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Type
+                                            </th>
+                                            <th className="px-4 py-3 text-center font-medium">
+                                                Priority
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Completed
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Expiry
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Renewal
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Evidence
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
                                         {items.map((item) => (
-                                            <tr key={item.id} className="hover:bg-muted/30">
+                                            <tr
+                                                key={item.id}
+                                                className="hover:bg-muted/30"
+                                            >
                                                 <td className="px-4 py-3">
-                                                    <span className="font-medium">{item.requirement_name}</span>
+                                                    <span className="font-medium">
+                                                        {item.requirement_name}
+                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Badge variant="outline" className="capitalize text-xs">{item.requirement_type.replace('_', ' ')}</Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-xs capitalize"
+                                                    >
+                                                        {item.requirement_type.replace(
+                                                            '_',
+                                                            ' ',
+                                                        )}
+                                                    </Badge>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     {item.is_mandatory ? (
-                                                        <Badge variant="default" className="text-xs">Required</Badge>
+                                                        <Badge
+                                                            variant="default"
+                                                            className="text-xs"
+                                                        >
+                                                            Required
+                                                        </Badge>
                                                     ) : (
-                                                        <Badge variant="secondary" className="text-xs">Optional</Badge>
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="text-xs"
+                                                        >
+                                                            Optional
+                                                        </Badge>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {item.completed_date || '\u2014'}
+                                                    {item.completed_date ||
+                                                        '\u2014'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {item.expiry_date ? (
-                                                        <span className={
-                                                            item.status === 'expired' ? 'text-destructive font-medium' :
-                                                            item.status === 'expiring_soon' ? 'text-status-warning font-medium' :
-                                                            'text-muted-foreground'
-                                                        }>
+                                                        <span
+                                                            className={
+                                                                item.status ===
+                                                                'expired'
+                                                                    ? 'font-medium text-destructive'
+                                                                    : item.status ===
+                                                                        'expiring_soon'
+                                                                      ? 'font-medium text-status-warning'
+                                                                      : 'text-muted-foreground'
+                                                            }
+                                                        >
                                                             {item.expiry_date}
                                                         </span>
-                                                    ) : '\u2014'}
+                                                    ) : (
+                                                        '\u2014'
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {item.renewal_period_months ? `${item.renewal_period_months} months` : '\u2014'}
+                                                    {item.renewal_period_months
+                                                        ? `${item.renewal_period_months} months`
+                                                        : '\u2014'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {item.evidence_url ? (
                                                         <a
-                                                            href={item.evidence_url}
+                                                            href={
+                                                                item.evidence_url
+                                                            }
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="inline-flex items-center gap-1 text-primary hover:underline"
@@ -196,10 +326,16 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                                                             <ExternalLink className="h-3 w-3" />
                                                         </a>
                                                     ) : (
-                                                        <span className="text-muted-foreground">\u2014</span>
+                                                        <span className="text-muted-foreground">
+                                                            \u2014
+                                                        </span>
                                                     )}
                                                     {item.evidence_notes && (
-                                                        <p className="mt-0.5 text-xs text-muted-foreground">{item.evidence_notes}</p>
+                                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                                            {
+                                                                item.evidence_notes
+                                                            }
+                                                        </p>
                                                     )}
                                                 </td>
                                             </tr>
@@ -215,7 +351,10 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
                             <Shield className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                            <p>No compliance requirements assigned to this staff member.</p>
+                            <p>
+                                No compliance requirements assigned to this
+                                staff member.
+                            </p>
                         </CardContent>
                     </Card>
                 )}

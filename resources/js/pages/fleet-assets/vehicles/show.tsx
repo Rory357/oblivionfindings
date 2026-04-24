@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
     Select,
     SelectContent,
@@ -200,7 +201,7 @@ export default function VehicleShow({
         if (!timelineLoaded) {
             router.reload({ only: ['timeline'], onSuccess: () => setTimelineLoaded(true) });
         }
-    }, []);
+    }, [timelineLoaded]);
 
     const markers = useMemo<MapMarker[]>(() => {
         const result: MapMarker[] = [];
@@ -235,7 +236,7 @@ export default function VehicleShow({
     const center = useMemo(() => {
         if (state?.lat && state?.lng) return { lat: Number(state.lat), lng: Number(state.lng) };
         return { lat: -36.8485, lng: 174.7633 };
-    }, [state, vehicle.home_site]);
+    }, [state]);
 
     return (
         <AppLayout
@@ -650,23 +651,14 @@ export default function VehicleShow({
                                 >
                                     <span className="text-sm font-medium">{item.label}</span>
                                     {canManage ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
+                                        <Switch
+                                            checked={!!(vehicle as Record<string, unknown>)[item.key]}
+                                            onCheckedChange={() => {
                                                 router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
                                                     [item.key]: !(vehicle as Record<string, unknown>)[item.key],
                                                 }, { preserveScroll: true });
                                             }}
-                                            className={`h-7 w-12 rounded-full transition-colors ${
-                                                (vehicle as Record<string, unknown>)[item.key] ? 'bg-primary' : 'bg-muted'
-                                            }`}
-                                        >
-                                            <span
-                                                className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                                                    (vehicle as Record<string, unknown>)[item.key] ? 'translate-x-6' : 'translate-x-1'
-                                                }`}
-                                            />
-                                        </button>
+                                        />
                                     ) : (
                                         <Badge variant={(vehicle as Record<string, unknown>)[item.key] ? 'default' : 'secondary'}>
                                             {(vehicle as Record<string, unknown>)[item.key] ? 'Enabled' : 'Not set'}

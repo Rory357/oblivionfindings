@@ -1,21 +1,28 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, TrendingUp, Users, Star, ThumbsUp } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import { ArrowLeft, Star, ThumbsUp, TrendingUp, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
 interface Trends {
     departure_reasons: { reason: string; count: number }[];
-    satisfaction_over_time: { month: string; avg_satisfaction: number; count: number }[];
-    recommend_stats: { would_recommend: number; would_not_recommend: number; total: number };
+    satisfaction_over_time: {
+        month: string;
+        avg_satisfaction: number;
+        count: number;
+    }[];
+    recommend_stats: {
+        would_recommend: number;
+        would_not_recommend: number;
+        total: number;
+    };
     overall: { avg_satisfaction: number; total_interviews: number };
 }
 
@@ -45,8 +52,16 @@ const reasonLabels: Record<string, string> = {
 };
 
 const pieColors = [
-    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-    '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+    '#3b82f6',
+    '#10b981',
+    '#f59e0b',
+    '#ef4444',
+    '#8b5cf6',
+    '#ec4899',
+    '#06b6d4',
+    '#84cc16',
+    '#f97316',
+    '#6366f1',
     '#14b8a6',
 ];
 
@@ -56,22 +71,35 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
         [trends.departure_reasons],
     );
 
-    const recommendPct = trends.recommend_stats.total > 0
-        ? Math.round((trends.recommend_stats.would_recommend / trends.recommend_stats.total) * 100)
-        : 0;
+    const recommendPct =
+        trends.recommend_stats.total > 0
+            ? Math.round(
+                  (trends.recommend_stats.would_recommend /
+                      trends.recommend_stats.total) *
+                      100,
+              )
+            : 0;
 
     const maxSatisfaction = useMemo(
-        () => Math.max(...trends.satisfaction_over_time.map((s) => s.avg_satisfaction), 5),
+        () =>
+            Math.max(
+                ...trends.satisfaction_over_time.map((s) => s.avg_satisfaction),
+                5,
+            ),
         [trends.satisfaction_over_time],
     );
 
     function handleFilter(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
-        router.get('/hr/exit-interviews/trends', {
-            from: formData.get('from') as string,
-            to: formData.get('to') as string,
-        }, { preserveState: true });
+        router.get(
+            '/hr/exit-interviews/trends',
+            {
+                from: formData.get('from') as string,
+                to: formData.get('to') as string,
+            },
+            { preserveState: true },
+        );
     }
 
     return (
@@ -79,8 +107,15 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
             <Head title="Exit Interview Trends" />
 
             <PageShell>
-                <PageHeader title="Exit Interview Trends" description="Aggregate analysis of departure feedback.">
-                    <Button size="sm" variant="outline" onClick={() => router.get('/hr/exit-interviews')}>
+                <PageHeader
+                    title="Exit Interview Trends"
+                    description="Aggregate analysis of departure feedback."
+                >
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.get('/hr/exit-interviews')}
+                    >
                         <ArrowLeft className="mr-1.5 h-4 w-4" />
                         Back to List
                     </Button>
@@ -91,14 +126,28 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     <Card>
                         <CardContent className="flex flex-wrap items-end gap-4 p-4">
                             <div>
-                                <Label className="text-xs text-muted-foreground">From</Label>
-                                <Input type="date" name="from" defaultValue={filters.from} />
+                                <Label className="text-xs text-muted-foreground">
+                                    From
+                                </Label>
+                                <Input
+                                    type="date"
+                                    name="from"
+                                    defaultValue={filters.from}
+                                />
                             </div>
                             <div>
-                                <Label className="text-xs text-muted-foreground">To</Label>
-                                <Input type="date" name="to" defaultValue={filters.to} />
+                                <Label className="text-xs text-muted-foreground">
+                                    To
+                                </Label>
+                                <Input
+                                    type="date"
+                                    name="to"
+                                    defaultValue={filters.to}
+                                />
                             </div>
-                            <Button type="submit" size="sm">Apply</Button>
+                            <Button type="submit" size="sm">
+                                Apply
+                            </Button>
                         </CardContent>
                     </Card>
                 </form>
@@ -111,8 +160,12 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                 <Users className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{trends.overall.total_interviews}</p>
-                                <p className="text-xs text-muted-foreground">Total Interviews</p>
+                                <p className="text-2xl font-bold">
+                                    {trends.overall.total_interviews}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Total Interviews
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -122,8 +175,12 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                 <Star className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{trends.overall.avg_satisfaction || '-'}</p>
-                                <p className="text-xs text-muted-foreground">Avg Satisfaction (1-5)</p>
+                                <p className="text-2xl font-bold">
+                                    {trends.overall.avg_satisfaction || '-'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Avg Satisfaction (1-5)
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -133,8 +190,12 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                 <ThumbsUp className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{recommendPct}%</p>
-                                <p className="text-xs text-muted-foreground">Would Recommend</p>
+                                <p className="text-2xl font-bold">
+                                    {recommendPct}%
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Would Recommend
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -144,8 +205,12 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                 <TrendingUp className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{trends.departure_reasons.length}</p>
-                                <p className="text-xs text-muted-foreground">Unique Reasons</p>
+                                <p className="text-2xl font-bold">
+                                    {trends.departure_reasons.length}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Unique Reasons
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -155,33 +220,57 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     {/* Departure Reasons */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Departure Reasons</CardTitle>
+                            <CardTitle className="text-base">
+                                Departure Reasons
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {trends.departure_reasons.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No data available.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No data available.
+                                </p>
                             ) : (
                                 <div className="space-y-3">
-                                    {trends.departure_reasons.map((item, idx) => {
-                                        const pct = totalReasons > 0 ? Math.round((item.count / totalReasons) * 100) : 0;
-                                        return (
-                                            <div key={item.reason}>
-                                                <div className="mb-1 flex items-center justify-between text-sm">
-                                                    <span>{reasonLabels[item.reason] ?? item.reason}</span>
-                                                    <span className="text-muted-foreground">{item.count} ({pct}%)</span>
+                                    {trends.departure_reasons.map(
+                                        (item, idx) => {
+                                            const pct =
+                                                totalReasons > 0
+                                                    ? Math.round(
+                                                          (item.count /
+                                                              totalReasons) *
+                                                              100,
+                                                      )
+                                                    : 0;
+                                            return (
+                                                <div key={item.reason}>
+                                                    <div className="mb-1 flex items-center justify-between text-sm">
+                                                        <span>
+                                                            {reasonLabels[
+                                                                item.reason
+                                                            ] ?? item.reason}
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                            {item.count} ({pct}
+                                                            %)
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                                        <div
+                                                            className="h-full rounded-full transition-all"
+                                                            style={{
+                                                                width: `${pct}%`,
+                                                                backgroundColor:
+                                                                    pieColors[
+                                                                        idx %
+                                                                            pieColors.length
+                                                                    ],
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                                    <div
-                                                        className="h-full rounded-full transition-all"
-                                                        style={{
-                                                            width: `${pct}%`,
-                                                            backgroundColor: pieColors[idx % pieColors.length],
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        },
+                                    )}
                                 </div>
                             )}
                         </CardContent>
@@ -190,32 +279,48 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     {/* Satisfaction Over Time */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Satisfaction Over Time</CardTitle>
+                            <CardTitle className="text-base">
+                                Satisfaction Over Time
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {trends.satisfaction_over_time.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No data available.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No data available.
+                                </p>
                             ) : (
                                 <div className="space-y-2">
-                                    {trends.satisfaction_over_time.map((item) => {
-                                        const pct = (item.avg_satisfaction / 5) * 100;
-                                        return (
-                                            <div key={item.month}>
-                                                <div className="mb-1 flex items-center justify-between text-sm">
-                                                    <span>{item.month}</span>
-                                                    <span className="text-muted-foreground">
-                                                        {item.avg_satisfaction}/5 ({item.count} interviews)
-                                                    </span>
+                                    {trends.satisfaction_over_time.map(
+                                        (item) => {
+                                            const pct =
+                                                (item.avg_satisfaction / 5) *
+                                                100;
+                                            return (
+                                                <div key={item.month}>
+                                                    <div className="mb-1 flex items-center justify-between text-sm">
+                                                        <span>
+                                                            {item.month}
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                            {
+                                                                item.avg_satisfaction
+                                                            }
+                                                            /5 ({item.count}{' '}
+                                                            interviews)
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                                                        <div
+                                                            className="h-full rounded-full bg-status-warning transition-all"
+                                                            style={{
+                                                                width: `${pct}%`,
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                                    <div
-                                                        className="h-full rounded-full bg-status-warning transition-all"
-                                                        style={{ width: `${pct}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        },
+                                    )}
                                 </div>
                             )}
                         </CardContent>
@@ -224,18 +329,27 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     {/* Recommendation Split */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Would Recommend</CardTitle>
+                            <CardTitle className="text-base">
+                                Would Recommend
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {trends.recommend_stats.total === 0 ? (
-                                <p className="text-sm text-muted-foreground">No data available.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No data available.
+                                </p>
                             ) : (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-4">
                                         <div className="flex-1">
                                             <div className="mb-1 flex justify-between text-sm">
                                                 <span>Yes</span>
-                                                <span className="text-status-success">{trends.recommend_stats.would_recommend}</span>
+                                                <span className="text-status-success">
+                                                    {
+                                                        trends.recommend_stats
+                                                            .would_recommend
+                                                    }
+                                                </span>
                                             </div>
                                             <div className="h-3 overflow-hidden rounded-full bg-muted">
                                                 <div
@@ -251,7 +365,12 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                         <div className="flex-1">
                                             <div className="mb-1 flex justify-between text-sm">
                                                 <span>No</span>
-                                                <span className="text-status-critical">{trends.recommend_stats.would_not_recommend}</span>
+                                                <span className="text-status-critical">
+                                                    {
+                                                        trends.recommend_stats
+                                                            .would_not_recommend
+                                                    }
+                                                </span>
                                             </div>
                                             <div className="h-3 overflow-hidden rounded-full bg-muted">
                                                 <div
@@ -264,7 +383,8 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                         </div>
                                     </div>
                                     <p className="text-center text-xs text-muted-foreground">
-                                        Based on {trends.recommend_stats.total} responses
+                                        Based on {trends.recommend_stats.total}{' '}
+                                        responses
                                     </p>
                                 </div>
                             )}

@@ -35,10 +35,12 @@ type Props = {
 
 function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
     return (
-        <div className="p-4 rounded-lg border bg-white">
+        <Card>
+            <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className={cn('text-2xl font-bold', color)}>{value}</p>
-        </div>
+            </CardContent>
+        </Card>
     );
 }
 

@@ -8,12 +8,10 @@ import {
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     ArrowUpRight,
     CheckCircle2,
     ChevronRight,
@@ -95,11 +93,34 @@ interface Props {
 
 // --- Severity config ---
 
-const severityConfig: Record<string, { label: string; className: string; borderColor: string; order: number }> = {
-    critical: { label: 'Critical', className: 'bg-status-critical text-white', borderColor: 'border-l-red-600', order: 0 },
-    high: { label: 'High', className: 'bg-status-warning text-white', borderColor: 'border-l-orange-500', order: 1 },
-    medium: { label: 'Medium', className: 'bg-status-warning text-white', borderColor: 'border-l-yellow-500', order: 2 },
-    low: { label: 'Low', className: 'bg-status-info text-white', borderColor: 'border-l-blue-500', order: 3 },
+const severityConfig: Record<
+    string,
+    { label: string; className: string; borderColor: string; order: number }
+> = {
+    critical: {
+        label: 'Critical',
+        className: 'bg-status-critical text-white',
+        borderColor: 'border-l-red-600',
+        order: 0,
+    },
+    high: {
+        label: 'High',
+        className: 'bg-status-warning text-white',
+        borderColor: 'border-l-orange-500',
+        order: 1,
+    },
+    medium: {
+        label: 'Medium',
+        className: 'bg-status-warning text-white',
+        borderColor: 'border-l-yellow-500',
+        order: 2,
+    },
+    low: {
+        label: 'Low',
+        className: 'bg-status-info text-white',
+        borderColor: 'border-l-blue-500',
+        order: 3,
+    },
 };
 
 const tierBgColors: Record<number, string> = {
@@ -185,7 +206,9 @@ function getSlaStatusDotColor(
     return 'bg-status-success';
 }
 
-function getSlaCountdownColor(color: 'green' | 'yellow' | 'red' | 'muted'): string {
+function getSlaCountdownColor(
+    color: 'green' | 'yellow' | 'red' | 'muted',
+): string {
     switch (color) {
         case 'green':
             return 'text-status-success';
@@ -200,7 +223,11 @@ function getSlaCountdownColor(color: 'green' | 'yellow' | 'red' | 'muted'): stri
 
 function isAlertBreached(sla: AlertSla | null): boolean {
     if (!sla) return false;
-    return sla.acknowledge_breached || sla.response_breached || sla.resolution_breached;
+    return (
+        sla.acknowledge_breached ||
+        sla.response_breached ||
+        sla.resolution_breached
+    );
 }
 
 function getInitial(name: string): string {
@@ -222,7 +249,12 @@ function SlaTimerDisplay({
     breached: boolean;
     nowMs: number;
 }) {
-    const countdown = computeSlaCountdown(deadline, completedAt, breached, nowMs);
+    const countdown = computeSlaCountdown(
+        deadline,
+        completedAt,
+        breached,
+        nowMs,
+    );
     const colorClass = getSlaCountdownColor(countdown.color);
 
     return (
@@ -234,15 +266,42 @@ function SlaTimerDisplay({
 }
 
 function SlaDotsCompact({ sla, nowMs }: { sla: AlertSla; nowMs: number }) {
-    const ackColor = getSlaStatusDotColor(sla.acknowledge_deadline, sla.acknowledged_at, sla.acknowledge_breached, nowMs);
-    const respColor = getSlaStatusDotColor(sla.response_deadline, sla.responded_at, sla.response_breached, nowMs);
-    const resColor = getSlaStatusDotColor(sla.resolution_deadline, sla.resolved_at, sla.resolution_breached, nowMs);
+    const ackColor = getSlaStatusDotColor(
+        sla.acknowledge_deadline,
+        sla.acknowledged_at,
+        sla.acknowledge_breached,
+        nowMs,
+    );
+    const respColor = getSlaStatusDotColor(
+        sla.response_deadline,
+        sla.responded_at,
+        sla.response_breached,
+        nowMs,
+    );
+    const resColor = getSlaStatusDotColor(
+        sla.resolution_deadline,
+        sla.resolved_at,
+        sla.resolution_breached,
+        nowMs,
+    );
 
     return (
-        <div className="flex items-center gap-1.5" title="SLA: Ack / Respond / Resolve">
-            <div className={`h-2 w-2 rounded-full ${ackColor}`} title="Acknowledge" />
-            <div className={`h-2 w-2 rounded-full ${respColor}`} title="Respond" />
-            <div className={`h-2 w-2 rounded-full ${resColor}`} title="Resolve" />
+        <div
+            className="flex items-center gap-1.5"
+            title="SLA: Ack / Respond / Resolve"
+        >
+            <div
+                className={`h-2 w-2 rounded-full ${ackColor}`}
+                title="Acknowledge"
+            />
+            <div
+                className={`h-2 w-2 rounded-full ${respColor}`}
+                title="Respond"
+            />
+            <div
+                className={`h-2 w-2 rounded-full ${resColor}`}
+                title="Resolve"
+            />
         </div>
     );
 }
@@ -316,8 +375,10 @@ function AlertCard({
 
     return (
         <div
-            className={`rounded-lg border-l-4 border bg-card transition-all ${sev.borderColor} ${
-                breached ? 'animate-pulse-subtle border-r-red-300 border-t-red-300 border-b-red-300 shadow-red-100 shadow-sm' : 'border-r-border border-t-border border-b-border'
+            className={`rounded-lg border border-l-4 bg-card transition-all ${sev.borderColor} ${
+                breached
+                    ? 'animate-pulse-subtle border-t-red-300 border-r-red-300 border-b-red-300 shadow-sm shadow-red-100'
+                    : 'border-t-border border-r-border border-b-border'
             } ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
         >
             <div className="p-3">
@@ -333,13 +394,23 @@ function AlertCard({
                             />
                         )}
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold leading-tight truncate">{alert.alert_type}</p>
-                            <span className="text-[10px] font-medium text-muted-foreground">#{alert.id}</span>
+                            <p className="truncate text-sm leading-tight font-semibold">
+                                {alert.alert_type}
+                            </p>
+                            <span className="text-[10px] font-medium text-muted-foreground">
+                                #{alert.id}
+                            </span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <Badge className={`text-[10px] px-1.5 py-0 ${sev.className}`}>{sev.label}</Badge>
-                        {breached && <ShieldAlert className="h-3.5 w-3.5 text-status-critical" />}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                        <Badge
+                            className={`px-1.5 py-0 text-[10px] ${sev.className}`}
+                        >
+                            {sev.label}
+                        </Badge>
+                        {breached && (
+                            <ShieldAlert className="h-3.5 w-3.5 text-status-critical" />
+                        )}
                     </div>
                 </div>
 
@@ -350,15 +421,23 @@ function AlertCard({
                         {alert.client_name && (
                             <>
                                 <span className="text-border">|</span>
-                                <span className="truncate">{alert.client_name}</span>
+                                <span className="truncate">
+                                    {alert.client_name}
+                                </span>
                             </>
                         )}
                     </div>
                     <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3 shrink-0" />
-                        <span>{formatTimeInQueue(alert.entered_queue_at, nowMs)} in queue</span>
+                        <span>
+                            {formatTimeInQueue(alert.entered_queue_at, nowMs)}{' '}
+                            in queue
+                        </span>
                         {alert.status !== 'open' && (
-                            <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0 capitalize">
+                            <Badge
+                                variant="outline"
+                                className="ml-1 px-1 py-0 text-[9px] capitalize"
+                            >
                                 {alert.status}
                             </Badge>
                         )}
@@ -402,12 +481,16 @@ function AlertCard({
                             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
                                 {getInitial(alert.assigned_to.name)}
                             </div>
-                            <span className="text-foreground">{alert.assigned_to.name}</span>
+                            <span className="text-foreground">
+                                {alert.assigned_to.name}
+                            </span>
                         </>
                     ) : (
                         <>
                             <User className="h-3.5 w-3.5 text-muted-foreground/50" />
-                            <span className="text-muted-foreground/50 italic">Unassigned</span>
+                            <span className="text-muted-foreground/50 italic">
+                                Unassigned
+                            </span>
                         </>
                     )}
                 </div>
@@ -419,7 +502,7 @@ function AlertCard({
                         <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 px-2 text-xs border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
+                            className="h-7 border-status-warning/30 px-2 text-xs text-status-warning hover:bg-status-warning-bg"
                             onClick={handleAcknowledge}
                             disabled={acking}
                         >
@@ -464,7 +547,9 @@ function AlertCard({
                         size="sm"
                         variant="ghost"
                         className="ml-auto h-7 w-7 p-0"
-                        onClick={() => router.visit(`/control-room/alerts/${alert.id}`)}
+                        onClick={() =>
+                            router.visit(`/control-room/alerts/${alert.id}`)
+                        }
                         title="View alert detail"
                     >
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -492,7 +577,9 @@ function QueueColumn({
     selectedAlertIds: Set<number>;
     onToggleSelect: (id: number) => void;
 }) {
-    const breachedCount = queue.alerts.filter((a) => isAlertBreached(a.sla)).length;
+    const breachedCount = queue.alerts.filter((a) =>
+        isAlertBreached(a.sla),
+    ).length;
     const capacityPercent = Math.min(100, (queue.alert_count / 20) * 100);
     const tierBg = tierBgColors[queue.tier] ?? tierBgColors[1];
 
@@ -502,17 +589,27 @@ function QueueColumn({
             <div className="border-b p-4">
                 <div className="mb-2 flex items-center gap-3">
                     {/* Tier number with colored circle */}
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-lg font-bold ${tierBg}`}>
+                    <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white ${tierBg}`}
+                    >
                         {queue.tier}
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-semibold truncate">{queue.name}</h3>
-                            <Badge variant="secondary" className="tabular-nums shrink-0">
+                            <h3 className="truncate text-sm font-semibold">
+                                {queue.name}
+                            </h3>
+                            <Badge
+                                variant="secondary"
+                                className="shrink-0 tabular-nums"
+                            >
                                 {queue.alert_count}
                             </Badge>
                             {breachedCount > 0 && (
-                                <Badge variant="destructive" className="tabular-nums shrink-0 text-[10px] px-1.5">
+                                <Badge
+                                    variant="destructive"
+                                    className="shrink-0 px-1.5 text-[10px] tabular-nums"
+                                >
                                     {breachedCount} breached
                                 </Badge>
                             )}
@@ -520,14 +617,17 @@ function QueueColumn({
                         {queue.auto_escalate_after_minutes && (
                             <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                                 <Timer className="h-3 w-3" />
-                                Auto-escalates after {queue.auto_escalate_after_minutes}m
+                                Auto-escalates after{' '}
+                                {queue.auto_escalate_after_minutes}m
                             </div>
                         )}
                     </div>
                 </div>
 
                 {queue.description && (
-                    <p className="mb-2 text-xs text-muted-foreground">{queue.description}</p>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                        {queue.description}
+                    </p>
                 )}
 
                 {/* Capacity progress bar */}
@@ -554,11 +654,16 @@ function QueueColumn({
             </div>
 
             {/* Alert cards */}
-            <div className="flex-1 space-y-2 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 360px)' }}>
+            <div
+                className="flex-1 space-y-2 overflow-y-auto p-3"
+                style={{ maxHeight: 'calc(100vh - 360px)' }}
+            >
                 {queue.alerts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                         <CheckCircle2 className="mb-2 h-8 w-8 text-status-success" />
-                        <p className="text-sm text-muted-foreground">Queue clear</p>
+                        <p className="text-sm text-muted-foreground">
+                            Queue clear
+                        </p>
                     </div>
                 ) : (
                     queue.alerts.map((alert) => (
@@ -582,12 +687,21 @@ function QueueColumn({
 
 // --- Main Page Component ---
 
-export default function EscalationQueue({ queues, allQueues, serverTime, can }: Props) {
+export default function EscalationQueue({
+    queues,
+    allQueues,
+    serverTime,
+    can,
+}: Props) {
     const [nowMs, setNowMs] = useState(() => new Date(serverTime).getTime());
-    const [selectedAlertIds, setSelectedAlertIds] = useState<Set<number>>(new Set());
+    const [selectedAlertIds, setSelectedAlertIds] = useState<Set<number>>(
+        new Set(),
+    );
     const [bulkEscalating, setBulkEscalating] = useState(false);
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+        null,
+    );
 
     // Client-side countdown ticker (1 second)
     useEffect(() => {
@@ -596,7 +710,8 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
         }, 1000);
 
         return () => {
-            if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+            if (countdownTimerRef.current)
+                clearInterval(countdownTimerRef.current);
         };
     }, []);
 
@@ -673,7 +788,9 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{queues.length}</p>
+                            <p className="text-2xl font-bold">
+                                {queues.length}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -693,7 +810,9 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className={`text-2xl font-bold ${totalBreached > 0 ? 'text-status-critical' : ''}`}>
+                            <p
+                                className={`text-2xl font-bold ${totalBreached > 0 ? 'text-status-critical' : ''}`}
+                            >
                                 {totalBreached}
                             </p>
                         </CardContent>
@@ -705,7 +824,9 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{selectedAlertIds.size}</p>
+                            <p className="text-2xl font-bold">
+                                {selectedAlertIds.size}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
@@ -719,7 +840,8 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                                 No active triage queues configured
                             </p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Set up triage queues to enable the escalation workflow.
+                                Set up triage queues to enable the escalation
+                                workflow.
                             </p>
                         </CardContent>
                     </Card>
@@ -750,9 +872,10 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
             {/* Floating bulk action bar */}
             {can.manage && selectedAlertIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 transform">
-                    <div className="flex items-center gap-3 rounded-xl border bg-card px-5 py-3 shadow-lg">
+                    <Card className="flex items-center gap-3 px-5 py-3 shadow-lg">
                         <span className="text-sm font-medium">
-                            {selectedAlertIds.size} alert{selectedAlertIds.size !== 1 ? 's' : ''} selected
+                            {selectedAlertIds.size} alert
+                            {selectedAlertIds.size !== 1 ? 's' : ''} selected
                         </span>
                         <Button
                             size="sm"
@@ -770,7 +893,7 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                         >
                             Clear
                         </Button>
-                    </div>
+                    </Card>
                 </div>
             )}
 

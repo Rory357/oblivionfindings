@@ -1,12 +1,18 @@
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, Plus, Star } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -56,12 +62,18 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
         const newGoals = [...goals];
         newGoals[index] = value;
         setGoals(newGoals);
-        setData('goals', newGoals.filter(g => g.trim() !== ''));
+        setData(
+            'goals',
+            newGoals.filter((g) => g.trim() !== ''),
+        );
     };
     const removeGoal = (index: number) => {
         const newGoals = goals.filter((_, i) => i !== index);
         setGoals(newGoals);
-        setData('goals', newGoals.filter(g => g.trim() !== ''));
+        setData(
+            'goals',
+            newGoals.filter((g) => g.trim() !== ''),
+        );
     };
 
     const addTraining = () => setTraining([...training, '']);
@@ -69,12 +81,18 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
         const newTraining = [...training];
         newTraining[index] = value;
         setTraining(newTraining);
-        setData('training_recommendations', newTraining.filter(t => t.trim() !== ''));
+        setData(
+            'training_recommendations',
+            newTraining.filter((t) => t.trim() !== ''),
+        );
     };
     const removeTraining = (index: number) => {
         const newTraining = training.filter((_, i) => i !== index);
         setTraining(newTraining);
-        setData('training_recommendations', newTraining.filter(t => t.trim() !== ''));
+        setData(
+            'training_recommendations',
+            newTraining.filter((t) => t.trim() !== ''),
+        );
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -86,7 +104,7 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Schedule Performance Review" />
 
-            <div className="space-y-6 max-w-4xl">
+            <div className="max-w-4xl space-y-6">
                 <div className="flex items-center gap-4">
                     <Link href="/hr/performance/reviews">
                         <Button variant="outline" size="sm">
@@ -95,8 +113,12 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                         </Button>
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold">Schedule Performance Review</h1>
-                        <p className="text-muted-foreground">Create a new performance review for a staff member</p>
+                        <h1 className="text-2xl font-bold">
+                            Schedule Performance Review
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Create a new performance review for a staff member
+                        </p>
                     </div>
                 </div>
 
@@ -106,116 +128,205 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                             <CardTitle>Review Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="employee_user_id">
-                                        Staff Member <span className="text-status-critical">*</span>
+                                        Staff Member{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.employee_user_id}
-                                        onValueChange={(value) => setData('employee_user_id', value)}
+                                        onValueChange={(value) =>
+                                            setData('employee_user_id', value)
+                                        }
                                     >
-                                        <SelectTrigger id="employee_user_id" className={errors.employee_user_id ? 'border-status-critical/30' : ''}>
+                                        <SelectTrigger
+                                            id="employee_user_id"
+                                            className={
+                                                errors.employee_user_id
+                                                    ? 'border-status-critical/30'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select staff member" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {staff.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name} ({s.email})
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.employee_user_id && (
-                                        <p className="text-sm text-status-critical">{errors.employee_user_id}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.employee_user_id}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="review_type">
-                                        Review Type <span className="text-status-critical">*</span>
+                                        Review Type{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.review_type}
-                                        onValueChange={(value) => setData('review_type', value)}
+                                        onValueChange={(value) =>
+                                            setData('review_type', value)
+                                        }
                                     >
-                                        <SelectTrigger id="review_type" className={errors.review_type ? 'border-status-critical/30' : ''}>
+                                        <SelectTrigger
+                                            id="review_type"
+                                            className={
+                                                errors.review_type
+                                                    ? 'border-status-critical/30'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select review type" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {reviewTypes.map((type) => (
-                                                <SelectItem key={type.value} value={type.value}>
+                                                <SelectItem
+                                                    key={type.value}
+                                                    value={type.value}
+                                                >
                                                     {type.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.review_type && (
-                                        <p className="text-sm text-status-critical">{errors.review_type}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.review_type}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="review_period_start">
-                                        Period Start <span className="text-status-critical">*</span>
+                                        Period Start{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Input
                                         id="review_period_start"
                                         type="date"
                                         value={data.review_period_start}
-                                        onChange={(e) => setData('review_period_start', e.target.value)}
-                                        className={errors.review_period_start ? 'border-status-critical/30' : ''}
+                                        onChange={(e) =>
+                                            setData(
+                                                'review_period_start',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={
+                                            errors.review_period_start
+                                                ? 'border-status-critical/30'
+                                                : ''
+                                        }
                                     />
                                     {errors.review_period_start && (
-                                        <p className="text-sm text-status-critical">{errors.review_period_start}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.review_period_start}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="review_period_end">
-                                        Period End <span className="text-status-critical">*</span>
+                                        Period End{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Input
                                         id="review_period_end"
                                         type="date"
                                         value={data.review_period_end}
-                                        onChange={(e) => setData('review_period_end', e.target.value)}
-                                        className={errors.review_period_end ? 'border-status-critical/30' : ''}
+                                        onChange={(e) =>
+                                            setData(
+                                                'review_period_end',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={
+                                            errors.review_period_end
+                                                ? 'border-status-critical/30'
+                                                : ''
+                                        }
                                     />
                                     {errors.review_period_end && (
-                                        <p className="text-sm text-status-critical">{errors.review_period_end}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.review_period_end}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="next_review_date">Next Review Date</Label>
+                                    <Label htmlFor="next_review_date">
+                                        Next Review Date
+                                    </Label>
                                     <Input
                                         id="next_review_date"
                                         type="date"
                                         value={data.next_review_date}
-                                        onChange={(e) => setData('next_review_date', e.target.value)}
-                                        className={errors.next_review_date ? 'border-status-critical/30' : ''}
+                                        onChange={(e) =>
+                                            setData(
+                                                'next_review_date',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className={
+                                            errors.next_review_date
+                                                ? 'border-status-critical/30'
+                                                : ''
+                                        }
                                     />
                                     {errors.next_review_date && (
-                                        <p className="text-sm text-status-critical">{errors.next_review_date}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.next_review_date}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="overall_rating">Overall Rating</Label>
+                                    <Label htmlFor="overall_rating">
+                                        Overall Rating
+                                    </Label>
                                     <Select
                                         value={data.overall_rating}
-                                        onValueChange={(value) => setData('overall_rating', value)}
+                                        onValueChange={(value) =>
+                                            setData('overall_rating', value)
+                                        }
                                     >
                                         <SelectTrigger id="overall_rating">
                                             <SelectValue placeholder="Select rating" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="1">1 - Needs Improvement</SelectItem>
-                                            <SelectItem value="2">2 - Below Expectations</SelectItem>
-                                            <SelectItem value="3">3 - Meets Expectations</SelectItem>
-                                            <SelectItem value="4">4 - Exceeds Expectations</SelectItem>
-                                            <SelectItem value="5">5 - Outstanding</SelectItem>
+                                            <SelectItem value="1">
+                                                1 - Needs Improvement
+                                            </SelectItem>
+                                            <SelectItem value="2">
+                                                2 - Below Expectations
+                                            </SelectItem>
+                                            <SelectItem value="3">
+                                                3 - Meets Expectations
+                                            </SelectItem>
+                                            <SelectItem value="4">
+                                                4 - Exceeds Expectations
+                                            </SelectItem>
+                                            <SelectItem value="5">
+                                                5 - Outstanding
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -235,24 +346,47 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                     placeholder="What has the employee done well..."
                                     rows={4}
                                     value={data.strengths}
-                                    onChange={(e) => setData('strengths', e.target.value)}
-                                    className={errors.strengths ? 'border-status-critical/30' : ''}
+                                    onChange={(e) =>
+                                        setData('strengths', e.target.value)
+                                    }
+                                    className={
+                                        errors.strengths
+                                            ? 'border-status-critical/30'
+                                            : ''
+                                    }
                                 />
-                                {errors.strengths && <p className="text-sm text-status-critical">{errors.strengths}</p>}
+                                {errors.strengths && (
+                                    <p className="text-sm text-status-critical">
+                                        {errors.strengths}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="development_areas">Development Areas</Label>
+                                <Label htmlFor="development_areas">
+                                    Development Areas
+                                </Label>
                                 <Textarea
                                     id="development_areas"
                                     placeholder="Areas where the employee can improve..."
                                     rows={4}
                                     value={data.development_areas}
-                                    onChange={(e) => setData('development_areas', e.target.value)}
-                                    className={errors.development_areas ? 'border-status-critical/30' : ''}
+                                    onChange={(e) =>
+                                        setData(
+                                            'development_areas',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className={
+                                        errors.development_areas
+                                            ? 'border-status-critical/30'
+                                            : ''
+                                    }
                                 />
                                 {errors.development_areas && (
-                                    <p className="text-sm text-status-critical">{errors.development_areas}</p>
+                                    <p className="text-sm text-status-critical">
+                                        {errors.development_areas}
+                                    </p>
                                 )}
                             </div>
                         </CardContent>
@@ -261,7 +395,12 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Goals</CardTitle>
-                            <Button type="button" variant="outline" size="sm" onClick={addGoal}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addGoal}
+                            >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add Goal
                             </Button>
@@ -272,7 +411,9 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                     <Input
                                         placeholder={`Goal ${index + 1}`}
                                         value={goal}
-                                        onChange={(e) => updateGoal(index, e.target.value)}
+                                        onChange={(e) =>
+                                            updateGoal(index, e.target.value)
+                                        }
                                     />
                                     {goals.length > 1 && (
                                         <Button
@@ -293,7 +434,12 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Training Recommendations</CardTitle>
-                            <Button type="button" variant="outline" size="sm" onClick={addTraining}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addTraining}
+                            >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add Training
                             </Button>
@@ -304,14 +450,21 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                     <Input
                                         placeholder={`Training ${index + 1}`}
                                         value={item}
-                                        onChange={(e) => updateTraining(index, e.target.value)}
+                                        onChange={(e) =>
+                                            updateTraining(
+                                                index,
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                     {training.length > 1 && (
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => removeTraining(index)}
+                                            onClick={() =>
+                                                removeTraining(index)
+                                            }
                                             className="text-status-critical hover:text-status-critical"
                                         >
                                             Remove
@@ -324,7 +477,9 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
 
                     <div className="flex items-center justify-end gap-4">
                         <Link href="/hr/performance/reviews">
-                            <Button type="button" variant="outline">Cancel</Button>
+                            <Button type="button" variant="outline">
+                                Cancel
+                            </Button>
                         </Link>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Creating...' : 'Create Review'}

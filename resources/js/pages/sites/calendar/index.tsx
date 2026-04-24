@@ -1,10 +1,5 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Dialog,
     DialogContent,
@@ -13,8 +8,18 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState, useEffect, type FormEvent } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import {
+    Calendar as CalendarIcon,
+    ChevronLeft,
+    ChevronRight,
+    Plus,
+} from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 type Site = {
     id: number;
@@ -38,7 +43,9 @@ type Props = {
 };
 
 function toLocalDateTimeInputValue(date: Date): string {
-    const adjusted = new Date(date.getTime() - (date.getTimezoneOffset() * 60_000));
+    const adjusted = new Date(
+        date.getTime() - date.getTimezoneOffset() * 60_000,
+    );
     return adjusted.toISOString().slice(0, 16);
 }
 
@@ -71,27 +78,23 @@ export default function SiteCalendar({ site, canCreate }: Props) {
         end_at: defaultEndAt(),
     });
 
-    useEffect(() => {
-        fetchEvents();
-    }, [currentDate]);
-
-    useEffect(() => {
-        if (!canCreate) return;
-
-        const [, queryString = ''] = page.url.split('?');
-        const params = new URLSearchParams(queryString);
-        if (params.get('action') === 'add') {
-            setCreateOpen(true);
-        }
-    }, [page.url, canCreate]);
-
-    const fetchEvents = async () => {
+    const fetchEvents = useCallback(async () => {
         setLoading(true);
-        const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
-        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString();
-        
+        const start = new Date(
+            currentDate.getFullYear(),
+            currentDate.getMonth(),
+            1,
+        ).toISOString();
+        const end = new Date(
+            currentDate.getFullYear(),
+            currentDate.getMonth() + 1,
+            0,
+        ).toISOString();
+
         try {
-            const response = await fetch(`/sites/${site.id}/calendar/events?start=${start}&end=${end}`);
+            const response = await fetch(
+                `/sites/${site.id}/calendar/events?start=${start}&end=${end}`,
+            );
             if (!response.ok) {
                 setEvents([]);
                 return;
@@ -103,15 +106,46 @@ export default function SiteCalendar({ site, canCreate }: Props) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentDate, site.id]);
 
-    const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    useEffect(() => {
+        fetchEvents();
+    }, [fetchEvents]);
 
-    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+    useEffect(() => {
+        if (!canCreate) return;
 
-    const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-    const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+        const [, queryString = ''] = page.url.split('?');
+        const params = new URLSearchParams(queryString);
+        if (params.get('action') === 'add') {
+            setCreateOpen(true);
+        }
+    }, [page.url, canCreate]);
+
+    const monthName = currentDate.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+    });
+
+    const daysInMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0,
+    ).getDate();
+    const firstDayOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+    ).getDay();
+
+    const prevMonth = () =>
+        setCurrentDate(
+            new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1),
+        );
+    const nextMonth = () =>
+        setCurrentDate(
+            new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
+        );
     const openCreateDialog = () => setCreateOpen(true);
 
     const resetCreateForm = () => {
@@ -158,34 +192,50 @@ export default function SiteCalendar({ site, canCreate }: Props) {
     };
 
     const getEventsForDay = (day: number) => {
-        const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
-        return events.filter(e => new Date(e.start_at).toDateString() === dateStr);
+        const dateStr = new Date(
+            currentDate.getFullYear(),
+            currentDate.getMonth(),
+            day,
+        ).toDateString();
+        return events.filter(
+            (e) => new Date(e.start_at).toDateString() === dateStr,
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }, { title: 'Calendar', href: `/sites/${site.id}/calendar` }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Calendar', href: `/sites/${site.id}/calendar` },
+            ]}
+        >
             <Head title={`${site.name} - Calendar`} />
 
             <div className="m-4 space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <CalendarIcon className="w-5 h-5" />
+                        <h1 className="flex items-center gap-2 text-lg font-semibold">
+                            <CalendarIcon className="h-5 w-5" />
                             Site Calendar
                         </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {site.name}
+                        </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={prevMonth}>
-                            <ChevronLeft className="w-4 h-4" />
+                            <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="font-medium min-w-[140px] text-center">{monthName}</span>
+                        <span className="min-w-[140px] text-center font-medium">
+                            {monthName}
+                        </span>
                         <Button variant="outline" size="sm" onClick={nextMonth}>
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="h-4 w-4" />
                         </Button>
                         {canCreate && (
                             <Button className="ml-4" onClick={openCreateDialog}>
-                                <Plus className="w-4 h-4 mr-1" />
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add Event
                             </Button>
                         )}
@@ -196,47 +246,83 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                     <CardContent className="p-4">
                         {/* Calendar Grid */}
                         <div className="grid grid-cols-7 gap-1">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                            {[
+                                'Sun',
+                                'Mon',
+                                'Tue',
+                                'Wed',
+                                'Thu',
+                                'Fri',
+                                'Sat',
+                            ].map((day) => (
+                                <div
+                                    key={day}
+                                    className="py-2 text-center text-sm font-medium text-muted-foreground"
+                                >
                                     {day}
                                 </div>
                             ))}
-                            
-                            {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-                                <div key={`empty-${i}`} className="min-h-[100px]" />
-                            ))}
-                            
+
+                            {Array.from({ length: firstDayOfMonth }).map(
+                                (_, i) => (
+                                    <div
+                                        key={`empty-${i}`}
+                                        className="min-h-[100px]"
+                                    />
+                                ),
+                            )}
+
                             {Array.from({ length: daysInMonth }).map((_, i) => {
                                 const day = i + 1;
                                 const dayEvents = getEventsForDay(day);
-                                const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
-                                
+                                const isToday =
+                                    new Date().toDateString() ===
+                                    new Date(
+                                        currentDate.getFullYear(),
+                                        currentDate.getMonth(),
+                                        day,
+                                    ).toDateString();
+
                                 return (
                                     <div
                                         key={day}
-                                        className={`min-h-[100px] border rounded-lg p-2 ${
-                                            isToday ? 'bg-primary/10 border-primary/30' : 'border'
+                                        className={`min-h-[100px] rounded-lg border p-2 ${
+                                            isToday
+                                                ? 'border-primary/30 bg-primary/10'
+                                                : 'border'
                                         }`}
                                     >
-                                        <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : ''}`}>
+                                        <div
+                                            className={`mb-1 text-sm font-medium ${isToday ? 'text-primary' : ''}`}
+                                        >
                                             {day}
                                         </div>
                                         <div className="space-y-1">
-                                            {dayEvents.slice(0, 3).map(event => (
-                                                <div
-                                                    key={event.id}
-                                                    className={`text-xs p-1 rounded truncate ${
-                                                        event.event_type === 'maintenance' ? 'bg-status-warning-bg text-status-warning' :
-                                                        event.event_type === 'inspection' ? 'bg-primary/20 text-primary/70' :
-                                                        event.event_type === 'site_visit' ? 'bg-status-success-bg text-status-success' :
-                                                        'bg-muted text-muted-foreground'
-                                                    }`}
-                                                >
-                                                    {event.title}
-                                                </div>
-                                            ))}
+                                            {dayEvents
+                                                .slice(0, 3)
+                                                .map((event) => (
+                                                    <div
+                                                        key={event.id}
+                                                        className={`truncate rounded p-1 text-xs ${
+                                                            event.event_type ===
+                                                            'maintenance'
+                                                                ? 'bg-status-warning-bg text-status-warning'
+                                                                : event.event_type ===
+                                                                    'inspection'
+                                                                  ? 'bg-primary/20 text-primary/70'
+                                                                  : event.event_type ===
+                                                                      'site_visit'
+                                                                    ? 'bg-status-success-bg text-status-success'
+                                                                    : 'bg-muted text-muted-foreground'
+                                                        }`}
+                                                    >
+                                                        {event.title}
+                                                    </div>
+                                                ))}
                                             {dayEvents.length > 3 && (
-                                                <div className="text-xs text-muted-foreground">+{dayEvents.length - 3} more</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    +{dayEvents.length - 3} more
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -249,25 +335,33 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                 {/* Event Type Legend */}
                 <div className="flex flex-wrap gap-3 text-sm">
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-status-warning" />
-                        <span className="text-muted-foreground">Maintenance</span>
+                        <div className="h-3 w-3 rounded bg-status-warning" />
+                        <span className="text-muted-foreground">
+                            Maintenance
+                        </span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-primary/30" />
-                        <span className="text-muted-foreground">Inspection</span>
+                        <div className="h-3 w-3 rounded bg-primary/30" />
+                        <span className="text-muted-foreground">
+                            Inspection
+                        </span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-status-success" />
-                        <span className="text-muted-foreground">Site Visit</span>
+                        <div className="h-3 w-3 rounded bg-status-success" />
+                        <span className="text-muted-foreground">
+                            Site Visit
+                        </span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-status-info" />
-                        <span className="text-muted-foreground">Contractor</span>
+                        <div className="h-3 w-3 rounded bg-status-info" />
+                        <span className="text-muted-foreground">
+                            Contractor
+                        </span>
                     </div>
                 </div>
 
                 {loading && (
-                    <div className="text-center py-4 text-muted-foreground">
+                    <div className="py-4 text-center text-muted-foreground">
                         Loading events...
                     </div>
                 )}
@@ -288,11 +382,17 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                             <Input
                                 id="event_title"
                                 value={form.data.title}
-                                onChange={(e) => form.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
                                 placeholder="Event title"
                                 required
                             />
-                            {form.errors.title && <p className="text-sm text-status-critical mt-1">{form.errors.title}</p>}
+                            {form.errors.title && (
+                                <p className="mt-1 text-sm text-status-critical">
+                                    {form.errors.title}
+                                </p>
+                            )}
                         </div>
 
                         <div>
@@ -300,8 +400,10 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                             <select
                                 id="event_type"
                                 value={form.data.event_type}
-                                onChange={(e) => form.setData('event_type', e.target.value)}
-                                className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+                                onChange={(e) =>
+                                    form.setData('event_type', e.target.value)
+                                }
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
                                 <option value="event">Event</option>
                                 <option value="maintenance">Maintenance</option>
@@ -309,7 +411,11 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                 <option value="site_visit">Site Visit</option>
                                 <option value="contractor">Contractor</option>
                             </select>
-                            {form.errors.event_type && <p className="text-sm text-status-critical mt-1">{form.errors.event_type}</p>}
+                            {form.errors.event_type && (
+                                <p className="mt-1 text-sm text-status-critical">
+                                    {form.errors.event_type}
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -319,10 +425,16 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                     id="event_start_at"
                                     type="datetime-local"
                                     value={form.data.start_at}
-                                    onChange={(e) => form.setData('start_at', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('start_at', e.target.value)
+                                    }
                                     required
                                 />
-                                {form.errors.start_at && <p className="text-sm text-status-critical mt-1">{form.errors.start_at}</p>}
+                                {form.errors.start_at && (
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {form.errors.start_at}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <Label htmlFor="event_end_at">End</Label>
@@ -330,22 +442,36 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                     id="event_end_at"
                                     type="datetime-local"
                                     value={form.data.end_at}
-                                    onChange={(e) => form.setData('end_at', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('end_at', e.target.value)
+                                    }
                                 />
-                                {form.errors.end_at && <p className="text-sm text-status-critical mt-1">{form.errors.end_at}</p>}
+                                {form.errors.end_at && (
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {form.errors.end_at}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
                         <div>
-                            <Label htmlFor="event_description">Description</Label>
+                            <Label htmlFor="event_description">
+                                Description
+                            </Label>
                             <Textarea
                                 id="event_description"
                                 rows={3}
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="Optional details"
                             />
-                            {form.errors.description && <p className="text-sm text-status-critical mt-1">{form.errors.description}</p>}
+                            {form.errors.description && (
+                                <p className="mt-1 text-sm text-status-critical">
+                                    {form.errors.description}
+                                </p>
+                            )}
                         </div>
 
                         <DialogFooter>

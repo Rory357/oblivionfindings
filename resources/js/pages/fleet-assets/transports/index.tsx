@@ -121,7 +121,7 @@ export default function TransportsIndex({
     vehicles: rawVehicles,
     stats: rawStats,
 }: Props) {
-    const transports = rawTransports?.data ?? [];
+    const transports = useMemo(() => rawTransports?.data ?? [], [rawTransports?.data]);
     const meta = rawTransports?.meta ?? {
         current_page: 1,
         last_page: 1,

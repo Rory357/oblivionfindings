@@ -121,6 +121,7 @@ export default function ShiftFormsCard({
     useEffect(() => {
         submissionForm.setData('data', buildInitialValues(selectedForm));
         submissionForm.clearErrors();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- The Inertia form helper is intentionally stable for this reset; including it would retrigger on setData.
     }, [selectedForm]);
 
     const submit = () => {
@@ -165,7 +166,9 @@ export default function ShiftFormsCard({
                         }
                     />
                     {error ? (
-                        <div className="text-xs text-status-critical">{error}</div>
+                        <div className="text-xs text-status-critical">
+                            {error}
+                        </div>
                     ) : null}
                 </div>
             );
@@ -234,7 +237,9 @@ export default function ShiftFormsCard({
                         </SelectContent>
                     </Select>
                     {error ? (
-                        <div className="text-xs text-status-critical">{error}</div>
+                        <div className="text-xs text-status-critical">
+                            {error}
+                        </div>
                     ) : null}
                 </div>
             );

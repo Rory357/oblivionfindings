@@ -3,7 +3,10 @@ import GlobalNavSearch from '@/components/global-nav-search';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
 import { Button } from '@/components/ui/button';
-import { type BreadcrumbItem as BreadcrumbItemType, type SharedData } from '@/types';
+import {
+    type BreadcrumbItem as BreadcrumbItemType,
+    type SharedData,
+} from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import { PanelLeftIcon, ShieldAlert } from 'lucide-react';
 
@@ -27,7 +30,8 @@ export function AppSidebarHeader({
                     <div className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 shrink-0" />
                         <span>
-                            You are impersonating <strong>{auth.user.name}</strong>
+                            You are impersonating{' '}
+                            <strong>{auth.user.name}</strong>
                             {auth.impersonator && (
                                 <> (logged in as {auth.impersonator.name})</>
                             )}
@@ -45,13 +49,16 @@ export function AppSidebarHeader({
             <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border/50 px-6 md:px-4">
                 <div className="flex min-w-0 items-center gap-2">
                     {onMobileMenuToggle && (
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={onMobileMenuToggle}
-                            className="-ml-1 h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-accent md:hidden"
+                            className="-ml-1 h-7 w-7 md:hidden"
                         >
                             <PanelLeftIcon className="h-4 w-4" />
                             <span className="sr-only">Toggle Menu</span>
-                        </button>
+                        </Button>
                     )}
                     <Breadcrumbs breadcrumbs={breadcrumbs} />
                 </div>

@@ -1,14 +1,27 @@
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Head, Link, router } from '@inertiajs/react';
-import { Search, Plus, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle, CheckCircle, Clock, Plus, Search } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -51,11 +64,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDate = (value?: string | null) => {
     if (!value) return '--';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const getStatusColor = (status: string) => {
@@ -80,7 +95,9 @@ const isExpiringSoon = (expiresAt: string | null) => {
     const d = new Date(expiresAt);
     const now = new Date();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    return d.getTime() - now.getTime() < thirtyDays && d.getTime() > now.getTime();
+    return (
+        d.getTime() - now.getTime() < thirtyDays && d.getTime() > now.getTime()
+    );
 };
 
 const isExpired = (expiresAt: string | null) => {
@@ -104,7 +121,11 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/compliance/vetting', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/compliance/vetting',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -114,7 +135,9 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">Vetting Register</h1>
+                        <h1 className="text-lg font-semibold">
+                            Vetting Register
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
                             Staff background checks, DBS, and vetting records
                         </div>
@@ -135,31 +158,43 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                 <div className="grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Records</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Total Records
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{summary.total}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Clear</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <CheckCircle className="h-5 w-5 text-status-success" />
-                                <div className="text-2xl font-bold text-status-success">{summary.clear}</div>
+                            <div className="text-2xl font-bold">
+                                {summary.total}
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring Soon</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Clear
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="h-5 w-5 text-status-success" />
+                                <div className="text-2xl font-bold text-status-success">
+                                    {summary.clear}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Expiring Soon
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
                                 <Clock className="h-5 w-5 text-status-warning" />
-                                <div className={`text-2xl font-bold ${summary.expiring > 0 ? 'text-status-warning' : ''}`}>
+                                <div
+                                    className={`text-2xl font-bold ${summary.expiring > 0 ? 'text-status-warning' : ''}`}
+                                >
                                     {summary.expiring}
                                 </div>
                             </div>
@@ -167,12 +202,18 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expired</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Expired
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
-                                {summary.expired > 0 && <AlertTriangle className="h-5 w-5 text-status-critical" />}
-                                <div className={`text-2xl font-bold ${summary.expired > 0 ? 'text-status-critical' : ''}`}>
+                                {summary.expired > 0 && (
+                                    <AlertTriangle className="h-5 w-5 text-status-critical" />
+                                )}
+                                <div
+                                    className={`text-2xl font-bold ${summary.expired > 0 ? 'text-status-critical' : ''}`}
+                                >
                                     {summary.expired}
                                 </div>
                             </div>
@@ -180,18 +221,26 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Pending
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{summary.pending}</div>
+                            <div className="text-2xl font-bold">
+                                {summary.pending}
+                            </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Flagged</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Flagged
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-status-critical">{summary.flagged}</div>
+                            <div className="text-2xl font-bold text-status-critical">
+                                {summary.flagged}
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -202,29 +251,45 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by staff name or reference..."
                                     value={filters.q || ''}
-                                    onChange={(e) => onFilter({ q: e.target.value })}
+                                    onChange={(e) =>
+                                        onFilter({ q: e.target.value })
+                                    }
                                     className="pl-9"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? NONE}
-                                onValueChange={(v) => onFilter({ status: v === NONE ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === NONE ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All statuses" />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>All Statuses</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        All Statuses
+                                    </SelectItem>
                                     {statuses.map((s) => (
-                                        <SelectItem key={s} value={s} className="capitalize">
+                                        <SelectItem
+                                            key={s}
+                                            value={s}
+                                            className="capitalize"
+                                        >
                                             {s.replace(/_/g, ' ')}
                                         </SelectItem>
                                     ))}
@@ -242,41 +307,64 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                     <TableHead>Staff Member</TableHead>
                                     <TableHead>Check Type</TableHead>
                                     <TableHead>Reference</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Issued</TableHead>
-                                        <TableHead>Expires</TableHead>
-                                        <TableHead className="w-20"></TableHead>
-                                    </TableRow>
-                                </TableHeader>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Issued</TableHead>
+                                    <TableHead>Expires</TableHead>
+                                    <TableHead className="w-20"></TableHead>
+                                </TableRow>
+                            </TableHeader>
                             <TableBody>
                                 {checks.data.map((check) => (
                                     <TableRow key={check.id}>
                                         <TableCell>
-                                            <div className="font-medium">{check.user.name}</div>
+                                            <div className="font-medium">
+                                                {check.user.name}
+                                            </div>
                                             {check.user.email && (
-                                                <div className="text-xs text-muted-foreground">{check.user.email}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {check.user.email}
+                                                </div>
                                             )}
                                         </TableCell>
                                         <TableCell className="capitalize">
-                                            {check.check_type.replace(/_/g, ' ')}
+                                            {check.check_type.replace(
+                                                /_/g,
+                                                ' ',
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {check.reference_number || '--'}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={getStatusColor(check.status)}>
-                                                {check.status.replace(/_/g, ' ')}
+                                            <Badge
+                                                className={getStatusColor(
+                                                    check.status,
+                                                )}
+                                            >
+                                                {check.status.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{formatDate(check.issue_date || check.check_date)}</TableCell>
                                         <TableCell>
-                                            <span className={
-                                                isExpired(check.expires_at)
-                                                    ? 'font-semibold text-status-critical'
-                                                    : isExpiringSoon(check.expires_at)
-                                                        ? 'font-medium text-status-warning'
-                                                        : ''
-                                            }>
+                                            {formatDate(
+                                                check.issue_date ||
+                                                    check.check_date,
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <span
+                                                className={
+                                                    isExpired(check.expires_at)
+                                                        ? 'font-semibold text-status-critical'
+                                                        : isExpiringSoon(
+                                                                check.expires_at,
+                                                            )
+                                                          ? 'font-medium text-status-warning'
+                                                          : ''
+                                                }
+                                            >
                                                 {formatDate(check.expires_at)}
                                             </span>
                                         </TableCell>
@@ -292,7 +380,10 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                 ))}
                                 {!checks.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No vetting records found.
                                         </TableCell>
                                     </TableRow>

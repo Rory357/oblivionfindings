@@ -1,14 +1,21 @@
-import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { CheckCircle, XCircle, Send, DollarSign } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { CheckCircle, DollarSign, Send, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
 type ExpenseItem = {
     id: number;
@@ -50,11 +57,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
-    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
-    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
-    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
-    paid: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Paid' },
+    draft: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        label: 'Draft',
+    },
+    submitted: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Submitted',
+    },
+    approved: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Approved',
+    },
+    rejected: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Rejected',
+    },
+    paid: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Paid',
+    },
 };
 
 const categoryLabels: Record<string, string> = {
@@ -67,7 +93,10 @@ const categoryLabels: Record<string, string> = {
 };
 
 const formatCurrency = (amount: number, currency = 'NZD') => {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(amount);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency,
+    }).format(amount);
 };
 
 export default function ExpenseShow({ claim, can }: Props) {
@@ -84,15 +113,26 @@ export default function ExpenseShow({ claim, can }: Props) {
                     <div>
                         <h1 className="text-2xl font-bold">{claim.title}</h1>
                         <div className="mt-1 flex items-center gap-2">
-                            <span className="font-mono text-sm text-muted-foreground">{claim.claim_number}</span>
-                            <Badge variant="outline" className={config.className}>{config.label}</Badge>
+                            <span className="font-mono text-sm text-muted-foreground">
+                                {claim.claim_number}
+                            </span>
+                            <Badge
+                                variant="outline"
+                                className={config.className}
+                            >
+                                {config.label}
+                            </Badge>
                         </div>
                     </div>
                     <div className="flex gap-2">
                         {claim.status === 'draft' && (
                             <Button
                                 size="sm"
-                                onClick={() => router.post(`/hr/expenses/${claim.id}/submit`)}
+                                onClick={() =>
+                                    router.post(
+                                        `/hr/expenses/${claim.id}/submit`,
+                                    )
+                                }
                             >
                                 <Send className="mr-1.5 h-3.5 w-3.5" />
                                 Submit
@@ -102,7 +142,11 @@ export default function ExpenseShow({ claim, can }: Props) {
                             <>
                                 <Button
                                     size="sm"
-                                    onClick={() => router.post(`/hr/expenses/${claim.id}/approve`)}
+                                    onClick={() =>
+                                        router.post(
+                                            `/hr/expenses/${claim.id}/approve`,
+                                        )
+                                    }
                                 >
                                     <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
                                     Approve
@@ -120,7 +164,11 @@ export default function ExpenseShow({ claim, can }: Props) {
                         {can.manage && claim.status === 'approved' && (
                             <Button
                                 size="sm"
-                                onClick={() => router.post(`/hr/expenses/${claim.id}/mark-paid`)}
+                                onClick={() =>
+                                    router.post(
+                                        `/hr/expenses/${claim.id}/mark-paid`,
+                                    )
+                                }
                             >
                                 <DollarSign className="mr-1.5 h-3.5 w-3.5" />
                                 Mark Paid
@@ -138,7 +186,9 @@ export default function ExpenseShow({ claim, can }: Props) {
                                 <Textarea
                                     rows={3}
                                     value={rejectionReason}
-                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    onChange={(e) =>
+                                        setRejectionReason(e.target.value)
+                                    }
                                     placeholder="Provide a reason for rejecting this claim..."
                                 />
                                 <div className="flex gap-2">
@@ -146,11 +196,23 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         variant="destructive"
                                         size="sm"
                                         disabled={!rejectionReason.trim()}
-                                        onClick={() => router.post(`/hr/expenses/${claim.id}/reject`, { rejection_reason: rejectionReason })}
+                                        onClick={() =>
+                                            router.post(
+                                                `/hr/expenses/${claim.id}/reject`,
+                                                {
+                                                    rejection_reason:
+                                                        rejectionReason,
+                                                },
+                                            )
+                                        }
                                     >
                                         Confirm Rejection
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => setShowRejectForm(false)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowRejectForm(false)}
+                                    >
                                         Cancel
                                     </Button>
                                 </div>
@@ -163,26 +225,43 @@ export default function ExpenseShow({ claim, can }: Props) {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Employee</p>
+                            <p className="text-sm text-muted-foreground">
+                                Employee
+                            </p>
                             <p className="font-medium">{claim.staff_name}</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Total Amount</p>
-                            <p className="text-xl font-bold">{formatCurrency(claim.total_amount, claim.currency)}</p>
+                            <p className="text-sm text-muted-foreground">
+                                Total Amount
+                            </p>
+                            <p className="text-xl font-bold">
+                                {formatCurrency(
+                                    claim.total_amount,
+                                    claim.currency,
+                                )}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Submitted</p>
-                            <p className="font-medium">{claim.submitted_at || 'Not yet'}</p>
+                            <p className="text-sm text-muted-foreground">
+                                Submitted
+                            </p>
+                            <p className="font-medium">
+                                {claim.submitted_at || 'Not yet'}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Approved By</p>
-                            <p className="font-medium">{claim.approved_by || '-'}</p>
+                            <p className="text-sm text-muted-foreground">
+                                Approved By
+                            </p>
+                            <p className="font-medium">
+                                {claim.approved_by || '-'}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
@@ -191,7 +270,9 @@ export default function ExpenseShow({ claim, can }: Props) {
                 {claim.rejection_reason && (
                     <Card className="border-status-critical/30">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-status-critical">Rejection Reason</CardTitle>
+                            <CardTitle className="text-sm text-status-critical">
+                                Rejection Reason
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-sm">{claim.rejection_reason}</p>
@@ -203,7 +284,9 @@ export default function ExpenseShow({ claim, can }: Props) {
                 {claim.notes && (
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">Notes</CardTitle>
+                            <CardTitle className="text-sm text-muted-foreground">
+                                Notes
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-sm">{claim.notes}</p>
@@ -214,7 +297,9 @@ export default function ExpenseShow({ claim, can }: Props) {
                 {/* Expense Items */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Expense Items</CardTitle>
+                        <CardTitle className="text-base">
+                            Expense Items
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
@@ -223,42 +308,73 @@ export default function ExpenseShow({ claim, can }: Props) {
                                     <TableHead>Description</TableHead>
                                     <TableHead>Category</TableHead>
                                     <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                    <TableHead className="text-right">Tax</TableHead>
+                                    <TableHead className="text-right">
+                                        Amount
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Tax
+                                    </TableHead>
                                     <TableHead>Receipt</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {claim.items.map((item) => (
                                     <TableRow key={item.id}>
-                                        <TableCell className="font-medium">{item.description}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {item.description}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant="secondary">
-                                                {categoryLabels[item.category] || item.category}
+                                                {categoryLabels[
+                                                    item.category
+                                                ] || item.category}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-muted-foreground">{item.expense_date}</TableCell>
+                                        <TableCell className="text-muted-foreground">
+                                            {item.expense_date}
+                                        </TableCell>
                                         <TableCell className="text-right font-medium">
-                                            {formatCurrency(item.amount, claim.currency)}
+                                            {formatCurrency(
+                                                item.amount,
+                                                claim.currency,
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right text-muted-foreground">
-                                            {item.tax_amount ? formatCurrency(item.tax_amount, claim.currency) : '-'}
+                                            {item.tax_amount
+                                                ? formatCurrency(
+                                                      item.tax_amount,
+                                                      claim.currency,
+                                                  )
+                                                : '-'}
                                         </TableCell>
                                         <TableCell>
                                             {item.receipt_path ? (
-                                                <Badge variant="outline" className="border-status-success/30 text-status-success">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-success/30 text-status-success"
+                                                >
                                                     Attached
                                                 </Badge>
                                             ) : (
-                                                <span className="text-sm text-muted-foreground">-</span>
+                                                <span className="text-sm text-muted-foreground">
+                                                    -
+                                                </span>
                                             )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
+                                    <TableCell
+                                        colSpan={3}
+                                        className="text-right font-medium"
+                                    >
+                                        Total
+                                    </TableCell>
                                     <TableCell className="text-right text-lg font-bold">
-                                        {formatCurrency(claim.total_amount, claim.currency)}
+                                        {formatCurrency(
+                                            claim.total_amount,
+                                            claim.currency,
+                                        )}
                                     </TableCell>
                                     <TableCell />
                                     <TableCell />

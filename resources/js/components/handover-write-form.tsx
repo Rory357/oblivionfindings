@@ -1,5 +1,6 @@
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import VoiceInputButton from '@/components/voice-input-button';
+import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
 /*  Handover write form — shown at clock-out                                  */
@@ -70,23 +71,24 @@ function YesNoToggle({
             ].map((opt) => {
                 const active = value === opt.v;
                 return (
-                    <button
+                    <Button
                         key={`${idPrefix}-${String(opt.v)}`}
                         type="button"
                         role="radio"
                         aria-checked={active}
+                        variant={active ? 'default' : 'outline'}
                         onClick={() => onChange(opt.v)}
                         disabled={disabled}
                         className={cn(
-                            'h-11 flex-1 rounded-full border px-4 text-sm font-medium transition-colors',
+                            'h-11 flex-1 rounded-full px-4 text-sm font-medium transition-colors',
                             active
-                                ? 'border-primary bg-primary text-primary-foreground'
+                                ? 'bg-primary text-primary-foreground'
                                 : 'border-border bg-background hover:bg-muted',
                             disabled && 'opacity-60',
                         )}
                     >
                         {opt.label}
-                    </button>
+                    </Button>
                 );
             })}
         </div>
@@ -133,28 +135,31 @@ export default function HandoverWriteForm({
 
             {/* Shift rating */}
             <div className="space-y-1.5">
-                <div className="text-sm font-medium">How was the shift overall?</div>
+                <div className="text-sm font-medium">
+                    How was the shift overall?
+                </div>
                 <div role="radiogroup" className="flex flex-wrap gap-2">
                     {RATING_OPTIONS.map((opt) => {
                         const active = value.shift_rating === opt.value;
                         return (
-                            <button
+                            <Button
                                 key={opt.value ?? 'unset'}
                                 type="button"
                                 role="radio"
                                 aria-checked={active}
+                                variant={active ? 'default' : 'outline'}
                                 onClick={() => set('shift_rating', opt.value)}
                                 disabled={disabled}
                                 className={cn(
-                                    'h-11 min-w-24 flex-1 rounded-full border px-4 text-sm font-medium transition-colors sm:flex-none',
+                                    'h-11 min-w-24 flex-1 rounded-full px-4 text-sm font-medium transition-colors sm:flex-none',
                                     active
-                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        ? 'bg-primary text-primary-foreground'
                                         : 'border-border bg-background hover:bg-muted',
                                     disabled && 'opacity-60',
                                 )}
                             >
                                 {opt.label}
-                            </button>
+                            </Button>
                         );
                     })}
                 </div>
@@ -187,7 +192,7 @@ export default function HandoverWriteForm({
                     value={value.handover_notes}
                     onChange={(e) => set('handover_notes', e.target.value)}
                     placeholder="e.g. Slept well, visitor expected at 10am, fluids low."
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-60"
                 />
             </div>
 

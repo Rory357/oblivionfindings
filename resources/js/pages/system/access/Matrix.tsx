@@ -134,20 +134,18 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
                             {roles.map((role) => (
-                                <button
+                                <Button
                                     key={role.id}
+                                    type="button"
+                                    variant={selectedRoles.includes(role.id) ? 'default' : 'secondary'}
                                     onClick={() => toggleRole(role.id)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                                        selectedRoles.includes(role.id)
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                    }`}
+                                    className="h-auto rounded-full px-3 py-1.5"
                                 >
                                     {role.label}
                                     <Badge variant={selectedRoles.includes(role.id) ? 'secondary' : 'outline'} className="text-xs">
                                         L{role.level}
                                     </Badge>
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     </CardContent>

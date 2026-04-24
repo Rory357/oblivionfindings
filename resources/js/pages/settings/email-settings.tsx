@@ -1,14 +1,20 @@
-import { Head, router, usePage } from '@inertiajs/react';
-import { type BreadcrumbItem } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { CheckCircle, Loader2, Mail, Send, XCircle } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings' },
@@ -40,8 +46,11 @@ type EmailSettingsPageProps = {
 };
 
 export default function EmailSettings() {
-    const { settings, connections, smtp_password_saved, flash } = usePage<EmailSettingsPageProps>().props;
-    const [submitAction, setSubmitAction] = useState<'save' | 'test' | null>(null);
+    const { settings, connections, smtp_password_saved, flash } =
+        usePage<EmailSettingsPageProps>().props;
+    const [submitAction, setSubmitAction] = useState<'save' | 'test' | null>(
+        null,
+    );
     const [formData, setFormData] = useState({
         provider: settings.provider,
         smtp_host: settings.smtp_host ?? '',
@@ -52,8 +61,6 @@ export default function EmailSettings() {
         from_address: settings.from_address ?? '',
         from_name: settings.from_name ?? '',
     });
-
-    const settingsKey = useMemo(() => JSON.stringify(settings), [settings]);
 
     useEffect(() => {
         setFormData({
@@ -66,7 +73,15 @@ export default function EmailSettings() {
             from_address: settings.from_address ?? '',
             from_name: settings.from_name ?? '',
         });
-    }, [settingsKey]);
+    }, [
+        settings.from_address,
+        settings.from_name,
+        settings.provider,
+        settings.smtp_encryption,
+        settings.smtp_host,
+        settings.smtp_port,
+        settings.smtp_username,
+    ]);
 
     const processing = submitAction !== null;
     const saving = submitAction === 'save';
@@ -74,24 +89,32 @@ export default function EmailSettings() {
 
     const handleSave = () => {
         setSubmitAction('save');
-        router.put('/settings/email', {
-            ...formData,
-            smtp_port: Number(formData.smtp_port || 0),
-        }, {
-            preserveScroll: true,
-            onFinish: () => setSubmitAction(null),
-        });
+        router.put(
+            '/settings/email',
+            {
+                ...formData,
+                smtp_port: Number(formData.smtp_port || 0),
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSubmitAction(null),
+            },
+        );
     };
 
     const handleTest = () => {
         setSubmitAction('test');
-        router.post('/settings/email/test', {
-            ...formData,
-            smtp_port: Number(formData.smtp_port || 0),
-        }, {
-            preserveScroll: true,
-            onFinish: () => setSubmitAction(null),
-        });
+        router.post(
+            '/settings/email/test',
+            {
+                ...formData,
+                smtp_port: Number(formData.smtp_port || 0),
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSubmitAction(null),
+            },
+        );
     };
 
     const renderProviderBadge = (connected: boolean, dusk: string) =>
@@ -157,15 +180,23 @@ export default function EmailSettings() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-3">
-                            <Label className="text-sm font-medium">Email Provider</Label>
+                            <Label className="text-sm font-medium">
+                                Email Provider
+                            </Label>
                             <div className="grid gap-3">
-                                <button
+                                <Button
                                     type="button"
                                     dusk="email-provider-smtp"
-                                    onClick={() => setFormData((current) => ({ ...current, provider: 'smtp' }))}
-                                    className={`flex items-center gap-4 rounded-lg border-2 p-4 text-left transition-all ${
+                                    onClick={() =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            provider: 'smtp',
+                                        }))
+                                    }
+                                    variant="outline"
+                                    className={`h-auto justify-start gap-4 rounded-lg border-2 p-4 text-left ${
                                         formData.provider === 'smtp'
-                                            ? 'border-primary bg-primary/10/60'
+                                            ? 'bg-primary/10/60 border-primary'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
@@ -181,20 +212,29 @@ export default function EmailSettings() {
                                         )}
                                     </div>
                                     <div>
-                                        <div className="text-sm font-medium">SMTP</div>
+                                        <div className="text-sm font-medium">
+                                            SMTP
+                                        </div>
                                         <div className="text-xs text-muted-foreground">
-                                            Standard SMTP server or local mailer configuration.
+                                            Standard SMTP server or local mailer
+                                            configuration.
                                         </div>
                                     </div>
-                                </button>
+                                </Button>
 
-                                <button
+                                <Button
                                     type="button"
                                     dusk="email-provider-microsoft"
-                                    onClick={() => setFormData((current) => ({ ...current, provider: 'microsoft' }))}
-                                    className={`flex items-center gap-4 rounded-lg border-2 p-4 text-left transition-all ${
+                                    onClick={() =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            provider: 'microsoft',
+                                        }))
+                                    }
+                                    variant="outline"
+                                    className={`h-auto justify-start gap-4 rounded-lg border-2 p-4 text-left ${
                                         formData.provider === 'microsoft'
-                                            ? 'border-primary bg-primary/10/60'
+                                            ? 'bg-primary/10/60 border-primary'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
@@ -210,9 +250,12 @@ export default function EmailSettings() {
                                         )}
                                     </div>
                                     <div className="flex-1">
-                                        <div className="text-sm font-medium">Microsoft 365</div>
+                                        <div className="text-sm font-medium">
+                                            Microsoft 365
+                                        </div>
                                         <div className="text-xs text-muted-foreground">
-                                            Use a linked Microsoft identity when available.
+                                            Use a linked Microsoft identity when
+                                            available.
                                         </div>
                                         {connections.microsoft.email && (
                                             <div className="mt-1 text-xs text-muted-foreground">
@@ -220,16 +263,25 @@ export default function EmailSettings() {
                                             </div>
                                         )}
                                     </div>
-                                    {renderProviderBadge(connections.microsoft.connected, 'email-provider-status-microsoft')}
-                                </button>
+                                    {renderProviderBadge(
+                                        connections.microsoft.connected,
+                                        'email-provider-status-microsoft',
+                                    )}
+                                </Button>
 
-                                <button
+                                <Button
                                     type="button"
                                     dusk="email-provider-google"
-                                    onClick={() => setFormData((current) => ({ ...current, provider: 'google' }))}
-                                    className={`flex items-center gap-4 rounded-lg border-2 p-4 text-left transition-all ${
+                                    onClick={() =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            provider: 'google',
+                                        }))
+                                    }
+                                    variant="outline"
+                                    className={`h-auto justify-start gap-4 rounded-lg border-2 p-4 text-left ${
                                         formData.provider === 'google'
-                                            ? 'border-primary bg-primary/10/60'
+                                            ? 'bg-primary/10/60 border-primary'
                                             : 'border-transparent bg-muted/30 hover:border-muted-foreground/20'
                                     }`}
                                 >
@@ -245,9 +297,12 @@ export default function EmailSettings() {
                                         )}
                                     </div>
                                     <div className="flex-1">
-                                        <div className="text-sm font-medium">Google Workspace</div>
+                                        <div className="text-sm font-medium">
+                                            Google Workspace
+                                        </div>
                                         <div className="text-xs text-muted-foreground">
-                                            Use a linked Google identity when available.
+                                            Use a linked Google identity when
+                                            available.
                                         </div>
                                         {connections.google.email && (
                                             <div className="mt-1 text-xs text-muted-foreground">
@@ -255,8 +310,11 @@ export default function EmailSettings() {
                                             </div>
                                         )}
                                     </div>
-                                    {renderProviderBadge(connections.google.connected, 'email-provider-status-google')}
-                                </button>
+                                    {renderProviderBadge(
+                                        connections.google.connected,
+                                        'email-provider-status-google',
+                                    )}
+                                </Button>
                             </div>
                         </div>
                     </CardContent>
@@ -267,7 +325,8 @@ export default function EmailSettings() {
                         <CardHeader>
                             <CardTitle>SMTP Settings</CardTitle>
                             <CardDescription>
-                                Values from the current mail configuration are used as defaults until you save overrides here.
+                                Values from the current mail configuration are
+                                used as defaults until you save overrides here.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -279,7 +338,12 @@ export default function EmailSettings() {
                                         dusk="email-smtp-host"
                                         placeholder="smtp.example.com"
                                         value={formData.smtp_host}
-                                        onChange={(event) => setFormData((current) => ({ ...current, smtp_host: event.target.value }))}
+                                        onChange={(event) =>
+                                            setFormData((current) => ({
+                                                ...current,
+                                                smtp_host: event.target.value,
+                                            }))
+                                        }
                                     />
                                 </div>
                                 <div className="grid gap-4 sm:grid-cols-2">
@@ -291,11 +355,19 @@ export default function EmailSettings() {
                                             inputMode="numeric"
                                             placeholder="587"
                                             value={formData.smtp_port}
-                                            onChange={(event) => setFormData((current) => ({ ...current, smtp_port: event.target.value }))}
+                                            onChange={(event) =>
+                                                setFormData((current) => ({
+                                                    ...current,
+                                                    smtp_port:
+                                                        event.target.value,
+                                                }))
+                                            }
                                         />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="smtp-encryption">Encryption</Label>
+                                        <Label htmlFor="smtp-encryption">
+                                            Encryption
+                                        </Label>
                                         <select
                                             id="smtp-encryption"
                                             dusk="email-smtp-encryption"
@@ -304,7 +376,11 @@ export default function EmailSettings() {
                                             onChange={(event) =>
                                                 setFormData((current) => ({
                                                     ...current,
-                                                    smtp_encryption: event.target.value as 'tls' | 'ssl' | 'none',
+                                                    smtp_encryption: event
+                                                        .target.value as
+                                                        | 'tls'
+                                                        | 'ssl'
+                                                        | 'none',
                                                 }))
                                             }
                                         >
@@ -317,28 +393,49 @@ export default function EmailSettings() {
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="smtp-username">Username</Label>
+                                    <Label htmlFor="smtp-username">
+                                        Username
+                                    </Label>
                                     <Input
                                         id="smtp-username"
                                         dusk="email-smtp-username"
                                         placeholder="user@example.com"
                                         value={formData.smtp_username}
-                                        onChange={(event) => setFormData((current) => ({ ...current, smtp_username: event.target.value }))}
+                                        onChange={(event) =>
+                                            setFormData((current) => ({
+                                                ...current,
+                                                smtp_username:
+                                                    event.target.value,
+                                            }))
+                                        }
                                     />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="smtp-password">Password / App Password</Label>
+                                    <Label htmlFor="smtp-password">
+                                        Password / App Password
+                                    </Label>
                                     <Input
                                         id="smtp-password"
                                         dusk="email-smtp-password"
                                         type="password"
-                                        placeholder={smtp_password_saved ? 'Leave blank to keep the saved password' : 'Enter SMTP password'}
+                                        placeholder={
+                                            smtp_password_saved
+                                                ? 'Leave blank to keep the saved password'
+                                                : 'Enter SMTP password'
+                                        }
                                         value={formData.smtp_password}
-                                        onChange={(event) => setFormData((current) => ({ ...current, smtp_password: event.target.value }))}
+                                        onChange={(event) =>
+                                            setFormData((current) => ({
+                                                ...current,
+                                                smtp_password:
+                                                    event.target.value,
+                                            }))
+                                        }
                                     />
                                     {smtp_password_saved && (
                                         <p className="text-xs text-muted-foreground">
-                                            A saved SMTP password is already on file. Leave this blank to keep it.
+                                            A saved SMTP password is already on
+                                            file. Leave this blank to keep it.
                                         </p>
                                     )}
                                 </div>
@@ -352,7 +449,8 @@ export default function EmailSettings() {
                         <CardHeader>
                             <CardTitle>Microsoft 365 Connection</CardTitle>
                             <CardDescription>
-                                Link a Microsoft account to send email through Microsoft Graph.
+                                Link a Microsoft account to send email through
+                                Microsoft Graph.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -371,7 +469,10 @@ export default function EmailSettings() {
                                 </div>
                                 {!connections.microsoft.connected && (
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href="/auth/microsoft/redirect?link=1" dusk="email-connect-microsoft">
+                                        <a
+                                            href="/auth/microsoft/redirect?link=1"
+                                            dusk="email-connect-microsoft"
+                                        >
                                             Connect Microsoft
                                         </a>
                                     </Button>
@@ -386,7 +487,8 @@ export default function EmailSettings() {
                         <CardHeader>
                             <CardTitle>Google Workspace Connection</CardTitle>
                             <CardDescription>
-                                Link a Google account to use Google Workspace delivery when that transport is available.
+                                Link a Google account to use Google Workspace
+                                delivery when that transport is available.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -405,7 +507,10 @@ export default function EmailSettings() {
                                 </div>
                                 {!connections.google.connected && (
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href="/auth/google/redirect?link=1" dusk="email-connect-google">
+                                        <a
+                                            href="/auth/google/redirect?link=1"
+                                            dusk="email-connect-google"
+                                        >
                                             Connect Google
                                         </a>
                                     </Button>
@@ -425,14 +530,21 @@ export default function EmailSettings() {
                     <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
-                                <Label htmlFor="from-address">From Address</Label>
+                                <Label htmlFor="from-address">
+                                    From Address
+                                </Label>
                                 <Input
                                     id="from-address"
                                     dusk="email-from-address"
                                     type="email"
                                     placeholder="noreply@yourorganisation.co.nz"
                                     value={formData.from_address}
-                                    onChange={(event) => setFormData((current) => ({ ...current, from_address: event.target.value }))}
+                                    onChange={(event) =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            from_address: event.target.value,
+                                        }))
+                                    }
                                 />
                             </div>
                             <div className="grid gap-2">
@@ -442,7 +554,12 @@ export default function EmailSettings() {
                                     dusk="email-from-name"
                                     placeholder="Your Organisation"
                                     value={formData.from_name}
-                                    onChange={(event) => setFormData((current) => ({ ...current, from_name: event.target.value }))}
+                                    onChange={(event) =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            from_name: event.target.value,
+                                        }))
+                                    }
                                 />
                             </div>
                         </div>

@@ -172,30 +172,34 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
                                 <div>
                                     <Label>Scope</Label>
                                     <div className="flex gap-2 mt-1">
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="outline"
+                                            size="sm"
                                             onClick={() => setScope('vehicle')}
                                             className={cn(
-                                                'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
+                                                'h-auto gap-1.5 rounded-lg px-3 py-1.5',
                                                 scope === 'vehicle'
                                                     ? 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70'
                                                     : 'border-border text-muted-foreground hover:bg-muted/50',
                                             )}
                                         >
                                             Vehicle
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                             type="button"
+                                            variant="outline"
+                                            size="sm"
                                             onClick={() => setScope('resident')}
                                             className={cn(
-                                                'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
+                                                'h-auto gap-1.5 rounded-lg px-3 py-1.5',
                                                 scope === 'resident'
                                                     ? 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70'
                                                     : 'border-border text-muted-foreground hover:bg-muted/50',
                                             )}
                                         >
                                             Resident
-                                        </button>
+                                        </Button>
                                     </div>
                                     <p className="mt-1 text-[10px] text-muted-foreground">
                                         {scope === 'vehicle' ? 'Monitors vehicle movements' : 'Monitors resident tracker movements'}

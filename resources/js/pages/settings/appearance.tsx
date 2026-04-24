@@ -263,13 +263,15 @@ export default function Appearance() {
                                 const isActive = themeSetting === option.value;
                                 const Icon = option.icon;
                                 return (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="outline"
                                         key={option.value}
                                         onClick={() =>
                                             handleTheme(option.value)
                                         }
                                         className={cn(
-                                            'group relative flex flex-col items-center gap-3 rounded-xl border-2 p-4 transition-all',
+                                            'group relative h-auto flex-col gap-3 rounded-xl border-2 p-4',
                                             isActive
                                                 ? 'border-primary bg-primary/5 shadow-sm'
                                                 : 'border-transparent bg-muted/30 hover:border-muted-foreground/20 hover:bg-muted/50',
@@ -359,7 +361,7 @@ export default function Appearance() {
                                                 {option.label}
                                             </span>
                                         </div>
-                                    </button>
+                                    </Button>
                                 );
                             })}
                         </div>
@@ -377,10 +379,11 @@ export default function Appearance() {
                     <CardContent>
                         <div className="flex items-center gap-4">
                             <div className="relative" ref={pickerRef}>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
                                     onClick={() => setAccentOpen((v) => !v)}
-                                    className="flex items-center gap-3 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:bg-muted/50"
+                                    className="h-auto gap-3 rounded-lg border-input bg-card px-3 py-2 text-sm hover:bg-muted/50"
                                     aria-haspopup="dialog"
                                     aria-expanded={accentOpen}
                                 >
@@ -396,7 +399,7 @@ export default function Appearance() {
                                         {form.data.accent_colour ??
                                             'Brand default'}
                                     </span>
-                                </button>
+                                </Button>
                                 {accentOpen && (
                                     <div className="absolute left-0 z-50 mt-2 rounded-lg border bg-popover p-3 shadow-lg">
                                         <HexColorPicker
@@ -453,13 +456,15 @@ export default function Appearance() {
                                     const isActive =
                                         form.data.font_size === opt.px;
                                     return (
-                                        <button
+                                        <Button
+                                            type="button"
+                                            variant="outline"
                                             key={opt.value}
                                             onClick={() =>
                                                 handleFontSize(opt.px)
                                             }
                                             className={cn(
-                                                'flex flex-col items-center gap-2 rounded-lg border-2 px-4 py-4 transition-all',
+                                                'h-auto flex-col gap-2 rounded-lg border-2 px-4 py-4',
                                                 isActive
                                                     ? 'border-primary bg-primary/5'
                                                     : 'border-transparent bg-muted/30 hover:border-muted-foreground/20',
@@ -481,7 +486,7 @@ export default function Appearance() {
                                             <span className="text-xs text-muted-foreground">
                                                 {opt.label} ({opt.px}px)
                                             </span>
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -507,13 +512,15 @@ export default function Appearance() {
                                                 ? 'p-2'
                                                 : 'p-1.5';
                                         return (
-                                            <button
+                                            <Button
+                                                type="button"
+                                                variant="outline"
                                                 key={density}
                                                 onClick={() =>
                                                     handleDensity(density)
                                                 }
                                                 className={cn(
-                                                    'flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all',
+                                                    'h-auto flex-col gap-2 rounded-lg border-2 p-4',
                                                     isActive
                                                         ? 'border-primary bg-primary/5'
                                                         : 'border-transparent bg-muted/30 hover:border-muted-foreground/20',
@@ -535,7 +542,7 @@ export default function Appearance() {
                                                 <span className="text-xs text-muted-foreground capitalize">
                                                     {density}
                                                 </span>
-                                            </button>
+                                            </Button>
                                         );
                                     },
                                 )}
@@ -595,20 +602,26 @@ export default function Appearance() {
                             <Label>Time format</Label>
                             <div className="flex gap-2">
                                 {(['12', '24'] as const).map((fmt) => (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant={
+                                            form.data.time_format === fmt
+                                                ? 'default'
+                                                : 'outline'
+                                        }
                                         key={fmt}
                                         onClick={() =>
                                             form.setData('time_format', fmt)
                                         }
                                         className={cn(
-                                            'rounded-md border px-4 py-2 text-sm font-medium transition-all',
+                                            'px-4 py-2 text-sm font-medium',
                                             form.data.time_format === fmt
-                                                ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                                                : 'border-input bg-transparent text-foreground hover:bg-muted/50',
+                                                ? 'shadow-sm'
+                                                : 'bg-transparent text-foreground hover:bg-muted/50',
                                         )}
                                     >
                                         {fmt}-hour
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>
@@ -628,7 +641,14 @@ export default function Appearance() {
                                         },
                                     ] as const
                                 ).map((opt) => (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant={
+                                            form.data.first_day_of_week ===
+                                            opt.value
+                                                ? 'default'
+                                                : 'outline'
+                                        }
                                         key={opt.value}
                                         onClick={() =>
                                             form.setData(
@@ -637,15 +657,15 @@ export default function Appearance() {
                                             )
                                         }
                                         className={cn(
-                                            'rounded-md border px-4 py-2 text-sm font-medium transition-all',
+                                            'px-4 py-2 text-sm font-medium',
                                             form.data.first_day_of_week ===
                                                 opt.value
-                                                ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                                                : 'border-input bg-transparent text-foreground hover:bg-muted/50',
+                                                ? 'shadow-sm'
+                                                : 'bg-transparent text-foreground hover:bg-muted/50',
                                         )}
                                     >
                                         {opt.label}
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </div>

@@ -1,10 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { FileText, Plus, Trash2 } from 'lucide-react';
 
@@ -95,7 +101,11 @@ export default function ProcedureEdit({ procedure }: Props) {
     const addStep = () => {
         form.setData('steps', [
             ...form.data.steps,
-            { step_number: form.data.steps.length + 1, description: '', safety_notes: '' },
+            {
+                step_number: form.data.steps.length + 1,
+                description: '',
+                safety_notes: '',
+            },
         ]);
     };
 
@@ -116,7 +126,10 @@ export default function ProcedureEdit({ procedure }: Props) {
     const togglePpe = (item: string) => {
         const current = form.data.ppe_required;
         if (current.includes(item)) {
-            form.setData('ppe_required', current.filter((p) => p !== item));
+            form.setData(
+                'ppe_required',
+                current.filter((p) => p !== item),
+            );
         } else {
             form.setData('ppe_required', [...current, item]);
         }
@@ -128,62 +141,138 @@ export default function ProcedureEdit({ procedure }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Health & Safety', href: '/health-safety' },
-            { title: 'Procedures', href: '/health-safety/procedures' },
-            { title: procedure.title, href: `/health-safety/procedures/${procedure.id}` },
-            { title: 'Edit', href: `/health-safety/procedures/${procedure.id}/edit` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'Procedures', href: '/health-safety/procedures' },
+                {
+                    title: procedure.title,
+                    href: `/health-safety/procedures/${procedure.id}`,
+                },
+                {
+                    title: 'Edit',
+                    href: `/health-safety/procedures/${procedure.id}/edit`,
+                },
+            ]}
+        >
             <Head title={`Edit ${procedure.title}`} />
 
             <div className="space-y-6">
                 <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5 text-status-info" />
-                    <h1 className="text-lg font-semibold">Edit Safe Work Procedure</h1>
+                    <h1 className="text-lg font-semibold">
+                        Edit Safe Work Procedure
+                    </h1>
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Basic Information</CardTitle>
+                            <CardTitle className="text-base">
+                                Basic Information
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                     <Label>Title</Label>
-                                    <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="Procedure title" />
-                                    {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
+                                    <Input
+                                        value={form.data.title}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'title',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Procedure title"
+                                    />
+                                    {form.errors.title && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.title}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Reference Number</Label>
-                                    <Input value={form.data.reference_number} onChange={(e) => form.setData('reference_number', e.target.value)} placeholder="e.g. SWP-001" />
-                                    {form.errors.reference_number && <p className="mt-1 text-xs text-status-critical">{form.errors.reference_number}</p>}
+                                    <Input
+                                        value={form.data.reference_number}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'reference_number',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. SWP-001"
+                                    />
+                                    {form.errors.reference_number && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.reference_number}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
                             <div>
                                 <Label>Category</Label>
-                                <Select value={form.data.category} onValueChange={(v) => form.setData('category', v)}>
-                                    <SelectTrigger className="sm:max-w-xs"><SelectValue placeholder="Select category" /></SelectTrigger>
+                                <Select
+                                    value={form.data.category}
+                                    onValueChange={(v) =>
+                                        form.setData('category', v)
+                                    }
+                                >
+                                    <SelectTrigger className="sm:max-w-xs">
+                                        <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
                                     <SelectContent>
                                         {CATEGORIES.map((c) => (
-                                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                            <SelectItem
+                                                key={c.value}
+                                                value={c.value}
+                                            >
+                                                {c.label}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.category && <p className="mt-1 text-xs text-status-critical">{form.errors.category}</p>}
+                                {form.errors.category && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.category}
+                                    </p>
+                                )}
                             </div>
 
                             <div>
                                 <Label>Purpose</Label>
-                                <Textarea value={form.data.purpose} onChange={(e) => form.setData('purpose', e.target.value)} rows={3} placeholder="What is the purpose of this procedure?" />
-                                {form.errors.purpose && <p className="mt-1 text-xs text-status-critical">{form.errors.purpose}</p>}
+                                <Textarea
+                                    value={form.data.purpose}
+                                    onChange={(e) =>
+                                        form.setData('purpose', e.target.value)
+                                    }
+                                    rows={3}
+                                    placeholder="What is the purpose of this procedure?"
+                                />
+                                {form.errors.purpose && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.purpose}
+                                    </p>
+                                )}
                             </div>
 
                             <div>
                                 <Label>Scope</Label>
-                                <Textarea value={form.data.scope} onChange={(e) => form.setData('scope', e.target.value)} rows={3} placeholder="What does this procedure cover?" />
-                                {form.errors.scope && <p className="mt-1 text-xs text-status-critical">{form.errors.scope}</p>}
+                                <Textarea
+                                    value={form.data.scope}
+                                    onChange={(e) =>
+                                        form.setData('scope', e.target.value)
+                                    }
+                                    rows={3}
+                                    placeholder="What does this procedure cover?"
+                                />
+                                {form.errors.scope && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {form.errors.scope}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -191,8 +280,15 @@ export default function ProcedureEdit({ procedure }: Props) {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">Procedure Steps</CardTitle>
-                                <Button type="button" size="sm" variant="outline" onClick={addStep}>
+                                <CardTitle className="text-base">
+                                    Procedure Steps
+                                </CardTitle>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={addStep}
+                                >
                                     <Plus className="mr-1 h-4 w-4" />
                                     Add Step
                                 </Button>
@@ -200,11 +296,23 @@ export default function ProcedureEdit({ procedure }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {form.data.steps.map((step, index) => (
-                                <div key={index} className="rounded-lg border p-4">
+                                <div
+                                    key={index}
+                                    className="rounded-lg border p-4"
+                                >
                                     <div className="mb-3 flex items-center justify-between">
-                                        <span className="text-sm font-semibold">Step {step.step_number}</span>
+                                        <span className="text-sm font-semibold">
+                                            Step {step.step_number}
+                                        </span>
                                         {form.data.steps.length > 1 && (
-                                            <Button type="button" size="sm" variant="ghost" onClick={() => removeStep(index)}>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    removeStep(index)
+                                                }
+                                            >
                                                 <Trash2 className="h-4 w-4 text-status-critical" />
                                             </Button>
                                         )}
@@ -214,7 +322,13 @@ export default function ProcedureEdit({ procedure }: Props) {
                                             <Label>Description</Label>
                                             <Textarea
                                                 value={step.description}
-                                                onChange={(e) => updateStep(index, 'description', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateStep(
+                                                        index,
+                                                        'description',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 rows={2}
                                                 placeholder="Describe what must be done in this step"
                                             />
@@ -223,7 +337,13 @@ export default function ProcedureEdit({ procedure }: Props) {
                                             <Label>Safety Notes</Label>
                                             <Textarea
                                                 value={step.safety_notes}
-                                                onChange={(e) => updateStep(index, 'safety_notes', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateStep(
+                                                        index,
+                                                        'safety_notes',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 rows={2}
                                                 placeholder="Any safety warnings or precautions for this step"
                                             />
@@ -231,31 +351,43 @@ export default function ProcedureEdit({ procedure }: Props) {
                                     </div>
                                 </div>
                             ))}
-                            {(form.errors as any).steps && <p className="text-xs text-status-critical">{(form.errors as any).steps}</p>}
+                            {(form.errors as any).steps && (
+                                <p className="text-xs text-status-critical">
+                                    {(form.errors as any).steps}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Safety Requirements</CardTitle>
+                            <CardTitle className="text-base">
+                                Safety Requirements
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <Label className="mb-2 block">PPE Required</Label>
+                                <Label className="mb-2 block">
+                                    PPE Required
+                                </Label>
                                 <div className="flex flex-wrap gap-2">
                                     {PPE_OPTIONS.map((item) => (
-                                        <button
+                                        <Button
                                             key={item}
                                             type="button"
+                                            variant="outline"
+                                            size="sm"
                                             onClick={() => togglePpe(item)}
-                                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                                                form.data.ppe_required.includes(item)
+                                            className={`rounded-full px-3 text-xs ${
+                                                form.data.ppe_required.includes(
+                                                    item,
+                                                )
                                                     ? 'border-status-info/30 bg-status-info-bg text-status-info'
                                                     : 'border-border bg-white text-muted-foreground hover:bg-muted'
                                             }`}
                                         >
                                             {item}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
@@ -264,7 +396,12 @@ export default function ProcedureEdit({ procedure }: Props) {
                                 <Label>Emergency Procedures</Label>
                                 <Textarea
                                     value={form.data.emergency_procedures}
-                                    onChange={(e) => form.setData('emergency_procedures', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'emergency_procedures',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="What to do in case of an emergency during this procedure"
                                 />
@@ -274,14 +411,26 @@ export default function ProcedureEdit({ procedure }: Props) {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Applicability</CardTitle>
+                            <CardTitle className="text-base">
+                                Applicability
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
                                 <Label>Applicable Roles</Label>
                                 <Input
-                                    value={form.data.applicable_roles.join(', ')}
-                                    onChange={(e) => form.setData('applicable_roles', e.target.value.split(',').map((r) => r.trim()).filter(Boolean))}
+                                    value={form.data.applicable_roles.join(
+                                        ', ',
+                                    )}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'applicable_roles',
+                                            e.target.value
+                                                .split(',')
+                                                .map((r) => r.trim())
+                                                .filter(Boolean),
+                                        )
+                                    }
                                     placeholder="e.g. Support Worker, Team Leader, Nurse (comma-separated)"
                                 />
                             </div>
@@ -289,8 +438,18 @@ export default function ProcedureEdit({ procedure }: Props) {
                             <div>
                                 <Label>Applicable Sites</Label>
                                 <Input
-                                    value={form.data.applicable_sites.join(', ')}
-                                    onChange={(e) => form.setData('applicable_sites', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+                                    value={form.data.applicable_sites.join(
+                                        ', ',
+                                    )}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'applicable_sites',
+                                            e.target.value
+                                                .split(',')
+                                                .map((s) => s.trim())
+                                                .filter(Boolean),
+                                        )
+                                    }
                                     placeholder="e.g. All sites, or specific site names (comma-separated)"
                                 />
                             </div>
@@ -298,8 +457,16 @@ export default function ProcedureEdit({ procedure }: Props) {
                     </Card>
 
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => window.history.back()}>Cancel</Button>
-                        <Button type="submit" disabled={form.processing}>Save Procedure</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => window.history.back()}
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={form.processing}>
+                            Save Procedure
+                        </Button>
                     </div>
                 </form>
             </div>

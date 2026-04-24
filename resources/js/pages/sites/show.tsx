@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { formatCurrency, formatDateTime, formatDistance } from '@/lib/fleet-utils';
+import { formatCurrency } from '@/lib/fleet-utils';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -51,12 +51,11 @@ import {
     FileText,
     Fuel,
     GraduationCap,
-    MapPin,
     Home,
     Layers,
     LayoutGrid,
+    MapPin,
     Package,
-    PlayCircle,
     Plus,
     Route,
     Shield,
@@ -202,23 +201,51 @@ type CoverageRequirement = {
 
 type SiteFleetData = {
     vehicles: Array<{
-        id: number; name: string; asset_tag: string; status: string;
-        fleet_status: string | null; speed_kph: number | null; last_seen_at: string | null;
-        consent_blocked: boolean; wof_expires_at: string | null; registration_expires_at: string | null;
+        id: number;
+        name: string;
+        asset_tag: string;
+        status: string;
+        fleet_status: string | null;
+        speed_kph: number | null;
+        last_seen_at: string | null;
+        consent_blocked: boolean;
+        wof_expires_at: string | null;
+        registration_expires_at: string | null;
     }>;
     today_bookings: Array<{
-        id: number; vehicle: { id: number; name: string } | null; booked_by: string | null;
-        purpose: string | null; status: string; starts_at: string | null; ends_at: string | null;
+        id: number;
+        vehicle: { id: number; name: string } | null;
+        booked_by: string | null;
+        purpose: string | null;
+        status: string;
+        starts_at: string | null;
+        ends_at: string | null;
     }>;
     active_outings: Array<{
-        id: number; title: string; destination: string; status: string;
-        planned_departure: string | null; vehicle: { id: number; name: string } | null;
-        driver: { id: number; name: string } | null; residents_count: number;
+        id: number;
+        title: string;
+        destination: string;
+        status: string;
+        planned_departure: string | null;
+        vehicle: { id: number; name: string } | null;
+        driver: { id: number; name: string } | null;
+        residents_count: number;
     }>;
-    stats: { trips_this_month: number; distance_this_month: number; fuel_cost_this_month: number; incidents_this_month: number };
+    stats: {
+        trips_this_month: number;
+        distance_this_month: number;
+        fuel_cost_this_month: number;
+        incidents_this_month: number;
+    };
     compliance: Array<{
-        vehicle_name: string; vehicle_id: number;
-        items: Array<{ type: string; expires_at: string; days_remaining: number; status: string }>;
+        vehicle_name: string;
+        vehicle_id: number;
+        items: Array<{
+            type: string;
+            expires_at: string;
+            days_remaining: number;
+            status: string;
+        }>;
     }>;
 };
 
@@ -267,7 +294,8 @@ const typeIcons = {
 const typeColors = {
     head_office: 'bg-status-info-bg text-status-info border-status-info/30',
     house: 'bg-status-success-bg text-status-success border-status-success/30',
-    facility: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    facility:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 function bytes(n?: number | null): string {
@@ -313,7 +341,10 @@ export default function SiteShow({
     const [fleetLoaded, setFleetLoaded] = useState(!!fleet);
     const loadFleet = () => {
         if (!fleetLoaded) {
-            router.reload({ only: ['fleet'], onSuccess: () => setFleetLoaded(true) });
+            router.reload({
+                only: ['fleet'],
+                onSuccess: () => setFleetLoaded(true),
+            });
         }
     };
 
@@ -390,16 +421,25 @@ export default function SiteShow({
                             </div>
                         }
                     />
-
                 </div>
 
                 {/* Setup completeness — compact, unobtrusive strip.
                     Hidden entirely once fully onboarded. */}
                 {!isOnboardingComplete && (
                     <div className="rounded-lg border border-border bg-muted/60 dark:border-border dark:bg-muted/30">
-                        <button
-                            type="button"
+                        <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setSetupExpanded((v) => !v)}
+                            onKeyDown={(event) => {
+                                if (
+                                    event.key === 'Enter' ||
+                                    event.key === ' '
+                                ) {
+                                    event.preventDefault();
+                                    setSetupExpanded((v) => !v);
+                                }
+                            }}
                             className="flex w-full items-center gap-3 px-3 py-2 text-left text-xs"
                         >
                             <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
@@ -433,7 +473,7 @@ export default function SiteShow({
                             ) : (
                                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                             )}
-                        </button>
+                        </div>
                         {setupExpanded && (
                             <div className="border-t border-border px-3 py-3 dark:border-border">
                                 <div className="grid gap-1.5 sm:grid-cols-2">
@@ -535,7 +575,12 @@ export default function SiteShow({
                             <Car className="h-4 w-4" />
                             Fleet
                             {fleet && fleet.vehicles.length > 0 && (
-                                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">{fleet.vehicles.length}</Badge>
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 px-1.5 py-0 text-xs"
+                                >
+                                    {fleet.vehicles.length}
+                                </Badge>
                             )}
                         </TabsTrigger>
                         <TabsTrigger
@@ -1110,159 +1155,332 @@ export default function SiteShow({
 
                     {/* Fleet Tab */}
                     <TabsContent value="fleet" className="space-y-4">
-                        {fleet ? (() => {
-                            const fv = fleet.vehicles ?? [];
-                            const fb = fleet.today_bookings ?? [];
-                            const fo = fleet.active_outings ?? [];
-                            const fs = fleet.stats ?? { trips_this_month: 0, distance_this_month: 0, fuel_cost_this_month: 0, incidents_this_month: 0 };
-                            const fc = fleet.compliance ?? [];
+                        {fleet ? (
+                            (() => {
+                                const fv = fleet.vehicles ?? [];
+                                const fb = fleet.today_bookings ?? [];
+                                const fo = fleet.active_outings ?? [];
+                                const fs = fleet.stats ?? {
+                                    trips_this_month: 0,
+                                    distance_this_month: 0,
+                                    fuel_cost_this_month: 0,
+                                    incidents_this_month: 0,
+                                };
+                                const fc = fleet.compliance ?? [];
 
-                            return (
-                                <>
-                                    {/* Stats */}
-                                    <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-                                        <Card className="border">
-                                            <CardContent className="p-4 text-center">
-                                                <Route className="mx-auto h-4 w-4 text-status-info mb-1" />
-                                                <div className="text-lg font-bold">{fs.trips_this_month}</div>
-                                                <div className="text-[10px] text-muted-foreground">Trips this month</div>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="border">
-                                            <CardContent className="p-4 text-center">
-                                                <MapPin className="mx-auto h-4 w-4 text-primary mb-1" />
-                                                <div className="text-lg font-bold">{fs.distance_this_month} <span className="text-xs font-normal text-muted-foreground">km</span></div>
-                                                <div className="text-[10px] text-muted-foreground">Distance this month</div>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className="border">
-                                            <CardContent className="p-4 text-center">
-                                                <Fuel className="mx-auto h-4 w-4 text-status-warning mb-1" />
-                                                <div className="text-lg font-bold">{formatCurrency(fs.fuel_cost_this_month)}</div>
-                                                <div className="text-[10px] text-muted-foreground">Fuel this month</div>
-                                            </CardContent>
-                                        </Card>
-                                        <Card className={`border ${fs.incidents_this_month > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}>
-                                            <CardContent className="p-4 text-center">
-                                                <AlertTriangle className={`mx-auto h-4 w-4 mb-1 ${fs.incidents_this_month > 0 ? 'text-status-critical' : 'text-muted-foreground'}`} />
-                                                <div className={`text-lg font-bold ${fs.incidents_this_month > 0 ? 'text-status-critical' : ''}`}>{fs.incidents_this_month}</div>
-                                                <div className="text-[10px] text-muted-foreground">Incidents this month</div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
+                                return (
+                                    <>
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                            <Card className="border">
+                                                <CardContent className="p-4 text-center">
+                                                    <Route className="mx-auto mb-1 h-4 w-4 text-status-info" />
+                                                    <div className="text-lg font-bold">
+                                                        {fs.trips_this_month}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        Trips this month
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="border">
+                                                <CardContent className="p-4 text-center">
+                                                    <MapPin className="mx-auto mb-1 h-4 w-4 text-primary" />
+                                                    <div className="text-lg font-bold">
+                                                        {fs.distance_this_month}{' '}
+                                                        <span className="text-xs font-normal text-muted-foreground">
+                                                            km
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        Distance this month
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                            <Card className="border">
+                                                <CardContent className="p-4 text-center">
+                                                    <Fuel className="mx-auto mb-1 h-4 w-4 text-status-warning" />
+                                                    <div className="text-lg font-bold">
+                                                        {formatCurrency(
+                                                            fs.fuel_cost_this_month,
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        Fuel this month
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                            <Card
+                                                className={`border ${fs.incidents_this_month > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}
+                                            >
+                                                <CardContent className="p-4 text-center">
+                                                    <AlertTriangle
+                                                        className={`mx-auto mb-1 h-4 w-4 ${fs.incidents_this_month > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                                    />
+                                                    <div
+                                                        className={`text-lg font-bold ${fs.incidents_this_month > 0 ? 'text-status-critical' : ''}`}
+                                                    >
+                                                        {
+                                                            fs.incidents_this_month
+                                                        }
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        Incidents this month
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
 
-                                    {/* Vehicles at Site */}
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="flex items-center gap-2 text-base"><Car className="h-4 w-4" /> Vehicles at Site ({fv.length})</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {fv.length > 0 ? (
-                                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                                    {fv.map((v) => (
-                                                        <Link key={v.id} href={`/fleet-assets/vehicles/${v.id}`} className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                                                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${v.fleet_status === 'online' ? 'bg-status-success' : 'bg-muted'}`} />
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="text-sm font-medium truncate">{v.name}</div>
-                                                                <div className="text-[10px] text-muted-foreground">
-                                                                    {v.asset_tag}
-                                                                    {v.consent_blocked ? ' · Location hidden' : v.last_seen_at ? ` · ${new Date(v.last_seen_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}` : ''}
-                                                                </div>
-                                                            </div>
-                                                            {v.speed_kph != null && v.speed_kph > 0 && (
-                                                                <span className="text-xs text-muted-foreground shrink-0">{v.speed_kph} km/h</span>
-                                                            )}
-                                                        </Link>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="py-6 text-center text-sm text-muted-foreground">
-                                                    <Car className="mx-auto h-8 w-8 opacity-30 mb-2" />
-                                                    No vehicles assigned to this site
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Today's Activity */}
-                                    {(fb.length > 0 || fo.length > 0) && (
+                                        {/* Vehicles at Site */}
                                         <Card>
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4" /> Today's Activity</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-3">
-                                                {fb.length > 0 && (
-                                                    <div>
-                                                        <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5">Bookings</div>
-                                                        <div className="space-y-1.5">
-                                                            {fb.map((b) => (
-                                                                <Link key={b.id} href={`/fleet-assets/bookings/${b.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50 transition-colors">
-                                                                    <div className="min-w-0">
-                                                                        <span className="font-medium">{b.vehicle?.name ?? 'Vehicle'}</span>
-                                                                        <span className="text-muted-foreground"> — {b.purpose ?? 'No purpose'}</span>
-                                                                    </div>
-                                                                    <Badge variant={b.status === 'checked_out' ? 'default' : 'outline'} className="text-[10px] shrink-0 ml-2">{b.status.replace(/_/g, ' ')}</Badge>
-                                                                </Link>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {fo.length > 0 && (
-                                                    <div>
-                                                        <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5">Outings</div>
-                                                        <div className="space-y-1.5">
-                                                            {fo.map((o) => (
-                                                                <Link key={o.id} href={`/fleet-assets/outings/${o.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50 transition-colors">
-                                                                    <div className="min-w-0">
-                                                                        <span className="font-medium">{o.title}</span>
-                                                                        <span className="text-muted-foreground"> → {o.destination}</span>
-                                                                        {o.residents_count > 0 && <span className="text-muted-foreground"> · {o.residents_count} resident{o.residents_count !== 1 ? 's' : ''}</span>}
-                                                                    </div>
-                                                                    <Badge variant={o.status === 'active' ? 'default' : 'outline'} className="text-[10px] shrink-0 ml-2">{o.status}</Badge>
-                                                                </Link>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    )}
-
-                                    {/* Compliance Warnings */}
-                                    {fc.length > 0 && (
-                                        <Card className="border-status-warning/30 dark:border-status-warning/30">
-                                            <CardHeader className="pb-2">
-                                                <CardTitle className="flex items-center gap-2 text-base text-status-warning dark:text-status-warning">
-                                                    <AlertTriangle className="h-4 w-4" /> Compliance Warnings
+                                                <CardTitle className="flex items-center gap-2 text-base">
+                                                    <Car className="h-4 w-4" />{' '}
+                                                    Vehicles at Site (
+                                                    {fv.length})
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="space-y-2">
-                                                    {fc.map((v) => (
-                                                        <div key={v.vehicle_id} className="rounded-md border border-status-warning/30 dark:border-status-warning/30 p-3">
-                                                            <Link href={`/fleet-assets/vehicles/${v.vehicle_id}`} className="text-sm font-medium text-primary hover:underline">{v.vehicle_name}</Link>
-                                                            <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                                {v.items.map((item, i) => (
-                                                                    <Badge
-                                                                        key={i}
-                                                                        variant={item.status === 'expired' ? 'destructive' : 'outline'}
-                                                                        className={`text-[10px] ${item.status === 'critical' ? 'border-status-critical/30 text-status-critical dark:text-status-critical' : item.status === 'warning' ? 'border-status-warning/30 text-status-warning dark:text-status-warning' : ''}`}
+                                                {fv.length > 0 ? (
+                                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                        {fv.map((v) => (
+                                                            <Link
+                                                                key={v.id}
+                                                                href={`/fleet-assets/vehicles/${v.id}`}
+                                                                className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                                                            >
+                                                                <span
+                                                                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${v.fleet_status === 'online' ? 'bg-status-success' : 'bg-muted'}`}
+                                                                />
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="truncate text-sm font-medium">
+                                                                        {v.name}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-muted-foreground">
+                                                                        {
+                                                                            v.asset_tag
+                                                                        }
+                                                                        {v.consent_blocked
+                                                                            ? ' · Location hidden'
+                                                                            : v.last_seen_at
+                                                                              ? ` · ${new Date(v.last_seen_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}`
+                                                                              : ''}
+                                                                    </div>
+                                                                </div>
+                                                                {v.speed_kph !=
+                                                                    null &&
+                                                                    v.speed_kph >
+                                                                        0 && (
+                                                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                                                            {
+                                                                                v.speed_kph
+                                                                            }{' '}
+                                                                            km/h
+                                                                        </span>
+                                                                    )}
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                                        <Car className="mx-auto mb-2 h-8 w-8 opacity-30" />
+                                                        No vehicles assigned to
+                                                        this site
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Today's Activity */}
+                                        {(fb.length > 0 || fo.length > 0) && (
+                                            <Card>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="flex items-center gap-2 text-base">
+                                                        <Calendar className="h-4 w-4" />{' '}
+                                                        Today's Activity
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-3">
+                                                    {fb.length > 0 && (
+                                                        <div>
+                                                            <div className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase">
+                                                                Bookings
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                {fb.map((b) => (
+                                                                    <Link
+                                                                        key={
+                                                                            b.id
+                                                                        }
+                                                                        href={`/fleet-assets/bookings/${b.id}`}
+                                                                        className="flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                                                                     >
-                                                                        {item.type}: {item.status === 'expired' ? 'EXPIRED' : `${item.days_remaining}d remaining`}
-                                                                    </Badge>
+                                                                        <div className="min-w-0">
+                                                                            <span className="font-medium">
+                                                                                {b
+                                                                                    .vehicle
+                                                                                    ?.name ??
+                                                                                    'Vehicle'}
+                                                                            </span>
+                                                                            <span className="text-muted-foreground">
+                                                                                {' '}
+                                                                                —{' '}
+                                                                                {b.purpose ??
+                                                                                    'No purpose'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <Badge
+                                                                            variant={
+                                                                                b.status ===
+                                                                                'checked_out'
+                                                                                    ? 'default'
+                                                                                    : 'outline'
+                                                                            }
+                                                                            className="ml-2 shrink-0 text-[10px]"
+                                                                        >
+                                                                            {b.status.replace(
+                                                                                /_/g,
+                                                                                ' ',
+                                                                            )}
+                                                                        </Badge>
+                                                                    </Link>
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </>
-                            );
-                        })() : (
+                                                    )}
+                                                    {fo.length > 0 && (
+                                                        <div>
+                                                            <div className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase">
+                                                                Outings
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                {fo.map((o) => (
+                                                                    <Link
+                                                                        key={
+                                                                            o.id
+                                                                        }
+                                                                        href={`/fleet-assets/outings/${o.id}`}
+                                                                        className="flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                                                                    >
+                                                                        <div className="min-w-0">
+                                                                            <span className="font-medium">
+                                                                                {
+                                                                                    o.title
+                                                                                }
+                                                                            </span>
+                                                                            <span className="text-muted-foreground">
+                                                                                {' '}
+                                                                                →{' '}
+                                                                                {
+                                                                                    o.destination
+                                                                                }
+                                                                            </span>
+                                                                            {o.residents_count >
+                                                                                0 && (
+                                                                                <span className="text-muted-foreground">
+                                                                                    {' '}
+                                                                                    ·{' '}
+                                                                                    {
+                                                                                        o.residents_count
+                                                                                    }{' '}
+                                                                                    resident
+                                                                                    {o.residents_count !==
+                                                                                    1
+                                                                                        ? 's'
+                                                                                        : ''}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <Badge
+                                                                            variant={
+                                                                                o.status ===
+                                                                                'active'
+                                                                                    ? 'default'
+                                                                                    : 'outline'
+                                                                            }
+                                                                            className="ml-2 shrink-0 text-[10px]"
+                                                                        >
+                                                                            {
+                                                                                o.status
+                                                                            }
+                                                                        </Badge>
+                                                                    </Link>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                        {/* Compliance Warnings */}
+                                        {fc.length > 0 && (
+                                            <Card className="border-status-warning/30 dark:border-status-warning/30">
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="flex items-center gap-2 text-base text-status-warning dark:text-status-warning">
+                                                        <AlertTriangle className="h-4 w-4" />{' '}
+                                                        Compliance Warnings
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-2">
+                                                        {fc.map((v) => (
+                                                            <div
+                                                                key={
+                                                                    v.vehicle_id
+                                                                }
+                                                                className="rounded-md border border-status-warning/30 p-3 dark:border-status-warning/30"
+                                                            >
+                                                                <Link
+                                                                    href={`/fleet-assets/vehicles/${v.vehicle_id}`}
+                                                                    className="text-sm font-medium text-primary hover:underline"
+                                                                >
+                                                                    {
+                                                                        v.vehicle_name
+                                                                    }
+                                                                </Link>
+                                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                                    {v.items.map(
+                                                                        (
+                                                                            item,
+                                                                            i,
+                                                                        ) => (
+                                                                            <Badge
+                                                                                key={
+                                                                                    i
+                                                                                }
+                                                                                variant={
+                                                                                    item.status ===
+                                                                                    'expired'
+                                                                                        ? 'destructive'
+                                                                                        : 'outline'
+                                                                                }
+                                                                                className={`text-[10px] ${item.status === 'critical' ? 'border-status-critical/30 text-status-critical dark:text-status-critical' : item.status === 'warning' ? 'border-status-warning/30 text-status-warning dark:text-status-warning' : ''}`}
+                                                                            >
+                                                                                {
+                                                                                    item.type
+                                                                                }
+                                                                                :{' '}
+                                                                                {item.status ===
+                                                                                'expired'
+                                                                                    ? 'EXPIRED'
+                                                                                    : `${item.days_remaining}d remaining`}
+                                                                            </Badge>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                    </>
+                                );
+                            })()
+                        ) : (
                             <div className="py-12 text-center text-muted-foreground">
-                                <Truck className="mx-auto h-10 w-10 opacity-30 mb-3" />
+                                <Truck className="mx-auto mb-3 h-10 w-10 opacity-30" />
                                 <p className="text-sm">Loading fleet data...</p>
                             </div>
                         )}
@@ -1572,12 +1790,17 @@ export default function SiteShow({
                             <CardContent className="flex flex-col items-center justify-center gap-4 py-12">
                                 <DollarSign className="h-10 w-10 text-primary/40" />
                                 <div className="text-center">
-                                    <p className="font-medium">Financial Dashboard</p>
+                                    <p className="font-medium">
+                                        Financial Dashboard
+                                    </p>
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        View detailed cost breakdowns, budgets, and trends for this site.
+                                        View detailed cost breakdowns, budgets,
+                                        and trends for this site.
                                     </p>
                                 </div>
-                                <Link href={`/finance/sites/${site.id}/financial-dashboard`}>
+                                <Link
+                                    href={`/finance/sites/${site.id}/financial-dashboard`}
+                                >
                                     <Button>
                                         <DollarSign className="mr-2 h-4 w-4" />
                                         Open Financial Dashboard
@@ -2388,7 +2611,7 @@ function CoverageRequirementsTab({
     return (
         <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-                <Card className="overflow-hidden border-primary/60 bg-gradient-to-br from-white via-primary/10/70 to-status-info-bg/70">
+                <Card className="via-primary/10/70 overflow-hidden border-primary/60 bg-gradient-to-br from-white to-status-info-bg/70">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>

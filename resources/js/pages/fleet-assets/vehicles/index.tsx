@@ -307,7 +307,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
 
                         {/* Bulk Action Bar */}
                         {canManage && selectedIds.length > 0 && (
-                            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg border bg-background px-4 py-3 shadow-lg">
+                            <article className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border bg-background px-4 py-3 shadow-lg">
                                 <span className="text-sm font-medium">{selectedIds.length} vehicle{selectedIds.length !== 1 ? 's' : ''} selected</span>
                                 <div className="flex items-center gap-2">
                                     <Select value={bulkSiteId} onValueChange={setBulkSiteId}>
@@ -330,7 +330,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
                                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
                                     <X className="h-4 w-4" />
                                 </Button>
-                            </div>
+                            </article>
                         )}
 
                         {/* Pagination */}

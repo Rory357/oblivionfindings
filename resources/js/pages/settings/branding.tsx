@@ -513,20 +513,6 @@ export default function BrandingPage(props: Props) {
         [form],
     );
 
-    if (!can?.settings?.manageBranding) {
-        return (
-            <AppLayout breadcrumbs={breadcrumbs}>
-                <Head title="Branding" />
-                <SettingsLayout>
-                    <HeadingSmall title="Branding" description="" />
-                    <div className="rounded-md border p-4 text-sm">
-                        You don't have permission to manage branding.
-                    </div>
-                </SettingsLayout>
-            </AppLayout>
-        );
-    }
-
     const primaryVars = [
         { label: 'Primary', cssVar: '--primary' },
         { label: 'Primary Foreground', cssVar: '--primary-foreground' },
@@ -626,6 +612,22 @@ export default function BrandingPage(props: Props) {
         applyVar('--primary-foreground', preset.primaryFg);
         applyVar('--accent', preset.accent);
     };
+
+    if (!can?.settings?.manageBranding) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Branding" />
+                <SettingsLayout>
+                    <HeadingSmall title="Branding" description="" />
+                    <Card>
+                        <CardContent className="p-4 text-sm">
+                            You don't have permission to manage branding.
+                        </CardContent>
+                    </Card>
+                </SettingsLayout>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -919,9 +921,10 @@ export default function BrandingPage(props: Props) {
                                                     </p>
                                                 )}
                                                 {props.branding?.faviconUrl && (
-                                                    <button
+                                                    <Button
                                                         type="button"
-                                                        className="text-xs text-destructive hover:underline"
+                                                        variant="link"
+                                                        className="h-auto p-0 text-xs text-destructive"
                                                         onClick={() =>
                                                             form.setData(
                                                                 'remove_favicon',
@@ -930,7 +933,7 @@ export default function BrandingPage(props: Props) {
                                                         }
                                                     >
                                                         Remove favicon
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </div>
                                         </div>
@@ -969,15 +972,16 @@ export default function BrandingPage(props: Props) {
                                                         preset.hex;
 
                                                     return (
-                                                        <button
+                                                        <Button
                                                             key={key}
                                                             type="button"
+                                                            variant="outline"
                                                             onClick={() =>
                                                                 handleBrandChange(
                                                                     preset.hex,
                                                                 )
                                                             }
-                                                            className={`flex items-center gap-2 rounded-lg border p-2 text-left text-xs transition-all hover:border-primary/50 ${
+                                                            className={`h-auto justify-start gap-2 rounded-lg p-2 text-left text-xs hover:border-primary/50 ${
                                                                 selected
                                                                     ? 'border-primary bg-primary/10 text-primary'
                                                                     : 'border-border'
@@ -993,7 +997,7 @@ export default function BrandingPage(props: Props) {
                                                             <span className="font-medium">
                                                                 {preset.label}
                                                             </span>
-                                                        </button>
+                                                        </Button>
                                                     );
                                                 },
                                             )}
@@ -1007,14 +1011,15 @@ export default function BrandingPage(props: Props) {
                                                 className="relative"
                                                 ref={brandPickerRef}
                                             >
-                                                <button
+                                                <Button
                                                     type="button"
+                                                    variant="outline"
                                                     onClick={() =>
                                                         setBrandPickerOpen(
                                                             (v) => !v,
                                                         )
                                                     }
-                                                    className="flex items-center gap-3 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:bg-muted/50"
+                                                    className="h-auto gap-3 rounded-lg border-input bg-card px-3 py-2 text-sm hover:bg-muted/50"
                                                 >
                                                     <span
                                                         className="h-6 w-6 rounded-md border"
@@ -1026,7 +1031,7 @@ export default function BrandingPage(props: Props) {
                                                     <span className="font-mono uppercase">
                                                         {brandHex}
                                                     </span>
-                                                </button>
+                                                </Button>
                                                 {brandPickerOpen && (
                                                     <div className="absolute left-0 z-50 mt-2 rounded-lg border bg-popover p-3 shadow-lg">
                                                         <HexColorPicker
@@ -1116,9 +1121,11 @@ export default function BrandingPage(props: Props) {
                                                 Essentials palette.
                                             </CardDescription>
                                         </div>
-                                        <button
+                                        <Button
                                             type="button"
-                                            className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors hover:bg-muted"
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2"
                                             onClick={() => {
                                                 const on = !previewDark;
                                                 setPreviewDark(on);
@@ -1149,7 +1156,7 @@ export default function BrandingPage(props: Props) {
                                                 <Sun className="h-4 w-4" />
                                             )}
                                             {previewDark ? 'Dark' : 'Light'}
-                                        </button>
+                                        </Button>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
@@ -1193,13 +1200,14 @@ export default function BrandingPage(props: Props) {
                                         </p>
                                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                             {THEME_PRESETS.map((preset) => (
-                                                <button
+                                                <Button
                                                     key={preset.name}
                                                     type="button"
+                                                    variant="outline"
                                                     onClick={() =>
                                                         applyThemePreset(preset)
                                                     }
-                                                    className="flex flex-col items-center gap-2 rounded-lg border p-3 transition-all hover:border-primary/50 hover:shadow-sm"
+                                                    className="h-auto flex-col gap-2 rounded-lg p-3 hover:border-primary/50 hover:shadow-sm"
                                                 >
                                                     <div className="flex gap-1">
                                                         <div
@@ -1227,7 +1235,7 @@ export default function BrandingPage(props: Props) {
                                                     <span className="text-xs font-medium">
                                                         {preset.name}
                                                     </span>
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     </div>
@@ -1236,9 +1244,10 @@ export default function BrandingPage(props: Props) {
 
                                     {/* Advanced Colours toggle */}
                                     <div className="space-y-3">
-                                        <button
+                                        <Button
                                             type="button"
-                                            className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                            variant="ghost"
+                                            className="h-auto justify-start gap-2 p-0 text-sm font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                                             onClick={() =>
                                                 setAdvancedOpen((s) => !s)
                                             }
@@ -1250,7 +1259,7 @@ export default function BrandingPage(props: Props) {
                                             )}
                                             Advanced Colours (
                                             {remainingVars.length} variables)
-                                        </button>
+                                        </Button>
 
                                         {advancedOpen && (
                                             <div className="space-y-6 rounded-lg border bg-muted/30 p-4">
@@ -1736,9 +1745,10 @@ export default function BrandingPage(props: Props) {
                                         </div>
 
                                         <div className="flex items-center justify-between">
-                                            <button
+                                            <Button
                                                 type="button"
-                                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                                variant="ghost"
+                                                className="h-auto gap-1.5 p-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
                                                 onClick={() => {
                                                     const reset =
                                                         Object.fromEntries(
@@ -1754,7 +1764,7 @@ export default function BrandingPage(props: Props) {
                                             >
                                                 <RotateCcw className="h-3 w-3" />
                                                 Reset all
-                                            </button>
+                                            </Button>
                                             <Button
                                                 type="submit"
                                                 disabled={termForm.processing}
@@ -1774,6 +1784,7 @@ export default function BrandingPage(props: Props) {
                         </TabsContent>
 
                         {/* Save branding */}
+                        {/* eslint-disable-next-line no-restricted-syntax -- Sticky save rail needs backdrop and bottom positioning rather than Card spacing. */}
                         <div className="sticky bottom-4 z-10 flex items-center gap-2 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur">
                             <Button
                                 type="button"

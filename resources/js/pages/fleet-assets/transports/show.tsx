@@ -201,15 +201,25 @@ export default function TransportShow({
     medication_context,
 }: Props) {
     const t = transport ?? ({} as Props['transport']);
-    const medicationContext = medication_context ?? {
-        client: null,
-        available_medications: [],
-        transit_logs: [],
-        witnesses: [],
-        can_manage: false,
-    };
-    const safeMedicationOptions = medicationContext.available_medications ?? [];
-    const safeTransitLogs = medicationContext.transit_logs ?? [];
+    const medicationContext = useMemo<MedicationContext>(
+        () =>
+            medication_context ?? {
+                client: null,
+                available_medications: [],
+                transit_logs: [],
+                witnesses: [],
+                can_manage: false,
+            },
+        [medication_context],
+    );
+    const safeMedicationOptions = useMemo(
+        () => medicationContext.available_medications ?? [],
+        [medicationContext.available_medications],
+    );
+    const safeTransitLogs = useMemo(
+        () => medicationContext.transit_logs ?? [],
+        [medicationContext.transit_logs],
+    );
     const safeWitnesses = medicationContext.witnesses ?? [];
     const canManageMedicationTransit = !!medicationContext.can_manage;
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -269,6 +279,7 @@ export default function TransportShow({
 
     useEffect(() => {
         packForm.setData('client_id', packClientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Keep the Inertia pack form synchronized with the selected medication client.
     }, [packClientId]);
 
     const vehicleMarkers: MapMarker[] = useMemo(() => {

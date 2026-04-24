@@ -268,10 +268,12 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                 {trainingRecords?.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {trainingRecords.links.map((l: any) => (
-                            <button
+                            <Button
                                 key={l.label}
+                                type="button"
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
                                 onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />

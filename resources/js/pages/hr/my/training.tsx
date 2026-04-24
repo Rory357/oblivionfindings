@@ -2,9 +2,8 @@ import { DonutChart } from '@/components/dashboard/donut-chart';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -12,7 +11,6 @@ import {
     BookOpen,
     Calendar,
     CheckCircle2,
-    ChevronRight,
     Clock,
     FileCheck,
     Filter,
@@ -118,7 +116,12 @@ export default function MyTraining({ complianceStatuses }: Props) {
     const [activeFilter, setActiveFilter] = useState<StatusKey | 'all'>('all');
 
     const summary = useMemo(() => {
-        const counts = { compliant: 0, expiring_soon: 0, expired: 0, not_started: 0 };
+        const counts = {
+            compliant: 0,
+            expiring_soon: 0,
+            expired: 0,
+            not_started: 0,
+        };
         complianceStatuses.forEach((cs) => {
             if (cs.status in counts) counts[cs.status as StatusKey]++;
         });
@@ -126,7 +129,8 @@ export default function MyTraining({ complianceStatuses }: Props) {
     }, [complianceStatuses]);
 
     const total = complianceStatuses.length;
-    const complianceRate = total > 0 ? Math.round((summary.compliant / total) * 100) : 0;
+    const complianceRate =
+        total > 0 ? Math.round((summary.compliant / total) * 100) : 0;
 
     const categories = useMemo(() => {
         const cats = new Set<string>();
@@ -155,9 +159,12 @@ export default function MyTraining({ complianceStatuses }: Props) {
                             <GraduationCap className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold md:text-2xl">My Training & Compliance</h1>
+                            <h1 className="text-xl font-bold md:text-2xl">
+                                My Training & Compliance
+                            </h1>
                             <p className="text-sm text-muted-foreground">
-                                Track your compliance requirements and certifications
+                                Track your compliance requirements and
+                                certifications
                             </p>
                         </div>
                     </div>
@@ -176,13 +183,19 @@ export default function MyTraining({ complianceStatuses }: Props) {
                             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                             <div>
                                 <p className="font-semibold text-status-critical dark:text-status-critical">
-                                    {urgentItems.length} item{urgentItems.length !== 1 ? 's' : ''} need
-                                    {urgentItems.length === 1 ? 's' : ''} your attention
+                                    {urgentItems.length} item
+                                    {urgentItems.length !== 1 ? 's' : ''} need
+                                    {urgentItems.length === 1 ? 's' : ''} your
+                                    attention
                                 </p>
                                 <p className="mt-0.5 text-sm text-status-critical dark:text-status-critical">
-                                    {summary.expired > 0 && `${summary.expired} expired`}
-                                    {summary.expired > 0 && summary.expiring_soon > 0 && ' and '}
-                                    {summary.expiring_soon > 0 && `${summary.expiring_soon} expiring soon`}
+                                    {summary.expired > 0 &&
+                                        `${summary.expired} expired`}
+                                    {summary.expired > 0 &&
+                                        summary.expiring_soon > 0 &&
+                                        ' and '}
+                                    {summary.expiring_soon > 0 &&
+                                        `${summary.expiring_soon} expiring soon`}
                                     . Please complete these as soon as possible.
                                 </p>
                             </div>
@@ -199,10 +212,26 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                 <>
                                     <DonutChart
                                         data={[
-                                            { label: 'Compliant', value: summary.compliant, color: '#10b981' },
-                                            { label: 'Expiring', value: summary.expiring_soon, color: '#f59e0b' },
-                                            { label: 'Expired', value: summary.expired, color: '#ef4444' },
-                                            { label: 'Not Started', value: summary.not_started, color: '#94a3b8' },
+                                            {
+                                                label: 'Compliant',
+                                                value: summary.compliant,
+                                                color: '#10b981',
+                                            },
+                                            {
+                                                label: 'Expiring',
+                                                value: summary.expiring_soon,
+                                                color: '#f59e0b',
+                                            },
+                                            {
+                                                label: 'Expired',
+                                                value: summary.expired,
+                                                color: '#ef4444',
+                                            },
+                                            {
+                                                label: 'Not Started',
+                                                value: summary.not_started,
+                                                color: '#94a3b8',
+                                            },
                                         ]}
                                         size={160}
                                         thickness={22}
@@ -211,14 +240,17 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                     />
                                     <div className="text-center">
                                         <p className="text-sm text-muted-foreground">
-                                            {summary.compliant} of {total} requirements met
+                                            {summary.compliant} of {total}{' '}
+                                            requirements met
                                         </p>
                                     </div>
                                 </>
                             ) : (
                                 <div className="flex flex-col items-center gap-3 py-6">
                                     <Shield className="h-12 w-12 text-muted-foreground/30" />
-                                    <p className="text-sm text-muted-foreground">No compliance items assigned</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No compliance items assigned
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -226,55 +258,91 @@ export default function MyTraining({ complianceStatuses }: Props) {
 
                     {/* Right: Status Cards */}
                     <div className="grid gap-3 sm:grid-cols-2">
-                        {(Object.keys(STATUS_CONFIG) as StatusKey[]).map((key) => {
-                            const config = STATUS_CONFIG[key];
-                            const Icon = config.icon;
-                            const count = summary[key] || 0;
-                            const isActive = activeFilter === key;
+                        {(Object.keys(STATUS_CONFIG) as StatusKey[]).map(
+                            (key) => {
+                                const config = STATUS_CONFIG[key];
+                                const Icon = config.icon;
+                                const count = summary[key] || 0;
+                                const isActive = activeFilter === key;
 
-                            return (
-                                <button
-                                    key={key}
-                                    onClick={() => setActiveFilter(isActive ? 'all' : key)}
-                                    className={`group relative overflow-hidden rounded-xl border p-4 text-left transition-all hover:shadow-md ${
-                                        isActive
-                                            ? `${config.border} ring-2 ring-offset-2`
-                                            : 'hover:border-primary/30'
-                                    }`}
-                                    style={isActive ? { borderColor: config.color, boxShadow: `0 0 0 2px ${config.color}` } : undefined}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-muted-foreground">{config.label}</p>
-                                            <p className="mt-1 text-3xl font-bold" style={{ color: config.color }}>
-                                                {count}
-                                            </p>
-                                        </div>
-                                        <div
-                                            className={`flex h-11 w-11 items-center justify-center rounded-xl ${config.bg} transition-transform group-hover:scale-110`}
-                                        >
-                                            <Icon className={`h-5 w-5 ${config.text}`} />
-                                        </div>
-                                    </div>
-                                    {total > 0 && (
-                                        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted/40">
+                                return (
+                                    <Card
+                                        key={key}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() =>
+                                            setActiveFilter(
+                                                isActive ? 'all' : key,
+                                            )
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (
+                                                event.key === 'Enter' ||
+                                                event.key === ' '
+                                            ) {
+                                                event.preventDefault();
+                                                setActiveFilter(
+                                                    isActive ? 'all' : key,
+                                                );
+                                            }
+                                        }}
+                                        className={`group relative overflow-hidden p-4 text-left transition-all hover:shadow-md ${
+                                            isActive
+                                                ? `${config.border} ring-2 ring-offset-2`
+                                                : 'hover:border-primary/30'
+                                        }`}
+                                        style={
+                                            isActive
+                                                ? {
+                                                      borderColor: config.color,
+                                                      boxShadow: `0 0 0 2px ${config.color}`,
+                                                  }
+                                                : undefined
+                                        }
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">
+                                                    {config.label}
+                                                </p>
+                                                <p
+                                                    className="mt-1 text-3xl font-bold"
+                                                    style={{
+                                                        color: config.color,
+                                                    }}
+                                                >
+                                                    {count}
+                                                </p>
+                                            </div>
                                             <div
-                                                className="h-full rounded-full transition-all duration-500"
-                                                style={{
-                                                    width: `${(count / total) * 100}%`,
-                                                    backgroundColor: config.color,
-                                                }}
-                                            />
+                                                className={`flex h-11 w-11 items-center justify-center rounded-xl ${config.bg} transition-transform group-hover:scale-110`}
+                                            >
+                                                <Icon
+                                                    className={`h-5 w-5 ${config.text}`}
+                                                />
+                                            </div>
                                         </div>
-                                    )}
-                                    {isActive && (
-                                        <p className="mt-2 text-[10px] text-muted-foreground">
-                                            Click to clear filter
-                                        </p>
-                                    )}
-                                </button>
-                            );
-                        })}
+                                        {total > 0 && (
+                                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted/40">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-500"
+                                                    style={{
+                                                        width: `${(count / total) * 100}%`,
+                                                        backgroundColor:
+                                                            config.color,
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                        {isActive && (
+                                            <p className="mt-2 text-[10px] text-muted-foreground">
+                                                Click to clear filter
+                                            </p>
+                                        )}
+                                    </Card>
+                                );
+                            },
+                        )}
                     </div>
                 </div>
 
@@ -293,15 +361,27 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                     const items = complianceStatuses.filter(
                                         (cs) => cs.requirement.category === cat,
                                     );
-                                    const compliantCount = items.filter((cs) => cs.status === 'compliant').length;
-                                    const pct = items.length > 0 ? Math.round((compliantCount / items.length) * 100) : 0;
+                                    const compliantCount = items.filter(
+                                        (cs) => cs.status === 'compliant',
+                                    ).length;
+                                    const pct =
+                                        items.length > 0
+                                            ? Math.round(
+                                                  (compliantCount /
+                                                      items.length) *
+                                                      100,
+                                              )
+                                            : 0;
 
                                     return (
                                         <div key={cat}>
                                             <div className="mb-1.5 flex items-center justify-between text-sm">
-                                                <span className="font-medium">{formatCategory(cat)}</span>
+                                                <span className="font-medium">
+                                                    {formatCategory(cat)}
+                                                </span>
                                                 <span className="text-muted-foreground">
-                                                    {compliantCount}/{items.length} complete
+                                                    {compliantCount}/
+                                                    {items.length} complete
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-3">
@@ -311,11 +391,17 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                                         style={{
                                                             width: `${pct}%`,
                                                             backgroundColor:
-                                                                pct === 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                                                                pct === 100
+                                                                    ? '#10b981'
+                                                                    : pct >= 50
+                                                                      ? '#f59e0b'
+                                                                      : '#ef4444',
                                                         }}
                                                     />
                                                 </div>
-                                                <span className="w-10 text-right text-xs font-semibold">{pct}%</span>
+                                                <span className="w-10 text-right text-xs font-semibold">
+                                                    {pct}%
+                                                </span>
                                             </div>
                                         </div>
                                     );
@@ -334,24 +420,30 @@ export default function MyTraining({ complianceStatuses }: Props) {
                             {activeFilter !== 'all' && (
                                 <Badge variant="secondary" className="ml-1">
                                     {STATUS_CONFIG[activeFilter].label}
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => setActiveFilter('all')}
-                                        className="ml-1.5 hover:text-foreground"
+                                        className="ml-1.5 h-4 w-4 p-0"
                                     >
                                         <XCircle className="h-3 w-3" />
-                                    </button>
+                                    </Button>
                                 </Badge>
                             )}
                         </h2>
                         <p className="text-xs text-muted-foreground">
-                            {filtered.length} item{filtered.length !== 1 ? 's' : ''}
+                            {filtered.length} item
+                            {filtered.length !== 1 ? 's' : ''}
                         </p>
                     </div>
 
                     {filtered.length > 0 ? (
                         <div className="space-y-3">
                             {filtered.map((cs) => {
-                                const config = STATUS_CONFIG[cs.status] ?? STATUS_CONFIG.not_started;
+                                const config =
+                                    STATUS_CONFIG[cs.status] ??
+                                    STATUS_CONFIG.not_started;
                                 const Icon = config.icon;
 
                                 return (
@@ -359,26 +451,42 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                         key={cs.id}
                                         className="overflow-hidden transition-all hover:shadow-sm"
                                     >
-                                        <div className="h-0.5" style={{ backgroundColor: config.color }} />
+                                        <div
+                                            className="h-0.5"
+                                            style={{
+                                                backgroundColor: config.color,
+                                            }}
+                                        />
                                         <CardContent className="p-4">
                                             <div className="flex items-start gap-4">
                                                 {/* Status icon */}
                                                 <div
                                                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${config.bg}`}
                                                 >
-                                                    <Icon className={`h-5 w-5 ${config.text}`} />
+                                                    <Icon
+                                                        className={`h-5 w-5 ${config.text}`}
+                                                    />
                                                 </div>
 
                                                 {/* Content */}
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div>
-                                                            <h3 className="font-semibold text-sm">
-                                                                {cs.requirement.name}
+                                                            <h3 className="text-sm font-semibold">
+                                                                {
+                                                                    cs
+                                                                        .requirement
+                                                                        .name
+                                                                }
                                                             </h3>
-                                                            {cs.requirement.description && (
-                                                                <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                                                                    {cs.requirement.description}
+                                                            {cs.requirement
+                                                                .description && (
+                                                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                                    {
+                                                                        cs
+                                                                            .requirement
+                                                                            .description
+                                                                    }
                                                                 </p>
                                                             )}
                                                         </div>
@@ -394,39 +502,58 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                                                         <span className="flex items-center gap-1">
                                                             <Filter className="h-3 w-3" />
-                                                            {formatCategory(cs.requirement.category)}
+                                                            {formatCategory(
+                                                                cs.requirement
+                                                                    .category,
+                                                            )}
                                                         </span>
 
                                                         {cs.completed_at && (
                                                             <span className="flex items-center gap-1">
                                                                 <CheckCircle2 className="h-3 w-3 text-status-success" />
-                                                                Completed {formatDate(cs.completed_at)}
+                                                                Completed{' '}
+                                                                {formatDate(
+                                                                    cs.completed_at,
+                                                                )}
                                                             </span>
                                                         )}
 
                                                         {cs.expiry_date && (
                                                             <span
                                                                 className={`flex items-center gap-1 ${
-                                                                    cs.status === 'expired'
+                                                                    cs.status ===
+                                                                    'expired'
                                                                         ? 'font-medium text-status-critical'
-                                                                        : cs.status === 'expiring_soon'
+                                                                        : cs.status ===
+                                                                            'expiring_soon'
                                                                           ? 'font-medium text-status-warning'
                                                                           : ''
                                                                 }`}
                                                             >
                                                                 <Calendar className="h-3 w-3" />
-                                                                {cs.status === 'expired'
+                                                                {cs.status ===
+                                                                'expired'
                                                                     ? `Expired ${formatDate(cs.expiry_date)}`
-                                                                    : cs.status === 'expiring_soon' && cs.days_until_expiry != null
+                                                                    : cs.status ===
+                                                                            'expiring_soon' &&
+                                                                        cs.days_until_expiry !=
+                                                                            null
                                                                       ? `Expires in ${cs.days_until_expiry} day${cs.days_until_expiry !== 1 ? 's' : ''}`
                                                                       : `Expires ${formatDate(cs.expiry_date)}`}
                                                             </span>
                                                         )}
 
-                                                        {cs.requirement.validity_months && (
+                                                        {cs.requirement
+                                                            .validity_months && (
                                                             <span className="flex items-center gap-1">
                                                                 <Clock className="h-3 w-3" />
-                                                                Valid for {cs.requirement.validity_months} months
+                                                                Valid for{' '}
+                                                                {
+                                                                    cs
+                                                                        .requirement
+                                                                        .validity_months
+                                                                }{' '}
+                                                                months
                                                             </span>
                                                         )}
                                                     </div>

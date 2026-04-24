@@ -26,7 +26,6 @@ import {
     FileText,
     Search,
     TrendingUp,
-    User,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -111,7 +110,11 @@ function relativeTime(dateStr?: string | null): string {
     if (diffHours < 24) return `${diffHours}h ago`;
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 function absoluteTime(dateStr?: string | null): string {
@@ -163,24 +166,34 @@ function moduleBadgeColor(module?: string | null): string {
 function DiffViewer({ properties }: { properties: Record<string, any> }) {
     const old = properties.old ?? {};
     const attributes = properties.attributes ?? {};
-    const keys = [...new Set([...Object.keys(old), ...Object.keys(attributes)])];
+    const keys = [
+        ...new Set([...Object.keys(old), ...Object.keys(attributes)]),
+    ];
 
     if (keys.length === 0) {
-        return <p className="text-xs text-muted-foreground">No detailed changes recorded.</p>;
+        return (
+            <p className="text-xs text-muted-foreground">
+                No detailed changes recorded.
+            </p>
+        );
     }
 
     return (
         <div className="mt-3 space-y-1.5 rounded-md bg-muted p-3 font-mono text-xs">
             {keys.map((key) => (
                 <div key={key} className="flex gap-2">
-                    <span className="shrink-0 font-semibold text-muted-foreground">{key}:</span>
+                    <span className="shrink-0 font-semibold text-muted-foreground">
+                        {key}:
+                    </span>
                     {old[key] !== undefined && (
                         <span className="text-status-critical line-through">
                             {JSON.stringify(old[key])}
                         </span>
                     )}
                     {attributes[key] !== undefined && (
-                        <span className="text-status-success">{JSON.stringify(attributes[key])}</span>
+                        <span className="text-status-success">
+                            {JSON.stringify(attributes[key])}
+                        </span>
                     )}
                 </div>
             ))}
@@ -292,12 +305,14 @@ export default function AuditLogs({
                             <form onSubmit={handleSearch} className="space-y-3">
                                 <div className="flex flex-col gap-3 sm:flex-row">
                                     <div className="relative flex-1">
-                                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                         <Input
                                             dusk="audit-search"
                                             placeholder="Search audit events..."
                                             value={search}
-                                            onChange={(e) => setSearch(e.target.value)}
+                                            onChange={(e) =>
+                                                setSearch(e.target.value)
+                                            }
                                             className="pl-9"
                                         />
                                     </div>
@@ -318,9 +333,14 @@ export default function AuditLogs({
                                             <SelectValue placeholder="All Users" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Users</SelectItem>
+                                            <SelectItem value="all">
+                                                All Users
+                                            </SelectItem>
                                             {(users ?? []).map((u) => (
-                                                <SelectItem key={u.id} value={u.id.toString()}>
+                                                <SelectItem
+                                                    key={u.id}
+                                                    value={u.id.toString()}
+                                                >
                                                     {u.name}
                                                 </SelectItem>
                                             ))}
@@ -339,7 +359,10 @@ export default function AuditLogs({
                                         </SelectTrigger>
                                         <SelectContent>
                                             {MODULES.map((m) => (
-                                                <SelectItem key={m.value} value={m.value}>
+                                                <SelectItem
+                                                    key={m.value}
+                                                    value={m.value}
+                                                >
                                                     {m.label}
                                                 </SelectItem>
                                             ))}
@@ -358,7 +381,10 @@ export default function AuditLogs({
                                         </SelectTrigger>
                                         <SelectContent>
                                             {ACTION_TYPES.map((a) => (
-                                                <SelectItem key={a.value} value={a.value}>
+                                                <SelectItem
+                                                    key={a.value}
+                                                    value={a.value}
+                                                >
                                                     {a.label}
                                                 </SelectItem>
                                             ))}
@@ -370,7 +396,9 @@ export default function AuditLogs({
                                         value={dateFrom}
                                         onChange={(e) => {
                                             setDateFrom(e.target.value);
-                                            applyFilters({ date_from: e.target.value });
+                                            applyFilters({
+                                                date_from: e.target.value,
+                                            });
                                         }}
                                         className="w-[150px]"
                                         placeholder="From"
@@ -380,7 +408,9 @@ export default function AuditLogs({
                                         value={dateTo}
                                         onChange={(e) => {
                                             setDateTo(e.target.value);
-                                            applyFilters({ date_to: e.target.value });
+                                            applyFilters({
+                                                date_to: e.target.value,
+                                            });
                                         }}
                                         className="w-[150px]"
                                         placeholder="To"
@@ -398,23 +428,33 @@ export default function AuditLogs({
                                     <div className="mb-4 rounded-full bg-primary/10 p-4">
                                         <FileText className="h-8 w-8 text-primary" />
                                     </div>
-                                    <h3 className="text-lg font-semibold">No audit events found</h3>
+                                    <h3 className="text-lg font-semibold">
+                                        No audit events found
+                                    </h3>
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        Try adjusting your search or filters to find activity.
+                                        Try adjusting your search or filters to
+                                        find activity.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="relative">
                                     {/* Timeline line */}
-                                    <div className="absolute left-8 top-0 bottom-0 w-px bg-border" />
+                                    <div className="absolute top-0 bottom-0 left-8 w-px bg-border" />
 
                                     <div className="divide-y">
                                         {allData.map((event) => {
-                                            const isExpanded = expandedIds.has(event.id);
+                                            const isExpanded = expandedIds.has(
+                                                event.id,
+                                            );
                                             const hasDetails =
                                                 event.properties &&
-                                                (Object.keys(event.properties.old ?? {}).length > 0 ||
-                                                    Object.keys(event.properties.attributes ?? {}).length > 0);
+                                                (Object.keys(
+                                                    event.properties.old ?? {},
+                                                ).length > 0 ||
+                                                    Object.keys(
+                                                        event.properties
+                                                            .attributes ?? {},
+                                                    ).length > 0);
 
                                             return (
                                                 <div
@@ -434,18 +474,27 @@ export default function AuditLogs({
                                                                 <Avatar className="h-6 w-6">
                                                                     <AvatarFallback className="bg-primary/10 text-[10px] text-primary">
                                                                         {event.causer
-                                                                            ? getInitials(event.causer.name)
+                                                                            ? getInitials(
+                                                                                  event
+                                                                                      .causer
+                                                                                      .name,
+                                                                              )
                                                                             : 'SY'}
                                                                     </AvatarFallback>
                                                                 </Avatar>
                                                                 <span className="text-sm font-medium">
-                                                                    {event.causer?.name ?? 'System'}
+                                                                    {event
+                                                                        .causer
+                                                                        ?.name ??
+                                                                        'System'}
                                                                 </span>
                                                             </div>
 
                                                             {/* Description */}
                                                             <p className="flex-1 text-sm text-muted-foreground">
-                                                                {event.description}
+                                                                {
+                                                                    event.description
+                                                                }
                                                             </p>
 
                                                             {/* Badges */}
@@ -455,7 +504,9 @@ export default function AuditLogs({
                                                                         variant="outline"
                                                                         className={`text-[10px] ${eventBadgeColor(event.event)}`}
                                                                     >
-                                                                        {event.event}
+                                                                        {
+                                                                            event.event
+                                                                        }
                                                                     </Badge>
                                                                 )}
                                                                 {event.module && (
@@ -463,7 +514,9 @@ export default function AuditLogs({
                                                                         variant="outline"
                                                                         className={`text-[10px] ${moduleBadgeColor(event.module)}`}
                                                                     >
-                                                                        {event.module}
+                                                                        {
+                                                                            event.module
+                                                                        }
                                                                     </Badge>
                                                                 )}
                                                             </div>
@@ -474,35 +527,56 @@ export default function AuditLogs({
                                                             <Clock className="h-3 w-3 text-muted-foreground" />
                                                             <span
                                                                 className="text-xs text-muted-foreground"
-                                                                title={absoluteTime(event.created_at)}
+                                                                title={absoluteTime(
+                                                                    event.created_at,
+                                                                )}
                                                             >
-                                                                {relativeTime(event.created_at)}
+                                                                {relativeTime(
+                                                                    event.created_at,
+                                                                )}
                                                             </span>
                                                             {event.subject_type && (
                                                                 <span className="text-xs text-muted-foreground">
-                                                                    {event.subject_type}
-                                                                    {event.subject_id ? ` #${event.subject_id}` : ''}
+                                                                    {
+                                                                        event.subject_type
+                                                                    }
+                                                                    {event.subject_id
+                                                                        ? ` #${event.subject_id}`
+                                                                        : ''}
                                                                 </span>
                                                             )}
                                                         </div>
 
                                                         {/* Expandable details */}
                                                         {hasDetails && (
-                                                            <button
-                                                                onClick={() => toggleExpanded(event.id)}
-                                                                className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:text-primary"
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                onClick={() =>
+                                                                    toggleExpanded(
+                                                                        event.id,
+                                                                    )
+                                                                }
+                                                                className="mt-2 h-auto gap-1 p-0 text-xs font-medium text-primary hover:bg-transparent hover:text-primary"
                                                             >
                                                                 {isExpanded ? (
                                                                     <ChevronDown className="h-3 w-3" />
                                                                 ) : (
                                                                     <ChevronRight className="h-3 w-3" />
                                                                 )}
-                                                                {isExpanded ? 'Hide changes' : 'View changes'}
-                                                            </button>
+                                                                {isExpanded
+                                                                    ? 'Hide changes'
+                                                                    : 'View changes'}
+                                                            </Button>
                                                         )}
-                                                        {isExpanded && hasDetails && (
-                                                            <DiffViewer properties={event.properties} />
-                                                        )}
+                                                        {isExpanded &&
+                                                            hasDetails && (
+                                                                <DiffViewer
+                                                                    properties={
+                                                                        event.properties
+                                                                    }
+                                                                />
+                                                            )}
                                                     </div>
                                                 </div>
                                             );
@@ -517,28 +591,45 @@ export default function AuditLogs({
                     {(events?.links ?? []).length > 3 && (
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-muted-foreground">
-                                Showing {allData.length} of {events.total} events
+                                Showing {allData.length} of {events.total}{' '}
+                                events
                             </p>
                             <div className="flex gap-1">
-                                {(events.links ?? []).map((link: any, i: number) => (
-                                    <Button
-                                        key={i}
-                                        variant={link.active ? 'default' : 'outline'}
-                                        size="sm"
-                                        disabled={!link.url}
-                                        className={link.active ? 'bg-primary hover:bg-primary' : ''}
-                                        asChild={!!link.url}
-                                    >
-                                        {link.url ? (
-                                            <Link
-                                                href={link.url}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        ) : (
-                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                        )}
-                                    </Button>
-                                ))}
+                                {(events.links ?? []).map(
+                                    (link: any, i: number) => (
+                                        <Button
+                                            key={i}
+                                            variant={
+                                                link.active
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                            size="sm"
+                                            disabled={!link.url}
+                                            className={
+                                                link.active
+                                                    ? 'bg-primary hover:bg-primary'
+                                                    : ''
+                                            }
+                                            asChild={!!link.url}
+                                        >
+                                            {link.url ? (
+                                                <Link
+                                                    href={link.url}
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: link.label,
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: link.label,
+                                                    }}
+                                                />
+                                            )}
+                                        </Button>
+                                    ),
+                                )}
                             </div>
                         </div>
                     )}

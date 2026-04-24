@@ -1,6 +1,3 @@
-import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -11,14 +8,23 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, useForm } from '@inertiajs/react';
 import { CheckCircle2, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
 
 interface SurveyQuestion {
     id: number;
@@ -62,11 +68,21 @@ function QuestionRenderer({
     switch (question.question_type) {
         case 'scale':
             return (
-                <RadioGroup value={value} onValueChange={onChange} className="flex flex-wrap gap-2">
+                <RadioGroup
+                    value={value}
+                    onValueChange={onChange}
+                    className="flex flex-wrap gap-2"
+                >
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                         <div key={n} className="flex items-center gap-1">
-                            <RadioGroupItem value={String(n)} id={`q${question.id}-${n}`} />
-                            <Label htmlFor={`q${question.id}-${n}`} className="text-sm cursor-pointer">
+                            <RadioGroupItem
+                                value={String(n)}
+                                id={`q${question.id}-${n}`}
+                            />
+                            <Label
+                                htmlFor={`q${question.id}-${n}`}
+                                className="cursor-pointer text-sm"
+                            >
                                 {n}
                             </Label>
                         </div>
@@ -76,17 +92,27 @@ function QuestionRenderer({
         case 'enps':
             return (
                 <div>
-                    <RadioGroup value={value} onValueChange={onChange} className="flex flex-wrap gap-2">
+                    <RadioGroup
+                        value={value}
+                        onValueChange={onChange}
+                        className="flex flex-wrap gap-2"
+                    >
                         {Array.from({ length: 11 }, (_, i) => i).map((n) => (
                             <div key={n} className="flex items-center gap-1">
-                                <RadioGroupItem value={String(n)} id={`q${question.id}-${n}`} />
-                                <Label htmlFor={`q${question.id}-${n}`} className="text-sm cursor-pointer">
+                                <RadioGroupItem
+                                    value={String(n)}
+                                    id={`q${question.id}-${n}`}
+                                />
+                                <Label
+                                    htmlFor={`q${question.id}-${n}`}
+                                    className="cursor-pointer text-sm"
+                                >
                                     {n}
                                 </Label>
                             </div>
                         ))}
                     </RadioGroup>
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <div className="mt-1 flex justify-between text-xs text-muted-foreground">
                         <span>Not at all likely</span>
                         <span>Extremely likely</span>
                     </div>
@@ -94,24 +120,53 @@ function QuestionRenderer({
             );
         case 'boolean':
             return (
-                <RadioGroup value={value} onValueChange={onChange} className="flex gap-4">
+                <RadioGroup
+                    value={value}
+                    onValueChange={onChange}
+                    className="flex gap-4"
+                >
                     <div className="flex items-center gap-2">
-                        <RadioGroupItem value="yes" id={`q${question.id}-yes`} />
-                        <Label htmlFor={`q${question.id}-yes`} className="cursor-pointer">Yes</Label>
+                        <RadioGroupItem
+                            value="yes"
+                            id={`q${question.id}-yes`}
+                        />
+                        <Label
+                            htmlFor={`q${question.id}-yes`}
+                            className="cursor-pointer"
+                        >
+                            Yes
+                        </Label>
                     </div>
                     <div className="flex items-center gap-2">
                         <RadioGroupItem value="no" id={`q${question.id}-no`} />
-                        <Label htmlFor={`q${question.id}-no`} className="cursor-pointer">No</Label>
+                        <Label
+                            htmlFor={`q${question.id}-no`}
+                            className="cursor-pointer"
+                        >
+                            No
+                        </Label>
                     </div>
                 </RadioGroup>
             );
         case 'choice':
             return (
-                <RadioGroup value={value} onValueChange={onChange} className="space-y-2">
+                <RadioGroup
+                    value={value}
+                    onValueChange={onChange}
+                    className="space-y-2"
+                >
                     {(question.options || []).map((opt, i) => (
                         <div key={i} className="flex items-center gap-2">
-                            <RadioGroupItem value={opt} id={`q${question.id}-opt${i}`} />
-                            <Label htmlFor={`q${question.id}-opt${i}`} className="cursor-pointer">{opt}</Label>
+                            <RadioGroupItem
+                                value={opt}
+                                id={`q${question.id}-opt${i}`}
+                            />
+                            <Label
+                                htmlFor={`q${question.id}-opt${i}`}
+                                className="cursor-pointer"
+                            >
+                                {opt}
+                            </Label>
                         </div>
                     ))}
                 </RadioGroup>
@@ -157,31 +212,45 @@ function SurveyCard({ survey }: { survey: Survey }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <MessageSquare className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle className="text-base">{survey.title}</CardTitle>
+                        <CardTitle className="text-base">
+                            {survey.title}
+                        </CardTitle>
                         {survey.is_anonymous && (
-                            <Badge variant="outline" className="text-xs">Anonymous</Badge>
+                            <Badge variant="outline" className="text-xs">
+                                Anonymous
+                            </Badge>
                         )}
                         {survey.has_responded && (
-                            <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success text-xs">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                            <Badge
+                                variant="outline"
+                                className="border-status-success/30 bg-status-success text-xs text-status-success"
+                            >
+                                <CheckCircle2 className="mr-1 h-3 w-3" />
                                 Completed
                             </Badge>
                         )}
                     </div>
                     {survey.ends_at && (
-                        <span className="text-sm text-muted-foreground">Due: {survey.ends_at}</span>
+                        <span className="text-sm text-muted-foreground">
+                            Due: {survey.ends_at}
+                        </span>
                     )}
                 </div>
                 {survey.description && (
-                    <CardDescription className="mt-1">{survey.description}</CardDescription>
+                    <CardDescription className="mt-1">
+                        {survey.description}
+                    </CardDescription>
                 )}
             </CardHeader>
             <CardContent>
                 {survey.has_responded ? (
-                    <p className="text-sm text-muted-foreground">Thank you for completing this survey.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Thank you for completing this survey.
+                    </p>
                 ) : !expanded ? (
                     <Button variant="outline" onClick={() => setExpanded(true)}>
-                        Start Survey ({survey.questions.length} question{survey.questions.length !== 1 ? 's' : ''})
+                        Start Survey ({survey.questions.length} question
+                        {survey.questions.length !== 1 ? 's' : ''})
                     </Button>
                 ) : (
                     <div className="space-y-6">
@@ -189,36 +258,61 @@ function SurveyCard({ survey }: { survey: Survey }) {
                             <div key={question.id} className="space-y-2">
                                 <Label className="text-sm font-medium">
                                     {index + 1}. {question.question_text}
-                                    {question.is_required && <span className="text-status-critical ml-1">*</span>}
+                                    {question.is_required && (
+                                        <span className="ml-1 text-status-critical">
+                                            *
+                                        </span>
+                                    )}
                                 </Label>
                                 <QuestionRenderer
                                     question={question}
                                     value={answers[String(question.id)] ?? ''}
-                                    onChange={(val) => setAnswer(question.id, val)}
+                                    onChange={(val) =>
+                                        setAnswer(question.id, val)
+                                    }
                                 />
                             </div>
                         ))}
 
                         <div className="flex gap-2 border-t pt-4">
-                            <Button onClick={() => setShowConfirm(true)} disabled={!allRequiredAnswered || form.processing}>
+                            <Button
+                                onClick={() => setShowConfirm(true)}
+                                disabled={
+                                    !allRequiredAnswered || form.processing
+                                }
+                            >
                                 Submit Survey
                             </Button>
-                            <Button variant="outline" onClick={() => setExpanded(false)}>
+                            <Button
+                                variant="outline"
+                                onClick={() => setExpanded(false)}
+                            >
                                 Cancel
                             </Button>
                         </div>
 
-                        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+                        <AlertDialog
+                            open={showConfirm}
+                            onOpenChange={setShowConfirm}
+                        >
                             <AlertDialogContent>
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle>Submit survey?</AlertDialogTitle>
+                                    <AlertDialogTitle>
+                                        Submit survey?
+                                    </AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        You cannot change your answers after submission. Are you sure you want to submit?
+                                        You cannot change your answers after
+                                        submission. Are you sure you want to
+                                        submit?
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleSubmit}>Submit</AlertDialogAction>
+                                    <AlertDialogCancel>
+                                        Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleSubmit}>
+                                        Submit
+                                    </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -249,18 +343,28 @@ export default function MySurveys({ surveys }: Props) {
                     <>
                         {pending.length > 0 && (
                             <div className="space-y-4">
-                                <h2 className="text-lg font-semibold">Pending</h2>
+                                <h2 className="text-lg font-semibold">
+                                    Pending
+                                </h2>
                                 {pending.map((survey) => (
-                                    <SurveyCard key={survey.id} survey={survey} />
+                                    <SurveyCard
+                                        key={survey.id}
+                                        survey={survey}
+                                    />
                                 ))}
                             </div>
                         )}
 
                         {completed.length > 0 && (
                             <div className="space-y-4">
-                                <h2 className="text-lg font-semibold">Completed</h2>
+                                <h2 className="text-lg font-semibold">
+                                    Completed
+                                </h2>
                                 {completed.map((survey) => (
-                                    <SurveyCard key={survey.id} survey={survey} />
+                                    <SurveyCard
+                                        key={survey.id}
+                                        survey={survey}
+                                    />
                                 ))}
                             </div>
                         )}

@@ -1,9 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
@@ -19,14 +19,24 @@ interface Props {
     can: { export: boolean };
 }
 
-export default function ReportShow({ reportType, reportTitle, reportData, generatedAt, exportId, filters, can }: Props) {
+export default function ReportShow({
+    reportType,
+    reportTitle,
+    reportData,
+    generatedAt,
+    exportId,
+    filters,
+    can,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Reports', href: '/hr/reports' },
         { title: reportTitle, href: '#' },
     ];
 
-    const tableData: Record<string, unknown>[] = Array.isArray(reportData) ? reportData as Record<string, unknown>[] : [];
+    const tableData: Record<string, unknown>[] = Array.isArray(reportData)
+        ? (reportData as Record<string, unknown>[])
+        : [];
     const columns = tableData.length > 0 ? Object.keys(tableData[0]) : [];
 
     const exportQuery = new URLSearchParams({
@@ -53,7 +63,9 @@ export default function ReportShow({ reportType, reportTitle, reportData, genera
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-xl">{reportTitle}</CardTitle>
+                                <CardTitle className="text-xl">
+                                    {reportTitle}
+                                </CardTitle>
                                 <p className="mt-1 text-sm text-muted-foreground">
                                     Generated: {generatedAt || '\u2014'}
                                 </p>
@@ -62,14 +74,18 @@ export default function ReportShow({ reportType, reportTitle, reportData, genera
                                 <div className="flex items-center gap-2">
                                     {exportId && (
                                         <Button variant="outline" asChild>
-                                            <a href={`/hr/reports/exports/${exportId}/download`}>
+                                            <a
+                                                href={`/hr/reports/exports/${exportId}/download`}
+                                            >
                                                 <Download className="mr-2 h-4 w-4" />
                                                 Download Export
                                             </a>
                                         </Button>
                                     )}
                                     <Button variant="ghost" asChild>
-                                        <a href={`/hr/reports/export?${exportQuery}`}>
+                                        <a
+                                            href={`/hr/reports/export?${exportQuery}`}
+                                        >
                                             <Download className="mr-2 h-4 w-4" />
                                             Regenerate CSV
                                         </a>
@@ -81,8 +97,16 @@ export default function ReportShow({ reportType, reportTitle, reportData, genera
                     {(filters.date_from || filters.date_to) && (
                         <CardContent>
                             <div className="flex flex-wrap gap-2">
-                                {filters.date_from && <Badge variant="outline">From: {filters.date_from}</Badge>}
-                                {filters.date_to && <Badge variant="outline">To: {filters.date_to}</Badge>}
+                                {filters.date_from && (
+                                    <Badge variant="outline">
+                                        From: {filters.date_from}
+                                    </Badge>
+                                )}
+                                {filters.date_to && (
+                                    <Badge variant="outline">
+                                        To: {filters.date_to}
+                                    </Badge>
+                                )}
                             </div>
                         </CardContent>
                     )}
@@ -97,7 +121,10 @@ export default function ReportShow({ reportType, reportTitle, reportData, genera
                                     <thead className="border-b bg-muted/50">
                                         <tr>
                                             {columns.map((col) => (
-                                                <th key={col} className="px-4 py-3 text-left font-medium capitalize whitespace-nowrap">
+                                                <th
+                                                    key={col}
+                                                    className="px-4 py-3 text-left font-medium whitespace-nowrap capitalize"
+                                                >
                                                     {col.replace(/_/g, ' ')}
                                                 </th>
                                             ))}
@@ -105,10 +132,18 @@ export default function ReportShow({ reportType, reportTitle, reportData, genera
                                     </thead>
                                     <tbody className="divide-y">
                                         {tableData.map((row, rowIndex) => (
-                                            <tr key={rowIndex} className="hover:bg-muted/30">
+                                            <tr
+                                                key={rowIndex}
+                                                className="hover:bg-muted/30"
+                                            >
                                                 {columns.map((col) => (
-                                                    <td key={col} className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                                                        {row[col] != null ? String(row[col]) : '\u2014'}
+                                                    <td
+                                                        key={col}
+                                                        className="px-4 py-3 whitespace-nowrap text-muted-foreground"
+                                                    >
+                                                        {row[col] != null
+                                                            ? String(row[col])
+                                                            : '\u2014'}
                                                     </td>
                                                 ))}
                                             </tr>
@@ -118,7 +153,9 @@ export default function ReportShow({ reportType, reportTitle, reportData, genera
                             </div>
                         ) : (
                             <div className="px-4 py-8 text-center text-muted-foreground">
-                                {reportData && typeof reportData === 'object' && !Array.isArray(reportData) ? (
+                                {reportData &&
+                                typeof reportData === 'object' &&
+                                !Array.isArray(reportData) ? (
                                     <pre className="mx-auto max-w-2xl overflow-x-auto text-left text-xs">
                                         {JSON.stringify(reportData, null, 2)}
                                     </pre>

@@ -72,7 +72,9 @@ export default function ObservationRecordSheet({
 }: Props) {
     const initialType = (defaultType as ObsType) || 'general';
     const [type, setType] = useState<ObsType>(initialType);
-    const [data, setData] = useState<Record<string, any>>(INITIAL_DATA[initialType] ?? INITIAL_DATA.general);
+    const [data, setData] = useState<Record<string, any>>(
+        INITIAL_DATA[initialType] ?? INITIAL_DATA.general,
+    );
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -99,12 +101,9 @@ export default function ObservationRecordSheet({
         setErrors({});
     }, []);
 
-    const updateData = useCallback(
-        (key: string, value: any) => {
-            setData((prev) => ({ ...prev, [key]: value }));
-        },
-        [],
-    );
+    const updateData = useCallback((key: string, value: any) => {
+        setData((prev) => ({ ...prev, [key]: value }));
+    }, []);
 
     const handleSubmit = useCallback(() => {
         setSubmitting(true);
@@ -114,9 +113,12 @@ export default function ObservationRecordSheet({
         const cleanedData: Record<string, any> = {};
         for (const [k, v] of Object.entries(data)) {
             if (v !== '' && v !== null && v !== undefined) {
-                cleanedData[k] = typeof v === 'string' && !isNaN(Number(v)) && v.trim() !== ''
-                    ? Number(v)
-                    : v;
+                cleanedData[k] =
+                    typeof v === 'string' &&
+                    !isNaN(Number(v)) &&
+                    v.trim() !== ''
+                        ? Number(v)
+                        : v;
             }
         }
 
@@ -149,11 +151,20 @@ export default function ObservationRecordSheet({
                 },
             },
         );
-    }, [clientId, shiftId, type, data, notes, protocolScheduleId, onOpenChange]);
+    }, [
+        clientId,
+        shiftId,
+        type,
+        data,
+        notes,
+        protocolScheduleId,
+        onOpenChange,
+        onRecorded,
+    ]);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-lg overflow-y-auto">
+            <SheetContent className="overflow-y-auto sm:max-w-lg">
                 <SheetHeader>
                     <SheetTitle>Record Observation</SheetTitle>
                     <SheetDescription>
@@ -188,7 +199,9 @@ export default function ObservationRecordSheet({
                                     type="number"
                                     placeholder="120"
                                     value={data.systolic}
-                                    onChange={(e) => updateData('systolic', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('systolic', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
@@ -197,7 +210,9 @@ export default function ObservationRecordSheet({
                                     type="number"
                                     placeholder="80"
                                     value={data.diastolic}
-                                    onChange={(e) => updateData('diastolic', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('diastolic', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
@@ -206,7 +221,9 @@ export default function ObservationRecordSheet({
                                     type="number"
                                     placeholder="72"
                                     value={data.pulse}
-                                    onChange={(e) => updateData('pulse', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('pulse', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
@@ -216,7 +233,12 @@ export default function ObservationRecordSheet({
                                     step="0.1"
                                     placeholder="36.8"
                                     value={data.temperature}
-                                    onChange={(e) => updateData('temperature', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData(
+                                            'temperature',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
@@ -225,16 +247,28 @@ export default function ObservationRecordSheet({
                                     type="number"
                                     placeholder="16"
                                     value={data.respiration_rate}
-                                    onChange={(e) => updateData('respiration_rate', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData(
+                                            'respiration_rate',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-xs">O&#8322; Sat (%)</Label>
+                                <Label className="text-xs">
+                                    O&#8322; Sat (%)
+                                </Label>
                                 <Input
                                     type="number"
                                     placeholder="98"
                                     value={data.o2_saturation}
-                                    onChange={(e) => updateData('o2_saturation', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData(
+                                            'o2_saturation',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
@@ -248,17 +282,23 @@ export default function ObservationRecordSheet({
                                 step="0.1"
                                 placeholder="72.5"
                                 value={data.weight_kg}
-                                onChange={(e) => updateData('weight_kg', e.target.value)}
+                                onChange={(e) =>
+                                    updateData('weight_kg', e.target.value)
+                                }
                             />
                         </div>
                     )}
 
                     {type === 'bowel' && (
                         <div className="space-y-1">
-                            <Label className="text-xs">Bristol Stool Type (1-7)</Label>
+                            <Label className="text-xs">
+                                Bristol Stool Type (1-7)
+                            </Label>
                             <Select
                                 value={String(data.bristol_type)}
-                                onValueChange={(v) => updateData('bristol_type', v)}
+                                onValueChange={(v) =>
+                                    updateData('bristol_type', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select type" />
@@ -281,7 +321,9 @@ export default function ObservationRecordSheet({
                                 <Input
                                     type="time"
                                     value={data.bed_time}
-                                    onChange={(e) => updateData('bed_time', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('bed_time', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
@@ -289,22 +331,32 @@ export default function ObservationRecordSheet({
                                 <Input
                                     type="time"
                                     value={data.wake_time}
-                                    onChange={(e) => updateData('wake_time', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('wake_time', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs">Quality</Label>
                                 <Select
                                     value={data.quality}
-                                    onValueChange={(v) => updateData('quality', v)}
+                                    onValueChange={(v) =>
+                                        updateData('quality', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="good">Good</SelectItem>
-                                        <SelectItem value="fair">Fair</SelectItem>
-                                        <SelectItem value="poor">Poor</SelectItem>
+                                        <SelectItem value="good">
+                                            Good
+                                        </SelectItem>
+                                        <SelectItem value="fair">
+                                            Fair
+                                        </SelectItem>
+                                        <SelectItem value="poor">
+                                            Poor
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -314,7 +366,12 @@ export default function ObservationRecordSheet({
                                     type="number"
                                     min="0"
                                     value={data.interruptions}
-                                    onChange={(e) => updateData('interruptions', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData(
+                                            'interruptions',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
@@ -328,25 +385,39 @@ export default function ObservationRecordSheet({
                                     type="number"
                                     placeholder="250"
                                     value={data.amount_ml}
-                                    onChange={(e) => updateData('amount_ml', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('amount_ml', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-xs">Fluid Type</Label>
                                 <Select
                                     value={data.fluid_type}
-                                    onValueChange={(v) => updateData('fluid_type', v)}
+                                    onValueChange={(v) =>
+                                        updateData('fluid_type', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="water">Water</SelectItem>
+                                        <SelectItem value="water">
+                                            Water
+                                        </SelectItem>
                                         <SelectItem value="tea">Tea</SelectItem>
-                                        <SelectItem value="coffee">Coffee</SelectItem>
-                                        <SelectItem value="juice">Juice</SelectItem>
-                                        <SelectItem value="milk">Milk</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
+                                        <SelectItem value="coffee">
+                                            Coffee
+                                        </SelectItem>
+                                        <SelectItem value="juice">
+                                            Juice
+                                        </SelectItem>
+                                        <SelectItem value="milk">
+                                            Milk
+                                        </SelectItem>
+                                        <SelectItem value="other">
+                                            Other
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -356,14 +427,18 @@ export default function ObservationRecordSheet({
                     {type === 'pain' && (
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
-                                <Label className="text-xs">Pain Score (0-10)</Label>
+                                <Label className="text-xs">
+                                    Pain Score (0-10)
+                                </Label>
                                 <Input
                                     type="number"
                                     min="0"
                                     max="10"
                                     placeholder="0"
                                     value={data.score}
-                                    onChange={(e) => updateData('score', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('score', e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="space-y-1">
@@ -371,7 +446,9 @@ export default function ObservationRecordSheet({
                                 <Input
                                     placeholder="e.g. lower back"
                                     value={data.location}
-                                    onChange={(e) => updateData('location', e.target.value)}
+                                    onChange={(e) =>
+                                        updateData('location', e.target.value)
+                                    }
                                 />
                             </div>
                         </div>
@@ -392,7 +469,10 @@ export default function ObservationRecordSheet({
                     {Object.keys(errors).length > 0 && (
                         <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3">
                             {Object.entries(errors).map(([key, msg]) => (
-                                <p key={key} className="text-xs text-status-critical">
+                                <p
+                                    key={key}
+                                    className="text-xs text-status-critical"
+                                >
                                     {msg}
                                 </p>
                             ))}

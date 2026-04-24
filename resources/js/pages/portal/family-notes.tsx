@@ -81,9 +81,21 @@ const NOTE_TYPES = [
 
 const PRIORITIES = [
     { key: 'low', label: 'Low', color: 'bg-muted text-muted-foreground' },
-    { key: 'normal', label: 'Normal', color: 'bg-status-info-bg text-status-info' },
-    { key: 'high', label: 'High', color: 'bg-status-warning-bg text-status-warning' },
-    { key: 'urgent', label: 'Urgent', color: 'bg-status-critical-bg text-status-critical' },
+    {
+        key: 'normal',
+        label: 'Normal',
+        color: 'bg-status-info-bg text-status-info',
+    },
+    {
+        key: 'high',
+        label: 'High',
+        color: 'bg-status-warning-bg text-status-warning',
+    },
+    {
+        key: 'urgent',
+        label: 'Urgent',
+        color: 'bg-status-critical-bg text-status-critical',
+    },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -230,20 +242,21 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                                     <Label className="text-xs">Type</Label>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         {NOTE_TYPES.map((t) => (
-                                            <button
+                                            <Button
                                                 key={t.key}
                                                 type="button"
+                                                variant="outline"
                                                 onClick={() =>
                                                     form.setData(
                                                         'note_type',
                                                         t.key,
                                                     )
                                                 }
-                                                className={`inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-all ${form.data.note_type === t.key ? `${t.color} scale-105 shadow-sm` : 'border-border bg-card text-muted-foreground hover:border-primary/30'}`}
+                                                className={`h-auto gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium ${form.data.note_type === t.key ? `${t.color} scale-105 shadow-sm` : 'border-border bg-card text-muted-foreground hover:border-primary/30'}`}
                                             >
                                                 <span>{t.emoji}</span>
                                                 {t.label}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
@@ -252,19 +265,20 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                                     <Label className="text-xs">Priority</Label>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         {PRIORITIES.map((p) => (
-                                            <button
+                                            <Button
                                                 key={p.key}
                                                 type="button"
+                                                variant="outline"
                                                 onClick={() =>
                                                     form.setData(
                                                         'priority',
                                                         p.key,
                                                     )
                                                 }
-                                                className={`rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-all ${form.data.priority === p.key ? `${p.color} scale-105 border-current shadow-sm` : 'border-border text-muted-foreground hover:border-primary/30'}`}
+                                                className={`h-auto rounded-full border-2 px-3 py-1.5 text-xs font-medium ${form.data.priority === p.key ? `${p.color} scale-105 border-current shadow-sm` : 'border-border text-muted-foreground hover:border-primary/30'}`}
                                             >
                                                 {p.label}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
@@ -467,7 +481,7 @@ function NoteCard({
                         )}
 
                         {note.assigned_shift && (
-                            <div className="mt-2 rounded-lg border border-primary bg-primary/10/60 p-2 text-xs text-primary">
+                            <div className="bg-primary/10/60 mt-2 rounded-lg border border-primary p-2 text-xs text-primary">
                                 <p className="font-medium">
                                     Assigned to{' '}
                                     {formatShiftType(
@@ -547,12 +561,15 @@ function NoteCard({
                     {/* Delete button (own open notes only) */}
                     {note.created_by === currentUserId &&
                         ['open', 'in_progress'].includes(note.status) && (
-                            <button
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => onDelete(note.id)}
-                                className="shrink-0 text-muted-foreground/50 transition-colors hover:text-status-critical"
+                                className="h-8 w-8 shrink-0 text-muted-foreground/50 hover:text-status-critical"
                             >
                                 <Trash2 className="h-4 w-4" />
-                            </button>
+                            </Button>
                         )}
                 </div>
             </CardContent>

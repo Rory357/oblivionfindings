@@ -1,17 +1,21 @@
-import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Clock, Plus, CalendarClock } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
+import { CalendarClock, ChevronDown, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 interface TimeEntry {
     id: number;
@@ -52,24 +56,47 @@ const breadcrumbs = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    active: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Active' },
-    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
-    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
-    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
+    active: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Active',
+    },
+    submitted: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Submitted',
+    },
+    approved: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Approved',
+    },
+    rejected: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Rejected',
+    },
 };
 
 function formatEntryDate(dateStr: string): string {
     if (!dateStr) return '-';
     const d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-NZ', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+    return d.toLocaleDateString('en-NZ', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    });
 }
 
 function formatTime(dateTimeStr: string): string {
     if (!dateTimeStr) return '-';
     const d = new Date(dateTimeStr);
     if (isNaN(d.getTime())) return dateTimeStr;
-    return d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 export default function TimeEntries({ entries, filters, can }: Props) {
@@ -87,7 +114,11 @@ export default function TimeEntries({ entries, filters, can }: Props) {
     });
 
     function handleDateFilter() {
-        router.get('/hr/time/entries', { from: dateFrom || undefined, to: dateTo || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/hr/time/entries',
+            { from: dateFrom || undefined, to: dateTo || undefined },
+            { preserveState: true, replace: true },
+        );
     }
 
     function handleSubmit(e: React.FormEvent) {
@@ -114,7 +145,7 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                 />
 
                 {/* Date Range Filter */}
-                <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3">
+                <Card className="flex flex-wrap items-end gap-3 p-3">
                     <div className="space-y-1">
                         <Label className="text-xs">From</Label>
                         <Input
@@ -133,7 +164,11 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                             className="w-[160px]"
                         />
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleDateFilter}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDateFilter}
+                    >
                         Filter
                     </Button>
                     <Button
@@ -142,12 +177,16 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                         onClick={() => {
                             setDateFrom('');
                             setDateTo('');
-                            router.get('/hr/time/entries', {}, { preserveState: true });
+                            router.get(
+                                '/hr/time/entries',
+                                {},
+                                { preserveState: true },
+                            );
                         }}
                     >
                         Clear
                     </Button>
-                </div>
+                </Card>
 
                 {/* Manual Entry Form */}
                 {can.manage && (
@@ -160,49 +199,90 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                                             <Plus className="h-4 w-4" />
                                             Add Manual Entry
                                         </CardTitle>
-                                        <ChevronDown className={`h-4 w-4 transition-transform ${formOpen ? 'rotate-180' : ''}`} />
+                                        <ChevronDown
+                                            className={`h-4 w-4 transition-transform ${formOpen ? 'rotate-180' : ''}`}
+                                        />
                                     </div>
                                 </CardHeader>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <CardContent>
-                                    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+                                    <form
+                                        onSubmit={handleSubmit}
+                                        className="grid gap-4 sm:grid-cols-2"
+                                    >
                                         <div className="space-y-2">
-                                            <Label htmlFor="clock_in">Clock In</Label>
+                                            <Label htmlFor="clock_in">
+                                                Clock In
+                                            </Label>
                                             <Input
                                                 id="clock_in"
                                                 type="datetime-local"
                                                 value={form.data.clock_in}
-                                                onChange={(e) => form.setData('clock_in', e.target.value)}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'clock_in',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
-                                            {form.errors.clock_in && <p className="text-xs text-destructive">{form.errors.clock_in}</p>}
+                                            {form.errors.clock_in && (
+                                                <p className="text-xs text-destructive">
+                                                    {form.errors.clock_in}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="clock_out">Clock Out</Label>
+                                            <Label htmlFor="clock_out">
+                                                Clock Out
+                                            </Label>
                                             <Input
                                                 id="clock_out"
                                                 type="datetime-local"
                                                 value={form.data.clock_out}
-                                                onChange={(e) => form.setData('clock_out', e.target.value)}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'clock_out',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
-                                            {form.errors.clock_out && <p className="text-xs text-destructive">{form.errors.clock_out}</p>}
+                                            {form.errors.clock_out && (
+                                                <p className="text-xs text-destructive">
+                                                    {form.errors.clock_out}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="break_minutes">Break (minutes)</Label>
+                                            <Label htmlFor="break_minutes">
+                                                Break (minutes)
+                                            </Label>
                                             <Input
                                                 id="break_minutes"
                                                 type="number"
                                                 min="0"
                                                 value={form.data.break_minutes}
-                                                onChange={(e) => form.setData('break_minutes', e.target.value)}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'break_minutes',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="project_code">Project Code</Label>
+                                            <Label htmlFor="project_code">
+                                                Project Code
+                                            </Label>
                                             <Input
                                                 id="project_code"
                                                 value={form.data.project_code}
-                                                onChange={(e) => form.setData('project_code', e.target.value)}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'project_code',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="Optional"
                                             />
                                         </div>
@@ -212,13 +292,23 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                                                 id="notes"
                                                 rows={2}
                                                 value={form.data.notes}
-                                                onChange={(e) => form.setData('notes', e.target.value)}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="Optional notes..."
                                             />
                                         </div>
                                         <div className="sm:col-span-2">
-                                            <Button type="submit" disabled={form.processing}>
-                                                {form.processing ? 'Creating...' : 'Create Entry'}
+                                            <Button
+                                                type="submit"
+                                                disabled={form.processing}
+                                            >
+                                                {form.processing
+                                                    ? 'Creating...'
+                                                    : 'Create Entry'}
                                             </Button>
                                         </div>
                                     </form>
@@ -239,7 +329,9 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
                                     <CalendarClock className="h-8 w-8 opacity-40" />
                                 </div>
-                                <p className="text-base font-medium">No time entries found</p>
+                                <p className="text-base font-medium">
+                                    No time entries found
+                                </p>
                                 <p className="mt-1 text-sm">
                                     {filters.from || filters.to
                                         ? 'No entries match the selected date range. Try adjusting or clearing your filters.'
@@ -262,34 +354,83 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-muted/5">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-medium">Staff</th>
-                                            <th className="px-4 py-3 text-left font-medium">Date</th>
-                                            <th className="px-4 py-3 text-left font-medium">In</th>
-                                            <th className="px-4 py-3 text-left font-medium">Out</th>
-                                            <th className="px-4 py-3 text-right font-medium">Break</th>
-                                            <th className="px-4 py-3 text-right font-medium">Hours</th>
-                                            <th className="px-4 py-3 text-left font-medium">Type</th>
-                                            <th className="px-4 py-3 text-left font-medium">Status</th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Staff
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Date
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                In
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Out
+                                            </th>
+                                            <th className="px-4 py-3 text-right font-medium">
+                                                Break
+                                            </th>
+                                            <th className="px-4 py-3 text-right font-medium">
+                                                Hours
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Type
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Status
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {entries.data.map((entry) => {
-                                            const config = statusConfig[entry.status] || statusConfig.active;
+                                            const config =
+                                                statusConfig[entry.status] ||
+                                                statusConfig.active;
                                             return (
-                                                <tr key={entry.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                                    <td className="px-4 py-3 font-medium">{entry.user_name}</td>
-                                                    <td className="px-4 py-3 text-muted-foreground">{formatEntryDate(entry.entry_date)}</td>
-                                                    <td className="px-4 py-3">{formatTime(entry.clock_in)}</td>
-                                                    <td className="px-4 py-3">{entry.clock_out ? formatTime(entry.clock_out) : '-'}</td>
+                                                <tr
+                                                    key={entry.id}
+                                                    className="border-b last:border-b-0 hover:bg-muted/50"
+                                                >
+                                                    <td className="px-4 py-3 font-medium">
+                                                        {entry.user_name}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-muted-foreground">
+                                                        {formatEntryDate(
+                                                            entry.entry_date,
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {formatTime(
+                                                            entry.clock_in,
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {entry.clock_out
+                                                            ? formatTime(
+                                                                  entry.clock_out,
+                                                              )
+                                                            : '-'}
+                                                    </td>
                                                     <td className="px-4 py-3 text-right text-muted-foreground">
-                                                        {entry.break_minutes > 0 ? `${entry.break_minutes}m` : '-'}
+                                                        {entry.break_minutes > 0
+                                                            ? `${entry.break_minutes}m`
+                                                            : '-'}
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-medium">
-                                                        {entry.total_hours != null ? `${entry.total_hours}h` : '-'}
+                                                        {entry.total_hours !=
+                                                        null
+                                                            ? `${entry.total_hours}h`
+                                                            : '-'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-muted-foreground capitalize">{entry.entry_type}</td>
+                                                    <td className="px-4 py-3 text-muted-foreground capitalize">
+                                                        {entry.entry_type}
+                                                    </td>
                                                     <td className="px-4 py-3">
-                                                        <Badge variant="outline" className={config.className}>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                config.className
+                                                            }
+                                                        >
                                                             {config.label}
                                                         </Badge>
                                                     </td>
@@ -307,9 +448,15 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                 {entries.total > 0 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(entries.current_page - 1) * entries.per_page + 1} to{' '}
-                            {Math.min(entries.current_page * entries.per_page, entries.total)} of{' '}
-                            {entries.total} {entries.total === 1 ? 'entry' : 'entries'}
+                            Showing{' '}
+                            {(entries.current_page - 1) * entries.per_page + 1}{' '}
+                            to{' '}
+                            {Math.min(
+                                entries.current_page * entries.per_page,
+                                entries.total,
+                            )}{' '}
+                            of {entries.total}{' '}
+                            {entries.total === 1 ? 'entry' : 'entries'}
                         </p>
                         {entries.last_page > 1 && (
                             <LaravelPagination links={entries.links} />

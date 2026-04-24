@@ -176,6 +176,7 @@ export default function RolesManagement({ systemRoles, customRoles, permissions,
 
         openEditDialog(role);
         window.history.replaceState(window.history.state, '', '/system/access/roles');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- URL deep-link handling intentionally hydrates the Inertia edit form once per matching page URL.
     }, [customRoles, page.url, systemRoles]);
 
     const groupedPermissions = permissionGroups.map((group) => ({

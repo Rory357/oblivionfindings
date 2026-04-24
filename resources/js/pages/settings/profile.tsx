@@ -238,7 +238,7 @@ export default function Profile({
 
             <SettingsLayout>
                 {/* ── Modern Profile Header ── */}
-                <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-muted">
+                <Card className="relative overflow-hidden bg-white dark:bg-muted">
                     {/* Accent bar */}
                     <div className="h-1.5 w-full bg-primary" />
 
@@ -255,15 +255,17 @@ export default function Profile({
                                         {getInitials(auth.user.name)}
                                     </AvatarFallback>
                                 </Avatar>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() =>
                                         fileInputRef.current?.click()
                                     }
-                                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
+                                    className="absolute inset-0 h-full w-full cursor-pointer rounded-full bg-black/40 p-0 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/40"
                                 >
                                     <Camera className="h-4 w-4 text-white" />
-                                </button>
+                                </Button>
                                 <input
                                     ref={fileInputRef}
                                     type="file"
@@ -356,7 +358,7 @@ export default function Profile({
                             message={(photoForm.errors as any).photo}
                         />
                     </div>
-                </div>
+                </Card>
 
                 {/* ── Two-Column Layout ── */}
                 <div className="grid gap-6 lg:grid-cols-[1fr_0.67fr]">

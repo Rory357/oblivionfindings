@@ -1,12 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { type BreadcrumbItem } from '@/types';
-import { Mail, Eye, Trash2, Pencil, Clock, Send, FileText } from 'lucide-react';
-import { useState } from 'react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Clock, Eye, FileText, Mail, Pencil, Send, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 interface Props {
     templates: {
@@ -19,10 +19,12 @@ interface Props {
         subject: string;
         body: string;
     };
-    emailLog?: {
-        data: any[];
-        links?: any[];
-    } | any[];
+    emailLog?:
+        | {
+              data: any[];
+              links?: any[];
+          }
+        | any[];
     showLog?: boolean;
     can: {
         manage: boolean;
@@ -37,11 +39,19 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type Tab = 'templates' | 'preview' | 'log';
 
-export default function OnboardingEmails({ templates, preview, emailLog, showLog, can }: Props) {
+export default function OnboardingEmails({
+    templates,
+    preview,
+    emailLog,
+    showLog,
+    can,
+}: Props) {
     const hasPreview = !!preview;
     const hasLog = !!showLog;
-    const logEntries = Array.isArray(emailLog) ? emailLog : emailLog?.data ?? [];
-    const logLinks = Array.isArray(emailLog) ? [] : emailLog?.links ?? [];
+    const logEntries = Array.isArray(emailLog)
+        ? emailLog
+        : (emailLog?.data ?? []);
+    const logLinks = Array.isArray(emailLog) ? [] : (emailLog?.links ?? []);
 
     const [activeTab, setActiveTab] = useState<Tab>(
         hasPreview ? 'preview' : hasLog ? 'log' : 'templates',
@@ -67,7 +77,9 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
             <Head title="Onboarding Email Templates" />
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Onboarding Email Templates</h1>
+                    <h1 className="text-2xl font-bold">
+                        Onboarding Email Templates
+                    </h1>
                 </div>
 
                 {/* Tab Navigation */}
@@ -75,24 +87,35 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                     {tabs
                         .filter((t) => t.show)
                         .map((tab) => (
-                            <button
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
                                 key={tab.key}
                                 onClick={() => {
                                     if (tab.key === 'log') {
-                                        router.get('/hr/onboarding/emails/log', {}, { preserveState: true });
+                                        router.get(
+                                            '/hr/onboarding/emails/log',
+                                            {},
+                                            { preserveState: true },
+                                        );
                                     } else if (tab.key === 'templates') {
-                                        router.get('/hr/onboarding/emails', {}, { preserveState: true });
+                                        router.get(
+                                            '/hr/onboarding/emails',
+                                            {},
+                                            { preserveState: true },
+                                        );
                                     }
                                     setActiveTab(tab.key);
                                 }}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                                className={`-mb-px rounded-none border-b-2 px-4 py-2 text-sm font-medium ${
                                     activeTab === tab.key
                                         ? 'border-primary text-primary'
                                         : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
                             >
                                 {tab.label}
-                            </button>
+                            </Button>
                         ))}
                 </div>
 
@@ -104,7 +127,9 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                                 <CardContent className="pt-6">
                                     <div className="py-8 text-center text-sm text-muted-foreground">
                                         <Mail className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                        <p>No email templates configured yet.</p>
+                                        <p>
+                                            No email templates configured yet.
+                                        </p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -113,32 +138,52 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                                 <Card key={tpl.id}>
                                     <CardContent className="pt-4">
                                         <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <Mail className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="font-medium">{tpl.template_name}</span>
+                                                    <span className="font-medium">
+                                                        {tpl.template_name}
+                                                    </span>
                                                     {tpl.trigger && (
-                                                        <Badge variant="outline" className="capitalize">
-                                                            {tpl.trigger.replace(/_/g, ' ')}
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="capitalize"
+                                                        >
+                                                            {tpl.trigger.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
                                                         </Badge>
                                                     )}
                                                 </div>
                                                 {tpl.subject && (
-                                                    <p className="mt-1 text-sm text-muted-foreground truncate">
+                                                    <p className="mt-1 truncate text-sm text-muted-foreground">
                                                         Subject: {tpl.subject}
                                                     </p>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/hr/onboarding/emails/${tpl.id}/preview`}>
+                                            <div className="flex shrink-0 items-center gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/hr/onboarding/emails/${tpl.id}/preview`}
+                                                    >
                                                         <Eye className="h-4 w-4" />
                                                     </Link>
                                                 </Button>
                                                 {can.manage && (
                                                     <>
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/hr/onboarding/emails/${tpl.id}/edit`}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/hr/onboarding/emails/${tpl.id}/edit`}
+                                                            >
                                                                 <Pencil className="h-4 w-4" />
                                                             </Link>
                                                         </Button>
@@ -146,8 +191,14 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => {
-                                                                if (confirm('Are you sure you want to delete this template?')) {
-                                                                    router.delete(`/hr/onboarding/emails/${tpl.id}`);
+                                                                if (
+                                                                    confirm(
+                                                                        'Are you sure you want to delete this template?',
+                                                                    )
+                                                                ) {
+                                                                    router.delete(
+                                                                        `/hr/onboarding/emails/${tpl.id}`,
+                                                                    );
                                                                 }
                                                             }}
                                                         >
@@ -179,15 +230,22 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
+                            {/* eslint-disable-next-line no-restricted-syntax -- Email preview frame intentionally mimics the rendered message body. */}
                             <div className="rounded-lg border bg-white">
                                 <div className="border-b px-6 py-3">
-                                    <p className="text-sm text-muted-foreground">Subject</p>
-                                    <p className="font-medium">{preview.subject}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Subject
+                                    </p>
+                                    <p className="font-medium">
+                                        {preview.subject}
+                                    </p>
                                 </div>
                                 <div className="px-6 py-4">
                                     <div
                                         className="prose prose-sm max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: preview.body }}
+                                        dangerouslySetInnerHTML={{
+                                            __html: preview.body,
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -215,40 +273,77 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                                     <table className="w-full text-sm">
                                         <thead className="border-b bg-muted/50">
                                             <tr>
-                                                <th className="px-4 py-3 text-left font-medium">Recipient</th>
-                                                <th className="px-4 py-3 text-left font-medium">Template</th>
-                                                <th className="px-4 py-3 text-left font-medium">Sent At</th>
-                                                <th className="px-4 py-3 text-center font-medium">Status</th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Recipient
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Template
+                                                </th>
+                                                <th className="px-4 py-3 text-left font-medium">
+                                                    Sent At
+                                                </th>
+                                                <th className="px-4 py-3 text-center font-medium">
+                                                    Status
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
-                                            {logEntries.map((entry: any, i: number) => (
-                                                <tr key={entry.id ?? i} className="hover:bg-muted/30">
-                                                    <td className="px-4 py-3">
-                                                        {entry.recipient ?? entry.to ?? entry.employee_profile?.user?.name ?? '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        {entry.template_name ?? entry.template ?? entry.onboarding_email?.template_name ?? '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="flex items-center gap-1 text-muted-foreground">
-                                                            <Clock className="h-3 w-3" />
-                                                            {entry.sent_at || entry.created_at ? formatDate(entry.sent_at ?? entry.created_at) : '-'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <Badge className={
-                                                            entry.status === 'sent' || entry.status === 'delivered'
-                                                                ? 'bg-status-success-bg text-status-success'
-                                                                : entry.status === 'failed'
-                                                                  ? 'bg-status-critical-bg text-status-critical'
-                                                                  : 'bg-muted text-foreground'
-                                                        }>
-                                                            {entry.status ?? 'unknown'}
-                                                        </Badge>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {logEntries.map(
+                                                (entry: any, i: number) => (
+                                                    <tr
+                                                        key={entry.id ?? i}
+                                                        className="hover:bg-muted/30"
+                                                    >
+                                                        <td className="px-4 py-3">
+                                                            {entry.recipient ??
+                                                                entry.to ??
+                                                                entry
+                                                                    .employee_profile
+                                                                    ?.user
+                                                                    ?.name ??
+                                                                '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {entry.template_name ??
+                                                                entry.template ??
+                                                                entry
+                                                                    .onboarding_email
+                                                                    ?.template_name ??
+                                                                '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span className="flex items-center gap-1 text-muted-foreground">
+                                                                <Clock className="h-3 w-3" />
+                                                                {entry.sent_at ||
+                                                                entry.created_at
+                                                                    ? formatDate(
+                                                                          entry.sent_at ??
+                                                                              entry.created_at,
+                                                                      )
+                                                                    : '-'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <Badge
+                                                                className={
+                                                                    entry.status ===
+                                                                        'sent' ||
+                                                                    entry.status ===
+                                                                        'delivered'
+                                                                        ? 'bg-status-success-bg text-status-success'
+                                                                        : entry.status ===
+                                                                            'failed'
+                                                                          ? 'bg-status-critical-bg text-status-critical'
+                                                                          : 'bg-muted text-foreground'
+                                                                }
+                                                            >
+                                                                {entry.status ??
+                                                                    'unknown'}
+                                                            </Badge>
+                                                        </td>
+                                                    </tr>
+                                                ),
+                                            )}
                                         </tbody>
                                     </table>
                                     {logLinks.length > 3 && (

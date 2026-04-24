@@ -33,11 +33,12 @@ This follow-up pass shipped the remaining practical items from the plan:
 - Playwright visual regression now has desktop/mobile baseline coverage for the dashboard and key settings/control-room pages, plus a GitHub Actions workflow that builds, seeds MySQL, and runs the snapshot suite.
 - Finance, Governance, Sites, Health/Clinical, Health/Safety, Notifications, Portal dashboard/media, and integrations data-heavy pages now use the same full-width operational page shell as HR; Finance plus cross-module desktop/mobile snapshots are covered, with Governance using the steadier policies index baseline instead of the async cockpit dashboard.
 - Button/Card follow-up is protected by lint guardrails, with safe focused conversions applied; broad raw element conversion remains an incremental design cleanup rather than a mechanical rewrite.
+- Continued follow-up converted another safe batch of raw action buttons to the shared `Button` primitive in frontline alerts, handover, progress notes, finance accounts, sidebar header, and HR document actions.
+- Latest continuation cleared the remaining React hook/compiler lint warnings and expanded the safe `Button`/`Card` cleanup through operations, HR, finance, control-room, health-safety, notifications, governance, sites, EMAR/incidents, assets, fleet-assets, settings, shared components, hooks, layouts, and supporting JS utilities. `npx eslint resources/js/pages` and `npx eslint resources/js/components resources/js/layouts resources/js/hooks resources/js/lib` are clean; full-project lint is still too slow for the iteration loop, so final verification uses targeted resource lint plus build and diff checks.
 
 Remaining follow-ons are content expansion rather than missing plumbing:
 extracting every hardcoded UI string into translation catalogs and
-continuing incremental Button/Card conversions where the design intent is
-clear.
+continuing design-led UI polish where the visual intent is clear.
 
 ---
 
@@ -46,6 +47,7 @@ clear.
 ### 1.1 Remaining ~91 hardcoded colour classes
 
 **Where they live (top files):**
+
 - `resources/js/pages/welcome.tsx` — marketing gradients
 - `resources/js/pages/home.tsx` — landing page gradients
 - `resources/js/pages/health-safety/dashboard.tsx` — risk heatmap hex colours
@@ -53,7 +55,7 @@ clear.
 - `resources/js/pages/control-room/map.tsx` — Leaflet marker colours
 - `resources/js/pages/operations/clients/show.tsx` — ~10 residuals
 - `resources/js/pages/sites/show.tsx` — site-type badges
-- Several hr/* pages with per-record colour coding
+- Several hr/\* pages with per-record colour coding
 
 **Why deferred:** These are per-pixel visual design decisions (chart
 heatmap grading, marker disambiguation, marketing gradient aesthetics)
@@ -62,20 +64,22 @@ that don't cleanly map onto the 5-severity-token model.
 **Approach for resolution:**
 
 1. Find them:
-   ```bash
-   grep -rEn "(bg|text|border|ring|from|to|via)-(red|rose|pink|emerald|green|lime|amber|yellow|orange|blue|sky|cyan|teal|gray|zinc|slate|neutral|stone|violet|indigo|purple|fuchsia)-[0-9]+" \
-       resources/js/pages resources/js/components
-   ```
+
+    ```bash
+    grep -rEn "(bg|text|border|ring|from|to|via)-(red|rose|pink|emerald|green|lime|amber|yellow|orange|blue|sky|cyan|teal|gray|zinc|slate|neutral|stone|violet|indigo|purple|fuchsia)-[0-9]+" \
+        resources/js/pages resources/js/components
+    ```
 
 2. Classify each occurrence per these rules:
-   - **Chart / heatmap / data viz** → swap to `var(--chart-1)`..`var(--chart-5)`. If you need more than 5 distinct series, extend `derivePalette.ts` to generate chart-6 through chart-10 via further hue rotations.
-   - **Map markers / Leaflet pins** → build a fixed 6–8 colour palette in `resources/js/lib/map-markers.ts` with an inline `/* eslint-disable no-restricted-syntax */` block and a comment explaining why (Leaflet's external JS layer can't read CSS custom properties cleanly).
-   - **Marketing page gradients** (welcome, home) → replace `from-violet-50 to-pink-50`-style gradients with `bg-primary/10` (already the behaviour for most). For multi-stop marketing gradients, convert to solid `bg-primary/5` or a two-colour tint using `from-primary/10 to-primary/5`.
-   - **Per-record colour coding** (e.g. each site type has its own colour) → replace with `bg-category-*` tokens (ops/hr/compliance/incidents/governance/sites/fleet) if the category fits; otherwise add a new category token to `app.css` and document it in `DESIGN_TOKENS.md`.
+    - **Chart / heatmap / data viz** → swap to `var(--chart-1)`..`var(--chart-5)`. If you need more than 5 distinct series, extend `derivePalette.ts` to generate chart-6 through chart-10 via further hue rotations.
+    - **Map markers / Leaflet pins** → build a fixed 6–8 colour palette in `resources/js/lib/map-markers.ts` with an inline `/* eslint-disable no-restricted-syntax */` block and a comment explaining why (Leaflet's external JS layer can't read CSS custom properties cleanly).
+    - **Marketing page gradients** (welcome, home) → replace `from-violet-50 to-pink-50`-style gradients with `bg-primary/10` (already the behaviour for most). For multi-stop marketing gradients, convert to solid `bg-primary/5` or a two-colour tint using `from-primary/10 to-primary/5`.
+    - **Per-record colour coding** (e.g. each site type has its own colour) → replace with `bg-category-*` tokens (ops/hr/compliance/incidents/governance/sites/fleet) if the category fits; otherwise add a new category token to `app.css` and document it in `DESIGN_TOKENS.md`.
 
 3. Verify: rebuild (`npx vite build`) and spot-check each touched page via Chrome Preview.
 
 **Files to create/modify:**
+
 - `resources/js/lib/map-markers.ts` (new, if adopting the marker palette approach)
 - `resources/css/app.css` (extend `--chart-*` if needed)
 - `docs/DESIGN_TOKENS.md` (document any new category tokens added)
@@ -94,37 +98,39 @@ the ~80–100 that are obviously action buttons without breaking the rest.
 **Approach:**
 
 1. Identify the safe conversion targets:
-   ```bash
-   # Icon-only close/trash/menu buttons with no complex layout
-   grep -rEn '<button[^>]*className="[^"]*(h-[678]|size-[678])[^"]*"[^>]*>\s*<\w+\s+className="[^"]*"\s*/>\s*</button>' \
-       resources/js
-   ```
+
+    ```bash
+    # Icon-only close/trash/menu buttons with no complex layout
+    grep -rEn '<button[^>]*className="[^"]*(h-[678]|size-[678])[^"]*"[^>]*>\s*<\w+\s+className="[^"]*"\s*/>\s*</button>' \
+        resources/js
+    ```
 
 2. Convert each match to `<Button variant="ghost" size="icon" onClick={…}>`. Preserve any `aria-label` / `title` attributes.
 
 3. For text-only action buttons (e.g. "Delete", "Cancel" buttons built from raw `<button>`):
-   - If destructive styling (`bg-destructive`, `bg-status-critical`, red tones) → `<Button variant="destructive">`
-   - If outlined → `<Button variant="outline">`
-   - If ghost (transparent with hover) → `<Button variant="ghost">`
-   - If primary solid → `<Button>` (default variant)
+    - If destructive styling (`bg-destructive`, `bg-status-critical`, red tones) → `<Button variant="destructive">`
+    - If outlined → `<Button variant="outline">`
+    - If ghost (transparent with hover) → `<Button variant="ghost">`
+    - If primary solid → `<Button>` (default variant)
 
 4. **Do NOT convert:**
-   - Option-card buttons with preview artwork inside (appearance.tsx theme cards, branding.tsx preset swatches)
-   - Full-width row buttons with avatars + metadata (portal/messages.tsx conversation rows)
-   - Carousel navigation arrows
-   - Buttons inside custom Radix wrappers
+    - Option-card buttons with preview artwork inside (appearance.tsx theme cards, branding.tsx preset swatches)
+    - Full-width row buttons with avatars + metadata (portal/messages.tsx conversation rows)
+    - Carousel navigation arrows
+    - Buttons inside custom Radix wrappers
 
 5. Lint rule to surface new regressions:
    Add to [eslint.config.js](../eslint.config.js) `no-restricted-syntax`:
-   ```js
-   {
-     selector: "JSXElement > JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='onClick'])",
-     message: "Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason."
-   }
-   ```
-   Set at `warn` level so existing legitimate raw buttons don't block builds.
+    ```js
+    {
+      selector: "JSXElement > JSXOpeningElement[name.name='button']:has(JSXAttribute[name.name='onClick'])",
+      message: "Consider <Button> from @/components/ui/button. If the raw <button> is intentional (custom layout / selector card), add an inline disable comment with reason."
+    }
+    ```
+    Set at `warn` level so existing legitimate raw buttons don't block builds.
 
 **Files to modify:**
+
 - [eslint.config.js](../eslint.config.js) — new rule
 - Target files identified in step 1
 
@@ -135,12 +141,14 @@ the ~80–100 that are obviously action buttons without breaking the rest.
 ### 1.3 Raw `<div>` → `<Card>` sweep (~50 instances)
 
 **Find:**
+
 ```bash
 grep -rEn '<div[^>]*className="[^"]*rounded-(lg|xl|md)[^"]*border[^"]*(bg-card|bg-white|bg-background)' \
     resources/js/pages resources/js/components
 ```
 
 **Rules:**
+
 - Plain `<div className="rounded-lg border bg-card p-4">…</div>` → `<Card>…</Card>` (use `CardHeader` / `CardContent` if the content has structure).
 - Don't convert divs inside `<Card>` already (double-wrap).
 - Don't convert divs that use `rounded-full` (chips/pills).
@@ -182,16 +190,18 @@ card on top, but the page is still dense.
 ```
 
 **Approach:**
+
 1. Extract each current section of `branding.tsx` into a separate component file under `resources/js/pages/settings/branding/`:
-   - `_essentials-tab.tsx`
-   - `_advanced-tab.tsx`
-   - `_terminology-tab.tsx`
-   - `_email-reports-tab.tsx`
+    - `_essentials-tab.tsx`
+    - `_advanced-tab.tsx`
+    - `_terminology-tab.tsx`
+    - `_email-reports-tab.tsx`
 2. Parent `branding.tsx` becomes a ~150-line file that wires `useForm` + terminology `useForm` and delegates to tabs.
 3. Share form state via props — each tab reads/writes into the same form object.
 4. Save button in a sticky footer bar (visible regardless of active tab).
 
 **Files:**
+
 - `resources/js/pages/settings/branding.tsx` (rewrite → thin orchestrator)
 - `resources/js/pages/settings/branding/_essentials-tab.tsx` (new)
 - `resources/js/pages/settings/branding/_advanced-tab.tsx` (new)
@@ -216,18 +226,18 @@ most common. Steps:
 
 1. `composer require twilio/sdk`
 2. Create `app/Services/Notifications/SmsProvider.php` interface:
-   ```php
-   interface SmsProvider {
-       public function send(string $to, string $message): SmsSendResult;
-   }
-   ```
+    ```php
+    interface SmsProvider {
+        public function send(string $to, string $message): SmsSendResult;
+    }
+    ```
 3. Create `app/Services/Notifications/TwilioSmsProvider.php` implementing the interface. Config values from `config('services.sms.twilio.*')` + `.env` entries:
-   ```
-   SMS_PROVIDER=twilio
-   TWILIO_ACCOUNT_SID=...
-   TWILIO_AUTH_TOKEN=...
-   TWILIO_FROM=+64...
-   ```
+    ```
+    SMS_PROVIDER=twilio
+    TWILIO_ACCOUNT_SID=...
+    TWILIO_AUTH_TOKEN=...
+    TWILIO_FROM=+64...
+    ```
 4. Register binding in `AppServiceProvider::register()`: switch on `config('services.sms.provider')` to resolve which implementation goes in the container.
 5. Replace the stub in `DeliverBroadcastCommunicationJob::sendSms()` with an `app(SmsProvider::class)->send(...)` call.
 6. Handle soft failures (invalid number, insufficient credit) by marking `status='failed'` with the provider's error. Hard failures (transport exception) let the job's retry kick in.
@@ -239,10 +249,12 @@ If mobile native shells are in scope, use Expo's push service or
 Firebase Cloud Messaging. Same provider-interface pattern as SMS.
 
 **Testing:**
+
 - Unit test: mock `SmsProvider` → assert the job calls `->send()` with the right args and updates status.
 - Manual: send a broadcast to a test phone number.
 
 **Files:**
+
 - `app/Services/Notifications/SmsProvider.php` (new interface)
 - `app/Services/Notifications/TwilioSmsProvider.php` (new)
 - `app/Providers/AppServiceProvider.php` (bindings)
@@ -260,11 +272,13 @@ Firebase Cloud Messaging. Same provider-interface pattern as SMS.
 ### 2.1 14 failing unit tests
 
 **Files with failing tests:**
+
 - `tests/Unit/MedicationSafetyServiceTest.php`
 - `tests/Unit/Operations/OperationalSnapshotServiceTest.php`
 - Tests touching `app/Services/ShiftSafetyInvariantService.php`
 
 **Symptoms seen:**
+
 - `Mockery_3_App_Models_ClientMedication::administrations() must return HasMany, Mockery_5 returned` (Mockery type-hint mismatch)
 - `Failed asserting that null is identical to 'Kauri House'` (snapshot test against expected relation data that isn't set up)
 - `ValidationException` thrown when test expected normal return
@@ -276,9 +290,9 @@ audit remediation") — they're a drift between test mocks and the
 production signature of the services.
 
 1. Check out each failing test, run it alone:
-   ```bash
-   php artisan test --filter=MedicationSafetyServiceTest
-   ```
+    ```bash
+    php artisan test --filter=MedicationSafetyServiceTest
+    ```
 2. Read the service signature vs the mock setup. For Mockery returning
    wrong type: update the mock to return the correct Eloquent relation
    instance (usually via `Mockery::mock(HasMany::class)` + `andReturn`).
@@ -290,6 +304,7 @@ production signature of the services.
    validation shouldn't apply to this case (fix service).
 
 **Files:**
+
 - Any of the three test files above
 - Possibly the corresponding service if logic drifted
 
@@ -306,27 +321,28 @@ shows "English (NZ)" disabled with "More coming soon". No Laravel
 **Approach (minimum viable):**
 
 1. Install `@inertiajs/react`-compatible i18n. Options:
-   - `laravel-react-i18n` (tracks Laravel's `lang/` files server-side, syncs to client)
-   - `i18next` (fully client-side, independent of Laravel)
+    - `laravel-react-i18n` (tracks Laravel's `lang/` files server-side, syncs to client)
+    - `i18next` (fully client-side, independent of Laravel)
 
-   Recommendation: `laravel-react-i18n` — keeps server-rendered emails / PDFs using the same strings.
+    Recommendation: `laravel-react-i18n` — keeps server-rendered emails / PDFs using the same strings.
 
 2. Scaffold:
-   ```
-   lang/
-     en/
-       app.php          # General UI strings
-       validation.php   # Laravel default
-       notifications.php
-     mi/                # Māori — common in NZ support living
-       app.php
-       ...
-   ```
+
+    ```
+    lang/
+      en/
+        app.php          # General UI strings
+        validation.php   # Laravel default
+        notifications.php
+      mi/                # Māori — common in NZ support living
+        app.php
+        ...
+    ```
 
 3. Extract hardcoded English strings from UI into `lang/en/app.php` in batches. Start with:
-   - Buttons (Save, Cancel, Edit, Delete, Create)
-   - Common labels (Name, Email, Phone)
-   - Status words (Active, Pending, Approved, Rejected)
+    - Buttons (Save, Cancel, Edit, Delete, Create)
+    - Common labels (Name, Email, Phone)
+    - Status words (Active, Pending, Approved, Rejected)
 
 4. Wire `__('app.save')` in Blade, `trans('app.save')` via `useTranslation()` hook in React.
 
@@ -345,22 +361,24 @@ Threshold is 500 KB — so it's marginal.
 **Approach:**
 
 1. Audit the biggest chunks with rollup-plugin-visualizer:
-   ```bash
-   npm i -D rollup-plugin-visualizer
-   ```
-   Add to `vite.config.ts` plugins: `visualizer({ open: true })`. Rebuild.
+
+    ```bash
+    npm i -D rollup-plugin-visualizer
+    ```
+
+    Add to `vite.config.ts` plugins: `visualizer({ open: true })`. Rebuild.
 
 2. Likely culprits:
-   - FullCalendar already split (vendor-calendar chunk)
-   - Recharts already split (vendor-charts)
-   - Leaflet + React-Leaflet already split (vendor-maps)
-   - Radix primitives — each one is small but there are many
-   - Lucide icons — `lucide-react` imports every icon by default in some setups
+    - FullCalendar already split (vendor-calendar chunk)
+    - Recharts already split (vendor-charts)
+    - Leaflet + React-Leaflet already split (vendor-maps)
+    - Radix primitives — each one is small but there are many
+    - Lucide icons — `lucide-react` imports every icon by default in some setups
 
 3. Fixes:
-   - Lucide: verify the build is using per-icon imports (`import { X } from 'lucide-react'`) not `import * as Icons`.
-   - Dynamic import heavy page components (`React.lazy`) — especially control-room/broadcast-show, operations/clients/show.
-   - Move one-off third-party widgets behind `React.lazy` + `Suspense`.
+    - Lucide: verify the build is using per-icon imports (`import { X } from 'lucide-react'`) not `import * as Icons`.
+    - Dynamic import heavy page components (`React.lazy`) — especially control-room/broadcast-show, operations/clients/show.
+    - Move one-off third-party widgets behind `React.lazy` + `Suspense`.
 
 **Expected effort:** 3 hours for analysis + the quick wins.
 
@@ -376,28 +394,32 @@ in three months, the diff against baseline should surface it.
 **Approach:**
 
 1. Install `@playwright/test` (or reuse existing Dusk if it's set up):
-   ```bash
-   npm i -D @playwright/test
-   npx playwright install chromium
-   ```
+
+    ```bash
+    npm i -D @playwright/test
+    npx playwright install chromium
+    ```
 
 2. Write `tests/visual/screenshot.spec.ts`:
-   - Log in as admin
-   - Navigate to: Dashboard, Operations, one Client show, Sites, HR, Control Room, each Settings page
-   - `expect(page).toHaveScreenshot()` each one
+    - Log in as admin
+    - Navigate to: Dashboard, Operations, one Client show, Sites, HR, Control Room, each Settings page
+    - `expect(page).toHaveScreenshot()` each one
 
 3. Run baseline capture under the default theme (violet).
 
 4. Rebrand to teal via tinker:
-   ```php
-   AppSetting::updateOrCreate(['key' => 'theme.light'], ['value' => derivePalette('#14b8a6')]);
-   ```
-   Re-run tests → expect diff on every page (confirms tokens propagate).
+
+    ```php
+    AppSetting::updateOrCreate(['key' => 'theme.light'], ['value' => derivePalette('#14b8a6')]);
+    ```
+
+    Re-run tests → expect diff on every page (confirms tokens propagate).
 
 5. Revert, capture new baseline. CI runs on every PR; any visual diff
    fails the check.
 
 **Files:**
+
 - `package.json` (add Playwright)
 - `playwright.config.ts` (new)
 - `tests/visual/` directory
@@ -416,15 +438,19 @@ in three months, the diff against baseline should surface it.
 
 1. Extend [derive-palette.ts](../resources/js/lib/derive-palette.ts)
    with a `PRESETS` map:
-   ```ts
-   export const BRAND_PRESETS = {
-     'nz-health-default': { hex: '#7c3aed', label: 'NZ Health Default' },
-     'high-contrast': { hex: '#000000', label: 'High Contrast', neutralTone: 'warm' },
-     'warm': { hex: '#ea580c', label: 'Warm Orange' },
-     'cool': { hex: '#0891b2', label: 'Cool Teal' },
-     'forest': { hex: '#059669', label: 'Forest Green' },
-   };
-   ```
+    ```ts
+    export const BRAND_PRESETS = {
+        'nz-health-default': { hex: '#7c3aed', label: 'NZ Health Default' },
+        'high-contrast': {
+            hex: '#000000',
+            label: 'High Contrast',
+            neutralTone: 'warm',
+        },
+        warm: { hex: '#ea580c', label: 'Warm Orange' },
+        cool: { hex: '#0891b2', label: 'Cool Teal' },
+        forest: { hex: '#059669', label: 'Forest Green' },
+    };
+    ```
 2. In the Branding page's Essentials tab, render a row of preset
    swatches above the colour picker. Clicking one calls
    `handleBrandChange(preset.hex)` — existing behaviour, zero new logic.
@@ -443,10 +469,12 @@ to Instrument Sans.
 **Approach:**
 
 1. Add to [app.css](../resources/css/app.css):
-   ```css
-   --font-sans-custom: var(--font-sans);  /* default = Instrument Sans */
-   body { font-family: var(--font-sans-custom); }
-   ```
+    ```css
+    --font-sans-custom: var(--font-sans); /* default = Instrument Sans */
+    body {
+        font-family: var(--font-sans-custom);
+    }
+    ```
 2. Extend Branding Essentials tab with a font picker (3 options: Instrument Sans / Inter / Source Sans 3 / System).
 3. On save, write `--font-sans-custom: 'Inter', …` into `theme.light`
    (or a new `branding.font` app_setting).
@@ -488,6 +516,7 @@ just shows counts. Admins can't see WHY a specific escalation failed.
    issues in bulk.
 
 **Files:**
+
 - `resources/js/pages/settings/notification-escalations.tsx`
 - `app/Http/Controllers/Settings/NotificationEscalationsController.php` (maybe include the field in the response)
 
@@ -525,11 +554,11 @@ Recommended priority if doing all of the above:
 - Chrome Preview tooling was flaky in the prior session — fall back to `php artisan serve --port=<free-port>` + direct curl / browser navigation if needed.
 - Admin login: `admin@demo.test` / `password`.
 - Key architectural docs:
-  - [docs/DESIGN_TOKENS.md](DESIGN_TOKENS.md) — token taxonomy + component conventions
-  - [resources/js/lib/derive-palette.ts](../resources/js/lib/derive-palette.ts) — palette derivation
-  - [resources/js/hooks/use-appearance.tsx](../resources/js/hooks/use-appearance.tsx) — live-apply hook
-  - [config/landing_routes.php](../config/landing_routes.php) — landing page registry
-  - [app/Http/Responses/LoginResponse.php](../app/Http/Responses/LoginResponse.php) — post-login redirect
+    - [docs/DESIGN_TOKENS.md](DESIGN_TOKENS.md) — token taxonomy + component conventions
+    - [resources/js/lib/derive-palette.ts](../resources/js/lib/derive-palette.ts) — palette derivation
+    - [resources/js/hooks/use-appearance.tsx](../resources/js/hooks/use-appearance.tsx) — live-apply hook
+    - [config/landing_routes.php](../config/landing_routes.php) — landing page registry
+    - [app/Http/Responses/LoginResponse.php](../app/Http/Responses/LoginResponse.php) — post-login redirect
 
 ## Things NOT in this plan (intentional exclusions)
 

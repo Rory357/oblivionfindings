@@ -1,14 +1,20 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -41,10 +47,15 @@ export default function EditTemplate({ template }: Props) {
         { title: 'HR', href: '/hr' },
         { title: 'Documents', href: '/hr/documents' },
         { title: 'Templates', href: '/hr/documents/templates' },
-        { title: template.name, href: `/hr/documents/templates/${template.id}/edit` },
+        {
+            title: template.name,
+            href: `/hr/documents/templates/${template.id}/edit`,
+        },
     ];
 
-    const initialFields = template.merge_fields?.length ? template.merge_fields : [''];
+    const initialFields = template.merge_fields?.length
+        ? template.merge_fields
+        : [''];
     const [mergeFields, setMergeFields] = useState<string[]>(initialFields);
 
     const { data, setData, put, processing, errors } = useForm({
@@ -64,13 +75,19 @@ export default function EditTemplate({ template }: Props) {
         const newFields = [...mergeFields];
         newFields[index] = value;
         setMergeFields(newFields);
-        setData('merge_fields', newFields.filter(f => f.trim() !== ''));
+        setData(
+            'merge_fields',
+            newFields.filter((f) => f.trim() !== ''),
+        );
     };
 
     const removeMergeField = (index: number) => {
         const newFields = mergeFields.filter((_, i) => i !== index);
         setMergeFields(newFields);
-        setData('merge_fields', newFields.filter(f => f.trim() !== ''));
+        setData(
+            'merge_fields',
+            newFields.filter((f) => f.trim() !== ''),
+        );
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -81,7 +98,7 @@ export default function EditTemplate({ template }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit ${template.name}`} />
-            <div className="flex flex-col gap-6 p-6 max-w-4xl">
+            <div className="flex max-w-4xl flex-col gap-6 p-6">
                 <div className="flex items-center gap-4">
                     <Link href="/hr/documents/templates">
                         <Button variant="outline" size="icon">
@@ -90,7 +107,7 @@ export default function EditTemplate({ template }: Props) {
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold">Edit Template</h1>
-                        <p className="text-muted-foreground flex items-center gap-2">
+                        <p className="flex items-center gap-2 text-muted-foreground">
                             {template.name}
                             <Badge variant="outline">v{template.version}</Badge>
                         </p>
@@ -103,66 +120,107 @@ export default function EditTemplate({ template }: Props) {
                             <CardTitle>Template Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="name">
-                                        Template Name <span className="text-status-critical">*</span>
+                                        Template Name{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Input
                                         id="name"
                                         value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('name', e.target.value)
+                                        }
                                         placeholder="e.g., Employment Contract"
-                                        className={errors.name ? 'border-status-critical/30' : ''}
+                                        className={
+                                            errors.name
+                                                ? 'border-status-critical/30'
+                                                : ''
+                                        }
                                     />
                                     {errors.name && (
-                                        <p className="text-sm text-status-critical">{errors.name}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.name}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="category">
-                                        Category <span className="text-status-critical">*</span>
+                                        Category{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </Label>
                                     <Select
                                         value={data.category}
-                                        onValueChange={(value) => setData('category', value)}
+                                        onValueChange={(value) =>
+                                            setData('category', value)
+                                        }
                                     >
-                                        <SelectTrigger id="category" className={errors.category ? 'border-status-critical/30' : ''}>
+                                        <SelectTrigger
+                                            id="category"
+                                            className={
+                                                errors.category
+                                                    ? 'border-status-critical/30'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select category" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {categories.map((cat) => (
-                                                <SelectItem key={cat.value} value={cat.value}>
+                                                <SelectItem
+                                                    key={cat.value}
+                                                    value={cat.value}
+                                                >
                                                     {cat.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.category && (
-                                        <p className="text-sm text-status-critical">{errors.category}</p>
+                                        <p className="text-sm text-status-critical">
+                                            {errors.category}
+                                        </p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="content">
-                                    Template Content <span className="text-status-critical">*</span>
+                                    Template Content{' '}
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
                                 </Label>
                                 <Textarea
                                     id="content"
                                     value={data.content}
-                                    onChange={(e) => setData('content', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('content', e.target.value)
+                                    }
                                     placeholder="Enter the template content. Use {{field_name}} for merge fields..."
                                     rows={15}
-                                    className={errors.content ? 'border-status-critical/30' : ''}
+                                    className={
+                                        errors.content
+                                            ? 'border-status-critical/30'
+                                            : ''
+                                    }
                                 />
                                 {errors.content && (
-                                    <p className="text-sm text-status-critical">{errors.content}</p>
+                                    <p className="text-sm text-status-critical">
+                                        {errors.content}
+                                    </p>
                                 )}
                                 <p className="text-xs text-muted-foreground">
-                                    Use {'{{employee_name}}'}, {'{{date}}'}, {'{{position_title}}'} etc. as placeholders for dynamic content.
-                                    Changes to content will auto-increment the version number.
+                                    Use {'{{employee_name}}'}, {'{{date}}'},{' '}
+                                    {'{{position_title}}'} etc. as placeholders
+                                    for dynamic content. Changes to content will
+                                    auto-increment the version number.
                                 </p>
                             </div>
                         </CardContent>
@@ -171,7 +229,12 @@ export default function EditTemplate({ template }: Props) {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Merge Fields</CardTitle>
-                            <Button type="button" variant="outline" size="sm" onClick={addMergeField}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addMergeField}
+                            >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add Field
                             </Button>
@@ -182,14 +245,21 @@ export default function EditTemplate({ template }: Props) {
                                     <Input
                                         placeholder={`Field name (e.g., employee_name)`}
                                         value={field}
-                                        onChange={(e) => updateMergeField(index, e.target.value)}
+                                        onChange={(e) =>
+                                            updateMergeField(
+                                                index,
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                     {mergeFields.length > 1 && (
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="icon"
-                                            onClick={() => removeMergeField(index)}
+                                            onClick={() =>
+                                                removeMergeField(index)
+                                            }
                                             className="text-status-critical hover:text-status-critical"
                                         >
                                             <X className="h-4 w-4" />
@@ -198,7 +268,9 @@ export default function EditTemplate({ template }: Props) {
                                 </div>
                             ))}
                             <p className="text-xs text-muted-foreground">
-                                Define the merge fields used in this template. These will be replaced with actual values when generating documents.
+                                Define the merge fields used in this template.
+                                These will be replaced with actual values when
+                                generating documents.
                             </p>
                         </CardContent>
                     </Card>
@@ -212,9 +284,14 @@ export default function EditTemplate({ template }: Props) {
                                 <Checkbox
                                     id="is_active"
                                     checked={data.is_active}
-                                    onCheckedChange={(checked) => setData('is_active', checked as boolean)}
+                                    onCheckedChange={(checked) =>
+                                        setData('is_active', checked as boolean)
+                                    }
                                 />
-                                <Label htmlFor="is_active" className="text-sm font-normal">
+                                <Label
+                                    htmlFor="is_active"
+                                    className="text-sm font-normal"
+                                >
                                     Template is active and available for use
                                 </Label>
                             </div>
@@ -223,9 +300,17 @@ export default function EditTemplate({ template }: Props) {
                                 <Checkbox
                                     id="approval_required"
                                     checked={data.approval_required}
-                                    onCheckedChange={(checked) => setData('approval_required', checked as boolean)}
+                                    onCheckedChange={(checked) =>
+                                        setData(
+                                            'approval_required',
+                                            checked as boolean,
+                                        )
+                                    }
                                 />
-                                <Label htmlFor="approval_required" className="text-sm font-normal">
+                                <Label
+                                    htmlFor="approval_required"
+                                    className="text-sm font-normal"
+                                >
                                     Require approval before use
                                 </Label>
                             </div>
@@ -234,7 +319,9 @@ export default function EditTemplate({ template }: Props) {
 
                     <div className="flex items-center justify-end gap-3">
                         <Link href="/hr/documents/templates">
-                            <Button type="button" variant="outline">Cancel</Button>
+                            <Button type="button" variant="outline">
+                                Cancel
+                            </Button>
                         </Link>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Saving...' : 'Update Template'}

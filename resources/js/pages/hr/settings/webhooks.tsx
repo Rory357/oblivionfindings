@@ -1,21 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogFooter,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Table,
     TableBody,
@@ -24,7 +22,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, TestTube, Pencil, Webhook } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Pencil, Plus, TestTube, Trash2, Webhook } from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -55,7 +55,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDate = (value?: string | null) => {
     if (!value) return 'Never';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          });
 };
 
 export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
@@ -101,7 +109,10 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
     const toggleEvent = (event: string) => {
         const current = form.data.events;
         if (current.includes(event)) {
-            form.setData('events', current.filter((e) => e !== event));
+            form.setData(
+                'events',
+                current.filter((e) => e !== event),
+            );
         } else {
             form.setData('events', [...current, event]);
         }
@@ -121,7 +132,10 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Webhooks - HR Settings" />
             <PageShell>
-                <PageHeader title="Webhooks" description="Manage webhook endpoints for HR event notifications.">
+                <PageHeader
+                    title="Webhooks"
+                    description="Manage webhook endpoints for HR event notifications."
+                >
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogTrigger asChild>
                             <Button onClick={openCreate}>
@@ -131,7 +145,11 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
-                                <DialogTitle>{editingId ? 'Edit Webhook' : 'Create Webhook'}</DialogTitle>
+                                <DialogTitle>
+                                    {editingId
+                                        ? 'Edit Webhook'
+                                        : 'Create Webhook'}
+                                </DialogTitle>
                             </DialogHeader>
                             <form onSubmit={submit} className="space-y-4">
                                 <div>
@@ -140,27 +158,44 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                         id="url"
                                         type="url"
                                         value={form.data.url}
-                                        onChange={(e) => form.setData('url', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData('url', e.target.value)
+                                        }
                                         placeholder="https://example.com/webhook"
                                         required
                                     />
-                                    {form.errors.url && <p className="text-sm text-status-critical mt-1">{form.errors.url}</p>}
+                                    {form.errors.url && (
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {form.errors.url}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
                                     <Label>Events</Label>
-                                    <div className="grid grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto">
+                                    <div className="mt-2 grid max-h-48 grid-cols-2 gap-2 overflow-y-auto">
                                         {availableEvents.map((event) => (
-                                            <label key={event} className="flex items-center gap-2 text-sm">
+                                            <label
+                                                key={event}
+                                                className="flex items-center gap-2 text-sm"
+                                            >
                                                 <Checkbox
-                                                    checked={form.data.events.includes(event)}
-                                                    onCheckedChange={() => toggleEvent(event)}
+                                                    checked={form.data.events.includes(
+                                                        event,
+                                                    )}
+                                                    onCheckedChange={() =>
+                                                        toggleEvent(event)
+                                                    }
                                                 />
                                                 {event}
                                             </label>
                                         ))}
                                     </div>
-                                    {form.errors.events && <p className="text-sm text-status-critical mt-1">{form.errors.events}</p>}
+                                    {form.errors.events && (
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {form.errors.events}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {editingId && (
@@ -168,7 +203,12 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                         <label className="flex items-center gap-2 text-sm">
                                             <Checkbox
                                                 checked={form.data.is_active}
-                                                onCheckedChange={(checked) => form.setData('is_active', !!checked)}
+                                                onCheckedChange={(checked) =>
+                                                    form.setData(
+                                                        'is_active',
+                                                        !!checked,
+                                                    )
+                                                }
                                             />
                                             Active
                                         </label>
@@ -176,7 +216,10 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                 )}
 
                                 <DialogFooter>
-                                    <Button type="submit" disabled={form.processing}>
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
+                                    >
                                         {editingId ? 'Update' : 'Create'}
                                     </Button>
                                 </DialogFooter>
@@ -194,7 +237,9 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                     </CardHeader>
                     <CardContent>
                         {webhooks.length === 0 ? (
-                            <p className="text-muted-foreground text-center py-8">No webhooks configured yet.</p>
+                            <p className="py-8 text-center text-muted-foreground">
+                                No webhooks configured yet.
+                            </p>
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -204,53 +249,106 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                         <TableHead>Status</TableHead>
                                         <TableHead>Failures</TableHead>
                                         <TableHead>Last Triggered</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {webhooks.map((webhook) => (
                                         <TableRow key={webhook.id}>
-                                            <TableCell className="font-mono text-xs max-w-[200px] truncate">
+                                            <TableCell className="max-w-[200px] truncate font-mono text-xs">
                                                 {webhook.url}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {webhook.events.slice(0, 3).map((event) => (
-                                                        <Badge key={event} variant="secondary" className="text-xs">
-                                                            {event}
-                                                        </Badge>
-                                                    ))}
-                                                    {webhook.events.length > 3 && (
-                                                        <Badge variant="outline" className="text-xs">
-                                                            +{webhook.events.length - 3}
+                                                    {webhook.events
+                                                        .slice(0, 3)
+                                                        .map((event) => (
+                                                            <Badge
+                                                                key={event}
+                                                                variant="secondary"
+                                                                className="text-xs"
+                                                            >
+                                                                {event}
+                                                            </Badge>
+                                                        ))}
+                                                    {webhook.events.length >
+                                                        3 && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-xs"
+                                                        >
+                                                            +
+                                                            {webhook.events
+                                                                .length - 3}
                                                         </Badge>
                                                     )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant={webhook.is_active ? 'default' : 'secondary'}>
-                                                    {webhook.is_active ? 'Active' : 'Inactive'}
+                                                <Badge
+                                                    variant={
+                                                        webhook.is_active
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                >
+                                                    {webhook.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 {webhook.failure_count > 0 ? (
-                                                    <Badge variant="destructive">{webhook.failure_count}</Badge>
+                                                    <Badge variant="destructive">
+                                                        {webhook.failure_count}
+                                                    </Badge>
                                                 ) : (
-                                                    <span className="text-muted-foreground">0</span>
+                                                    <span className="text-muted-foreground">
+                                                        0
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
-                                                {formatDate(webhook.last_triggered_at)}
+                                                {formatDate(
+                                                    webhook.last_triggered_at,
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => testWebhook(webhook.id)} title="Test">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            testWebhook(
+                                                                webhook.id,
+                                                            )
+                                                        }
+                                                        title="Test"
+                                                    >
                                                         <TestTube className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(webhook)} title="Edit">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            openEdit(webhook)
+                                                        }
+                                                        title="Edit"
+                                                    >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => deleteWebhook(webhook.id)} title="Delete">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            deleteWebhook(
+                                                                webhook.id,
+                                                            )
+                                                        }
+                                                        title="Delete"
+                                                    >
                                                         <Trash2 className="h-4 w-4 text-status-critical" />
                                                     </Button>
                                                 </div>

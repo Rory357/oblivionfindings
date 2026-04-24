@@ -449,16 +449,17 @@ export default function Schedule({
                                                     form.data.visit_type ===
                                                     type;
                                                 return (
-                                                    <button
+                                                    <Button
                                                         key={type}
                                                         type="button"
+                                                        variant="outline"
                                                         onClick={() =>
                                                             form.setData(
                                                                 'visit_type',
                                                                 type,
                                                             )
                                                         }
-                                                        className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${
+                                                        className={`h-auto flex-col gap-1.5 rounded-lg border-2 p-3 text-xs font-medium ${
                                                             selected
                                                                 ? 'border-primary bg-primary/5 text-primary'
                                                                 : 'border-border text-muted-foreground hover:border-primary/30'
@@ -466,7 +467,7 @@ export default function Schedule({
                                                     >
                                                         <Icon className="h-5 w-5" />
                                                         {label}
-                                                    </button>
+                                                    </Button>
                                                 );
                                             })}
                                         </div>

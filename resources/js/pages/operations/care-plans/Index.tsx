@@ -1,5 +1,10 @@
 import { CarePlanSummaryCard } from '@/components/care-plan-summary-card';
-import { BarChart, DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
+import {
+    BarChart,
+    DonutChart,
+    OPS_COLORS,
+    OpsStatCard,
+} from '@/components/ops-stat-card';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
@@ -95,7 +100,13 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function CarePlansIndex({
-    carePlans = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
+    carePlans = {
+        data: [],
+        links: [],
+        current_page: 1,
+        last_page: 1,
+        total: 0,
+    },
     clients = [],
     filters = {} as any,
     stats = {} as any,
@@ -106,7 +117,11 @@ export default function CarePlansIndex({
     const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
 
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/care-plans', { ...filters, [key]: value }, { preserveState: true, replace: true });
+        router.get(
+            '/operations/care-plans',
+            { ...filters, [key]: value },
+            { preserveState: true, replace: true },
+        );
     };
 
     const s = {
@@ -119,11 +134,13 @@ export default function CarePlansIndex({
         overdue_goals: stats?.overdue_goals ?? 0,
     };
 
-    const donutSegments = Object.entries(plans_by_status ?? {}).map(([key, value]) => ({
-        label: STATUS_LABELS[key] ?? key,
-        value: (value as number) ?? 0,
-        color: STATUS_DONUT_COLORS[key] ?? OPS_COLORS.muted,
-    }));
+    const donutSegments = Object.entries(plans_by_status ?? {}).map(
+        ([key, value]) => ({
+            label: STATUS_LABELS[key] ?? key,
+            value: (value as number) ?? 0,
+            color: STATUS_DONUT_COLORS[key] ?? OPS_COLORS.muted,
+        }),
+    );
 
     // Quick insight bar chart — plans by type
     const plansByType = (carePlans?.data ?? []).reduce(
@@ -134,10 +151,14 @@ export default function CarePlansIndex({
         },
         {},
     );
-    const typeBarData = Object.entries(plansByType).map(([label, value]) => ({ label, value }));
+    const typeBarData = Object.entries(plansByType).map(([label, value]) => ({
+        label,
+        value,
+    }));
 
     const showComplianceBanner = s.review_due > 0 || s.plans_without_goals > 0;
-    const completionRate = s.total > 0 ? Math.round((s.active / s.total) * 100) : 0;
+    const completionRate =
+        s.total > 0 ? Math.round((s.active / s.total) * 100) : 0;
 
     return (
         <AppLayout>
@@ -158,12 +179,42 @@ export default function CarePlansIndex({
             <PageShell>
                 {/* ─── Stats Row ─── */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                    <OpsStatCard label="Total Plans" value={s.total} icon={ClipboardList} color="indigo" />
-                    <OpsStatCard label="Active" value={s.active} icon={CheckCircle2} color="emerald" />
-                    <OpsStatCard label="Review Due" value={s.review_due} icon={AlertTriangle} color="amber" />
-                    <OpsStatCard label="Draft" value={s.draft} icon={ClipboardCheck} color="slate" />
-                    <OpsStatCard label="Without Goals" value={s.plans_without_goals} icon={Target} color="red" />
-                    <OpsStatCard label="Overdue Goals" value={s.overdue_goals} icon={FileWarning} color="red" />
+                    <OpsStatCard
+                        label="Total Plans"
+                        value={s.total}
+                        icon={ClipboardList}
+                        color="indigo"
+                    />
+                    <OpsStatCard
+                        label="Active"
+                        value={s.active}
+                        icon={CheckCircle2}
+                        color="emerald"
+                    />
+                    <OpsStatCard
+                        label="Review Due"
+                        value={s.review_due}
+                        icon={AlertTriangle}
+                        color="amber"
+                    />
+                    <OpsStatCard
+                        label="Draft"
+                        value={s.draft}
+                        icon={ClipboardCheck}
+                        color="slate"
+                    />
+                    <OpsStatCard
+                        label="Without Goals"
+                        value={s.plans_without_goals}
+                        icon={Target}
+                        color="red"
+                    />
+                    <OpsStatCard
+                        label="Overdue Goals"
+                        value={s.overdue_goals}
+                        icon={FileWarning}
+                        color="red"
+                    />
                 </div>
 
                 {/* ─── Compliance Alert Banner ─── */}
@@ -173,10 +224,24 @@ export default function CarePlansIndex({
                             <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-status-warning dark:text-status-warning">Compliance Attention Required</p>
+                            <p className="text-sm font-semibold text-status-warning dark:text-status-warning">
+                                Compliance Attention Required
+                            </p>
                             <p className="mt-0.5 text-xs text-status-warning dark:text-status-warning">
-                                {s.review_due > 0 && <span>{s.review_due} plan{s.review_due !== 1 ? 's' : ''} overdue for review. </span>}
-                                {s.plans_without_goals > 0 && <span>{s.plans_without_goals} plan{s.plans_without_goals !== 1 ? 's' : ''} have no goals defined.</span>}
+                                {s.review_due > 0 && (
+                                    <span>
+                                        {s.review_due} plan
+                                        {s.review_due !== 1 ? 's' : ''} overdue
+                                        for review.{' '}
+                                    </span>
+                                )}
+                                {s.plans_without_goals > 0 && (
+                                    <span>
+                                        {s.plans_without_goals} plan
+                                        {s.plans_without_goals !== 1 ? 's' : ''}{' '}
+                                        have no goals defined.
+                                    </span>
+                                )}
                             </p>
                             <div className="mt-2.5 flex gap-2">
                                 {s.review_due > 0 && (
@@ -184,7 +249,9 @@ export default function CarePlansIndex({
                                         size="sm"
                                         variant="outline"
                                         className="h-7 border-status-warning/30 text-xs font-medium text-status-warning hover:bg-status-warning-bg"
-                                        onClick={() => updateFilters('review_due', '1')}
+                                        onClick={() =>
+                                            updateFilters('review_due', '1')
+                                        }
                                     >
                                         View Due Reviews
                                     </Button>
@@ -194,7 +261,9 @@ export default function CarePlansIndex({
                                         size="sm"
                                         variant="outline"
                                         className="h-7 border-status-warning/30 text-xs font-medium text-status-warning hover:bg-status-warning-bg"
-                                        onClick={() => updateFilters('status', 'active')}
+                                        onClick={() =>
+                                            updateFilters('status', 'active')
+                                        }
                                     >
                                         View Plans Without Goals
                                     </Button>
@@ -218,7 +287,12 @@ export default function CarePlansIndex({
                         </CardHeader>
                         <CardContent className="flex justify-center pb-4">
                             {s.total > 0 ? (
-                                <DonutChart segments={donutSegments} centerLabel="Total" centerValue={s.total} size={150} />
+                                <DonutChart
+                                    segments={donutSegments}
+                                    centerLabel="Total"
+                                    centerValue={s.total}
+                                    size={150}
+                                />
                             ) : (
                                 <div className="flex h-[150px] items-center justify-center text-xs text-muted-foreground">
                                     No data yet
@@ -229,13 +303,28 @@ export default function CarePlansIndex({
                         {s.total > 0 && (
                             <div className="border-t bg-muted/50 px-4 py-2.5">
                                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                    {donutSegments.filter(seg => seg.value > 0).map((seg) => (
-                                        <div key={seg.label} className="flex items-center gap-1.5 text-[11px]">
-                                            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: seg.color }} />
-                                            <span className="text-muted-foreground">{seg.label}</span>
-                                            <span className="font-semibold">{seg.value}</span>
-                                        </div>
-                                    ))}
+                                    {donutSegments
+                                        .filter((seg) => seg.value > 0)
+                                        .map((seg) => (
+                                            <div
+                                                key={seg.label}
+                                                className="flex items-center gap-1.5 text-[11px]"
+                                            >
+                                                <div
+                                                    className="h-2.5 w-2.5 rounded-full"
+                                                    style={{
+                                                        backgroundColor:
+                                                            seg.color,
+                                                    }}
+                                                />
+                                                <span className="text-muted-foreground">
+                                                    {seg.label}
+                                                </span>
+                                                <span className="font-semibold">
+                                                    {seg.value}
+                                                </span>
+                                            </div>
+                                        ))}
                                 </div>
                             </div>
                         )}
@@ -255,30 +344,55 @@ export default function CarePlansIndex({
                             {/* Active rate */}
                             <div>
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">Active Plan Rate</span>
-                                    <span className="font-bold text-status-success">{completionRate}%</span>
+                                    <span className="text-muted-foreground">
+                                        Active Plan Rate
+                                    </span>
+                                    <span className="font-bold text-status-success">
+                                        {completionRate}%
+                                    </span>
                                 </div>
                                 <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
-                                    <div className="h-full rounded-full bg-status-success transition-all" style={{ width: `${completionRate}%` }} />
+                                    <div
+                                        className="h-full rounded-full bg-status-success transition-all"
+                                        style={{ width: `${completionRate}%` }}
+                                    />
                                 </div>
                             </div>
                             {/* Key metrics */}
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
-                                    <div className="text-lg font-bold text-primary">{s.active}</div>
-                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Active</div>
+                                    <div className="text-lg font-bold text-primary">
+                                        {s.active}
+                                    </div>
+                                    <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                        Active
+                                    </div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
-                                    <div className="text-lg font-bold text-status-warning">{s.in_review}</div>
-                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">In Review</div>
+                                    <div className="text-lg font-bold text-status-warning">
+                                        {s.in_review}
+                                    </div>
+                                    <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                        In Review
+                                    </div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
-                                    <div className="text-lg font-bold text-muted-foreground">{s.draft}</div>
-                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Drafts</div>
+                                    <div className="text-lg font-bold text-muted-foreground">
+                                        {s.draft}
+                                    </div>
+                                    <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                        Drafts
+                                    </div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
-                                    <div className={`text-lg font-bold ${s.overdue_goals > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>{s.overdue_goals}</div>
-                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Overdue Goals</div>
+                                    <div
+                                        className={`text-lg font-bold ${s.overdue_goals > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                    >
+                                        {s.overdue_goals}
+                                    </div>
+                                    <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                        Overdue Goals
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -296,7 +410,11 @@ export default function CarePlansIndex({
                         </CardHeader>
                         <CardContent className="pb-4">
                             {typeBarData.length > 0 ? (
-                                <BarChart data={typeBarData} height={130} barColor={OPS_COLORS.primary} />
+                                <BarChart
+                                    data={typeBarData}
+                                    height={130}
+                                    barColor={OPS_COLORS.primary}
+                                />
                             ) : (
                                 <div className="flex h-[130px] items-center justify-center text-xs text-muted-foreground">
                                     Create plans to see analytics
@@ -307,54 +425,98 @@ export default function CarePlansIndex({
                 </div>
 
                 {/* ─── Filter Bar ─── */}
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-3 shadow-sm dark:bg-muted/50">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                            placeholder="Search care plans..."
-                            className="h-9 pl-8 text-sm"
-                            defaultValue={filters?.q ?? ''}
-                            onChange={(e) => updateFilters('q', e.target.value || null)}
-                        />
-                    </div>
-                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="review">In Review</SelectItem>
-                            <SelectItem value="archived">Archived</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select value={filters?.plan_type ?? ANY} onValueChange={(v) => updateFilters('plan_type', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Plan Type" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Types</SelectItem>
-                            {Object.entries(PLAN_TYPES).map(([k, v]) => (
-                                <SelectItem key={k} value={k}>{v}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={filters?.client_id ?? ANY} onValueChange={(v) => updateFilters('client_id', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[160px] text-xs"><SelectValue placeholder={`All ${clientLabelPlural}`} /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All {clientLabelPlural}</SelectItem>
-                            {(clients ?? []).map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button
-                        size="sm"
-                        variant={filters?.review_due ? 'default' : 'outline'}
-                        className={`h-9 gap-1 text-xs ${filters?.review_due ? '' : 'text-status-warning border-status-warning/30 hover:bg-status-warning-bg'}`}
-                        onClick={() => updateFilters('review_due', filters?.review_due ? null : '1')}
-                    >
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Review Due
-                    </Button>
-                </div>
+                <Card className="bg-white/50 shadow-sm dark:bg-muted/50">
+                    <CardContent className="flex flex-wrap items-center gap-2 p-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search care plans..."
+                                className="h-9 pl-8 text-sm"
+                                defaultValue={filters?.q ?? ''}
+                                onChange={(e) =>
+                                    updateFilters('q', e.target.value || null)
+                                }
+                            />
+                        </div>
+                        <Select
+                            value={filters?.status ?? ANY}
+                            onValueChange={(v) =>
+                                updateFilters('status', v === ANY ? null : v)
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-[130px] text-xs">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ANY}>All Status</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="review">
+                                    In Review
+                                </SelectItem>
+                                <SelectItem value="archived">
+                                    Archived
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select
+                            value={filters?.plan_type ?? ANY}
+                            onValueChange={(v) =>
+                                updateFilters('plan_type', v === ANY ? null : v)
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-[150px] text-xs">
+                                <SelectValue placeholder="Plan Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ANY}>All Types</SelectItem>
+                                {Object.entries(PLAN_TYPES).map(([k, v]) => (
+                                    <SelectItem key={k} value={k}>
+                                        {v}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select
+                            value={filters?.client_id ?? ANY}
+                            onValueChange={(v) =>
+                                updateFilters('client_id', v === ANY ? null : v)
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-[160px] text-xs">
+                                <SelectValue
+                                    placeholder={`All ${clientLabelPlural}`}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ANY}>
+                                    All {clientLabelPlural}
+                                </SelectItem>
+                                {(clients ?? []).map((c) => (
+                                    <SelectItem key={c.id} value={String(c.id)}>
+                                        {c.first_name} {c.last_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button
+                            size="sm"
+                            variant={
+                                filters?.review_due ? 'default' : 'outline'
+                            }
+                            className={`h-9 gap-1 text-xs ${filters?.review_due ? '' : 'border-status-warning/30 text-status-warning hover:bg-status-warning-bg'}`}
+                            onClick={() =>
+                                updateFilters(
+                                    'review_due',
+                                    filters?.review_due ? null : '1',
+                                )
+                            }
+                        >
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            Review Due
+                        </Button>
+                    </CardContent>
+                </Card>
 
                 {/* ─── Card List ─── */}
                 <div className="space-y-2">
@@ -364,9 +526,14 @@ export default function CarePlansIndex({
                                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                                     <Heart className="h-8 w-8 text-primary" />
                                 </div>
-                                <h2 className="text-lg font-semibold">No Care Plans Found</h2>
+                                <h2 className="text-lg font-semibold">
+                                    No Care Plans Found
+                                </h2>
                                 <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">
-                                    {filters?.q || filters?.status || filters?.plan_type || filters?.client_id
+                                    {filters?.q ||
+                                    filters?.status ||
+                                    filters?.plan_type ||
+                                    filters?.client_id
                                         ? 'No plans match your current filters. Try adjusting your search criteria.'
                                         : `Create your first care plan to start tracking goals, support needs, and progress for your ${clientLabelPlural.toLowerCase()}.`}
                                 </p>
@@ -382,7 +549,11 @@ export default function CarePlansIndex({
                         </Card>
                     )}
                     {(carePlans?.data ?? []).map((plan) => (
-                        <CarePlanSummaryCard key={plan.id} plan={plan} showClient />
+                        <CarePlanSummaryCard
+                            key={plan.id}
+                            plan={plan}
+                            showClient
+                        />
                     ))}
                 </div>
 
@@ -390,20 +561,35 @@ export default function CarePlansIndex({
                 {(carePlans?.last_page ?? 1) > 1 && (
                     <div className="flex flex-col items-center gap-2">
                         <div className="flex items-center justify-center gap-1">
-                            {(carePlans?.links ?? []).map((link: any, i: number) => (
-                                <Button
-                                    key={i}
-                                    size="sm"
-                                    variant={link.active ? 'default' : 'outline'}
-                                    className="h-7 min-w-[28px] px-2 text-xs"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
+                            {(carePlans?.links ?? []).map(
+                                (link: any, i: number) => (
+                                    <Button
+                                        key={i}
+                                        size="sm"
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
+                                        className="h-7 min-w-[28px] px-2 text-xs"
+                                        disabled={!link.url}
+                                        onClick={() =>
+                                            link.url &&
+                                            router.get(
+                                                link.url,
+                                                {},
+                                                { preserveState: true },
+                                            )
+                                        }
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
+                                    />
+                                ),
+                            )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Showing page {carePlans?.current_page ?? 1} of {carePlans?.last_page ?? 1} ({carePlans?.total ?? 0} plans)
+                            Showing page {carePlans?.current_page ?? 1} of{' '}
+                            {carePlans?.last_page ?? 1} ({carePlans?.total ?? 0}{' '}
+                            plans)
                         </p>
                     </div>
                 )}

@@ -1,15 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import { type BreadcrumbItem } from '@/types';
-import { Check, X, ArrowUpRight, Settings } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from '@inertiajs/react';
+import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Check, Settings } from 'lucide-react';
+import { useState } from 'react';
 
 type ApprovalInstance = {
     id: number;
@@ -40,26 +46,43 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const processTypeConfig: Record<string, { className: string }> = {
-    leave: { className: 'border-status-info/30 text-status-info bg-status-info' },
-    expense: { className: 'border-status-success/30 text-status-success bg-status-success' },
+    leave: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+    },
+    expense: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+    },
     timesheet: { className: 'border-primary/30 text-primary bg-primary/10' },
-    document: { className: 'border-status-warning/30 text-status-warning bg-status-warning' },
+    document: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+    },
 };
 
 export default function PendingApprovals({ instances, can }: Props) {
-    const [actionInstanceId, setActionInstanceId] = useState<number | null>(null);
+    const [actionInstanceId, setActionInstanceId] = useState<number | null>(
+        null,
+    );
     const [actionNotes, setActionNotes] = useState('');
 
-    const handleAction = (instanceId: number, action: 'approved' | 'rejected') => {
-        router.post(`/hr/approvals/${instanceId}/action`, {
-            action,
-            notes: actionNotes,
-        }, {
-            onSuccess: () => {
-                setActionInstanceId(null);
-                setActionNotes('');
+    const handleAction = (
+        instanceId: number,
+        action: 'approved' | 'rejected',
+    ) => {
+        router.post(
+            `/hr/approvals/${instanceId}/action`,
+            {
+                action,
+                notes: actionNotes,
             },
-        });
+            {
+                onSuccess: () => {
+                    setActionInstanceId(null);
+                    setActionNotes('');
+                },
+            },
+        );
     };
 
     return (
@@ -68,8 +91,12 @@ export default function PendingApprovals({ instances, can }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold">Pending Approvals</h1>
-                        <p className="text-sm text-muted-foreground">Review and action pending approval requests</p>
+                        <h1 className="text-2xl font-bold">
+                            Pending Approvals
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Review and action pending approval requests
+                        </p>
                     </div>
                     {can.manage && (
                         <Button asChild size="sm" variant="outline">
@@ -92,54 +119,110 @@ export default function PendingApprovals({ instances, can }: Props) {
                                     <TableHead>Progress</TableHead>
                                     <TableHead>Initiated By</TableHead>
                                     <TableHead>Date</TableHead>
-                                    <TableHead className="w-48">Actions</TableHead>
+                                    <TableHead className="w-48">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {instances.data.map((instance) => {
-                                    const ptConfig = processTypeConfig[instance.process_type] || processTypeConfig.leave;
+                                    const ptConfig =
+                                        processTypeConfig[
+                                            instance.process_type
+                                        ] || processTypeConfig.leave;
                                     return (
                                         <TableRow key={instance.id}>
                                             <TableCell>
-                                                <Badge variant="outline" className={`capitalize ${ptConfig.className}`}>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`capitalize ${ptConfig.className}`}
+                                                >
                                                     {instance.process_type}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="font-medium">{instance.chain_name}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {instance.chain_name}
+                                            </TableCell>
                                             <TableCell className="text-muted-foreground">
-                                                {instance.approvable_type} #{instance.approvable_id}
+                                                {instance.approvable_type} #
+                                                {instance.approvable_id}
                                             </TableCell>
                                             <TableCell>
                                                 <span className="text-sm">
-                                                    Step {instance.current_step} of {instance.total_steps}
+                                                    Step {instance.current_step}{' '}
+                                                    of {instance.total_steps}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground">{instance.initiated_by}</TableCell>
-                                            <TableCell className="text-muted-foreground">{instance.initiated_at}</TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {instance.initiated_by}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {instance.initiated_at}
+                                            </TableCell>
                                             <TableCell>
-                                                {actionInstanceId === instance.id ? (
+                                                {actionInstanceId ===
+                                                instance.id ? (
                                                     <div className="space-y-2">
                                                         <Textarea
                                                             placeholder="Notes (optional)..."
                                                             value={actionNotes}
-                                                            onChange={(e) => setActionNotes(e.target.value)}
+                                                            onChange={(e) =>
+                                                                setActionNotes(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
                                                             className="h-16 text-xs"
                                                         />
                                                         <div className="flex gap-1">
-                                                            <Button size="sm" variant="default" onClick={() => handleAction(instance.id, 'approved')}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="default"
+                                                                onClick={() =>
+                                                                    handleAction(
+                                                                        instance.id,
+                                                                        'approved',
+                                                                    )
+                                                                }
+                                                            >
                                                                 Approve
                                                             </Button>
-                                                            <Button size="sm" variant="destructive" onClick={() => handleAction(instance.id, 'rejected')}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="destructive"
+                                                                onClick={() =>
+                                                                    handleAction(
+                                                                        instance.id,
+                                                                        'rejected',
+                                                                    )
+                                                                }
+                                                            >
                                                                 Reject
                                                             </Button>
-                                                            <Button size="sm" variant="ghost" onClick={() => setActionInstanceId(null)}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() =>
+                                                                    setActionInstanceId(
+                                                                        null,
+                                                                    )
+                                                                }
+                                                            >
                                                                 Cancel
                                                             </Button>
                                                         </div>
                                                     </div>
                                                 ) : (
                                                     <div className="flex gap-1">
-                                                        <Button size="sm" variant="outline" onClick={() => setActionInstanceId(instance.id)}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setActionInstanceId(
+                                                                    instance.id,
+                                                                )
+                                                            }
+                                                        >
                                                             <Check className="mr-1 h-3 w-3" />
                                                             Review
                                                         </Button>
@@ -151,7 +234,10 @@ export default function PendingApprovals({ instances, can }: Props) {
                                 })}
                                 {instances.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
                                             No pending approvals.
                                         </TableCell>
                                     </TableRow>

@@ -1,13 +1,20 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { type BreadcrumbItem } from '@/types';
-import { Plus, Eye } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Eye, Plus } from 'lucide-react';
 
 type ExpenseClaim = {
     id: number;
@@ -37,20 +44,46 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
-    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
-    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
-    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
-    paid: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Paid' },
+    draft: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        label: 'Draft',
+    },
+    submitted: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Submitted',
+    },
+    approved: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Approved',
+    },
+    rejected: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Rejected',
+    },
+    paid: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Paid',
+    },
 };
 
 const formatCurrency = (amount: number, currency = 'NZD') => {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(amount);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency,
+    }).format(amount);
 };
 
 export default function ExpenseIndex({ claims, filters, can }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/expenses', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/expenses',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -60,7 +93,9 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold">Expense Claims</h1>
-                        <p className="text-sm text-muted-foreground">Manage employee expense claims and reimbursements</p>
+                        <p className="text-sm text-muted-foreground">
+                            Manage employee expense claims and reimbursements
+                        </p>
                     </div>
                     {can.create && (
                         <Button asChild size="sm">
@@ -74,12 +109,26 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
 
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">
-                    {['all', 'draft', 'submitted', 'approved', 'rejected', 'paid'].map((s) => (
+                    {[
+                        'all',
+                        'draft',
+                        'submitted',
+                        'approved',
+                        'rejected',
+                        'paid',
+                    ].map((s) => (
                         <Button
                             key={s}
-                            variant={(!filters.status && s === 'all') || filters.status === s ? 'default' : 'outline'}
+                            variant={
+                                (!filters.status && s === 'all') ||
+                                filters.status === s
+                                    ? 'default'
+                                    : 'outline'
+                            }
                             size="sm"
-                            onClick={() => onFilter({ status: s === 'all' ? null : s })}
+                            onClick={() =>
+                                onFilter({ status: s === 'all' ? null : s })
+                            }
                         >
                             <span className="capitalize">{s}</span>
                         </Button>
@@ -102,9 +151,13 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                                 <TableRow>
                                     <TableHead>Claim #</TableHead>
                                     <TableHead>Title</TableHead>
-                                    {can.manage && <TableHead>Employee</TableHead>}
+                                    {can.manage && (
+                                        <TableHead>Employee</TableHead>
+                                    )}
                                     <TableHead>Items</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">
+                                        Amount
+                                    </TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Submitted</TableHead>
                                     <TableHead className="w-16" />
@@ -112,25 +165,51 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                             </TableHeader>
                             <TableBody>
                                 {claims.data.map((claim) => {
-                                    const config = statusConfig[claim.status] || statusConfig.draft;
+                                    const config =
+                                        statusConfig[claim.status] ||
+                                        statusConfig.draft;
                                     return (
                                         <TableRow key={claim.id}>
-                                            <TableCell className="font-mono text-sm">{claim.claim_number}</TableCell>
-                                            <TableCell className="font-medium">{claim.title}</TableCell>
-                                            {can.manage && <TableCell className="text-muted-foreground">{claim.staff_name}</TableCell>}
-                                            <TableCell>{claim.items_count}</TableCell>
+                                            <TableCell className="font-mono text-sm">
+                                                {claim.claim_number}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {claim.title}
+                                            </TableCell>
+                                            {can.manage && (
+                                                <TableCell className="text-muted-foreground">
+                                                    {claim.staff_name}
+                                                </TableCell>
+                                            )}
+                                            <TableCell>
+                                                {claim.items_count}
+                                            </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                {formatCurrency(claim.total_amount, claim.currency)}
+                                                {formatCurrency(
+                                                    claim.total_amount,
+                                                    claim.currency,
+                                                )}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className={config.className}>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={config.className}
+                                                >
                                                     {config.label}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground">{claim.submitted_at || '-'}</TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {claim.submitted_at || '-'}
+                                            </TableCell>
                                             <TableCell>
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <Link href={`/hr/expenses/${claim.id}`}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/hr/expenses/${claim.id}`}
+                                                    >
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Link>
                                                 </Button>
@@ -140,7 +219,10 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                                 })}
                                 {claims.data.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={can.manage ? 8 : 7} className="py-8 text-center text-muted-foreground">
+                                        <TableCell
+                                            colSpan={can.manage ? 8 : 7}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
                                             No expense claims found.
                                         </TableCell>
                                     </TableRow>

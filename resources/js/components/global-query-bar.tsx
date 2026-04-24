@@ -39,11 +39,8 @@ export default function GlobalQueryBar() {
     const auth = page.props?.auth;
     const can = auth?.can;
     const legacyRole = auth?.user?.role as string | null | undefined;
-
-    // Portal users should only have the per-client query UI on the client profile page.
-    if (legacyRole === 'client' || legacyRole === 'next_of_kin') {
-        return null;
-    }
+    const isPortalUser =
+        legacyRole === 'client' || legacyRole === 'next_of_kin';
 
     const canAsk =
         !!can?.rag?.askAny || !!can?.rag?.askAssigned || !!can?.rag?.askSelf;
@@ -88,6 +85,11 @@ export default function GlobalQueryBar() {
             }
         })();
     }, [open]);
+
+    // Portal users should only have the per-client query UI on the client profile page.
+    if (isPortalUser) {
+        return null;
+    }
 
     function fail(msg: string) {
         setError(msg);

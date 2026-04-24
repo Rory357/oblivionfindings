@@ -1,4 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarClock, CheckCircle2, AlertTriangle, Timer } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 
 type Drill = {
     id: number;
@@ -97,11 +97,21 @@ const complianceBadge = (status: string) => {
     }
 };
 
-export default function DrillsIndex({ filters, stats, site_compliance, drills, sites }: Props) {
+export default function DrillsIndex({
+    filters,
+    stats,
+    site_compliance,
+    drills,
+    sites,
+}: Props) {
     const ANY = '__any__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/health-safety/drills', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/health-safety/drills',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -121,9 +131,15 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                     icon={<CalendarClock className="h-7 w-7 text-white" />}
                     stats={[
                         { label: 'Scheduled', value: stats.scheduled_drills },
-                        { label: 'Completed (6mo)', value: stats.completed_6mo },
+                        {
+                            label: 'Completed (6mo)',
+                            value: stats.completed_6mo,
+                        },
                         { label: 'Sites Overdue', value: stats.sites_overdue },
-                        { label: 'Avg Evac Time', value: stats.avg_evacuation_time },
+                        {
+                            label: 'Avg Evac Time',
+                            value: stats.avg_evacuation_time,
+                        },
                     ]}
                     actions={
                         <Link href="/health-safety/drills/create">
@@ -136,7 +152,9 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                 {site_compliance.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Site Compliance Status</CardTitle>
+                            <CardTitle className="text-base">
+                                Site Compliance Status
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -146,8 +164,14 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                                         className={`rounded-lg border p-3 ${complianceColor(site.status)}`}
                                     >
                                         <div className="flex items-center justify-between">
-                                            <div className="font-medium text-sm">{site.name}</div>
-                                            <Badge className={complianceBadge(site.status)}>
+                                            <div className="text-sm font-medium">
+                                                {site.name}
+                                            </div>
+                                            <Badge
+                                                className={complianceBadge(
+                                                    site.status,
+                                                )}
+                                            >
                                                 {site.status === 'compliant'
                                                     ? 'Compliant'
                                                     : site.status === 'due_soon'
@@ -174,60 +198,109 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Title or description"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Site</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Site
+                            </Label>
                             <Select
                                 value={filters.site_id ?? ANY}
-                                onValueChange={(v) => onFilter({ site_id: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ site_id: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Site" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Site" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     {sites.map((s) => (
-                                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={String(s.id)}
+                                        >
+                                            {s.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Type</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Type
+                            </Label>
                             <Select
                                 value={filters.drill_type ?? ANY}
-                                onValueChange={(v) => onFilter({ drill_type: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        drill_type: v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Type" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="fire_evacuation">Fire Evacuation</SelectItem>
-                                    <SelectItem value="earthquake">Earthquake</SelectItem>
-                                    <SelectItem value="lockdown">Lockdown</SelectItem>
-                                    <SelectItem value="tsunami">Tsunami</SelectItem>
-                                    <SelectItem value="chemical_spill">Chemical Spill</SelectItem>
-                                    <SelectItem value="medical_emergency">Medical Emergency</SelectItem>
+                                    <SelectItem value="fire_evacuation">
+                                        Fire Evacuation
+                                    </SelectItem>
+                                    <SelectItem value="earthquake">
+                                        Earthquake
+                                    </SelectItem>
+                                    <SelectItem value="lockdown">
+                                        Lockdown
+                                    </SelectItem>
+                                    <SelectItem value="tsunami">
+                                        Tsunami
+                                    </SelectItem>
+                                    <SelectItem value="chemical_spill">
+                                        Chemical Spill
+                                    </SelectItem>
+                                    <SelectItem value="medical_emergency">
+                                        Medical Emergency
+                                    </SelectItem>
                                     <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="scheduled">Scheduled</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    <SelectItem value="scheduled">
+                                        Scheduled
+                                    </SelectItem>
+                                    <SelectItem value="in_progress">
+                                        In Progress
+                                    </SelectItem>
+                                    <SelectItem value="completed">
+                                        Completed
+                                    </SelectItem>
+                                    <SelectItem value="cancelled">
+                                        Cancelled
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -241,35 +314,75 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="pb-2 pr-4 font-medium">Site</th>
-                                        <th className="pb-2 pr-4 font-medium">Type</th>
-                                        <th className="pb-2 pr-4 font-medium">Date</th>
-                                        <th className="pb-2 pr-4 font-medium">Duration</th>
-                                        <th className="pb-2 pr-4 font-medium">Outcome</th>
-                                        <th className="pb-2 pr-4 font-medium">Participants</th>
-                                        <th className="pb-2 pr-4 font-medium">Findings</th>
-                                        <th className="pb-2 pr-4 font-medium">Status</th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Site
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Type
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Date
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Duration
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Outcome
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Participants
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Findings
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Status
+                                        </th>
                                         <th className="pb-2 font-medium"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {drills.data.map((drill) => (
-                                        <tr key={drill.id} className="border-b last:border-0">
-                                            <td className="py-2 pr-4">{drill.site?.name ?? '-'}</td>
+                                        <tr
+                                            key={drill.id}
+                                            className="border-b last:border-0"
+                                        >
+                                            <td className="py-2 pr-4">
+                                                {drill.site?.name ?? '-'}
+                                            </td>
                                             <td className="py-2 pr-4 capitalize">
-                                                {drill.drill_type.replace(/_/g, ' ')}
+                                                {drill.drill_type.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
                                             </td>
                                             <td className="py-2 pr-4">
-                                                {new Date(drill.scheduled_at).toLocaleDateString('en-GB')}
+                                                {new Date(
+                                                    drill.scheduled_at,
+                                                ).toLocaleDateString('en-GB')}
                                             </td>
                                             <td className="py-2 pr-4">
-                                                {drill.duration_minutes ? `${drill.duration_minutes} min` : '-'}
+                                                {drill.duration_minutes
+                                                    ? `${drill.duration_minutes} min`
+                                                    : '-'}
                                             </td>
-                                            <td className="py-2 pr-4 capitalize">{drill.outcome ?? '-'}</td>
-                                            <td className="py-2 pr-4">{drill.participants_count}</td>
-                                            <td className="py-2 pr-4">{drill.findings_count}</td>
+                                            <td className="py-2 pr-4 capitalize">
+                                                {drill.outcome ?? '-'}
+                                            </td>
                                             <td className="py-2 pr-4">
-                                                <Badge className={statusColor(drill.status)}>{drill.status}</Badge>
+                                                {drill.participants_count}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {drill.findings_count}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                <Badge
+                                                    className={statusColor(
+                                                        drill.status,
+                                                    )}
+                                                >
+                                                    {drill.status}
+                                                </Badge>
                                             </td>
                                             <td className="py-2">
                                                 <Link
@@ -296,11 +409,24 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                 {drills?.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {drills.links.map((l) => (
-                            <button
+                            <Button
+                                type="button"
                                 key={l.label}
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
+                                className="text-xs"
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

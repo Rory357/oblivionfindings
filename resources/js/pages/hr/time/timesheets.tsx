@@ -1,17 +1,5 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import PageShell from '@/components/page-shell';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -22,6 +10,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -30,12 +21,21 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { FileText, CheckCircle2, XCircle, Send, ClipboardList } from 'lucide-react';
-import { useState } from 'react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import { CheckCircle2, ClipboardList, Send, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
 interface Timesheet {
     id: number;
@@ -76,38 +76,69 @@ const breadcrumbs = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
-    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
-    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
-    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
+    draft: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        label: 'Draft',
+    },
+    submitted: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Submitted',
+    },
+    approved: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Approved',
+    },
+    rejected: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Rejected',
+    },
 };
 
 function formatDate(dateStr: string): string {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return d.toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    });
 }
 
 function formatDateTime(dateStr: string | null): string {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
     const [rejectId, setRejectId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [processing, setProcessing] = useState<number | null>(null);
-    const [confirmApproveId, setConfirmApproveId] = useState<number | null>(null);
+    const [confirmApproveId, setConfirmApproveId] = useState<number | null>(
+        null,
+    );
 
     function updateFilter(key: string, value: string | null) {
         const newFilters = { ...filters, [key]: value };
         if (value === null || value === 'all') {
             delete newFilters[key as keyof typeof newFilters];
         }
-        router.get('/hr/time/timesheets', newFilters, { preserveState: true, replace: true });
+        router.get('/hr/time/timesheets', newFilters, {
+            preserveState: true,
+            replace: true,
+        });
     }
 
     const { run: runUndoable } = useUndoableAction();
@@ -121,10 +152,14 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
             message: 'Timesheet sending…',
             durationMs: 5000,
             onCommit: () => {
-                router.post(`/hr/time/timesheets/${id}/submit`, {}, {
-                    preserveScroll: true,
-                    onFinish: () => setProcessing(null),
-                });
+                router.post(
+                    `/hr/time/timesheets/${id}/submit`,
+                    {},
+                    {
+                        preserveScroll: true,
+                        onFinish: () => setProcessing(null),
+                    },
+                );
             },
             onUndo: () => {
                 setProcessing(null);
@@ -136,23 +171,31 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
     function handleApprove(id: number) {
         setProcessing(id);
         setConfirmApproveId(null);
-        router.post(`/hr/time/timesheets/${id}/approve`, {}, {
-            preserveScroll: true,
-            onFinish: () => setProcessing(null),
-        });
+        router.post(
+            `/hr/time/timesheets/${id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setProcessing(null),
+            },
+        );
     }
 
     function handleReject(id: number) {
         if (!rejectReason.trim()) return;
         setProcessing(id);
-        router.post(`/hr/time/timesheets/${id}/reject`, { rejection_reason: rejectReason }, {
-            preserveScroll: true,
-            onFinish: () => setProcessing(null),
-            onSuccess: () => {
-                setRejectId(null);
-                setRejectReason('');
+        router.post(
+            `/hr/time/timesheets/${id}/reject`,
+            { rejection_reason: rejectReason },
+            {
+                preserveScroll: true,
+                onFinish: () => setProcessing(null),
+                onSuccess: () => {
+                    setRejectId(null);
+                    setRejectReason('');
+                },
             },
-        });
+        );
     }
 
     return (
@@ -168,10 +211,12 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                 />
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
+                <Card className="flex flex-wrap items-center gap-2 p-3">
                     <Select
                         value={filters.status ?? 'all'}
-                        onValueChange={(v) => updateFilter('status', v === 'all' ? null : v)}
+                        onValueChange={(v) =>
+                            updateFilter('status', v === 'all' ? null : v)
+                        }
                     >
                         <SelectTrigger className="w-[140px]">
                             <SelectValue placeholder="All Statuses" />
@@ -187,11 +232,17 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => router.get('/hr/time/timesheets', {}, { preserveState: true })}
+                        onClick={() =>
+                            router.get(
+                                '/hr/time/timesheets',
+                                {},
+                                { preserveState: true },
+                            )
+                        }
                     >
                         Clear
                     </Button>
-                </div>
+                </Card>
 
                 {/* Timesheets Table */}
                 <Card>
@@ -204,7 +255,9 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
                                     <ClipboardList className="h-8 w-8 opacity-40" />
                                 </div>
-                                <p className="text-base font-medium">No timesheets found</p>
+                                <p className="text-base font-medium">
+                                    No timesheets found
+                                </p>
                                 <p className="mt-1 text-sm">
                                     {filters.status
                                         ? `There are no timesheets with "${statusConfig[filters.status]?.label ?? filters.status}" status. Try clearing your filters.`
@@ -216,74 +269,150 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-muted/5">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-medium">Staff</th>
-                                            <th className="px-4 py-3 text-left font-medium">Period</th>
-                                            <th className="px-4 py-3 text-right font-medium">Hours</th>
-                                            <th className="px-4 py-3 text-left font-medium">Status</th>
-                                            <th className="px-4 py-3 text-left font-medium">Submitted</th>
-                                            <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Staff
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Period
+                                            </th>
+                                            <th className="px-4 py-3 text-right font-medium">
+                                                Hours
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Status
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Submitted
+                                            </th>
+                                            <th className="px-4 py-3 text-right font-medium">
+                                                Actions
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {timesheets.data.map((ts) => {
-                                            const config = statusConfig[ts.status] || statusConfig.draft;
+                                            const config =
+                                                statusConfig[ts.status] ||
+                                                statusConfig.draft;
                                             return (
-                                                <tr key={ts.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                                    <td className="px-4 py-3 font-medium">{ts.user_name}</td>
-                                                    <td className="px-4 py-3 text-muted-foreground">
-                                                        {formatDate(ts.period_start)} &ndash; {formatDate(ts.period_end)}
+                                                <tr
+                                                    key={ts.id}
+                                                    className="border-b last:border-b-0 hover:bg-muted/50"
+                                                >
+                                                    <td className="px-4 py-3 font-medium">
+                                                        {ts.user_name}
                                                     </td>
-                                                    <td className="px-4 py-3 text-right font-medium">{ts.total_hours}h</td>
+                                                    <td className="px-4 py-3 text-muted-foreground">
+                                                        {formatDate(
+                                                            ts.period_start,
+                                                        )}{' '}
+                                                        &ndash;{' '}
+                                                        {formatDate(
+                                                            ts.period_end,
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-medium">
+                                                        {ts.total_hours}h
+                                                    </td>
                                                     <td className="px-4 py-3">
-                                                        <Badge variant="outline" className={config.className}>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                config.className
+                                                            }
+                                                        >
                                                             {config.label}
                                                         </Badge>
                                                     </td>
                                                     <td className="px-4 py-3 text-muted-foreground">
-                                                        {formatDateTime(ts.submitted_at)}
+                                                        {formatDateTime(
+                                                            ts.submitted_at,
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-2">
-                                                            {ts.status === 'draft' && (
+                                                            {ts.status ===
+                                                                'draft' && (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    disabled={processing === ts.id}
-                                                                    onClick={() => handleSubmit(ts.id)}
+                                                                    disabled={
+                                                                        processing ===
+                                                                        ts.id
+                                                                    }
+                                                                    onClick={() =>
+                                                                        handleSubmit(
+                                                                            ts.id,
+                                                                        )
+                                                                    }
                                                                 >
                                                                     <Send className="mr-1 h-3 w-3" />
-                                                                    {processing === ts.id ? 'Submitting...' : 'Submit'}
+                                                                    {processing ===
+                                                                    ts.id
+                                                                        ? 'Submitting...'
+                                                                        : 'Submit'}
                                                                 </Button>
                                                             )}
-                                                            {can.approve && ts.status === 'submitted' && (
-                                                                <>
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="border-status-success/30 text-status-success hover:bg-status-success"
-                                                                        disabled={processing === ts.id}
-                                                                        onClick={() => setConfirmApproveId(ts.id)}
+                                                            {can.approve &&
+                                                                ts.status ===
+                                                                    'submitted' && (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="border-status-success/30 text-status-success hover:bg-status-success"
+                                                                            disabled={
+                                                                                processing ===
+                                                                                ts.id
+                                                                            }
+                                                                            onClick={() =>
+                                                                                setConfirmApproveId(
+                                                                                    ts.id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                                                                            {processing ===
+                                                                            ts.id
+                                                                                ? 'Approving...'
+                                                                                : 'Approve'}
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="border-status-critical/30 text-status-critical hover:bg-status-critical"
+                                                                            disabled={
+                                                                                processing ===
+                                                                                ts.id
+                                                                            }
+                                                                            onClick={() =>
+                                                                                setRejectId(
+                                                                                    ts.id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <XCircle className="mr-1 h-3 w-3" />
+                                                                            Reject
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                            {ts.rejection_reason &&
+                                                                ts.status ===
+                                                                    'rejected' && (
+                                                                    <span
+                                                                        className="text-xs text-status-critical"
+                                                                        title={
+                                                                            ts.rejection_reason
+                                                                        }
                                                                     >
-                                                                        <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                                        {processing === ts.id ? 'Approving...' : 'Approve'}
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="border-status-critical/30 text-status-critical hover:bg-status-critical"
-                                                                        disabled={processing === ts.id}
-                                                                        onClick={() => setRejectId(ts.id)}
-                                                                    >
-                                                                        <XCircle className="mr-1 h-3 w-3" />
-                                                                        Reject
-                                                                    </Button>
-                                                                </>
-                                                            )}
-                                                            {ts.rejection_reason && ts.status === 'rejected' && (
-                                                                <span className="text-xs text-status-critical" title={ts.rejection_reason}>
-                                                                    Reason: {ts.rejection_reason.slice(0, 30)}...
-                                                                </span>
-                                                            )}
+                                                                        Reason:{' '}
+                                                                        {ts.rejection_reason.slice(
+                                                                            0,
+                                                                            30,
+                                                                        )}
+                                                                        ...
+                                                                    </span>
+                                                                )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -300,26 +429,45 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                 {timesheets.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(timesheets.current_page - 1) * timesheets.per_page + 1} to{' '}
-                            {Math.min(timesheets.current_page * timesheets.per_page, timesheets.total)} of{' '}
-                            {timesheets.total} timesheets
+                            Showing{' '}
+                            {(timesheets.current_page - 1) *
+                                timesheets.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                timesheets.current_page * timesheets.per_page,
+                                timesheets.total,
+                            )}{' '}
+                            of {timesheets.total} timesheets
                         </p>
                         <LaravelPagination links={timesheets.links} />
                     </div>
                 )}
                 {/* Approve Confirmation Dialog */}
-                <AlertDialog open={confirmApproveId !== null} onOpenChange={(open) => { if (!open) setConfirmApproveId(null); }}>
+                <AlertDialog
+                    open={confirmApproveId !== null}
+                    onOpenChange={(open) => {
+                        if (!open) setConfirmApproveId(null);
+                    }}
+                >
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Approve Timesheet</AlertDialogTitle>
+                            <AlertDialogTitle>
+                                Approve Timesheet
+                            </AlertDialogTitle>
                             <AlertDialogDescription>
-                                Are you sure you want to approve this timesheet? This will mark the hours as finalised and they may be forwarded to payroll.
+                                Are you sure you want to approve this timesheet?
+                                This will mark the hours as finalised and they
+                                may be forwarded to payroll.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
-                                onClick={() => confirmApproveId && handleApprove(confirmApproveId)}
+                                onClick={() =>
+                                    confirmApproveId &&
+                                    handleApprove(confirmApproveId)
+                                }
                                 className="bg-status-success hover:bg-status-success"
                             >
                                 Yes, Approve
@@ -329,13 +477,25 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                 </AlertDialog>
 
                 {/* Reject Dialog */}
-                <Dialog open={rejectId !== null} onOpenChange={(open) => { if (!open) { setRejectId(null); setRejectReason(''); } }}>
+                <Dialog
+                    open={rejectId !== null}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setRejectId(null);
+                            setRejectReason('');
+                        }
+                    }}
+                >
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Reject Timesheet</DialogTitle>
                             <DialogDescription>
                                 {(() => {
-                                    const ts = rejectId ? timesheets.data.find((t) => t.id === rejectId) : null;
+                                    const ts = rejectId
+                                        ? timesheets.data.find(
+                                              (t) => t.id === rejectId,
+                                          )
+                                        : null;
                                     return ts
                                         ? `${ts.user_name} — ${formatDate(ts.period_start)} to ${formatDate(ts.period_end)} (${ts.total_hours}h)`
                                         : 'Provide a reason for rejecting this timesheet.';
@@ -347,18 +507,35 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                             <Textarea
                                 rows={3}
                                 value={rejectReason}
-                                onChange={(e) => setRejectReason(e.target.value)}
+                                onChange={(e) =>
+                                    setRejectReason(e.target.value)
+                                }
                                 placeholder="Explain why this timesheet is being rejected"
                             />
                         </div>
                         <DialogFooter>
-                            <Button variant="ghost" onClick={() => { setRejectId(null); setRejectReason(''); }}>Cancel</Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    setRejectId(null);
+                                    setRejectReason('');
+                                }}
+                            >
+                                Cancel
+                            </Button>
                             <Button
                                 variant="destructive"
-                                disabled={!rejectReason.trim() || processing === rejectId}
-                                onClick={() => rejectId && handleReject(rejectId)}
+                                disabled={
+                                    !rejectReason.trim() ||
+                                    processing === rejectId
+                                }
+                                onClick={() =>
+                                    rejectId && handleReject(rejectId)
+                                }
                             >
-                                {processing === rejectId ? 'Rejecting...' : 'Reject'}
+                                {processing === rejectId
+                                    ? 'Rejecting...'
+                                    : 'Reject'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

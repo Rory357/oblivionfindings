@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { Button } from '@/components/ui/button';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -97,10 +98,9 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                             </div>
                         </div>
 
-                        <button
+                        <Button
                             onClick={save}
                             disabled={status === 'saving'}
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary disabled:opacity-60"
                             type="button"
                         >
                             {status === 'saving'
@@ -108,7 +108,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                                 : status === 'saved'
                                   ? 'Saved ✅'
                                   : 'Save'}
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="mt-4 divide-y">

@@ -1,7 +1,9 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -23,9 +25,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency, formatDateTime } from '@/lib/fleet-utils';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Fuel, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface FuelLog {
@@ -84,8 +85,14 @@ export default function FleetFuelIndex({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedVehicle) return;
-        if (!form.data.quantity_litres || parseFloat(form.data.quantity_litres) <= 0) {
-            form.setError('quantity_litres', 'Quantity must be greater than 0.');
+        if (
+            !form.data.quantity_litres ||
+            parseFloat(form.data.quantity_litres) <= 0
+        ) {
+            form.setError(
+                'quantity_litres',
+                'Quantity must be greater than 0.',
+            );
             return;
         }
         if (!form.data.total_cost || parseFloat(form.data.total_cost) <= 0) {
@@ -185,7 +192,9 @@ export default function FleetFuelIndex({
                                                     <Label>Date/Time</Label>
                                                     <Input
                                                         type="datetime-local"
-                                                        value={form.data.logged_at}
+                                                        value={
+                                                            form.data.logged_at
+                                                        }
                                                         onChange={(e) =>
                                                             form.setData(
                                                                 'logged_at',
@@ -197,7 +206,9 @@ export default function FleetFuelIndex({
                                                 <div>
                                                     <Label>Fuel Type</Label>
                                                     <Select
-                                                        value={form.data.fuel_type}
+                                                        value={
+                                                            form.data.fuel_type
+                                                        }
                                                         onValueChange={(v) =>
                                                             form.setData(
                                                                 'fuel_type',
@@ -250,11 +261,15 @@ export default function FleetFuelIndex({
                                                     />
                                                 </div>
                                                 <div>
-                                                    <Label>Total Cost ($)</Label>
+                                                    <Label>
+                                                        Total Cost ($)
+                                                    </Label>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
-                                                        value={form.data.total_cost}
+                                                        value={
+                                                            form.data.total_cost
+                                                        }
                                                         onChange={(e) =>
                                                             form.setData(
                                                                 'total_cost',
@@ -271,7 +286,8 @@ export default function FleetFuelIndex({
                                                     <Input
                                                         type="number"
                                                         value={
-                                                            form.data.odometer_km
+                                                            form.data
+                                                                .odometer_km
                                                         }
                                                         onChange={(e) =>
                                                             form.setData(
@@ -287,7 +303,8 @@ export default function FleetFuelIndex({
                                                     <Input
                                                         type="text"
                                                         value={
-                                                            form.data.station_name
+                                                            form.data
+                                                                .station_name
                                                         }
                                                         onChange={(e) =>
                                                             form.setData(
@@ -303,7 +320,9 @@ export default function FleetFuelIndex({
                                                 <input
                                                     type="checkbox"
                                                     id="full_tank"
-                                                    checked={form.data.full_tank}
+                                                    checked={
+                                                        form.data.full_tank
+                                                    }
                                                     onChange={(e) =>
                                                         form.setData(
                                                             'full_tank',
@@ -356,45 +375,47 @@ export default function FleetFuelIndex({
 
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-lg border bg-card p-3">
+                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
                         <div className="text-xs text-muted-foreground">
                             Total Fill-ups
                         </div>
                         <div className="mt-1 text-2xl font-bold">
                             {stats.total_logs}
                         </div>
-                    </div>
-                    <div className="rounded-lg border bg-card p-3">
+                    </Card>
+                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
                         <div className="text-xs text-muted-foreground">
                             Total Litres
                         </div>
                         <div className="mt-1 text-2xl font-bold">
                             {stats.total_litres.toLocaleString()}L
                         </div>
-                    </div>
-                    <div className="rounded-lg border bg-card p-3">
+                    </Card>
+                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
                         <div className="text-xs text-muted-foreground">
                             Total Cost
                         </div>
                         <div className="mt-1 text-2xl font-bold">
                             {formatCurrency(stats.total_cost)}
                         </div>
-                    </div>
-                    <div className="rounded-lg border bg-card p-3">
+                    </Card>
+                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
                         <div className="text-xs text-muted-foreground">
                             Avg $/Litre
                         </div>
                         <div className="mt-1 text-2xl font-bold">
                             ${stats.avg_cost_per_litre.toFixed(2)}
                         </div>
-                    </div>
+                    </Card>
                 </div>
 
                 {/* Filters */}
                 <div className="mt-4 flex flex-wrap gap-3">
                     <Select
                         value={filters.asset_id || 'all'}
-                        onValueChange={(v) => applyFilter('asset_id', v === 'all' ? '' : v)}
+                        onValueChange={(v) =>
+                            applyFilter('asset_id', v === 'all' ? '' : v)
+                        }
                     >
                         <SelectTrigger className="w-40">
                             <SelectValue placeholder="All Vehicles" />
@@ -492,7 +513,9 @@ export default function FleetFuelIndex({
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() =>
-                                                            setDeletingFuelId(log.id)
+                                                            setDeletingFuelId(
+                                                                log.id,
+                                                            )
                                                         }
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />

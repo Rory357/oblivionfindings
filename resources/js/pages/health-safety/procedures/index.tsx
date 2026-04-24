@@ -1,15 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
-import { FileText, Plus, ClipboardCheck, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { FileText, Plus } from 'lucide-react';
 
 type Props = {
     procedures: {
@@ -50,22 +54,33 @@ const STATUSES = [
 
 function categoryBadge(cat: string) {
     switch (cat) {
-        case 'fire_safety': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'chemical_handling': return 'bg-primary/10 text-primary border-primary';
-        case 'manual_handling': return 'bg-status-info-bg text-status-info border-status-info/30';
-        case 'infection_control': return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'emergency_procedures': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        default: return 'bg-muted text-foreground border-border';
+        case 'fire_safety':
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'chemical_handling':
+            return 'bg-primary/10 text-primary border-primary';
+        case 'manual_handling':
+            return 'bg-status-info-bg text-status-info border-status-info/30';
+        case 'infection_control':
+            return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'emergency_procedures':
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        default:
+            return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusBadge(status: string) {
     switch (status) {
-        case 'approved': return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'draft': return 'bg-muted text-foreground border-border';
-        case 'under_review': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'archived': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        default: return 'bg-muted text-foreground border-border';
+        case 'approved':
+            return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'draft':
+            return 'bg-muted text-foreground border-border';
+        case 'under_review':
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'archived':
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        default:
+            return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -74,11 +89,23 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
     const currentFilters = filters ?? { category: null, status: null };
 
     const onFilter = (next: Partial<typeof currentFilters>) => {
-        router.get('/health-safety/procedures', { ...currentFilters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/health-safety/procedures',
+            { ...currentFilters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Safe Work Procedures', href: '/health-safety/procedures' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Health & Safety', href: '/health-safety' },
+                {
+                    title: 'Safe Work Procedures',
+                    href: '/health-safety/procedures',
+                },
+            ]}
+        >
             <Head title="Safe Work Procedures" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -90,7 +117,10 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                     stats={[
                         { label: 'Total', value: stats.total },
                         { label: 'Approved', value: stats.approved },
-                        { label: 'Due for Review', value: stats.due_for_review },
+                        {
+                            label: 'Due for Review',
+                            value: stats.due_for_review,
+                        },
                     ]}
                     actions={
                         <Link href="/health-safety/procedures/create">
@@ -109,31 +139,53 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Category</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Category
+                            </Label>
                             <Select
                                 value={currentFilters.category ?? ANY}
-                                onValueChange={(v) => onFilter({ category: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ category: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Category" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     {CATEGORIES.map((c) => (
-                                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                        <SelectItem
+                                            key={c.value}
+                                            value={c.value}
+                                        >
+                                            {c.label}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={currentFilters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     {STATUSES.map((s) => (
-                                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                        <SelectItem
+                                            key={s.value}
+                                            value={s.value}
+                                        >
+                                            {s.label}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -148,42 +200,97 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="pb-2 font-medium">Reference</th>
-                                        <th className="pb-2 font-medium">Title</th>
-                                        <th className="pb-2 font-medium">Category</th>
-                                        <th className="pb-2 font-medium">Status</th>
-                                        <th className="pb-2 font-medium">Version</th>
-                                        <th className="pb-2 font-medium">Approved By</th>
-                                        <th className="pb-2 font-medium">Review Date</th>
-                                        <th className="pb-2 font-medium">Actions</th>
+                                        <th className="pb-2 font-medium">
+                                            Reference
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Title
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Category
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Version
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Approved By
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Review Date
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {procedures.data.map((p: any) => {
-                                        const reviewOverdue = p.review_date && new Date(p.review_date) < new Date();
+                                        const reviewOverdue =
+                                            p.review_date &&
+                                            new Date(p.review_date) <
+                                                new Date();
                                         return (
-                                            <tr key={p.id} className="border-b last:border-0">
-                                                <td className="py-2 font-mono text-xs">{p.reference_number ?? '-'}</td>
-                                                <td className="py-2 font-medium">{p.title}</td>
+                                            <tr
+                                                key={p.id}
+                                                className="border-b last:border-0"
+                                            >
+                                                <td className="py-2 font-mono text-xs">
+                                                    {p.reference_number ?? '-'}
+                                                </td>
+                                                <td className="py-2 font-medium">
+                                                    {p.title}
+                                                </td>
                                                 <td className="py-2">
-                                                    <Badge className={categoryBadge(p.category)}>
-                                                        {p.category?.replace(/_/g, ' ')}
+                                                    <Badge
+                                                        className={categoryBadge(
+                                                            p.category,
+                                                        )}
+                                                    >
+                                                        {p.category?.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
                                                 </td>
                                                 <td className="py-2">
-                                                    <Badge className={statusBadge(p.status)}>
-                                                        {p.status?.replace(/_/g, ' ')}
+                                                    <Badge
+                                                        className={statusBadge(
+                                                            p.status,
+                                                        )}
+                                                    >
+                                                        {p.status?.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
                                                 </td>
-                                                <td className="py-2">{p.version ?? 1}</td>
-                                                <td className="py-2">{p.approved_by?.name ?? '-'}</td>
                                                 <td className="py-2">
-                                                    <span className={reviewOverdue ? 'font-semibold text-status-critical' : ''}>
-                                                        {formatDate(p.review_date)}
+                                                    {p.version ?? 1}
+                                                </td>
+                                                <td className="py-2">
+                                                    {p.approved_by?.name ?? '-'}
+                                                </td>
+                                                <td className="py-2">
+                                                    <span
+                                                        className={
+                                                            reviewOverdue
+                                                                ? 'font-semibold text-status-critical'
+                                                                : ''
+                                                        }
+                                                    >
+                                                        {formatDate(
+                                                            p.review_date,
+                                                        )}
                                                     </span>
                                                 </td>
                                                 <td className="py-2">
-                                                    <Link href={`/health-safety/procedures/${p.id}`} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted">
+                                                    <Link
+                                                        href={`/health-safety/procedures/${p.id}`}
+                                                        className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                                                    >
                                                         View
                                                     </Link>
                                                 </td>
@@ -192,7 +299,12 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                                     })}
                                     {!procedures.data.length && (
                                         <tr>
-                                            <td colSpan={8} className="py-8 text-center text-muted-foreground">No procedures found.</td>
+                                            <td
+                                                colSpan={8}
+                                                className="py-8 text-center text-muted-foreground"
+                                            >
+                                                No procedures found.
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -205,11 +317,24 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                 {procedures.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {procedures.links.map((l: any) => (
-                            <button
+                            <Button
+                                type="button"
                                 key={l.label}
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
+                                className="text-xs"
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

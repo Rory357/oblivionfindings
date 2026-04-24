@@ -1,18 +1,28 @@
-import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { type BreadcrumbItem } from '@/types';
-import { ChevronDown, Target } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { Progress } from '@/components/ui/progress';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, useForm } from '@inertiajs/react';
+import { ChevronDown, Target } from 'lucide-react';
+import { useState } from 'react';
 
 interface Goal {
     id: number;
@@ -22,7 +32,12 @@ interface Goal {
     competency_area: string | null;
     target_level: number | null;
     current_level: number | null;
-    status: 'not_started' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+    status:
+        | 'not_started'
+        | 'in_progress'
+        | 'blocked'
+        | 'completed'
+        | 'cancelled';
     progress_percent: number;
     start_date: string | null;
     due_date: string | null;
@@ -47,11 +62,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    not_started: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Not Started' },
-    in_progress: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'In Progress' },
-    blocked: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Blocked' },
-    completed: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Completed' },
-    cancelled: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Cancelled' },
+    not_started: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        label: 'Not Started',
+    },
+    in_progress: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'In Progress',
+    },
+    blocked: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Blocked',
+    },
+    completed: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Completed',
+    },
+    cancelled: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        label: 'Cancelled',
+    },
 };
 
 const categoryConfig: Record<string, string> = {
@@ -73,7 +107,8 @@ function GoalCard({ goal }: { goal: Goal }) {
 
     const sc = statusConfig[goal.status] || statusConfig.not_started;
     const isActive = !['completed', 'cancelled'].includes(goal.status);
-    const isOverdue = isActive && goal.due_date && new Date(goal.due_date) < new Date();
+    const isOverdue =
+        isActive && goal.due_date && new Date(goal.due_date) < new Date();
 
     const handleSave = () => {
         form.put(`/hr/my/goals/${goal.id}`, {
@@ -90,26 +125,51 @@ function GoalCard({ goal }: { goal: Goal }) {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <Target className="h-4 w-4 text-muted-foreground" />
-                                <CardTitle className="text-base">{goal.title}</CardTitle>
-                                <Badge variant="outline" className={sc.className}>{sc.label}</Badge>
-                                <Badge variant="outline" className={categoryConfig[goal.category] || 'bg-muted text-foreground'}>
+                                <CardTitle className="text-base">
+                                    {goal.title}
+                                </CardTitle>
+                                <Badge
+                                    variant="outline"
+                                    className={sc.className}
+                                >
+                                    {sc.label}
+                                </Badge>
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        categoryConfig[goal.category] ||
+                                        'bg-muted text-foreground'
+                                    }
+                                >
                                     {goal.category}
                                 </Badge>
                                 {isOverdue && (
-                                    <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                                    <Badge
+                                        variant="destructive"
+                                        className="text-xs"
+                                    >
+                                        Overdue
+                                    </Badge>
                                 )}
                             </div>
                             <div className="flex items-center gap-3">
-                                <span className="text-sm text-muted-foreground">{goal.progress_percent}%</span>
+                                <span className="text-sm text-muted-foreground">
+                                    {goal.progress_percent}%
+                                </span>
                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             </div>
                         </div>
                         <div className="mt-2 px-0">
-                            <Progress value={goal.progress_percent} className="h-2" />
+                            <Progress
+                                value={goal.progress_percent}
+                                className="h-2"
+                            />
                         </div>
-                        <div className="flex gap-4 text-sm text-muted-foreground mt-2">
+                        <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
                             {goal.due_date && <span>Due: {goal.due_date}</span>}
-                            {goal.manager && <span>Manager: {goal.manager.name}</span>}
+                            {goal.manager && (
+                                <span>Manager: {goal.manager.name}</span>
+                            )}
                         </div>
                     </CardHeader>
                 </CollapsibleTrigger>
@@ -117,44 +177,75 @@ function GoalCard({ goal }: { goal: Goal }) {
                     <CardContent className="space-y-4 pt-0">
                         {goal.description && (
                             <div>
-                                <Label className="text-sm font-medium">Description</Label>
-                                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{goal.description}</p>
+                                <Label className="text-sm font-medium">
+                                    Description
+                                </Label>
+                                <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
+                                    {goal.description}
+                                </p>
                             </div>
                         )}
 
                         {goal.competency_area && (
                             <div className="flex gap-4 text-sm">
-                                <span className="text-muted-foreground">Competency: {goal.competency_area}</span>
-                                {goal.target_level && <span className="text-muted-foreground">Target Level: {goal.target_level}</span>}
-                                {goal.current_level && <span className="text-muted-foreground">Current Level: {goal.current_level}</span>}
+                                <span className="text-muted-foreground">
+                                    Competency: {goal.competency_area}
+                                </span>
+                                {goal.target_level && (
+                                    <span className="text-muted-foreground">
+                                        Target Level: {goal.target_level}
+                                    </span>
+                                )}
+                                {goal.current_level && (
+                                    <span className="text-muted-foreground">
+                                        Current Level: {goal.current_level}
+                                    </span>
+                                )}
                             </div>
                         )}
 
                         {goal.start_date && (
-                            <div className="text-sm text-muted-foreground">Started: {goal.start_date}</div>
+                            <div className="text-sm text-muted-foreground">
+                                Started: {goal.start_date}
+                            </div>
                         )}
 
                         {goal.completed_at && (
-                            <div className="text-sm text-muted-foreground">Completed: {goal.completed_at}</div>
+                            <div className="text-sm text-muted-foreground">
+                                Completed: {goal.completed_at}
+                            </div>
                         )}
 
                         {editing ? (
-                            <div className="border-t pt-4 space-y-4">
+                            <div className="space-y-4 border-t pt-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <Label>Status</Label>
                                         <Select
                                             value={form.data.status}
-                                            onValueChange={(val) => form.setData('status', val as Goal['status'])}
+                                            onValueChange={(val) =>
+                                                form.setData(
+                                                    'status',
+                                                    val as Goal['status'],
+                                                )
+                                            }
                                         >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="not_started">Not Started</SelectItem>
-                                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                                <SelectItem value="blocked">Blocked</SelectItem>
-                                                <SelectItem value="completed">Completed</SelectItem>
+                                                <SelectItem value="not_started">
+                                                    Not Started
+                                                </SelectItem>
+                                                <SelectItem value="in_progress">
+                                                    In Progress
+                                                </SelectItem>
+                                                <SelectItem value="blocked">
+                                                    Blocked
+                                                </SelectItem>
+                                                <SelectItem value="completed">
+                                                    Completed
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -165,7 +256,13 @@ function GoalCard({ goal }: { goal: Goal }) {
                                             min={0}
                                             max={100}
                                             value={form.data.progress_percent}
-                                            onChange={(e) => form.setData('progress_percent', parseInt(e.target.value) || 0)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'progress_percent',
+                                                    parseInt(e.target.value) ||
+                                                        0,
+                                                )
+                                            }
                                         />
                                     </div>
                                 </div>
@@ -177,7 +274,12 @@ function GoalCard({ goal }: { goal: Goal }) {
                                             min={1}
                                             max={5}
                                             value={form.data.current_level}
-                                            onChange={(e) => form.setData('current_level', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'current_level',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                 )}
@@ -185,24 +287,48 @@ function GoalCard({ goal }: { goal: Goal }) {
                                     <Label>Review Notes</Label>
                                     <Textarea
                                         value={form.data.review_notes}
-                                        onChange={(e) => form.setData('review_notes', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'review_notes',
+                                                e.target.value,
+                                            )
+                                        }
                                         className="min-h-[80px]"
                                         placeholder="Add your notes on progress..."
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button size="sm" onClick={handleSave} disabled={form.processing}>Save</Button>
-                                    <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSave}
+                                        disabled={form.processing}
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setEditing(false)}
+                                    >
+                                        Cancel
+                                    </Button>
                                 </div>
                             </div>
                         ) : (
                             <div className="border-t pt-4">
-                                <Label className="text-sm font-medium">Review Notes</Label>
-                                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                                <Label className="text-sm font-medium">
+                                    Review Notes
+                                </Label>
+                                <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
                                     {goal.review_notes || 'No notes yet.'}
                                 </p>
                                 {isActive && (
-                                    <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-2"
+                                        onClick={() => setEditing(true)}
+                                    >
                                         Update Progress
                                     </Button>
                                 )}

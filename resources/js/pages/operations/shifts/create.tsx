@@ -1,14 +1,15 @@
+import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
+import { EligibilityStatusBadge } from '@/components/eligibility/eligibility-status-badge';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
-import { EligibilityStatusBadge, deriveEligibilityStatus } from '@/components/eligibility/eligibility-status-badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Client = {
     id: number;
@@ -300,18 +301,30 @@ export default function ShiftCreate({
                     ends_at: endsAt,
                 });
 
-                const selectedClient = clients.find(c => String(c.id) === String(form.data.client_id));
-                if (selectedClient?.site_id) params.set('site_id', String(selectedClient.site_id));
-                if (form.data.shift_type) params.set('shift_type', form.data.shift_type);
+                const selectedClient = clients.find(
+                    (c) => String(c.id) === String(form.data.client_id),
+                );
+                if (selectedClient?.site_id)
+                    params.set('site_id', String(selectedClient.site_id));
+                if (form.data.shift_type)
+                    params.set('shift_type', form.data.shift_type);
                 if (form.data.coverage_roles?.length) {
-                    form.data.coverage_roles.forEach(r => params.append('coverage_roles[]', r));
+                    form.data.coverage_roles.forEach((r) =>
+                        params.append('coverage_roles[]', r),
+                    );
                 }
 
-                const res = await fetch(`/operations/shifts/eligibility-preview?${params}`, {
-                    signal: controller.signal,
-                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    credentials: 'same-origin',
-                });
+                const res = await fetch(
+                    `/operations/shifts/eligibility-preview?${params}`,
+                    {
+                        signal: controller.signal,
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                    },
+                );
                 if (!res.ok) throw new Error('preview failed');
                 const data = await res.json();
                 if (!controller.signal.aborted) setEligPreview(data);
@@ -321,7 +334,15 @@ export default function ShiftCreate({
                 if (!controller.signal.aborted) setEligLoading(false);
             }
         }, 500);
-    }, [form.data.user_id, form.data.starts_at, form.data.ends_at, form.data.shift_type, form.data.coverage_roles, form.data.client_id, clients]);
+    }, [
+        form.data.user_id,
+        form.data.starts_at,
+        form.data.ends_at,
+        form.data.shift_type,
+        form.data.coverage_roles,
+        form.data.client_id,
+        clients,
+    ]);
 
     useEffect(() => {
         fetchEligibility();
@@ -477,26 +498,29 @@ export default function ShiftCreate({
                                 </div>
                             ) : null}
                             {coverageContext?.fill_intent?.action ? (
-                                <div className="mt-3 rounded-md border border-status-critical/30 bg-white/70 p-3 text-xs">
-                                    <div className="font-medium text-status-critical">
-                                        Recommended setup
-                                    </div>
-                                    <div className="mt-1 text-status-critical">
-                                        {fillActionLabel(
-                                            coverageContext.fill_intent.action,
-                                        )}
-                                    </div>
-                                    <div className="mt-2">
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={applyRecommendedSetup}
-                                        >
-                                            Apply recommended setup
-                                        </Button>
-                                    </div>
-                                </div>
+                                <Card className="mt-3 border-status-critical/30 bg-white/70">
+                                    <CardContent className="p-3 text-xs">
+                                        <div className="font-medium text-status-critical">
+                                            Recommended setup
+                                        </div>
+                                        <div className="mt-1 text-status-critical">
+                                            {fillActionLabel(
+                                                coverageContext.fill_intent
+                                                    .action,
+                                            )}
+                                        </div>
+                                        <div className="mt-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={applyRecommendedSetup}
+                                            >
+                                                Apply recommended setup
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             ) : null}
                             {!coverageReservationToken ? (
                                 <div className="mt-2 text-xs font-medium text-status-critical">
@@ -625,22 +649,31 @@ export default function ShiftCreate({
                                     Checking eligibility...
                                 </div>
                             ) : null}
-                            {form.data.user_id && !eligLoading && eligPreview ? (
+                            {form.data.user_id &&
+                            !eligLoading &&
+                            eligPreview ? (
                                 <>
                                     {eligPreview.blocked_reasons?.length > 0 ? (
                                         <EligibilityAlertBanner
                                             type="blocked"
-                                            reasons={eligPreview.blocked_reasons}
+                                            reasons={
+                                                eligPreview.blocked_reasons
+                                            }
                                         />
-                                    ) : eligPreview.warning_reasons?.length > 0 ? (
+                                    ) : eligPreview.warning_reasons?.length >
+                                      0 ? (
                                         <EligibilityAlertBanner
                                             type="warnings"
-                                            reasons={eligPreview.warning_reasons}
+                                            reasons={
+                                                eligPreview.warning_reasons
+                                            }
                                         />
                                     ) : (
                                         <div className="flex items-center gap-2 text-xs text-status-success dark:text-status-success">
                                             <EligibilityStatusBadge status="eligible" />
-                                            <span>All eligibility checks passed.</span>
+                                            <span>
+                                                All eligibility checks passed.
+                                            </span>
                                         </div>
                                     )}
                                 </>
@@ -929,16 +962,24 @@ export default function ShiftCreate({
                                                     'sun',
                                                 ] as const
                                             ).map((d) => (
-                                                <button
+                                                <Button
                                                     type="button"
                                                     key={d}
+                                                    size="sm"
+                                                    variant={
+                                                        form.data.repeat_by_weekday.includes(
+                                                            d,
+                                                        )
+                                                            ? 'secondary'
+                                                            : 'outline'
+                                                    }
                                                     onClick={() =>
                                                         toggleWeekday(d)
                                                     }
-                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-muted text-white dark:bg-white dark:text-foreground' : ''}`}
+                                                    className="h-8 px-3 text-xs"
                                                 >
                                                     {d.toUpperCase()}
-                                                </button>
+                                                </Button>
                                             ))}
                                         </div>
                                     </div>

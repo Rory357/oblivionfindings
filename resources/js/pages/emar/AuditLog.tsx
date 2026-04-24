@@ -74,84 +74,101 @@ type Props = {
 
 const EVENT_CONFIG: Record<
     string,
-    { label: string; icon: React.ElementType; color: string; bg: string; badgeVariant: string }
+    {
+        label: string;
+        icon: React.ElementType;
+        color: string;
+        bg: string;
+        badgeVariant: string;
+    }
 > = {
     medication_started: {
         label: 'Medication Started',
         icon: Pill,
         color: 'text-status-success dark:text-status-success',
         bg: 'bg-status-success-bg dark:bg-status-success',
-        badgeVariant: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
+        badgeVariant:
+            'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
     medication_ceased: {
         label: 'Medication Ceased',
         icon: XCircle,
         color: 'text-status-critical dark:text-status-critical',
         bg: 'bg-status-critical-bg dark:bg-status-critical',
-        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+        badgeVariant:
+            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     medication_changed: {
         label: 'Medication Changed',
         icon: Edit,
         color: 'text-status-warning dark:text-status-warning',
         bg: 'bg-status-warning-bg dark:bg-status-warning',
-        badgeVariant: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+        badgeVariant:
+            'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
     dose_administered: {
         label: 'Dose Administered',
         icon: Check,
         color: 'text-status-info dark:text-status-info',
         bg: 'bg-status-info-bg dark:bg-status-info',
-        badgeVariant: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+        badgeVariant:
+            'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
     dose_refused: {
         label: 'Dose Refused',
         icon: XCircle,
         color: 'text-status-warning dark:text-status-warning',
         bg: 'bg-status-warning-bg dark:bg-status-warning',
-        badgeVariant: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+        badgeVariant:
+            'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
     dose_missed: {
         label: 'Dose Missed',
         icon: AlertTriangle,
         color: 'text-status-critical dark:text-status-critical',
         bg: 'bg-status-critical-bg dark:bg-status-critical',
-        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+        badgeVariant:
+            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     prescriber_order: {
         label: 'Prescriber Order',
         icon: FileText,
         color: 'text-primary dark:text-primary',
         bg: 'bg-primary/10 dark:bg-primary/40',
-        badgeVariant: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
+        badgeVariant:
+            'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
     },
     review_completed: {
         label: 'Review Completed',
         icon: ClipboardCheck,
         color: 'text-status-info dark:text-status-info',
         bg: 'bg-status-info-bg dark:bg-status-info',
-        badgeVariant: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+        badgeVariant:
+            'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
     stock_received: {
         label: 'Stock Received',
         icon: Package,
         color: 'text-status-success dark:text-status-success',
         bg: 'bg-status-success-bg dark:bg-status-success',
-        badgeVariant: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
+        badgeVariant:
+            'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
     destruction: {
         label: 'Medication Destroyed',
         icon: Trash2,
         color: 'text-status-critical dark:text-status-critical',
         bg: 'bg-status-critical-bg dark:bg-status-critical',
-        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+        badgeVariant:
+            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     error_reported: {
         label: 'Error Reported',
         icon: AlertOctagon,
         color: 'text-status-critical dark:text-status-critical',
         bg: 'bg-status-critical-bg dark:bg-status-critical',
-        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+        badgeVariant:
+            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
 };
 
@@ -162,8 +179,15 @@ const ALL_EVENT_TYPES = Object.keys(EVENT_CONFIG);
 function formatTimestamp(iso: string): { date: string; time: string } {
     const d = new Date(iso);
     return {
-        date: d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }),
-        time: d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }),
+        date: d.toLocaleDateString('en-NZ', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        }),
+        time: d.toLocaleTimeString('en-NZ', {
+            hour: '2-digit',
+            minute: '2-digit',
+        }),
     };
 }
 
@@ -171,7 +195,8 @@ function formatTimestamp(iso: string): { date: string; time: string } {
 
 function TimelineEntry({ event }: { event: AuditEvent }) {
     const [expanded, setExpanded] = useState(false);
-    const config = EVENT_CONFIG[event.event_type] ?? EVENT_CONFIG.medication_started;
+    const config =
+        EVENT_CONFIG[event.event_type] ?? EVENT_CONFIG.medication_started;
     const Icon = config.icon;
     const { date, time } = formatTimestamp(event.timestamp);
 
@@ -194,7 +219,9 @@ function TimelineEntry({ event }: { event: AuditEvent }) {
             {/* Content */}
             <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${config.badgeVariant}`}>
+                    <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${config.badgeVariant}`}
+                    >
                         {config.label}
                     </span>
                     <span className="text-xs text-muted-foreground">
@@ -211,10 +238,12 @@ function TimelineEntry({ event }: { event: AuditEvent }) {
                 )}
 
                 {detailEntries.length > 0 && (
-                    <button
+                    <Button
                         type="button"
+                        variant="link"
+                        size="sm"
                         onClick={() => setExpanded(!expanded)}
-                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        className="mt-1.5 h-auto gap-1 p-0 text-xs font-medium text-primary"
                     >
                         {expanded ? (
                             <>
@@ -225,7 +254,7 @@ function TimelineEntry({ event }: { event: AuditEvent }) {
                                 Show details <ChevronDown className="h-3 w-3" />
                             </>
                         )}
-                    </button>
+                    </Button>
                 )}
 
                 {expanded && detailEntries.length > 0 && (
@@ -233,7 +262,7 @@ function TimelineEntry({ event }: { event: AuditEvent }) {
                         <dl className="grid gap-1 text-xs sm:grid-cols-2">
                             {detailEntries.map(([key, val]) => (
                                 <div key={key}>
-                                    <dt className="font-medium capitalize text-muted-foreground">
+                                    <dt className="font-medium text-muted-foreground capitalize">
                                         {key.replace(/_/g, ' ')}
                                     </dt>
                                     <dd className="mt-0.5">{String(val)}</dd>
@@ -249,15 +278,31 @@ function TimelineEntry({ event }: { event: AuditEvent }) {
 
 // ─── Main Component ──────────────────────────────────────────────
 
-export default function AuditLog({ events, stats, hasMore, currentPage, clients, filters }: Props) {
+export default function AuditLog({
+    events,
+    stats,
+    hasMore,
+    currentPage,
+    clients,
+    filters,
+}: Props) {
     const [loading, setLoading] = useState(false);
-    const [selectedTypes, setSelectedTypes] = useState<string[]>(filters.event_types ?? []);
+    const [selectedTypes, setSelectedTypes] = useState<string[]>(
+        filters.event_types ?? [],
+    );
     const [clientId, setClientId] = useState<string>(filters.client_id ?? '');
     const [dateFrom, setDateFrom] = useState<string>(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState<string>(filters.date_to ?? '');
 
     const applyFilters = useCallback(
-        (overrides: Partial<{ client_id: string; date_from: string; date_to: string; event_types: string[] }> = {}) => {
+        (
+            overrides: Partial<{
+                client_id: string;
+                date_from: string;
+                date_to: string;
+                event_types: string[];
+            }> = {},
+        ) => {
             const params: Record<string, string> = {};
             const cid = overrides.client_id ?? clientId;
             const df = overrides.date_from ?? dateFrom;
@@ -269,18 +314,24 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
             if (dt) params.date_to = dt;
             if (et.length > 0) params.event_types = et.join(',');
 
-            router.get('/emar/audit', params, { preserveState: true, preserveScroll: true });
+            router.get('/emar/audit', params, {
+                preserveState: true,
+                preserveScroll: true,
+            });
         },
         [clientId, dateFrom, dateTo, selectedTypes],
     );
 
     const loadMore = () => {
         setLoading(true);
-        const params: Record<string, string> = { page: String(currentPage + 1) };
+        const params: Record<string, string> = {
+            page: String(currentPage + 1),
+        };
         if (clientId) params.client_id = clientId;
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
-        if (selectedTypes.length > 0) params.event_types = selectedTypes.join(',');
+        if (selectedTypes.length > 0)
+            params.event_types = selectedTypes.join(',');
 
         router.get('/emar/audit', params, {
             preserveState: true,
@@ -305,7 +356,8 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
         router.get('/emar/audit', {}, { preserveState: true });
     };
 
-    const hasActiveFilters = clientId || dateFrom || dateTo || selectedTypes.length > 0;
+    const hasActiveFilters =
+        clientId || dateFrom || dateTo || selectedTypes.length > 0;
 
     return (
         <AppLayout>
@@ -323,8 +375,12 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                 <FileText className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.total.toLocaleString()}</p>
-                                <p className="text-xs text-muted-foreground">Total events</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.total.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Total events
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -334,8 +390,12 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                 <Calendar className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.this_week.toLocaleString()}</p>
-                                <p className="text-xs text-muted-foreground">This week</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.this_week.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    This week
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -345,8 +405,12 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                 <Calendar className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.this_month.toLocaleString()}</p>
-                                <p className="text-xs text-muted-foreground">This month</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.this_month.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    This month
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -355,7 +419,9 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                 {/* ── Filters ──────────────────────────────────────── */}
                 <Card className="mb-6">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium">Filters</CardTitle>
+                        <CardTitle className="text-sm font-medium">
+                            Filters
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Row 1: Client + Dates */}
@@ -376,9 +442,14 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                         <SelectValue placeholder="All clients" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All clients</SelectItem>
+                                        <SelectItem value="all">
+                                            All clients
+                                        </SelectItem>
                                         {clients.map((c) => (
-                                            <SelectItem key={c.id} value={String(c.id)}>
+                                            <SelectItem
+                                                key={c.id}
+                                                value={String(c.id)}
+                                            >
                                                 {c.name}
                                             </SelectItem>
                                         ))}
@@ -394,7 +465,9 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                     value={dateFrom}
                                     onChange={(e) => {
                                         setDateFrom(e.target.value);
-                                        applyFilters({ date_from: e.target.value });
+                                        applyFilters({
+                                            date_from: e.target.value,
+                                        });
                                     }}
                                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                                 />
@@ -408,7 +481,9 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                     value={dateTo}
                                     onChange={(e) => {
                                         setDateTo(e.target.value);
-                                        applyFilters({ date_to: e.target.value });
+                                        applyFilters({
+                                            date_to: e.target.value,
+                                        });
                                     }}
                                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                                 />
@@ -423,20 +498,26 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                             <div className="flex flex-wrap gap-1.5">
                                 {ALL_EVENT_TYPES.map((type) => {
                                     const cfg = EVENT_CONFIG[type];
-                                    const active = selectedTypes.length === 0 || selectedTypes.includes(type);
+                                    const active =
+                                        selectedTypes.length === 0 ||
+                                        selectedTypes.includes(type);
                                     return (
-                                        <button
+                                        <Button
                                             key={type}
                                             type="button"
-                                            onClick={() => toggleEventType(type)}
-                                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                toggleEventType(type)
+                                            }
+                                            className={`h-7 rounded-full px-2.5 text-xs ${
                                                 active
                                                     ? `${cfg.badgeVariant} border-transparent`
                                                     : 'border-border bg-muted/30 text-muted-foreground opacity-50'
                                             }`}
                                         >
                                             {cfg.label}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -444,7 +525,11 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
 
                         {hasActiveFilters && (
                             <div className="flex justify-end">
-                                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                >
                                     Clear all filters
                                 </Button>
                             </div>
@@ -470,13 +555,17 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                                     No events found
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Try adjusting your filters to see more results.
+                                    Try adjusting your filters to see more
+                                    results.
                                 </p>
                             </div>
                         ) : (
                             <div className="space-y-0">
                                 {events.map((event) => (
-                                    <TimelineEntry key={event.id} event={event} />
+                                    <TimelineEntry
+                                        key={event.id}
+                                        event={event}
+                                    />
                                 ))}
                             </div>
                         )}

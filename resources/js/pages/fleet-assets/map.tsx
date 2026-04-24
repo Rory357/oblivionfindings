@@ -1,5 +1,6 @@
 import LeafletMap, { MapGeofence, MapMarker } from '@/components/leaflet-map';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { formatRelativeTime } from '@/lib/fleet-utils';
@@ -213,7 +214,7 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                 />
 
                 {/* Sidebar Overlay */}
-                <div className="absolute left-4 top-4 z-[1000] w-80 rounded-lg border bg-card p-4 shadow-lg" style={{ maxHeight: 'calc(100vh - 8rem)', overflowY: 'auto' }}>
+                <aside className="absolute left-4 top-4 z-[1000] w-80 rounded-lg border bg-card p-4 shadow-lg" style={{ maxHeight: 'calc(100vh - 8rem)', overflowY: 'auto' }}>
                     <div className="mb-4">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -228,36 +229,33 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
 
                     {/* Filter Toggles */}
                     <div className="mb-4 flex flex-wrap gap-2">
-                        <button
+                        <Button
+                            type="button"
+                            variant={showVehicles ? 'default' : 'secondary'}
+                            size="xs"
                             onClick={() => setShowVehicles(!showVehicles)}
-                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                                showVehicles
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted text-muted-foreground'
-                            }`}
+                            className="h-auto rounded-full px-3 py-1"
                         >
                             <Car className="h-3 w-3" /> Vehicles
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={showHouses ? 'default' : 'secondary'}
+                            size="xs"
                             onClick={() => setShowHouses(!showHouses)}
-                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                                showHouses
-                                    ? 'bg-primary text-white'
-                                    : 'bg-muted text-muted-foreground'
-                            }`}
+                            className="h-auto rounded-full px-3 py-1"
                         >
                             <Home className="h-3 w-3" /> Houses
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={showGeofences ? 'destructive' : 'secondary'}
+                            size="xs"
                             onClick={() => setShowGeofences(!showGeofences)}
-                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                                showGeofences
-                                    ? 'bg-status-critical text-white'
-                                    : 'bg-muted text-muted-foreground'
-                            }`}
+                            className="h-auto rounded-full px-3 py-1"
                         >
                             <Layers className="h-3 w-3" /> Geofences
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Vehicle List */}
@@ -337,7 +335,7 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                             </div>
                         </div>
                     )}
-                </div>
+                </aside>
             </div>
         </AppLayout>
     );

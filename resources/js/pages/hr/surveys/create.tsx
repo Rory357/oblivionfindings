@@ -1,14 +1,20 @@
-import { useState, FormEvent } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Head, router, usePage } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { GripVertical, Plus, Trash2 } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type Question = {
     question_text: string;
@@ -58,10 +64,13 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
         ends_at: '',
     });
 
-    const [questions, setQuestions] = useState<Question[]>([{ ...emptyQuestion }]);
+    const [questions, setQuestions] = useState<Question[]>([
+        { ...emptyQuestion },
+    ]);
     const [processing, setProcessing] = useState(false);
 
-    const set = (key: string, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
+    const set = (key: string, value: any) =>
+        setForm((prev) => ({ ...prev, [key]: value }));
 
     const addQuestion = () => {
         setQuestions((prev) => [...prev, { ...emptyQuestion }]);
@@ -73,13 +82,15 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
 
     const updateQuestion = (index: number, key: keyof Question, value: any) => {
         setQuestions((prev) =>
-            prev.map((q, i) => (i === index ? { ...q, [key]: value } : q))
+            prev.map((q, i) => (i === index ? { ...q, [key]: value } : q)),
         );
     };
 
     const addOption = (qIndex: number) => {
         setQuestions((prev) =>
-            prev.map((q, i) => (i === qIndex ? { ...q, options: [...q.options, ''] } : q))
+            prev.map((q, i) =>
+                i === qIndex ? { ...q, options: [...q.options, ''] } : q,
+            ),
         );
     };
 
@@ -87,9 +98,14 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
         setQuestions((prev) =>
             prev.map((q, i) =>
                 i === qIndex
-                    ? { ...q, options: q.options.map((o, j) => (j === oIndex ? value : o)) }
-                    : q
-            )
+                    ? {
+                          ...q,
+                          options: q.options.map((o, j) =>
+                              j === oIndex ? value : o,
+                          ),
+                      }
+                    : q,
+            ),
         );
     };
 
@@ -97,9 +113,12 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
         setQuestions((prev) =>
             prev.map((q, i) =>
                 i === qIndex
-                    ? { ...q, options: q.options.filter((_, j) => j !== oIndex) }
-                    : q
-            )
+                    ? {
+                          ...q,
+                          options: q.options.filter((_, j) => j !== oIndex),
+                      }
+                    : q,
+            ),
         );
     };
 
@@ -114,12 +133,15 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                 questions: questions.map((q, i) => ({
                     ...q,
                     sort_order: i,
-                    options: q.question_type === 'multiple_choice' ? q.options.filter(Boolean) : null,
+                    options:
+                        q.question_type === 'multiple_choice'
+                            ? q.options.filter(Boolean)
+                            : null,
                 })),
             },
             {
                 onFinish: () => setProcessing(false),
-            }
+            },
         );
     };
 
@@ -133,19 +155,30 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                     {/* Survey Details */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Survey Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Survey Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="title">Title <span className="text-destructive">*</span></Label>
+                                <Label htmlFor="title">
+                                    Title{' '}
+                                    <span className="text-destructive">*</span>
+                                </Label>
                                 <Input
                                     id="title"
                                     value={form.title}
-                                    onChange={(e) => set('title', e.target.value)}
+                                    onChange={(e) =>
+                                        set('title', e.target.value)
+                                    }
                                     placeholder="e.g. Q1 2026 Employee Satisfaction"
                                     required
                                 />
-                                {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
+                                {errors.title && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.title}
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2 sm:col-span-2">
                                 <Label htmlFor="description">Description</Label>
@@ -153,14 +186,23 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                     id="description"
                                     rows={3}
                                     value={form.description}
-                                    onChange={(e) => set('description', e.target.value)}
+                                    onChange={(e) =>
+                                        set('description', e.target.value)
+                                    }
                                     placeholder="Describe the purpose of this survey..."
                                 />
-                                {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+                                {errors.description && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.description}
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label>Survey Type</Label>
-                                <Select value={form.survey_type} onValueChange={(v) => set('survey_type', v)}>
+                                <Select
+                                    value={form.survey_type}
+                                    onValueChange={(v) => set('survey_type', v)}
+                                >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -172,28 +214,63 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.survey_type && <p className="text-sm text-destructive">{errors.survey_type}</p>}
+                                {errors.survey_type && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.survey_type}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex items-end">
                                 <label className="flex items-center gap-2 text-sm">
                                     <input
                                         type="checkbox"
                                         checked={form.is_anonymous}
-                                        onChange={(e) => set('is_anonymous', e.target.checked)}
+                                        onChange={(e) =>
+                                            set(
+                                                'is_anonymous',
+                                                e.target.checked,
+                                            )
+                                        }
                                         className="rounded border-border"
                                     />
                                     Anonymous responses
                                 </label>
                             </div>
                             <div className="space-y-2">
-                                <Label>Start Date <span className="text-destructive">*</span></Label>
-                                <Input type="date" value={form.starts_at} onChange={(e) => set('starts_at', e.target.value)} />
-                                {errors.starts_at && <p className="text-sm text-destructive">{errors.starts_at}</p>}
+                                <Label>
+                                    Start Date{' '}
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    type="date"
+                                    value={form.starts_at}
+                                    onChange={(e) =>
+                                        set('starts_at', e.target.value)
+                                    }
+                                />
+                                {errors.starts_at && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.starts_at}
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2">
-                                <Label>End Date <span className="text-destructive">*</span></Label>
-                                <Input type="date" value={form.ends_at} onChange={(e) => set('ends_at', e.target.value)} />
-                                {errors.ends_at && <p className="text-sm text-destructive">{errors.ends_at}</p>}
+                                <Label>
+                                    End Date{' '}
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    type="date"
+                                    value={form.ends_at}
+                                    onChange={(e) =>
+                                        set('ends_at', e.target.value)
+                                    }
+                                />
+                                {errors.ends_at && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.ends_at}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -202,85 +279,178 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">Questions</CardTitle>
-                                <Button type="button" variant="outline" size="sm" onClick={addQuestion}>
+                                <CardTitle className="text-base">
+                                    Questions
+                                </CardTitle>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addQuestion}
+                                >
                                     <Plus className="mr-1.5 h-3.5 w-3.5" />
                                     Add Question
                                 </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {errors.questions && <p className="text-sm text-destructive">{errors.questions}</p>}
+                            {errors.questions && (
+                                <p className="text-sm text-destructive">
+                                    {errors.questions}
+                                </p>
+                            )}
                             {questions.map((question, qIndex) => (
-                                <div key={qIndex} className="rounded-lg border p-4 space-y-3">
+                                <div
+                                    key={qIndex}
+                                    className="space-y-3 rounded-lg border p-4"
+                                >
                                     <div className="flex items-start gap-3">
                                         <GripVertical className="mt-2 h-4 w-4 text-muted-foreground" />
                                         <div className="flex-1 space-y-3">
                                             <div className="flex gap-3">
                                                 <div className="flex-1 space-y-1">
-                                                    <Label>Question Text <span className="text-destructive">*</span></Label>
+                                                    <Label>
+                                                        Question Text{' '}
+                                                        <span className="text-destructive">
+                                                            *
+                                                        </span>
+                                                    </Label>
                                                     <Input
-                                                        value={question.question_text}
-                                                        onChange={(e) => updateQuestion(qIndex, 'question_text', e.target.value)}
+                                                        value={
+                                                            question.question_text
+                                                        }
+                                                        onChange={(e) =>
+                                                            updateQuestion(
+                                                                qIndex,
+                                                                'question_text',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         placeholder={`Question ${qIndex + 1}`}
                                                         required
                                                     />
-                                                    {errors[`questions.${qIndex}.question_text`] && (
-                                                        <p className="text-sm text-destructive">{errors[`questions.${qIndex}.question_text`]}</p>
+                                                    {errors[
+                                                        `questions.${qIndex}.question_text`
+                                                    ] && (
+                                                        <p className="text-sm text-destructive">
+                                                            {
+                                                                errors[
+                                                                    `questions.${qIndex}.question_text`
+                                                                ]
+                                                            }
+                                                        </p>
                                                     )}
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Select
-                                                        value={question.question_type}
-                                                        onValueChange={(v) => updateQuestion(qIndex, 'question_type', v)}
+                                                        value={
+                                                            question.question_type
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            updateQuestion(
+                                                                qIndex,
+                                                                'question_type',
+                                                                v,
+                                                            )
+                                                        }
                                                     >
                                                         <SelectTrigger className="w-44">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {questionTypes.map((t) => (
-                                                                <SelectItem key={t} value={t}>
-                                                                    {typeLabels[t] || t}
-                                                                </SelectItem>
-                                                            ))}
+                                                            {questionTypes.map(
+                                                                (t) => (
+                                                                    <SelectItem
+                                                                        key={t}
+                                                                        value={
+                                                                            t
+                                                                        }
+                                                                    >
+                                                                        {typeLabels[
+                                                                            t
+                                                                        ] || t}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
-                                                    {errors[`questions.${qIndex}.question_type`] && (
-                                                        <p className="text-sm text-destructive">{errors[`questions.${qIndex}.question_type`]}</p>
+                                                    {errors[
+                                                        `questions.${qIndex}.question_type`
+                                                    ] && (
+                                                        <p className="text-sm text-destructive">
+                                                            {
+                                                                errors[
+                                                                    `questions.${qIndex}.question_type`
+                                                                ]
+                                                            }
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {question.question_type === 'multiple_choice' && (
+                                            {question.question_type ===
+                                                'multiple_choice' && (
                                                 <div className="space-y-2 pl-4">
-                                                    {question.options.map((option, oIndex) => (
-                                                        <div key={oIndex} className="flex gap-2">
-                                                            <Input
-                                                                value={option}
-                                                                onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
-                                                                placeholder={`Option ${oIndex + 1}`}
-                                                            />
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => removeOption(qIndex, oIndex)}
+                                                    {question.options.map(
+                                                        (option, oIndex) => (
+                                                            <div
+                                                                key={oIndex}
+                                                                className="flex gap-2"
                                                             >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
+                                                                <Input
+                                                                    value={
+                                                                        option
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        updateOption(
+                                                                            qIndex,
+                                                                            oIndex,
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                    placeholder={`Option ${oIndex + 1}`}
+                                                                />
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        removeOption(
+                                                                            qIndex,
+                                                                            oIndex,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        ),
+                                                    )}
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => addOption(qIndex)}
+                                                        onClick={() =>
+                                                            addOption(qIndex)
+                                                        }
                                                     >
                                                         <Plus className="mr-1 h-3 w-3" />
                                                         Add Option
                                                     </Button>
-                                                    {errors[`questions.${qIndex}.options`] && (
-                                                        <p className="text-sm text-destructive">{errors[`questions.${qIndex}.options`]}</p>
+                                                    {errors[
+                                                        `questions.${qIndex}.options`
+                                                    ] && (
+                                                        <p className="text-sm text-destructive">
+                                                            {
+                                                                errors[
+                                                                    `questions.${qIndex}.options`
+                                                                ]
+                                                            }
+                                                        </p>
                                                     )}
                                                 </div>
                                             )}
@@ -289,8 +459,17 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                                 <label className="flex items-center gap-2 text-sm">
                                                     <input
                                                         type="checkbox"
-                                                        checked={question.is_required}
-                                                        onChange={(e) => updateQuestion(qIndex, 'is_required', e.target.checked)}
+                                                        checked={
+                                                            question.is_required
+                                                        }
+                                                        onChange={(e) =>
+                                                            updateQuestion(
+                                                                qIndex,
+                                                                'is_required',
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
                                                         className="rounded border-border"
                                                     />
                                                     Required
@@ -298,7 +477,14 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                             </div>
                                         </div>
                                         {questions.length > 1 && (
-                                            <Button type="button" variant="ghost" size="sm" onClick={() => removeQuestion(qIndex)}>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                    removeQuestion(qIndex)
+                                                }
+                                            >
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
                                         )}
@@ -309,7 +495,11 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                     </Card>
 
                     <div className="flex justify-end gap-3">
-                        <Button type="button" variant="outline" onClick={() => router.get('/hr/surveys')}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => router.get('/hr/surveys')}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>

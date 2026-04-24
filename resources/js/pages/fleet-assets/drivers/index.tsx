@@ -1,5 +1,5 @@
+import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { HalfMoonGauge, FLEET_COLORS } from '@/components/fleet-charts';
 import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { formatDate } from '@/lib/fleet-utils';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Car,
@@ -25,13 +26,10 @@ import {
     Clock,
     Download,
     Search,
-    Shield,
     User,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatDate } from '@/lib/fleet-utils';
-
 
 type Driver = {
     id: number;
@@ -58,7 +56,9 @@ type Props = {
     filters: { search?: string; status?: string };
 };
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(
+    status: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
         case 'eligible':
             return 'default';
@@ -75,12 +75,16 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
 
 function getLicenceExpiryDays(dateStr: string | null): number | null {
     if (!dateStr) return null;
-    const diff = (new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
+    const diff =
+        (new Date(dateStr).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24);
     return Math.ceil(diff);
 }
 
 function getLicenceRowClass(driver: Driver): string {
-    const days = getLicenceExpiryDays(driver.eligibility?.licence_expires_at ?? null);
+    const days = getLicenceExpiryDays(
+        driver.eligibility?.licence_expires_at ?? null,
+    );
     if (days === null) return '';
     if (days < 0) return 'bg-status-critical hover:bg-status-critical';
     if (days <= 30) return 'bg-status-warning hover:bg-status-warning';
@@ -88,9 +92,16 @@ function getLicenceRowClass(driver: Driver): string {
     return '';
 }
 
-export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters }: Props) {
+export default function DriversIndex({
+    drivers: rawDrivers,
+    filters: rawFilters,
+}: Props) {
     const drivers = rawDrivers?.data ?? [];
-    const meta = rawDrivers?.meta ?? { current_page: 1, last_page: 1, total: 0 };
+    const meta = rawDrivers?.meta ?? {
+        current_page: 1,
+        last_page: 1,
+        total: 0,
+    };
     const links = rawDrivers?.links ?? [];
     const filters = rawFilters ?? {};
     const [search, setSearch] = useState(filters.search ?? '');
@@ -98,49 +109,85 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
     function handleSort(field: string) {
-        const newDir = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
+        const newDir =
+            sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
         setSortField(field);
         setSortDir(newDir);
-        router.get(window.location.pathname, { ...filters, sort: field, direction: newDir }, { preserveState: true });
-    }
-
-    function SortHeader({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) {
-        const active = sortField === field;
-        return (
-            <th className={`px-4 py-3 cursor-pointer select-none hover:bg-muted/50 font-medium ${className ?? 'text-left'}`} onClick={() => handleSort(field)}>
-                <div className="flex items-center gap-1">
-                    {children}
-                    {active ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />}
-                </div>
-            </th>
+        router.get(
+            window.location.pathname,
+            { ...filters, sort: field, direction: newDir },
+            { preserveState: true },
         );
     }
 
+    const renderSortHeader = (
+        field: string,
+        children: React.ReactNode,
+        className?: string,
+    ) => {
+        const active = sortField === field;
+        return (
+            <th
+                className={`cursor-pointer px-4 py-3 font-medium select-none hover:bg-muted/50 ${className ?? 'text-left'}`}
+                onClick={() => handleSort(field)}
+            >
+                <div className="flex items-center gap-1">
+                    {children}
+                    {active ? (
+                        sortDir === 'asc' ? (
+                            <ChevronUp className="h-3 w-3" />
+                        ) : (
+                            <ChevronDown className="h-3 w-3" />
+                        )
+                    ) : (
+                        <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
+                    )}
+                </div>
+            </th>
+        );
+    };
+
     const handleSearch = () => {
-        router.get('/fleet-assets/drivers', { ...filters, search, page: 1 }, { preserveState: true });
+        router.get(
+            '/fleet-assets/drivers',
+            { ...filters, search, page: 1 },
+            { preserveState: true },
+        );
     };
 
     const applyFilters = (newFilters: Partial<typeof filters>) => {
-        router.get('/fleet-assets/drivers', { ...filters, ...newFilters, page: 1 }, { preserveState: true });
+        router.get(
+            '/fleet-assets/drivers',
+            { ...filters, ...newFilters, page: 1 },
+            { preserveState: true },
+        );
     };
 
     // Compute stats from the current page data
     const stats = {
         total: meta.total ?? drivers.length,
-        eligible: drivers.filter((d) => d.eligibility?.status === 'eligible').length,
-        pending: drivers.filter((d) => d.eligibility?.status === 'pending').length,
-        suspended: drivers.filter((d) => d.eligibility?.status === 'suspended').length,
-        expired: drivers.filter((d) => d.eligibility?.status === 'expired').length,
+        eligible: drivers.filter((d) => d.eligibility?.status === 'eligible')
+            .length,
+        pending: drivers.filter((d) => d.eligibility?.status === 'pending')
+            .length,
+        suspended: drivers.filter((d) => d.eligibility?.status === 'suspended')
+            .length,
+        expired: drivers.filter((d) => d.eligibility?.status === 'expired')
+            .length,
     };
 
     // Licence expiry warnings
     const expiredCount = drivers.filter((d) => {
-        const days = getLicenceExpiryDays(d.eligibility?.licence_expires_at ?? null);
+        const days = getLicenceExpiryDays(
+            d.eligibility?.licence_expires_at ?? null,
+        );
         return days !== null && days < 0;
     }).length;
 
     const expiringSoonCount = drivers.filter((d) => {
-        const days = getLicenceExpiryDays(d.eligibility?.licence_expires_at ?? null);
+        const days = getLicenceExpiryDays(
+            d.eligibility?.licence_expires_at ?? null,
+        );
         return days !== null && days >= 0 && days <= 60;
     }).length;
 
@@ -174,12 +221,18 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                             <div className="space-y-0.5">
                                 {expiredCount > 0 && (
                                     <p className="text-sm font-medium text-status-critical dark:text-status-critical">
-                                        {expiredCount} driver{expiredCount !== 1 ? 's have' : ' has'} expired licences
+                                        {expiredCount} driver
+                                        {expiredCount !== 1 ? 's have' : ' has'}{' '}
+                                        expired licences
                                     </p>
                                 )}
                                 {expiringSoonCount > 0 && (
                                     <p className="text-sm text-status-warning dark:text-status-warning">
-                                        {expiringSoonCount} driver{expiringSoonCount !== 1 ? 's have' : ' has'} licences expiring within 60 days
+                                        {expiringSoonCount} driver
+                                        {expiringSoonCount !== 1
+                                            ? 's have'
+                                            : ' has'}{' '}
+                                        licences expiring within 60 days
                                     </p>
                                 )}
                             </div>
@@ -192,10 +245,14 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Total
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold">{stats.total}</div>
+                                <div className="text-3xl font-bold">
+                                    {stats.total}
+                                </div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -205,7 +262,9 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold">{stats.eligible}</div>
+                                <div className="text-3xl font-bold">
+                                    {stats.eligible}
+                                </div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -215,7 +274,9 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold">{stats.pending}</div>
+                                <div className="text-3xl font-bold">
+                                    {stats.pending}
+                                </div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -225,23 +286,34 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold">{stats.suspended}</div>
+                                <div className="text-3xl font-bold">
+                                    {stats.suspended}
+                                </div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-critical">
-                                    <AlertTriangle className="h-4 w-4" /> Expired
+                                    <AlertTriangle className="h-4 w-4" />{' '}
+                                    Expired
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold">{stats.expired}</div>
+                                <div className="text-3xl font-bold">
+                                    {stats.expired}
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
                     <Card className="flex items-center justify-center px-6 py-4">
                         <HalfMoonGauge
-                            value={stats.total > 0 ? Math.round((stats.eligible / stats.total) * 100) : 0}
+                            value={
+                                stats.total > 0
+                                    ? Math.round(
+                                          (stats.eligible / stats.total) * 100,
+                                      )
+                                    : 0
+                            }
                             label="Fleet Safety"
                             sublabel={`${stats.eligible} eligible of ${stats.total}`}
                             size={130}
@@ -253,18 +325,22 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                 {/* Search & Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative sm:max-w-xs">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search drivers..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && handleSearch()
+                            }
                             className="pl-9"
                         />
                     </div>
                     <Select
                         value={filters.status || 'all'}
-                        onValueChange={(v) => applyFilters({ status: v === 'all' ? '' : v })}
+                        onValueChange={(v) =>
+                            applyFilters({ status: v === 'all' ? '' : v })
+                        }
                     >
                         <SelectTrigger className="w-44">
                             <SelectValue placeholder="Filter by status" />
@@ -275,70 +351,130 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                             <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="suspended">Suspended</SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
-                            <SelectItem value="expiring_soon">Expiring Soon</SelectItem>
+                            <SelectItem value="expiring_soon">
+                                Expiring Soon
+                            </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
                 {/* Table */}
-                <div className="rounded-lg border overflow-hidden">
+                <div className="overflow-hidden rounded-lg border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
-                                <SortHeader field="name">Name</SortHeader>
-                                <th className="px-4 py-3 text-left font-medium">Licence Class</th>
-                                <th className="px-4 py-3 text-left font-medium">Expiry</th>
-                                <th className="px-4 py-3 text-left font-medium">Status</th>
-                                <th className="px-4 py-3 text-left font-medium">Assigned Vehicles</th>
-                                <th className="px-4 py-3 text-left font-medium">Sessions</th>
+                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                {renderSortHeader('name', 'Name')}
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Licence Class
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Expiry
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Status
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Assigned Vehicles
+                                </th>
+                                <th className="px-4 py-3 text-left font-medium">
+                                    Sessions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {drivers.length > 0 ? (
                                 drivers.map((driver) => {
-                                    const expiryDays = getLicenceExpiryDays(driver.eligibility?.licence_expires_at ?? null);
+                                    const expiryDays = getLicenceExpiryDays(
+                                        driver.eligibility
+                                            ?.licence_expires_at ?? null,
+                                    );
                                     return (
                                         <tr
                                             key={driver.id}
-                                            className={`border-b cursor-pointer ${getLicenceRowClass(driver) || 'hover:bg-muted/30'}`}
-                                            onClick={() => router.visit(`/fleet-assets/drivers/${driver.id}`)}
+                                            className={`cursor-pointer border-b ${getLicenceRowClass(driver) || 'hover:bg-muted/30'}`}
+                                            onClick={() =>
+                                                router.visit(
+                                                    `/fleet-assets/drivers/${driver.id}`,
+                                                )
+                                            }
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <User className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="font-medium">{driver.name}</span>
+                                                    <span className="font-medium">
+                                                        {driver.name}
+                                                    </span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3">{driver.eligibility?.licence_class ?? '---'}</td>
+                                            <td className="px-4 py-3">
+                                                {driver.eligibility
+                                                    ?.licence_class ?? '---'}
+                                            </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                    {driver.eligibility?.licence_expires_at
-                                                        ? formatDate(driver.eligibility.licence_expires_at)
+                                                    {driver.eligibility
+                                                        ?.licence_expires_at
+                                                        ? formatDate(
+                                                              driver.eligibility
+                                                                  .licence_expires_at,
+                                                          )
                                                         : '---'}
-                                                    {expiryDays !== null && expiryDays < 0 && (
-                                                        <Badge variant="destructive" className="text-[10px]">Expired</Badge>
-                                                    )}
-                                                    {expiryDays !== null && expiryDays >= 0 && expiryDays <= 30 && (
-                                                        <Badge className="bg-status-warning text-white text-[10px]">{expiryDays}d left</Badge>
-                                                    )}
-                                                    {expiryDays !== null && expiryDays > 30 && expiryDays <= 60 && (
-                                                        <Badge className="bg-status-warning text-white text-[10px]">{expiryDays}d left</Badge>
-                                                    )}
+                                                    {expiryDays !== null &&
+                                                        expiryDays < 0 && (
+                                                            <Badge
+                                                                variant="destructive"
+                                                                className="text-[10px]"
+                                                            >
+                                                                Expired
+                                                            </Badge>
+                                                        )}
+                                                    {expiryDays !== null &&
+                                                        expiryDays >= 0 &&
+                                                        expiryDays <= 30 && (
+                                                            <Badge className="bg-status-warning text-[10px] text-white">
+                                                                {expiryDays}d
+                                                                left
+                                                            </Badge>
+                                                        )}
+                                                    {expiryDays !== null &&
+                                                        expiryDays > 30 &&
+                                                        expiryDays <= 60 && (
+                                                            <Badge className="bg-status-warning text-[10px] text-white">
+                                                                {expiryDays}d
+                                                                left
+                                                            </Badge>
+                                                        )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <Badge variant={statusVariant(driver.eligibility?.status ?? '')}>
-                                                    {driver.eligibility?.status ?? 'unknown'}
+                                                <Badge
+                                                    variant={statusVariant(
+                                                        driver.eligibility
+                                                            ?.status ?? '',
+                                                    )}
+                                                >
+                                                    {driver.eligibility
+                                                        ?.status ?? 'unknown'}
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3">
-                                                {(driver.assigned_vehicles ?? []).length > 0 ? (
+                                                {(
+                                                    driver.assigned_vehicles ??
+                                                    []
+                                                ).length > 0 ? (
                                                     <span className="inline-flex items-center gap-1">
                                                         <Car className="h-3 w-3" />
-                                                        {(driver.assigned_vehicles ?? []).map((v) => v.name).join(', ')}
+                                                        {(
+                                                            driver.assigned_vehicles ??
+                                                            []
+                                                        )
+                                                            .map((v) => v.name)
+                                                            .join(', ')}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-muted-foreground">---</span>
+                                                    <span className="text-muted-foreground">
+                                                        ---
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
@@ -350,7 +486,11 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                             ) : (
                                 <tr>
                                     <td colSpan={6} className="px-4 py-12">
-                                        <FleetEmptyState icon={User} title="No drivers found" description="Drivers appear here when staff have driver eligibility set up in HR." />
+                                        <FleetEmptyState
+                                            icon={User}
+                                            title="No drivers found"
+                                            description="Drivers appear here when staff have driver eligibility set up in HR."
+                                        />
                                     </td>
                                 </tr>
                             )}

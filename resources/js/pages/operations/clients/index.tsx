@@ -1,9 +1,10 @@
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import { ClientSafetyBadges } from '@/components/client-safety-ribbon';
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
@@ -60,7 +61,7 @@ export default function ClientsIndex({ clients }) {
             const status = (c.status ?? '').toLowerCase();
             return name.includes(q) || site.includes(q) || status.includes(q);
         });
-    }, [clients, query, onlyIncomplete]);
+    }, [clients, query, onlyIncomplete, respiteFilter]);
 
     const breadcrumbs = useMemo(
         () => [
@@ -143,13 +144,13 @@ export default function ClientsIndex({ clients }) {
                     {filteredClients.map((client) => {
                         const isActive = client.status === 'active';
                         return (
-                            <div
+                            <Card
                                 key={client.id}
-                                className="group relative flex flex-col rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                                className="group relative flex flex-col p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
                             >
                                 {/* Top: Avatar + identity */}
                                 <div className="flex min-w-0 items-start gap-4">
-                                    <Avatar className="h-14 w-14 shrink-0 ring-2 ring-background shadow-sm">
+                                    <Avatar className="h-14 w-14 shrink-0 shadow-sm ring-2 ring-background">
                                         <AvatarImage
                                             src={
                                                 client.avatar ??
@@ -164,7 +165,7 @@ export default function ClientsIndex({ clients }) {
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0 flex-1 space-y-1">
-                                        <div className="truncate text-base font-semibold leading-tight">
+                                        <div className="truncate text-base leading-tight font-semibold">
                                             {client.first_name}{' '}
                                             {client.last_name}
                                         </div>
@@ -176,7 +177,7 @@ export default function ClientsIndex({ clients }) {
                                                         : 'bg-muted ring-2 ring-muted-foreground/20'
                                                 }`}
                                             />
-                                            <span className="capitalize text-muted-foreground">
+                                            <span className="text-muted-foreground capitalize">
                                                 {client.status}
                                             </span>
                                         </div>
@@ -273,7 +274,7 @@ export default function ClientsIndex({ clients }) {
                                         </Button>
                                     )}
                                 </div>
-                            </div>
+                            </Card>
                         );
                     })}
 

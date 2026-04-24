@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { Appearance, useAppearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
 import { LucideIcon, Monitor, Moon, Sun } from 'lucide-react';
@@ -24,11 +25,14 @@ export default function AppearanceToggleTab({
             {...props}
         >
             {tabs.map(({ value, icon: Icon, label }) => (
-                <button
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     key={value}
                     onClick={() => updateAppearance(value)}
                     className={cn(
-                        'flex items-center rounded-md px-3.5 py-1.5 transition-colors',
+                        'h-auto items-center rounded-md px-3.5 py-1.5 transition-colors',
                         appearance === value
                             ? 'bg-white shadow-xs dark:bg-muted dark:text-foreground'
                             : 'text-muted-foreground hover:bg-muted/60 hover:text-black dark:text-muted-foreground dark:hover:bg-muted',
@@ -36,7 +40,7 @@ export default function AppearanceToggleTab({
                 >
                     <Icon className="-ml-1 h-4 w-4" />
                     <span className="ml-1.5 text-sm">{label}</span>
-                </button>
+                </Button>
             ))}
         </div>
     );

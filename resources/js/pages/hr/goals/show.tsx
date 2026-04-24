@@ -1,14 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useState, FormEvent } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TabsRoot as Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
     Select,
     SelectContent,
@@ -17,14 +17,38 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts';
-import {
-    Target, TrendingUp, Users, Clock, Plus, Trash2,
-    Pencil, Calendar, User, ChevronDown, ChevronUp,
-    BarChart3, ListChecks, History,
-} from 'lucide-react';
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    BarChart3,
+    Calendar,
+    ChevronUp,
+    History,
+    ListChecks,
+    Pencil,
+    Plus,
+    Target,
+    Trash2,
+    TrendingUp,
+    User,
+} from 'lucide-react';
+import { FormEvent, useState } from 'react';
+import {
+    CartesianGrid,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -104,8 +128,10 @@ interface Props {
 const statusColours: Record<string, string> = {
     not_started: 'bg-muted text-foreground border-border',
     in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
-    completed: 'bg-status-success-bg text-status-success border-status-success/30',
-    cancelled: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    completed:
+        'bg-status-success-bg text-status-success border-status-success/30',
+    cancelled:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const statusBadgeWhite: Record<string, string> = {
@@ -144,11 +170,16 @@ function progressBarColour(pct: number): string {
 
 function krStatusColour(status: string): string {
     switch (status) {
-        case 'completed': return 'bg-status-success';
-        case 'in_progress': return 'bg-status-info';
-        case 'at_risk': return 'bg-status-warning';
-        case 'behind': return 'bg-status-critical';
-        default: return 'bg-muted';
+        case 'completed':
+            return 'bg-status-success';
+        case 'in_progress':
+            return 'bg-status-info';
+        case 'at_risk':
+            return 'bg-status-warning';
+        case 'behind':
+            return 'bg-status-critical';
+        default:
+            return 'bg-muted';
     }
 }
 
@@ -161,7 +192,11 @@ function formatDate(value?: string | null): string {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 }
 
 function formatDateTime(value?: string | null): string {
@@ -170,8 +205,11 @@ function formatDateTime(value?: string | null): string {
     return Number.isNaN(d.getTime())
         ? value
         : d.toLocaleDateString('en-NZ', {
-              day: '2-digit', month: 'short', year: 'numeric',
-              hour: '2-digit', minute: '2-digit',
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
           });
 }
 
@@ -225,36 +263,50 @@ export default function GoalShow({ goal, users, can }: Props) {
     }
 
     function updateKeyResultValue(krId: number) {
-        router.put(`/hr/goals/key-results/${krId}`, {
-            current_value: krUpdateValue,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEditingKrId(null);
-                setKrUpdateValue('');
+        router.put(
+            `/hr/goals/key-results/${krId}`,
+            {
+                current_value: krUpdateValue,
             },
-        });
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingKrId(null);
+                    setKrUpdateValue('');
+                },
+            },
+        );
     }
 
     function deleteKeyResult(krId: number) {
         if (confirm('Are you sure you want to delete this key result?')) {
-            router.delete(`/hr/goals/key-results/${krId}`, { preserveScroll: true });
+            router.delete(`/hr/goals/key-results/${krId}`, {
+                preserveScroll: true,
+            });
         }
     }
 
     function submitProgress(e: FormEvent) {
         e.preventDefault();
-        router.post(`/hr/goals/${goal.id}/progress`, {
-            current_value: progressForm.current_value || null,
-            progress_percentage: progressForm.progress_percentage,
-            comment: progressForm.comment || null,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setProgressOpen(false);
-                setProgressForm({ current_value: '', progress_percentage: String(goal.progress_percentage), comment: '' });
+        router.post(
+            `/hr/goals/${goal.id}/progress`,
+            {
+                current_value: progressForm.current_value || null,
+                progress_percentage: progressForm.progress_percentage,
+                comment: progressForm.comment || null,
             },
-        });
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setProgressOpen(false);
+                    setProgressForm({
+                        current_value: '',
+                        progress_percentage: String(goal.progress_percentage),
+                        comment: '',
+                    });
+                },
+            },
+        );
     }
 
     /* ---- Chart data ---- */
@@ -276,28 +328,47 @@ export default function GoalShow({ goal, users, can }: Props) {
                 {/* ============================================================ */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
                     {/* Decorative circles */}
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-white/5" />
 
                     <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                         {/* Left side: title + badges + meta */}
                         <div className="min-w-0 flex-1">
-                            <h1 className="text-2xl font-bold md:text-3xl">{goal.title}</h1>
+                            <h1 className="text-2xl font-bold md:text-3xl">
+                                {goal.title}
+                            </h1>
 
                             {goal.description && (
-                                <p className="mt-1 max-w-2xl text-sm text-white/70">{goal.description}</p>
+                                <p className="mt-1 max-w-2xl text-sm text-white/70">
+                                    {goal.description}
+                                </p>
                             )}
 
                             {/* Badges row */}
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <Badge className={statusBadgeWhite[goal.status] ?? 'bg-white/10 text-white/90 border-white/20'}>
+                                <Badge
+                                    className={
+                                        statusBadgeWhite[goal.status] ??
+                                        'border-white/20 bg-white/10 text-white/90'
+                                    }
+                                >
                                     {capitalize(goal.status)}
                                 </Badge>
-                                <Badge className={priorityBadgeWhite[goal.priority] ?? 'bg-white/10 text-white/80 border-white/20'}>
+                                <Badge
+                                    className={
+                                        priorityBadgeWhite[goal.priority] ??
+                                        'border-white/20 bg-white/10 text-white/80'
+                                    }
+                                >
                                     {capitalize(goal.priority)} Priority
                                 </Badge>
-                                <Badge className={typeBadgeWhite[goal.goal_type] ?? 'bg-white/10 text-white/90 border-white/20'}>
+                                <Badge
+                                    className={
+                                        typeBadgeWhite[goal.goal_type] ??
+                                        'border-white/20 bg-white/10 text-white/90'
+                                    }
+                                >
                                     {capitalize(goal.goal_type)}
                                 </Badge>
                             </div>
@@ -312,7 +383,8 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 )}
                                 <span className="flex items-center gap-1.5">
                                     <Calendar className="h-3.5 w-3.5" />
-                                    {formatDate(goal.start_date)} &ndash; {formatDate(goal.due_date)}
+                                    {formatDate(goal.start_date)} &ndash;{' '}
+                                    {formatDate(goal.due_date)}
                                 </span>
                                 {goal.category && (
                                     <span className="flex items-center gap-1.5">
@@ -323,7 +395,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 {goal.parent_goal && (
                                     <Link
                                         href={`/hr/goals/${goal.parent_goal.id}`}
-                                        className="flex items-center gap-1.5 underline decoration-white/30 hover:text-white transition-colors"
+                                        className="flex items-center gap-1.5 underline decoration-white/30 transition-colors hover:text-white"
                                     >
                                         Parent: {goal.parent_goal.title}
                                     </Link>
@@ -334,15 +406,23 @@ export default function GoalShow({ goal, users, can }: Props) {
                         {/* Right side: large progress display */}
                         <div className="flex flex-col items-center justify-center text-center">
                             <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-bold">{goal.progress_percentage}</span>
-                                <span className="text-xl font-semibold text-white/80">%</span>
-                            </div>
-                            <span className="mt-1 text-sm font-medium text-white/70">Progress</span>
-                            {goal.target_value !== null && goal.target_value !== undefined && (
-                                <span className="mt-1 text-xs text-white/60">
-                                    {goal.current_value ?? 0} / {goal.target_value} {goal.unit ?? ''}
+                                <span className="text-4xl font-bold">
+                                    {goal.progress_percentage}
                                 </span>
-                            )}
+                                <span className="text-xl font-semibold text-white/80">
+                                    %
+                                </span>
+                            </div>
+                            <span className="mt-1 text-sm font-medium text-white/70">
+                                Progress
+                            </span>
+                            {goal.target_value !== null &&
+                                goal.target_value !== undefined && (
+                                    <span className="mt-1 text-xs text-white/60">
+                                        {goal.current_value ?? 0} /{' '}
+                                        {goal.target_value} {goal.unit ?? ''}
+                                    </span>
+                                )}
                         </div>
                     </div>
                 </div>
@@ -376,7 +456,9 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <div className="flex justify-end">
                                     <Button
                                         size="sm"
-                                        variant={showKrForm ? 'secondary' : 'default'}
+                                        variant={
+                                            showKrForm ? 'secondary' : 'default'
+                                        }
                                         onClick={() => setShowKrForm((p) => !p)}
                                     >
                                         {showKrForm ? (
@@ -398,75 +480,160 @@ export default function GoalShow({ goal, users, can }: Props) {
                             {showKrForm && (
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle className="text-base">New Key Result</CardTitle>
+                                        <CardTitle className="text-base">
+                                            New Key Result
+                                        </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <form onSubmit={submitKeyResult} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <form
+                                            onSubmit={submitKeyResult}
+                                            className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                                        >
                                             <div className="sm:col-span-2">
-                                                <Label htmlFor="kr-title">Title</Label>
+                                                <Label htmlFor="kr-title">
+                                                    Title
+                                                </Label>
                                                 <Input
                                                     id="kr-title"
                                                     value={krForm.data.title}
-                                                    onChange={(e) => krForm.setData('title', e.target.value)}
+                                                    onChange={(e) =>
+                                                        krForm.setData(
+                                                            'title',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="e.g. Increase customer satisfaction score"
                                                     required
                                                 />
-                                                {krForm.errors.title && <p className="mt-1 text-xs text-status-critical">{krForm.errors.title}</p>}
+                                                {krForm.errors.title && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {krForm.errors.title}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div>
-                                                <Label htmlFor="kr-target">Target Value</Label>
+                                                <Label htmlFor="kr-target">
+                                                    Target Value
+                                                </Label>
                                                 <Input
                                                     id="kr-target"
                                                     type="number"
                                                     step="0.01"
-                                                    value={krForm.data.target_value}
-                                                    onChange={(e) => krForm.setData('target_value', e.target.value)}
+                                                    value={
+                                                        krForm.data.target_value
+                                                    }
+                                                    onChange={(e) =>
+                                                        krForm.setData(
+                                                            'target_value',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="100"
                                                     required
                                                 />
-                                                {krForm.errors.target_value && <p className="mt-1 text-xs text-status-critical">{krForm.errors.target_value}</p>}
+                                                {krForm.errors.target_value && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {
+                                                            krForm.errors
+                                                                .target_value
+                                                        }
+                                                    </p>
+                                                )}
                                             </div>
                                             <div>
-                                                <Label htmlFor="kr-unit">Unit</Label>
+                                                <Label htmlFor="kr-unit">
+                                                    Unit
+                                                </Label>
                                                 <Input
                                                     id="kr-unit"
                                                     value={krForm.data.unit}
-                                                    onChange={(e) => krForm.setData('unit', e.target.value)}
+                                                    onChange={(e) =>
+                                                        krForm.setData(
+                                                            'unit',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="e.g. %, points, hours"
                                                 />
-                                                {krForm.errors.unit && <p className="mt-1 text-xs text-status-critical">{krForm.errors.unit}</p>}
+                                                {krForm.errors.unit && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {krForm.errors.unit}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div>
-                                                <Label htmlFor="kr-due">Due Date</Label>
+                                                <Label htmlFor="kr-due">
+                                                    Due Date
+                                                </Label>
                                                 <Input
                                                     id="kr-due"
                                                     type="date"
                                                     value={krForm.data.due_date}
-                                                    onChange={(e) => krForm.setData('due_date', e.target.value)}
+                                                    onChange={(e) =>
+                                                        krForm.setData(
+                                                            'due_date',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                {krForm.errors.due_date && <p className="mt-1 text-xs text-status-critical">{krForm.errors.due_date}</p>}
+                                                {krForm.errors.due_date && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {krForm.errors.due_date}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div>
-                                                <Label htmlFor="kr-owner">Owner</Label>
+                                                <Label htmlFor="kr-owner">
+                                                    Owner
+                                                </Label>
                                                 <Select
                                                     value={krForm.data.owner_id}
-                                                    onValueChange={(val) => krForm.setData('owner_id', val)}
+                                                    onValueChange={(val) =>
+                                                        krForm.setData(
+                                                            'owner_id',
+                                                            val,
+                                                        )
+                                                    }
                                                 >
                                                     <SelectTrigger id="kr-owner">
                                                         <SelectValue placeholder="Select owner" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {users.map((u) => (
-                                                            <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                                                            <SelectItem
+                                                                key={u.id}
+                                                                value={String(
+                                                                    u.id,
+                                                                )}
+                                                            >
+                                                                {u.name}
+                                                            </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {krForm.errors.owner_id && <p className="mt-1 text-xs text-status-critical">{krForm.errors.owner_id}</p>}
+                                                {krForm.errors.owner_id && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {krForm.errors.owner_id}
+                                                    </p>
+                                                )}
                                             </div>
-                                            <div className="sm:col-span-2 flex justify-end gap-2">
-                                                <Button type="button" variant="outline" onClick={() => setShowKrForm(false)}>Cancel</Button>
-                                                <Button type="submit" disabled={krForm.processing}>
-                                                    {krForm.processing ? 'Creating...' : 'Create Key Result'}
+                                            <div className="flex justify-end gap-2 sm:col-span-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setShowKrForm(false)
+                                                    }
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    type="submit"
+                                                    disabled={krForm.processing}
+                                                >
+                                                    {krForm.processing
+                                                        ? 'Creating...'
+                                                        : 'Create Key Result'}
                                                 </Button>
                                             </div>
                                         </form>
@@ -483,22 +650,51 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
-                                                            <h3 className="text-sm font-semibold">{kr.title}</h3>
-                                                            <Badge className={statusColours[kr.status] ?? 'bg-muted text-foreground'}>
-                                                                {capitalize(kr.status)}
+                                                            <h3 className="text-sm font-semibold">
+                                                                {kr.title}
+                                                            </h3>
+                                                            <Badge
+                                                                className={
+                                                                    statusColours[
+                                                                        kr
+                                                                            .status
+                                                                    ] ??
+                                                                    'bg-muted text-foreground'
+                                                                }
+                                                            >
+                                                                {capitalize(
+                                                                    kr.status,
+                                                                )}
                                                             </Badge>
                                                         </div>
 
                                                         {/* Full-width progress bar */}
                                                         <div className="mt-2">
                                                             <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                                <span>{kr.current_value} / {kr.target_value} {kr.unit ?? ''}</span>
-                                                                <span>{kr.progress_percentage}%</span>
+                                                                <span>
+                                                                    {
+                                                                        kr.current_value
+                                                                    }{' '}
+                                                                    /{' '}
+                                                                    {
+                                                                        kr.target_value
+                                                                    }{' '}
+                                                                    {kr.unit ??
+                                                                        ''}
+                                                                </span>
+                                                                <span>
+                                                                    {
+                                                                        kr.progress_percentage
+                                                                    }
+                                                                    %
+                                                                </span>
                                                             </div>
                                                             <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                                                                 <div
                                                                     className={`h-full rounded-full transition-all ${progressBarColour(kr.progress_percentage)}`}
-                                                                    style={{ width: `${Math.min(kr.progress_percentage, 100)}%` }}
+                                                                    style={{
+                                                                        width: `${Math.min(kr.progress_percentage, 100)}%`,
+                                                                    }}
                                                                 />
                                                             </div>
                                                         </div>
@@ -507,13 +703,18 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                             {kr.owner && (
                                                                 <span className="flex items-center gap-1">
                                                                     <User className="h-3 w-3" />
-                                                                    {kr.owner.name}
+                                                                    {
+                                                                        kr.owner
+                                                                            .name
+                                                                    }
                                                                 </span>
                                                             )}
                                                             {kr.due_date && (
                                                                 <span className="flex items-center gap-1">
                                                                     <Calendar className="h-3 w-3" />
-                                                                    {formatDate(kr.due_date)}
+                                                                    {formatDate(
+                                                                        kr.due_date,
+                                                                    )}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -523,22 +724,41 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     <div className="flex shrink-0 items-center gap-1.5">
                                                         {can.updateProgress && (
                                                             <>
-                                                                {editingKrId === kr.id ? (
+                                                                {editingKrId ===
+                                                                kr.id ? (
                                                                     <div className="flex items-center gap-1.5">
                                                                         <Input
                                                                             type="number"
                                                                             step="0.01"
                                                                             className="h-8 w-24 text-xs"
-                                                                            value={krUpdateValue}
-                                                                            onChange={(e) => setKrUpdateValue(e.target.value)}
-                                                                            placeholder={String(kr.current_value)}
+                                                                            value={
+                                                                                krUpdateValue
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setKrUpdateValue(
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            placeholder={String(
+                                                                                kr.current_value,
+                                                                            )}
                                                                             autoFocus
                                                                         />
                                                                         <Button
                                                                             size="sm"
                                                                             className="h-8 text-xs"
-                                                                            onClick={() => updateKeyResultValue(kr.id)}
-                                                                            disabled={!krUpdateValue}
+                                                                            onClick={() =>
+                                                                                updateKeyResultValue(
+                                                                                    kr.id,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                !krUpdateValue
+                                                                            }
                                                                         >
                                                                             Save
                                                                         </Button>
@@ -546,7 +766,14 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                                             size="sm"
                                                                             variant="ghost"
                                                                             className="h-8 text-xs"
-                                                                            onClick={() => { setEditingKrId(null); setKrUpdateValue(''); }}
+                                                                            onClick={() => {
+                                                                                setEditingKrId(
+                                                                                    null,
+                                                                                );
+                                                                                setKrUpdateValue(
+                                                                                    '',
+                                                                                );
+                                                                            }}
                                                                         >
                                                                             Cancel
                                                                         </Button>
@@ -557,8 +784,14 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                                         variant="outline"
                                                                         className="h-8 text-xs"
                                                                         onClick={() => {
-                                                                            setEditingKrId(kr.id);
-                                                                            setKrUpdateValue(String(kr.current_value));
+                                                                            setEditingKrId(
+                                                                                kr.id,
+                                                                            );
+                                                                            setKrUpdateValue(
+                                                                                String(
+                                                                                    kr.current_value,
+                                                                                ),
+                                                                            );
                                                                         }}
                                                                     >
                                                                         <Pencil className="mr-1 h-3 w-3" />
@@ -572,7 +805,11 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                                 size="sm"
                                                                 variant="ghost"
                                                                 className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
-                                                                onClick={() => deleteKeyResult(kr.id)}
+                                                                onClick={() =>
+                                                                    deleteKeyResult(
+                                                                        kr.id,
+                                                                    )
+                                                                }
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
@@ -587,9 +824,17 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <Card>
                                     <CardContent className="py-10 text-center">
                                         <ListChecks className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                        <p className="mt-2 text-sm text-muted-foreground">No key results yet.</p>
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            No key results yet.
+                                        </p>
                                         {can.manage && (
-                                            <Button size="sm" className="mt-3" onClick={() => setShowKrForm(true)}>
+                                            <Button
+                                                size="sm"
+                                                className="mt-3"
+                                                onClick={() =>
+                                                    setShowKrForm(true)
+                                                }
+                                            >
                                                 <Plus className="mr-1.5 h-4 w-4" />
                                                 Add First Key Result
                                             </Button>
@@ -608,7 +853,9 @@ export default function GoalShow({ goal, users, can }: Props) {
                             {can.manage && (
                                 <div className="flex justify-end">
                                     <Button size="sm" asChild>
-                                        <Link href={`/hr/goals/create?parent_id=${goal.id}`}>
+                                        <Link
+                                            href={`/hr/goals/create?parent_id=${goal.id}`}
+                                        >
                                             <Plus className="mr-1.5 h-4 w-4" />
                                             Add Child Goal
                                         </Link>
@@ -627,24 +874,42 @@ export default function GoalShow({ goal, users, can }: Props) {
                                             <Card className="h-full transition-shadow hover:shadow-md">
                                                 <CardContent className="pt-5">
                                                     <div className="flex items-start justify-between gap-2">
-                                                        <h3 className="text-sm font-semibold leading-snug">{child.title}</h3>
-                                                        <Badge variant="outline" className="shrink-0 capitalize text-xs">
-                                                            {capitalize(child.goal_type)}
+                                                        <h3 className="text-sm leading-snug font-semibold">
+                                                            {child.title}
+                                                        </h3>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="shrink-0 text-xs capitalize"
+                                                        >
+                                                            {capitalize(
+                                                                child.goal_type,
+                                                            )}
                                                         </Badge>
                                                     </div>
 
                                                     {/* Progress bar */}
                                                     <div className="mt-3">
                                                         <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                            <span>{child.progress_percentage}%</span>
-                                                            <Badge className={`text-[10px] px-1.5 py-0 ${statusColours[child.status] ?? 'bg-muted text-foreground'}`}>
-                                                                {capitalize(child.status)}
+                                                            <span>
+                                                                {
+                                                                    child.progress_percentage
+                                                                }
+                                                                %
+                                                            </span>
+                                                            <Badge
+                                                                className={`px-1.5 py-0 text-[10px] ${statusColours[child.status] ?? 'bg-muted text-foreground'}`}
+                                                            >
+                                                                {capitalize(
+                                                                    child.status,
+                                                                )}
                                                             </Badge>
                                                         </div>
                                                         <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                                             <div
                                                                 className={`h-full rounded-full transition-all ${progressBarColour(child.progress_percentage)}`}
-                                                                style={{ width: `${Math.min(child.progress_percentage, 100)}%` }}
+                                                                style={{
+                                                                    width: `${Math.min(child.progress_percentage, 100)}%`,
+                                                                }}
                                                             />
                                                         </div>
                                                     </div>
@@ -652,17 +917,29 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                                                         <span className="flex items-center gap-1">
                                                             <User className="h-3 w-3" />
-                                                            {child.user?.name ?? 'Unassigned'}
+                                                            {child.user?.name ??
+                                                                'Unassigned'}
                                                         </span>
                                                         <span className="flex items-center gap-1">
                                                             <ListChecks className="h-3 w-3" />
-                                                            {child.key_results_count} KR{child.key_results_count !== 1 ? 's' : ''}
+                                                            {
+                                                                child.key_results_count
+                                                            }{' '}
+                                                            KR
+                                                            {child.key_results_count !==
+                                                            1
+                                                                ? 's'
+                                                                : ''}
                                                         </span>
                                                     </div>
 
                                                     <div className="mt-2">
-                                                        <Badge className={`text-[10px] px-1.5 py-0 ${priorityColours[child.priority] ?? 'bg-muted text-foreground'}`}>
-                                                            {capitalize(child.priority)}
+                                                        <Badge
+                                                            className={`px-1.5 py-0 text-[10px] ${priorityColours[child.priority] ?? 'bg-muted text-foreground'}`}
+                                                        >
+                                                            {capitalize(
+                                                                child.priority,
+                                                            )}
                                                         </Badge>
                                                     </div>
                                                 </CardContent>
@@ -674,10 +951,18 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <Card>
                                     <CardContent className="py-10 text-center">
                                         <Target className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                        <p className="mt-2 text-sm text-muted-foreground">No child goals yet.</p>
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            No child goals yet.
+                                        </p>
                                         {can.manage && (
-                                            <Button size="sm" className="mt-3" asChild>
-                                                <Link href={`/hr/goals/create?parent_id=${goal.id}`}>
+                                            <Button
+                                                size="sm"
+                                                className="mt-3"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/hr/goals/create?parent_id=${goal.id}`}
+                                                >
                                                     <Plus className="mr-1.5 h-4 w-4" />
                                                     Add First Child Goal
                                                 </Link>
@@ -697,7 +982,10 @@ export default function GoalShow({ goal, users, can }: Props) {
                             {/* Update Progress button */}
                             {can.updateProgress && (
                                 <div className="flex justify-end">
-                                    <Button size="sm" onClick={() => setProgressOpen(true)}>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setProgressOpen(true)}
+                                    >
                                         <TrendingUp className="mr-1.5 h-4 w-4" />
                                         Update Progress
                                     </Button>
@@ -715,9 +1003,23 @@ export default function GoalShow({ goal, users, can }: Props) {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="h-64">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <ResponsiveContainer
+                                                width="100%"
+                                                height="100%"
+                                            >
+                                                <LineChart
+                                                    data={chartData}
+                                                    margin={{
+                                                        top: 5,
+                                                        right: 20,
+                                                        left: 0,
+                                                        bottom: 5,
+                                                    }}
+                                                >
+                                                    <CartesianGrid
+                                                        strokeDasharray="3 3"
+                                                        className="stroke-muted"
+                                                    />
                                                     <XAxis
                                                         dataKey="date"
                                                         tick={{ fontSize: 11 }}
@@ -727,14 +1029,22 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                         domain={[0, 100]}
                                                         tick={{ fontSize: 11 }}
                                                         className="text-muted-foreground"
-                                                        tickFormatter={(v) => `${v}%`}
+                                                        tickFormatter={(v) =>
+                                                            `${v}%`
+                                                        }
                                                     />
                                                     <Tooltip
-                                                        formatter={(value?: number) => [`${value ?? 0}%`, 'Progress']}
+                                                        formatter={(
+                                                            value?: number,
+                                                        ) => [
+                                                            `${value ?? 0}%`,
+                                                            'Progress',
+                                                        ]}
                                                         contentStyle={{
                                                             borderRadius: '8px',
                                                             border: '1px solid hsl(var(--border))',
-                                                            backgroundColor: 'hsl(var(--background))',
+                                                            backgroundColor:
+                                                                'hsl(var(--background))',
                                                             fontSize: '12px',
                                                         }}
                                                     />
@@ -743,7 +1053,10 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                         dataKey="progress"
                                                         stroke="hsl(var(--primary))"
                                                         strokeWidth={2}
-                                                        dot={{ r: 4, fill: 'hsl(var(--primary))' }}
+                                                        dot={{
+                                                            r: 4,
+                                                            fill: 'hsl(var(--primary))',
+                                                        }}
                                                         activeDot={{ r: 6 }}
                                                     />
                                                 </LineChart>
@@ -765,10 +1078,15 @@ export default function GoalShow({ goal, users, can }: Props) {
                                     {goal.updates.length > 0 ? (
                                         <div className="relative space-y-0">
                                             {goal.updates.map((update, idx) => (
-                                                <div key={update.id} className="relative flex gap-4 pb-6 last:pb-0">
+                                                <div
+                                                    key={update.id}
+                                                    className="relative flex gap-4 pb-6 last:pb-0"
+                                                >
                                                     {/* Timeline line */}
-                                                    {idx < goal.updates.length - 1 && (
-                                                        <div className="absolute left-[11px] top-6 h-full w-0.5 bg-border" />
+                                                    {idx <
+                                                        goal.updates.length -
+                                                            1 && (
+                                                        <div className="absolute top-6 left-[11px] h-full w-0.5 bg-border" />
                                                     )}
                                                     {/* Timeline dot */}
                                                     <div className="relative z-10 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-background">
@@ -777,24 +1095,45 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     {/* Content */}
                                                     <div className="min-w-0 flex-1 rounded-lg border p-3">
                                                         <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-sm font-medium">{update.user_name}</span>
+                                                            <span className="text-sm font-medium">
+                                                                {
+                                                                    update.user_name
+                                                                }
+                                                            </span>
                                                             <span className="shrink-0 text-xs text-muted-foreground">
-                                                                {formatDateTime(update.created_at)}
+                                                                {formatDateTime(
+                                                                    update.created_at,
+                                                                )}
                                                             </span>
                                                         </div>
                                                         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                                             <span className="flex items-center gap-1">
                                                                 <TrendingUp className="h-3 w-3" />
-                                                                {update.progress_percentage}%
+                                                                {
+                                                                    update.progress_percentage
+                                                                }
+                                                                %
                                                             </span>
-                                                            {update.previous_value !== null && update.new_value !== null && (
-                                                                <span>
-                                                                    Value: {update.previous_value} &rarr; {update.new_value}
-                                                                </span>
-                                                            )}
+                                                            {update.previous_value !==
+                                                                null &&
+                                                                update.new_value !==
+                                                                    null && (
+                                                                    <span>
+                                                                        Value:{' '}
+                                                                        {
+                                                                            update.previous_value
+                                                                        }{' '}
+                                                                        &rarr;{' '}
+                                                                        {
+                                                                            update.new_value
+                                                                        }
+                                                                    </span>
+                                                                )}
                                                         </div>
                                                         {update.comment && (
-                                                            <p className="mt-1.5 text-sm text-foreground/80">{update.comment}</p>
+                                                            <p className="mt-1.5 text-sm text-foreground/80">
+                                                                {update.comment}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -803,9 +1142,17 @@ export default function GoalShow({ goal, users, can }: Props) {
                                     ) : (
                                         <div className="py-8 text-center">
                                             <History className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                            <p className="mt-2 text-sm text-muted-foreground">No progress updates yet.</p>
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                No progress updates yet.
+                                            </p>
                                             {can.updateProgress && (
-                                                <Button size="sm" className="mt-3" onClick={() => setProgressOpen(true)}>
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-3"
+                                                    onClick={() =>
+                                                        setProgressOpen(true)
+                                                    }
+                                                >
                                                     <TrendingUp className="mr-1.5 h-4 w-4" />
                                                     Record First Update
                                                 </Button>
@@ -828,23 +1175,32 @@ export default function GoalShow({ goal, users, can }: Props) {
                         <DialogTitle>Update Progress</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submitProgress} className="space-y-4">
-                        {goal.target_value !== null && goal.target_value !== undefined && (
-                            <div>
-                                <Label htmlFor="progress-value">
-                                    Current Value {goal.unit ? `(${goal.unit})` : ''}
-                                </Label>
-                                <Input
-                                    id="progress-value"
-                                    type="number"
-                                    step="0.01"
-                                    value={progressForm.current_value}
-                                    onChange={(e) => setProgressForm((p) => ({ ...p, current_value: e.target.value }))}
-                                    placeholder={`Target: ${goal.target_value}`}
-                                />
-                            </div>
-                        )}
+                        {goal.target_value !== null &&
+                            goal.target_value !== undefined && (
+                                <div>
+                                    <Label htmlFor="progress-value">
+                                        Current Value{' '}
+                                        {goal.unit ? `(${goal.unit})` : ''}
+                                    </Label>
+                                    <Input
+                                        id="progress-value"
+                                        type="number"
+                                        step="0.01"
+                                        value={progressForm.current_value}
+                                        onChange={(e) =>
+                                            setProgressForm((p) => ({
+                                                ...p,
+                                                current_value: e.target.value,
+                                            }))
+                                        }
+                                        placeholder={`Target: ${goal.target_value}`}
+                                    />
+                                </div>
+                            )}
                         <div>
-                            <Label htmlFor="progress-pct">Progress Percentage</Label>
+                            <Label htmlFor="progress-pct">
+                                Progress Percentage
+                            </Label>
                             <div className="flex items-center gap-3">
                                 <input
                                     id="progress-pct"
@@ -852,10 +1208,17 @@ export default function GoalShow({ goal, users, can }: Props) {
                                     min="0"
                                     max="100"
                                     value={progressForm.progress_percentage}
-                                    onChange={(e) => setProgressForm((p) => ({ ...p, progress_percentage: e.target.value }))}
+                                    onChange={(e) =>
+                                        setProgressForm((p) => ({
+                                            ...p,
+                                            progress_percentage: e.target.value,
+                                        }))
+                                    }
                                     className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
                                 />
-                                <span className="w-12 text-right text-sm font-medium">{progressForm.progress_percentage}%</span>
+                                <span className="w-12 text-right text-sm font-medium">
+                                    {progressForm.progress_percentage}%
+                                </span>
                             </div>
                         </div>
                         <div>
@@ -863,13 +1226,22 @@ export default function GoalShow({ goal, users, can }: Props) {
                             <Textarea
                                 id="progress-comment"
                                 value={progressForm.comment}
-                                onChange={(e) => setProgressForm((p) => ({ ...p, comment: e.target.value }))}
+                                onChange={(e) =>
+                                    setProgressForm((p) => ({
+                                        ...p,
+                                        comment: e.target.value,
+                                    }))
+                                }
                                 placeholder="Describe what was accomplished..."
                                 rows={3}
                             />
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setProgressOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setProgressOpen(false)}
+                            >
                                 Cancel
                             </Button>
                             <Button type="submit">Save Update</Button>

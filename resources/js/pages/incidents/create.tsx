@@ -1,14 +1,27 @@
-import WizardStepper, { type WizardStep } from '@/components/wizard-stepper';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import WizardStepper, { type WizardStep } from '@/components/wizard-stepper';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
-import { formatTime } from '@/lib/datetime';
 import AppLayout from '@/layouts/app-layout';
+import { formatTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    ArrowRight,
+    Check,
+    Loader2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import StepDescribe, { type StepTwoData } from './wizard/step-describe';
-import StepOptionalDetail, { type StepThreeData } from './wizard/step-optional-detail';
-import StepWhoWhat, { type IncidentSeverity, type IncidentType, type StepOneData } from './wizard/step-who-what';
+import StepOptionalDetail, {
+    type StepThreeData,
+} from './wizard/step-optional-detail';
+import StepWhoWhat, {
+    type IncidentSeverity,
+    type IncidentType,
+    type StepOneData,
+} from './wizard/step-who-what';
 
 type Client = { id: number; first_name: string; last_name: string };
 
@@ -58,7 +71,10 @@ const STEPS: WizardStep[] = [
 ];
 
 export default function IncidentCreate({ clients, resumeIncident }: Props) {
-    const page = usePage().props as { auth?: { user?: { id?: number } }; labels?: Record<string, string> };
+    const page = usePage().props as {
+        auth?: { user?: { id?: number } };
+        labels?: Record<string, string>;
+    };
     const userId = page.auth?.user?.id ?? 0;
     const clientSingular = page.labels?.['client.singular'] ?? 'Client';
 
@@ -67,9 +83,14 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
     const [data, setData] = useState<WizardData>(DEFAULT_DATA);
     const [step, setStep] = useState(0);
     const [incidentId, setIncidentId] = useState<number | null>(null);
-    const [errors, setErrors] = useState<Partial<Record<keyof WizardData, string>>>({});
+    const [errors, setErrors] = useState<
+        Partial<Record<keyof WizardData, string>>
+    >({});
     const [processing, setProcessing] = useState(false);
-    const [resumePrompt, setResumePrompt] = useState<{ data: WizardData; incidentId: number | null } | null>(null);
+    const [resumePrompt, setResumePrompt] = useState<{
+        data: WizardData;
+        incidentId: number | null;
+    } | null>(null);
     const [bootstrapped, setBootstrapped] = useState(false);
 
     const { savedAt, load, clear, flush } = useFormAutosave<WizardData>(
@@ -90,7 +111,9 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
             client_id: String(resumeIncident.client_id ?? ''),
             type: (resumeIncident.type as IncidentType) || 'injury',
             severity: (resumeIncident.severity as IncidentSeverity) || 'low',
-            occurred_at: resumeIncident.occurred_at ? toLocalInput(resumeIncident.occurred_at) : '',
+            occurred_at: resumeIncident.occurred_at
+                ? toLocalInput(resumeIncident.occurred_at)
+                : '',
             description: resumeIncident.description ?? '',
             immediate_action_taken: resumeIncident.immediate_action_taken ?? '',
             witnesses: resumeIncident.witnesses ?? '',
@@ -121,7 +144,9 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
         ) {
             setResumePrompt({
                 data: { ...DEFAULT_DATA, ...existing.data },
-                incidentId: (existing.meta as { incidentId?: number | null })?.incidentId ?? null,
+                incidentId:
+                    (existing.meta as { incidentId?: number | null })
+                        ?.incidentId ?? null,
             });
         } else {
             setBootstrapped(true);
@@ -133,20 +158,30 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
         setData((prev) => ({ ...prev, ...p }));
     }, []);
 
-    const stepOneValid = useMemo(() => !!data.client_id && !!data.type && !!data.severity, [data]);
-    const stepTwoValid = useMemo(() => (data.description ?? '').trim().length >= 3, [data.description]);
+    const stepOneValid = useMemo(
+        () => !!data.client_id && !!data.type && !!data.severity,
+        [data],
+    );
+    const stepTwoValid = useMemo(
+        () => (data.description ?? '').trim().length >= 3,
+        [data.description],
+    );
 
     const goNext = () => {
         const e: typeof errors = {};
         if (step === 0) {
-            if (!data.client_id) e.client_id = `Please choose a ${clientSingular.toLowerCase()}.`;
+            if (!data.client_id)
+                e.client_id = `Please choose a ${clientSingular.toLowerCase()}.`;
             setErrors(e);
             if (Object.keys(e).length > 0) return;
             flush();
             setStep(1);
         } else if (step === 1) {
             if (!stepTwoValid) {
-                setErrors({ description: 'Write a short description so the record is useful.' });
+                setErrors({
+                    description:
+                        'Write a short description so the record is useful.',
+                });
                 return;
             }
             setErrors({});
@@ -242,7 +277,12 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
 
     if (resumePrompt) {
         return (
-            <AppLayout breadcrumbs={[{ title: 'Incidents', href: '/incidents' }, { title: 'New', href: '/incidents/create' }]}>
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Incidents', href: '/incidents' },
+                    { title: 'New', href: '/incidents/create' },
+                ]}
+            >
                 <Head title="Resume draft incident" />
                 <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-10">
                     <div className="flex items-center gap-3">
@@ -250,8 +290,12 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                             <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-semibold">Resume your draft incident?</h1>
-                            <p className="text-sm text-muted-foreground">We found an unfinished incident on this device.</p>
+                            <h1 className="text-lg font-semibold">
+                                Resume your draft incident?
+                            </h1>
+                            <p className="text-sm text-muted-foreground">
+                                We found an unfinished incident on this device.
+                            </p>
                         </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -268,13 +312,22 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
     const showInjuryFields = data.type === 'injury';
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Incidents', href: '/incidents' }, { title: 'New', href: '/incidents/create' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Incidents', href: '/incidents' },
+                { title: 'New', href: '/incidents/create' },
+            ]}
+        >
             <Head title="Report incident" />
-            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4 sm:pb-8">
+            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:pb-8">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Report an incident</h1>
-                        <p className="text-sm text-muted-foreground">Three quick steps. You can add more detail later.</p>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Report an incident
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Three quick steps. You can add more detail later.
+                        </p>
                     </div>
                     <Link
                         href="/incidents"
@@ -287,7 +340,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
 
                 <WizardStepper steps={STEPS} current={step} />
 
-                <div className="rounded-xl border bg-card p-4 sm:p-6">
+                <Card className="p-4 sm:p-6">
                     {step === 0 && (
                         <StepWhoWhat
                             data={data}
@@ -297,7 +350,13 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                             errors={errors}
                         />
                     )}
-                    {step === 1 && <StepDescribe data={data} onChange={patch} errors={errors} />}
+                    {step === 1 && (
+                        <StepDescribe
+                            data={data}
+                            onChange={patch}
+                            errors={errors}
+                        />
+                    )}
                     {step === 2 && (
                         <StepOptionalDetail
                             data={data}
@@ -305,7 +364,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                             showInjuryFields={showInjuryFields}
                         />
                     )}
-                </div>
+                </Card>
 
                 {savedAt && (
                     <p className="text-xs text-muted-foreground">
@@ -316,7 +375,12 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                 {step < 2 ? (
                     <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0">
                         {step > 0 && (
-                            <Button variant="outline" size="lg" onClick={goBack} className="flex-1 sm:flex-none">
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={goBack}
+                                className="flex-1 sm:flex-none"
+                            >
                                 <ArrowLeft className="mr-1.5 h-4 w-4" />
                                 Back
                             </Button>
@@ -324,8 +388,11 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                         <Button
                             size="lg"
                             onClick={goNext}
-                            disabled={processing || (step === 0 ? !stepOneValid : !stepTwoValid)}
-                            className="flex-1 sm:flex-none sm:min-w-[180px]"
+                            disabled={
+                                processing ||
+                                (step === 0 ? !stepOneValid : !stepTwoValid)
+                            }
+                            className="flex-1 sm:min-w-[180px] sm:flex-none"
                         >
                             {processing ? (
                                 <>

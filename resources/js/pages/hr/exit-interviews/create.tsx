@@ -1,12 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -14,6 +11,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Star } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -44,7 +44,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const NOT_SPECIFIED_VALUE = '__not_specified__';
 
-export default function ExitInterviewCreate({ employees, interviewers, departureReasons }: Props) {
+export default function ExitInterviewCreate({
+    employees,
+    interviewers,
+    departureReasons,
+}: Props) {
     const form = useForm({
         employee_profile_id: '',
         interviewer_user_id: '',
@@ -63,7 +67,10 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         const submitData: any = { ...form.data };
-        if (submitData.would_recommend === '' || submitData.would_recommend === NOT_SPECIFIED_VALUE) {
+        if (
+            submitData.would_recommend === '' ||
+            submitData.would_recommend === NOT_SPECIFIED_VALUE
+        ) {
             submitData.would_recommend = null;
         } else {
             submitData.would_recommend = submitData.would_recommend === 'true';
@@ -79,76 +86,152 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
             <Head title="Record Exit Interview" />
 
             <PageShell>
-                <PageHeader title="Record Exit Interview" description="Capture structured departure feedback." />
+                <PageHeader
+                    title="Record Exit Interview"
+                    description="Capture structured departure feedback."
+                />
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Basic Info */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Interview Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Interview Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label>Departing Employee <span className="text-status-critical">*</span></Label>
+                                    <Label>
+                                        Departing Employee{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
                                     <Select
                                         value={form.data.employee_profile_id}
-                                        onValueChange={(v) => form.setData('employee_profile_id', v)}
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'employee_profile_id',
+                                                v,
+                                            )
+                                        }
                                     >
-                                        <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select employee" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {employees.map((emp) => (
-                                                <SelectItem key={emp.id} value={String(emp.id)}>
-                                                    {emp.user?.name} - {emp.position_title}
+                                                <SelectItem
+                                                    key={emp.id}
+                                                    value={String(emp.id)}
+                                                >
+                                                    {emp.user?.name} -{' '}
+                                                    {emp.position_title}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.employee_profile_id && <p className="mt-1 text-xs text-status-critical">{form.errors.employee_profile_id}</p>}
+                                    {form.errors.employee_profile_id && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.employee_profile_id}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label>Interviewer <span className="text-status-critical">*</span></Label>
+                                    <Label>
+                                        Interviewer{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
                                     <Select
                                         value={form.data.interviewer_user_id}
-                                        onValueChange={(v) => form.setData('interviewer_user_id', v)}
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'interviewer_user_id',
+                                                v,
+                                            )
+                                        }
                                     >
-                                        <SelectTrigger><SelectValue placeholder="Select interviewer" /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select interviewer" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {interviewers.map((user) => (
-                                                <SelectItem key={user.id} value={String(user.id)}>
+                                                <SelectItem
+                                                    key={user.id}
+                                                    value={String(user.id)}
+                                                >
                                                     {user.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.interviewer_user_id && <p className="mt-1 text-xs text-status-critical">{form.errors.interviewer_user_id}</p>}
+                                    {form.errors.interviewer_user_id && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.interviewer_user_id}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label>Interview Date <span className="text-status-critical">*</span></Label>
+                                    <Label>
+                                        Interview Date{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
                                     <Input
                                         type="date"
                                         value={form.data.interview_date}
-                                        onChange={(e) => form.setData('interview_date', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'interview_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {form.errors.interview_date && <p className="mt-1 text-xs text-status-critical">{form.errors.interview_date}</p>}
+                                    {form.errors.interview_date && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.interview_date}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label>Primary Departure Reason <span className="text-status-critical">*</span></Label>
+                                    <Label>
+                                        Primary Departure Reason{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
                                     <Select
                                         value={form.data.departure_reason}
-                                        onValueChange={(v) => form.setData('departure_reason', v)}
+                                        onValueChange={(v) =>
+                                            form.setData('departure_reason', v)
+                                        }
                                     >
-                                        <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select reason" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {departureReasons.map((r) => (
-                                                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                                                <SelectItem
+                                                    key={r.value}
+                                                    value={r.value}
+                                                >
+                                                    {r.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.departure_reason && <p className="mt-1 text-xs text-status-critical">{form.errors.departure_reason}</p>}
+                                    {form.errors.departure_reason && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.departure_reason}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -164,29 +247,45 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 <Label>Overall Satisfaction (1-5)</Label>
                                 <div className="mt-2 flex items-center gap-1">
                                     {[1, 2, 3, 4, 5].map((star) => (
-                                        <button
+                                        <Button
                                             key={star}
                                             type="button"
-                                            onClick={() => form.setData('overall_satisfaction', star)}
-                                            className="rounded p-1 hover:bg-muted"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                form.setData(
+                                                    'overall_satisfaction',
+                                                    star,
+                                                )
+                                            }
+                                            className="h-8 w-8"
                                         >
                                             <Star
                                                 className={`h-6 w-6 ${
-                                                    star <= form.data.overall_satisfaction
+                                                    star <=
+                                                    form.data
+                                                        .overall_satisfaction
                                                         ? 'fill-yellow-400 text-status-warning'
                                                         : 'text-muted-foreground'
                                                 }`}
                                             />
-                                        </button>
+                                        </Button>
                                     ))}
                                     {form.data.overall_satisfaction > 0 && (
-                                        <button
+                                        <Button
                                             type="button"
-                                            className="ml-2 text-xs text-muted-foreground hover:text-foreground"
-                                            onClick={() => form.setData('overall_satisfaction', 0)}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="ml-2 text-xs text-muted-foreground"
+                                            onClick={() =>
+                                                form.setData(
+                                                    'overall_satisfaction',
+                                                    0,
+                                                )
+                                            }
                                         >
                                             Clear
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -195,13 +294,23 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 <Label>Would Recommend as Employer</Label>
                                 <Select
                                     value={form.data.would_recommend}
-                                    onValueChange={(v) => form.setData('would_recommend', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('would_recommend', v)
+                                    }
                                 >
-                                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={NOT_SPECIFIED_VALUE}>Not specified</SelectItem>
-                                        <SelectItem value="true">Yes</SelectItem>
-                                        <SelectItem value="false">No</SelectItem>
+                                        <SelectItem value={NOT_SPECIFIED_VALUE}>
+                                            Not specified
+                                        </SelectItem>
+                                        <SelectItem value="true">
+                                            Yes
+                                        </SelectItem>
+                                        <SelectItem value="false">
+                                            No
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -211,14 +320,21 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                     {/* Feedback */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Feedback</CardTitle>
+                            <CardTitle className="text-base">
+                                Feedback
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
                                 <Label>What Went Well</Label>
                                 <Textarea
                                     value={form.data.what_went_well}
-                                    onChange={(e) => form.setData('what_went_well', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'what_went_well',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Positive experiences during their time here..."
                                 />
@@ -227,7 +343,12 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 <Label>What Could Improve</Label>
                                 <Textarea
                                     value={form.data.what_could_improve}
-                                    onChange={(e) => form.setData('what_could_improve', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'what_could_improve',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Areas for improvement..."
                                 />
@@ -236,7 +357,12 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 <Label>Management Feedback</Label>
                                 <Textarea
                                     value={form.data.management_feedback}
-                                    onChange={(e) => form.setData('management_feedback', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'management_feedback',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Feedback on management and leadership..."
                                 />
@@ -245,7 +371,12 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 <Label>Culture Feedback</Label>
                                 <Textarea
                                     value={form.data.culture_feedback}
-                                    onChange={(e) => form.setData('culture_feedback', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'culture_feedback',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Feedback on company culture..."
                                 />
@@ -254,7 +385,12 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 <Label>Additional Comments</Label>
                                 <Textarea
                                     value={form.data.additional_comments}
-                                    onChange={(e) => form.setData('additional_comments', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'additional_comments',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Any other feedback..."
                                 />
@@ -265,10 +401,17 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                     type="checkbox"
                                     id="is_confidential"
                                     checked={form.data.is_confidential}
-                                    onChange={(e) => form.setData('is_confidential', e.target.checked)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'is_confidential',
+                                            e.target.checked,
+                                        )
+                                    }
                                     className="rounded border-border"
                                 />
-                                <Label htmlFor="is_confidential">Mark as confidential</Label>
+                                <Label htmlFor="is_confidential">
+                                    Mark as confidential
+                                </Label>
                             </div>
                         </CardContent>
                     </Card>
@@ -277,7 +420,11 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                         <Button type="submit" disabled={form.processing}>
                             Save Exit Interview
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => router.get('/hr/exit-interviews')}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => router.get('/hr/exit-interviews')}
+                        >
                             Cancel
                         </Button>
                     </div>

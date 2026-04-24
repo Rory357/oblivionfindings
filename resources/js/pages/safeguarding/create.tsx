@@ -184,15 +184,16 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             const Icon = type.icon;
                                             const isSelected = data.subject_type === type.value;
                                             return (
-                                                <button
+                                                <Button
                                                     key={type.value}
                                                     type="button"
+                                                    variant="outline"
                                                     onClick={() => {
                                                         setData('subject_type', type.value);
                                                         setData('subject_id', '');
                                                         setData('other_subject_name', '');
                                                     }}
-                                                    className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-sm font-medium transition-all ${
+                                                    className={`h-auto flex-col gap-2 whitespace-normal rounded-lg border-2 p-4 transition-all ${
                                                         isSelected
                                                             ? `${type.color} ring-2 ring-offset-1`
                                                             : 'border-border bg-white text-muted-foreground hover:border-border hover:bg-muted'
@@ -200,7 +201,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                                 >
                                                     <Icon className="h-5 w-5" />
                                                     {type.label}
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -275,18 +276,19 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                         {CONCERN_TYPES.map((type) => {
                                             const isSelected = data.concern_type === type.value;
                                             return (
-                                                <button
+                                                <Button
                                                     key={type.value}
                                                     type="button"
+                                                    variant="outline"
                                                     onClick={() => setData('concern_type', type.value)}
-                                                    className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
+                                                    className={`h-auto whitespace-normal rounded-lg border-2 px-3 py-2.5 transition-all ${
                                                         isSelected
                                                             ? `${type.color} ring-2 ring-offset-1`
                                                             : 'border-border bg-white text-muted-foreground hover:border-border hover:bg-muted'
                                                     }`}
                                                 >
                                                     {type.label}
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -314,17 +316,18 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                         {SEVERITY_OPTIONS.map((opt) => {
                                             const isSelected = data.severity === opt.value;
                                             return (
-                                                <button
+                                                <Button
                                                     key={opt.value}
                                                     type="button"
+                                                    variant="outline"
                                                     onClick={() => setData('severity', opt.value)}
-                                                    className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                                                    className={`h-auto gap-2 rounded-lg border-2 px-4 py-2 transition-all ${
                                                         isSelected ? opt.selectedBg + ' ' + opt.color : opt.color
                                                     }`}
                                                 >
                                                     <span className={`h-2.5 w-2.5 rounded-full ${opt.dot}`} />
                                                     {opt.label}
-                                                </button>
+                                                </Button>
                                             );
                                         })}
                                     </div>
@@ -434,10 +437,11 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                     {/* Step 3: Alleged Perpetrator (expandable) */}
                     <Card>
                         <CardContent className="pt-5">
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={() => setPerpetratorOpen(!perpetratorOpen)}
-                                className="flex w-full items-center justify-between"
+                                className="h-auto w-full justify-between p-0 hover:bg-transparent"
                             >
                                 <div className="flex items-center gap-2">
                                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">3</div>
@@ -445,7 +449,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                     <Badge variant="outline" className="text-[10px]">Optional</Badge>
                                 </div>
                                 {perpetratorOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                            </button>
+                            </Button>
 
                             {perpetratorOpen && (
                                 <div className="mt-4 space-y-4 border-t pt-4">

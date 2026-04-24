@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Bell, Save, Settings } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { Settings, Bell, Save } from 'lucide-react';
 
 type PreferenceItem = {
     key: string;
@@ -17,14 +17,21 @@ type Props = {
     preferences: PreferenceItem[];
 };
 
-function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+function Toggle({
+    enabled,
+    onToggle,
+}: {
+    enabled: boolean;
+    onToggle: () => void;
+}) {
     return (
+        // eslint-disable-next-line no-restricted-syntax -- Custom switch track/knob control, not a standard action button.
         <button
             type="button"
             role="switch"
             aria-checked={enabled}
             onClick={onToggle}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${
                 enabled ? 'bg-primary' : 'bg-muted'
             }`}
         >
@@ -38,12 +45,15 @@ function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void 
 }
 
 export default function Preferences({ preferences }: Props) {
-    const [localPreferences, setLocalPreferences] = useState<PreferenceItem[]>(preferences);
+    const [localPreferences, setLocalPreferences] =
+        useState<PreferenceItem[]>(preferences);
     const [saving, setSaving] = useState(false);
 
     const handleToggle = (key: string) => {
         setLocalPreferences((prev) =>
-            prev.map((p) => (p.key === key ? { ...p, enabled: !p.enabled } : p)),
+            prev.map((p) =>
+                p.key === key ? { ...p, enabled: !p.enabled } : p,
+            ),
         );
     };
 
@@ -52,7 +62,10 @@ export default function Preferences({ preferences }: Props) {
         router.post(
             '/portal/preferences',
             {
-                preferences: localPreferences.map((p) => ({ key: p.key, enabled: p.enabled })),
+                preferences: localPreferences.map((p) => ({
+                    key: p.key,
+                    enabled: p.enabled,
+                })),
             },
             {
                 preserveScroll: true,
@@ -79,7 +92,9 @@ export default function Preferences({ preferences }: Props) {
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
                         <Bell className="h-5 w-5 text-primary" />
-                        <h1 className="text-2xl font-semibold tracking-tight">Notification Preferences</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            Notification Preferences
+                        </h1>
                     </div>
                     <p className="text-sm text-muted-foreground">
                         Choose which notifications you'd like to receive
@@ -93,11 +108,18 @@ export default function Preferences({ preferences }: Props) {
                                 <div className="space-y-0.5">
                                     <div className="flex items-center gap-2">
                                         <Settings className="h-4 w-4 text-muted-foreground" />
-                                        <span className="font-medium">{pref.label}</span>
+                                        <span className="font-medium">
+                                            {pref.label}
+                                        </span>
                                     </div>
-                                    <p className="text-sm text-muted-foreground">{pref.description}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {pref.description}
+                                    </p>
                                 </div>
-                                <Toggle enabled={pref.enabled} onToggle={() => handleToggle(pref.key)} />
+                                <Toggle
+                                    enabled={pref.enabled}
+                                    onToggle={() => handleToggle(pref.key)}
+                                />
                             </CardContent>
                         </Card>
                     ))}
@@ -105,11 +127,14 @@ export default function Preferences({ preferences }: Props) {
                     {localPreferences.length === 0 && (
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">No preferences available</CardTitle>
+                                <CardTitle className="text-base">
+                                    No preferences available
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <p className="text-sm text-muted-foreground">
-                                    There are no notification preferences to configure at this time.
+                                    There are no notification preferences to
+                                    configure at this time.
                                 </p>
                             </CardContent>
                         </Card>

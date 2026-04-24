@@ -55,7 +55,7 @@ const statusBannerColors: Record<string, string> = {
 };
 
 export default function DeviceShow({ tracker }: Props) {
-    const device = tracker ?? {} as Props['tracker'];
+    const device = tracker;
     const snapshots = device.telemetry_snapshots ?? [];
     const [showUnpairDialog, setShowUnpairDialog] = useState(false);
 

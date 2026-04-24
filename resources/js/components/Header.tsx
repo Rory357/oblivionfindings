@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { useAppearance } from '@/hooks/use-appearance';
 import { Link, usePage } from '@inertiajs/react';
 import { Menu, Moon, Sun, X } from 'lucide-react';
@@ -76,13 +77,16 @@ const Header: React.FC = () => {
 
             <div className="flex items-center gap-2">
                 {/* Theme toggle */}
-                <button
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
                     onClick={toggleTheme}
-                    className="hidden h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
+                    className="hidden h-10 w-10 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:inline-flex"
                     aria-label="Toggle theme"
                 >
                     {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
+                </Button>
 
                 <Link
                     href="/login"
@@ -99,13 +103,16 @@ const Header: React.FC = () => {
                 </Link>
 
                 {/* Mobile menu button */}
-                <button
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground sm:hidden"
+                    className="h-10 w-10 rounded-xl text-muted-foreground sm:hidden"
                     aria-label="Toggle menu"
                 >
                     {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
+                </Button>
             </div>
 
             {/* Mobile nav */}
@@ -138,18 +145,20 @@ const Header: React.FC = () => {
                             Contact
                         </Link>
                         <div className="my-2 h-px bg-border" />
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
                             onClick={() => {
                                 toggleTheme();
                                 setMobileMenuOpen(false);
                             }}
-                            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
+                            className="h-auto justify-start gap-3 rounded-xl px-4 py-3 text-sm font-normal text-muted-foreground hover:bg-muted"
                         >
                             {isDark ? <Sun size={18} /> : <Moon size={18} />}
                             <span>
                                 Switch to {isDark ? 'light' : 'dark'} mode
                             </span>
-                        </button>
+                        </Button>
                         <Link
                             href="/login"
                             onClick={() => setMobileMenuOpen(false)}

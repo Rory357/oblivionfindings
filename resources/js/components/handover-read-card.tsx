@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { formatRelative } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
@@ -131,24 +132,28 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                         {mood ? ` · ${mood}` : ''}
                     </p>
                 </div>
-                <button
+                <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setCollapsed((v) => !v)}
-                    aria-label={collapsed ? 'Expand handover' : 'Collapse handover'}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-status-info hover:bg-status-info-bg dark:text-status-info dark:hover:bg-status-info"
+                    aria-label={
+                        collapsed ? 'Expand handover' : 'Collapse handover'
+                    }
+                    className="h-9 w-9 shrink-0 text-status-info hover:bg-status-info-bg dark:text-status-info dark:hover:bg-status-info"
                 >
                     {collapsed ? (
                         <ChevronDown className="h-4 w-4" />
                     ) : (
                         <ChevronUp className="h-4 w-4" />
                     )}
-                </button>
+                </Button>
             </div>
 
             {!collapsed && (
                 <div className="mt-3 space-y-3">
                     {/* Meds */}
-                    <div className="rounded-lg border border-status-info/30 bg-background/70 p-3 dark:border-status-info/50">
+                    <Card className="gap-0 rounded-lg border-status-info/30 bg-background/70 p-3 shadow-none dark:border-status-info/50">
                         <div className="flex items-center gap-2 text-sm font-medium">
                             <Pill className="h-4 w-4 text-status-info dark:text-status-info" />
                             Meds
@@ -164,7 +169,12 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                             aria-hidden
                                             className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning"
                                         />
-                                        <span>{itemLabel(m, 'Outstanding medication')}</span>
+                                        <span>
+                                            {itemLabel(
+                                                m,
+                                                'Outstanding medication',
+                                            )}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -173,10 +183,10 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                 All scheduled meds given on the last shift.
                             </p>
                         )}
-                    </div>
+                    </Card>
 
                     {/* Incidents / alerts */}
-                    <div className="rounded-lg border border-status-info/30 bg-background/70 p-3 dark:border-status-info/50">
+                    <Card className="gap-0 rounded-lg border-status-info/30 bg-background/70 p-3 shadow-none dark:border-status-info/50">
                         <div className="flex items-center gap-2 text-sm font-medium">
                             <AlertTriangle className="h-4 w-4 text-status-info dark:text-status-info" />
                             Incidents / alerts
@@ -192,7 +202,12 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                             aria-hidden
                                             className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-status-critical"
                                         />
-                                        <span>{itemLabel(inc, 'Incident noted last shift')}</span>
+                                        <span>
+                                            {itemLabel(
+                                                inc,
+                                                'Incident noted last shift',
+                                            )}
+                                        </span>
                                     </li>
                                 ))}
                                 {followUps.map((f, i) => (
@@ -204,7 +219,9 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                             aria-hidden
                                             className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning"
                                         />
-                                        <span>{itemLabel(f, 'Follow-up needed')}</span>
+                                        <span>
+                                            {itemLabel(f, 'Follow-up needed')}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -213,19 +230,19 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                 Nothing urgent flagged.
                             </p>
                         )}
-                    </div>
+                    </Card>
 
                     {/* Notes */}
                     {hasNotes && (
-                        <div className="rounded-lg border border-status-info/30 bg-background/70 p-3 dark:border-status-info/50">
+                        <Card className="gap-0 rounded-lg border-status-info/30 bg-background/70 p-3 shadow-none dark:border-status-info/50">
                             <div className="flex items-center gap-2 text-sm font-medium">
                                 <FileText className="h-4 w-4 text-status-info dark:text-status-info" />
                                 Notes from last shift
                             </div>
-                            <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">
+                            <p className="mt-1.5 text-sm whitespace-pre-wrap text-foreground">
                                 {notes}
                             </p>
-                        </div>
+                        </Card>
                     )}
                 </div>
             )}

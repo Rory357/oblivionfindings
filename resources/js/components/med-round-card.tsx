@@ -1,6 +1,13 @@
-import { AlertTriangle, Clock, Pill, ShieldAlert, UserCircle2 } from 'lucide-react';
+import {
+    AlertTriangle,
+    Clock,
+    Pill,
+    ShieldAlert,
+    UserCircle2,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { formatTime } from '@/lib/datetime';
 
 /* -------------------------------------------------------------------------- */
@@ -44,12 +51,14 @@ export default function MedRoundCard({
     requiresWitness,
 }: MedRoundCardProps) {
     const safetyFlags: { label: string; tone: 'danger' | 'warn' }[] = [];
-    if (isControlled) safetyFlags.push({ label: 'Controlled drug', tone: 'danger' });
+    if (isControlled)
+        safetyFlags.push({ label: 'Controlled drug', tone: 'danger' });
     if (isHighRisk) safetyFlags.push({ label: 'High risk', tone: 'danger' });
-    if (requiresWitness) safetyFlags.push({ label: 'Witness required', tone: 'warn' });
+    if (requiresWitness)
+        safetyFlags.push({ label: 'Witness required', tone: 'warn' });
 
     return (
-        <div className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <Card className="gap-0 rounded-2xl p-5 sm:p-6">
             {/* Who the dose is for */}
             <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
@@ -64,7 +73,7 @@ export default function MedRoundCard({
                     )}
                 </div>
                 <div className="min-w-0">
-                    <p className="truncate text-base font-semibold leading-tight">
+                    <p className="truncate text-base leading-tight font-semibold">
                         {clientName}
                     </p>
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
@@ -75,17 +84,19 @@ export default function MedRoundCard({
             </div>
 
             {/* The medication itself */}
+            {/* eslint-disable-next-line no-restricted-syntax -- Nested dose summary belongs inside the medication card, so it stays a raw layout surface. */}
             <div className="mt-5 rounded-xl border bg-background p-4">
                 <div className="flex items-start gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <Pill className="h-5 w-5 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-lg font-semibold leading-tight">
+                        <p className="text-lg leading-tight font-semibold">
                             {medicationName}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            {[dose, route, form].filter(Boolean).join(' · ') || 'Dose details not recorded'}
+                            {[dose, route, form].filter(Boolean).join(' · ') ||
+                                'Dose details not recorded'}
                         </p>
                     </div>
                 </div>
@@ -94,7 +105,9 @@ export default function MedRoundCard({
                     <div className="mt-3 rounded-md bg-status-warning-bg p-3 text-sm text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                         <div className="flex gap-2">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                            <p className="whitespace-pre-line">{instructions}</p>
+                            <p className="whitespace-pre-line">
+                                {instructions}
+                            </p>
                         </div>
                     </div>
                 )}
@@ -120,6 +133,6 @@ export default function MedRoundCard({
                     ))}
                 </div>
             )}
-        </div>
+        </Card>
     );
 }

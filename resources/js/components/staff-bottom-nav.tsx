@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 type StaffBottomNavItemKey = 'home' | 'meds' | 'clock' | 'report' | 'more';
@@ -77,7 +78,11 @@ function isHrefActive(currentUrl: string, href: string): boolean {
  * - Active state uses a visible indicator (no hover-only cues).
  * - Respects iOS safe-area-bottom via pb-[env(safe-area-inset-bottom)].
  */
-export function StaffBottomNav({ onMore, items, className }: StaffBottomNavProps) {
+export function StaffBottomNav({
+    onMore,
+    items,
+    className,
+}: StaffBottomNavProps) {
     const { url } = usePage();
 
     const resolvedItems: StaffBottomNavItem[] = (items ?? DEFAULT_ITEMS).map(
@@ -110,7 +115,7 @@ export function StaffBottomNav({ onMore, items, className }: StaffBottomNavProps
                     const content = (
                         <span
                             className={cn(
-                                'relative flex h-full w-full min-h-12 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] font-medium',
+                                'relative flex h-full min-h-12 w-full flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] font-medium',
                                 active
                                     ? 'text-primary'
                                     : 'text-muted-foreground',
@@ -120,7 +125,9 @@ export function StaffBottomNav({ onMore, items, className }: StaffBottomNavProps
                                 aria-hidden
                                 className={cn(
                                     'absolute top-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full transition-opacity',
-                                    active ? 'bg-primary opacity-100' : 'opacity-0',
+                                    active
+                                        ? 'bg-primary opacity-100'
+                                        : 'opacity-0',
                                 )}
                             />
                             <span className="relative">
@@ -129,7 +136,7 @@ export function StaffBottomNav({ onMore, items, className }: StaffBottomNavProps
                                     strokeWidth={active ? 2.25 : 2}
                                 />
                                 {item.badge ? (
-                                    <span className="absolute -top-1 -right-2 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+                                    <span className="absolute -top-1 -right-2 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-destructive-foreground">
                                         {item.badge}
                                     </span>
                                 ) : null}
@@ -144,15 +151,19 @@ export function StaffBottomNav({ onMore, items, className }: StaffBottomNavProps
                     return (
                         <li key={item.key} className="contents">
                             {item.onClick ? (
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
                                     onClick={item.onClick}
                                     aria-current={active ? 'page' : undefined}
                                     aria-label={item.label}
-                                    className={commonClass}
+                                    className={cn(
+                                        commonClass,
+                                        'h-auto rounded-none p-0',
+                                    )}
                                 >
                                     {content}
-                                </button>
+                                </Button>
                             ) : (
                                 <Link
                                     href={item.href}

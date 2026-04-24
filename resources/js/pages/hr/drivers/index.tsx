@@ -1,12 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { type BreadcrumbItem } from '@/types';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 
 interface DriverRecord {
     id: number;
@@ -46,26 +51,34 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     eligible: {
-        className: 'border-status-success/30 text-status-success bg-status-success',
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
         label: 'Eligible',
     },
     pending_review: {
-        className: 'border-status-warning/30 text-status-warning bg-status-warning',
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Pending Review',
     },
     suspended: {
-        className: 'border-status-critical/30 text-status-critical bg-status-critical',
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Suspended',
     },
     expired: {
-        className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
         label: 'Expired',
     },
 };
 
 export default function DriversIndex({ records, summary, filters }: Props) {
     function applyFilter(key: string, value: string | null) {
-        router.get('/hr/compliance/drivers', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/hr/compliance/drivers',
+            { ...filters, [key]: value || undefined },
+            { preserveState: true, replace: true },
+        );
     }
 
     return (
@@ -73,49 +86,71 @@ export default function DriversIndex({ records, summary, filters }: Props) {
             <Head title="Driver Eligibility" />
             <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Driver Eligibility Register</h1>
+                    <h1 className="text-2xl font-bold">
+                        Driver Eligibility Register
+                    </h1>
                 </div>
 
                 {/* Summary Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Total
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold">{summary.total}</p>
+                            <p className="text-2xl font-bold">
+                                {summary.total}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Eligible</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Eligible
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-status-success">{summary.eligible}</p>
+                            <p className="text-2xl font-bold text-status-success">
+                                {summary.eligible}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Pending
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-status-warning">{summary.pending}</p>
+                            <p className="text-2xl font-bold text-status-warning">
+                                {summary.pending}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Suspended</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Suspended
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-status-critical">{summary.suspended}</p>
+                            <p className="text-2xl font-bold text-status-critical">
+                                {summary.suspended}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Expiring
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-muted-foreground">{summary.expiring}</p>
+                            <p className="text-2xl font-bold text-muted-foreground">
+                                {summary.expiring}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
@@ -127,17 +162,28 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                         defaultValue={filters.q}
                         className="w-64"
                         onKeyDown={(e) => {
-                            if (e.key === 'Enter') applyFilter('q', (e.target as HTMLInputElement).value);
+                            if (e.key === 'Enter')
+                                applyFilter(
+                                    'q',
+                                    (e.target as HTMLInputElement).value,
+                                );
                         }}
                     />
-                    <Select value={filters.status || '__none__'} onValueChange={(v) => applyFilter('status', v === '__none__' ? null : v)}>
+                    <Select
+                        value={filters.status || '__none__'}
+                        onValueChange={(v) =>
+                            applyFilter('status', v === '__none__' ? null : v)
+                        }
+                    >
                         <SelectTrigger className="w-40">
                             <SelectValue placeholder="All Status" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="__none__">All Status</SelectItem>
                             <SelectItem value="eligible">Eligible</SelectItem>
-                            <SelectItem value="pending_review">Pending Review</SelectItem>
+                            <SelectItem value="pending_review">
+                                Pending Review
+                            </SelectItem>
                             <SelectItem value="expiring">Expiring</SelectItem>
                             <SelectItem value="suspended">Suspended</SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
@@ -151,25 +197,55 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">Name</th>
-                                    <th className="px-4 py-3 text-left font-medium">Licence Class</th>
-                                    <th className="px-4 py-3 text-left font-medium">Licence Number</th>
-                                    <th className="px-4 py-3 text-left font-medium">Expiry</th>
-                                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    <th className="px-4 py-3 text-left font-medium">Approved</th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Name
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Licence Class
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Licence Number
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Expiry
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Approved
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {records.data.map((record) => {
-                                    const config = statusConfig[record.status] || statusConfig.pending;
+                                    const config =
+                                        statusConfig[record.status] ||
+                                        statusConfig.pending;
                                     return (
-                                        <tr key={record.id} className="hover:bg-muted/30">
-                                            <td className="px-4 py-3 font-medium">{record.user.name}</td>
-                                            <td className="px-4 py-3">{record.licence_class}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{record.licence_number}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{record.licence_expires_at || record.licence_expiry || '-'}</td>
+                                        <tr
+                                            key={record.id}
+                                            className="hover:bg-muted/30"
+                                        >
+                                            <td className="px-4 py-3 font-medium">
+                                                {record.user.name}
+                                            </td>
                                             <td className="px-4 py-3">
-                                                <Badge variant="outline" className={config.className}>
+                                                {record.licence_class}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {record.licence_number}
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {record.licence_expires_at ||
+                                                    record.licence_expiry ||
+                                                    '-'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={config.className}
+                                                >
                                                     {config.label}
                                                 </Badge>
                                             </td>
@@ -181,7 +257,10 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                                 })}
                                 {records.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={6}
+                                            className="px-4 py-8 text-center text-muted-foreground"
+                                        >
                                             No driver eligibility records found.
                                         </td>
                                     </tr>
@@ -195,9 +274,14 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                 {records.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(records.current_page - 1) * records.per_page + 1} to{' '}
-                            {Math.min(records.current_page * records.per_page, records.total)} of{' '}
-                            {records.total} results
+                            Showing{' '}
+                            {(records.current_page - 1) * records.per_page + 1}{' '}
+                            to{' '}
+                            {Math.min(
+                                records.current_page * records.per_page,
+                                records.total,
+                            )}{' '}
+                            of {records.total} results
                         </p>
                         <LaravelPagination links={records.links} />
                     </div>

@@ -443,6 +443,7 @@ export default function RecordAdministrationDialog({
                                 </div>
 
                                 <div className="space-y-2">
+                                    {/* eslint-disable-next-line no-restricted-syntax -- QR code needs a tight white scan surface inside the medication dialog. */}
                                     <div className="rounded-md border bg-white p-2">
                                         <img
                                             src={

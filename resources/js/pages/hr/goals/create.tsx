@@ -1,15 +1,28 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target, ArrowLeft, Lightbulb, Users, User, Building2 } from 'lucide-react';
-import { FormEvent, useMemo } from 'react';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    Building2,
+    Lightbulb,
+    Target,
+    User,
+    Users,
+} from 'lucide-react';
+import { FormEvent, useMemo } from 'react';
 
 interface SelectOption {
     value: string;
@@ -67,12 +80,22 @@ const statusColors: Record<string, string> = {
     behind: 'bg-status-critical-bg text-status-critical',
 };
 
-export default function CreateGoal({ users, parentGoals, parentContext, goalTypes, priorities }: Props) {
+export default function CreateGoal({
+    users,
+    parentGoals,
+    parentContext,
+    goalTypes,
+    priorities,
+}: Props) {
     const form = useForm({
         user_id: '',
         title: '',
         description: '',
-        goal_type: parentContext ? (parentContext.goal_type === 'company' ? 'team' : 'individual') : 'individual',
+        goal_type: parentContext
+            ? parentContext.goal_type === 'company'
+                ? 'team'
+                : 'individual'
+            : 'individual',
         category: '',
         parent_goal_id: parentContext ? String(parentContext.id) : '',
         target_value: '',
@@ -83,7 +106,8 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
         status: 'draft',
     });
 
-    const set = (key: string, value: string) => form.setData(key as keyof typeof form.data, value);
+    const set = (key: string, value: string) =>
+        form.setData(key as keyof typeof form.data, value);
 
     const filteredParentGoals = useMemo(() => {
         if (form.data.goal_type === 'team') {
@@ -112,7 +136,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
             <div className="flex flex-col gap-6 p-6">
                 {/* Green Gradient Header */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-success/80 p-6 text-white md:p-8">
-                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full bg-white/5" />
                     <div className="relative flex items-center gap-4">
                         <Link
@@ -126,9 +150,12 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                 <Target className="h-6 w-6" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold md:text-2xl">Create Objective</h1>
+                                <h1 className="text-xl font-bold md:text-2xl">
+                                    Create Objective
+                                </h1>
                                 <p className="text-sm text-status-success">
-                                    Define a new objective or key result for your organisation
+                                    Define a new objective or key result for
+                                    your organisation
                                 </p>
                             </div>
                         </div>
@@ -150,49 +177,99 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div>
-                                        <Label>Title <span className="text-status-critical">*</span></Label>
+                                        <Label>
+                                            Title{' '}
+                                            <span className="text-status-critical">
+                                                *
+                                            </span>
+                                        </Label>
                                         <Input
                                             value={form.data.title}
-                                            onChange={(e) => set('title', e.target.value)}
+                                            onChange={(e) =>
+                                                set('title', e.target.value)
+                                            }
                                             placeholder="e.g. Increase customer satisfaction score to 90%"
                                             required
                                         />
-                                        {form.errors.title && <p className="mt-1 text-sm text-status-critical">{form.errors.title}</p>}
+                                        {form.errors.title && (
+                                            <p className="mt-1 text-sm text-status-critical">
+                                                {form.errors.title}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div>
                                         <Label>Description</Label>
                                         <Textarea
                                             value={form.data.description}
-                                            onChange={(e) => set('description', e.target.value)}
+                                            onChange={(e) =>
+                                                set(
+                                                    'description',
+                                                    e.target.value,
+                                                )
+                                            }
                                             rows={3}
                                             placeholder="Provide additional context about this objective..."
                                         />
-                                        {form.errors.description && <p className="mt-1 text-sm text-status-critical">{form.errors.description}</p>}
+                                        {form.errors.description && (
+                                            <p className="mt-1 text-sm text-status-critical">
+                                                {form.errors.description}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label>Objective Type <span className="text-status-critical">*</span></Label>
-                                            <Select value={form.data.goal_type} onValueChange={(val) => set('goal_type', val)}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <Label>
+                                                Objective Type{' '}
+                                                <span className="text-status-critical">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Select
+                                                value={form.data.goal_type}
+                                                onValueChange={(val) =>
+                                                    set('goal_type', val)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
                                                 <SelectContent>
                                                     {goalTypes.map((gt) => (
-                                                        <SelectItem key={gt.value} value={gt.value}>{gt.label}</SelectItem>
+                                                        <SelectItem
+                                                            key={gt.value}
+                                                            value={gt.value}
+                                                        >
+                                                            {gt.label}
+                                                        </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {form.errors.goal_type && <p className="mt-1 text-sm text-status-critical">{form.errors.goal_type}</p>}
+                                            {form.errors.goal_type && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.goal_type}
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div>
                                             <Label>Category</Label>
                                             <Input
                                                 value={form.data.category}
-                                                onChange={(e) => set('category', e.target.value)}
+                                                onChange={(e) =>
+                                                    set(
+                                                        'category',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="e.g. Sales, Engineering, Quality"
                                             />
-                                            {form.errors.category && <p className="mt-1 text-sm text-status-critical">{form.errors.category}</p>}
+                                            {form.errors.category && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.category}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </CardContent>
@@ -209,53 +286,123 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                 <CardContent className="space-y-4">
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label>Assigned To <span className="text-status-critical">*</span></Label>
-                                            <Select value={form.data.user_id} onValueChange={(val) => set('user_id', val)}>
-                                                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                                            <Label>
+                                                Assigned To{' '}
+                                                <span className="text-status-critical">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Select
+                                                value={form.data.user_id}
+                                                onValueChange={(val) =>
+                                                    set('user_id', val)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select employee" />
+                                                </SelectTrigger>
                                                 <SelectContent>
                                                     {users.map((u) => (
-                                                        <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                                                        <SelectItem
+                                                            key={u.id}
+                                                            value={String(u.id)}
+                                                        >
+                                                            {u.name}
+                                                        </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {form.errors.user_id && <p className="mt-1 text-sm text-status-critical">{form.errors.user_id}</p>}
+                                            {form.errors.user_id && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.user_id}
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div>
-                                            <Label>Priority <span className="text-status-critical">*</span></Label>
-                                            <Select value={form.data.priority} onValueChange={(val) => set('priority', val)}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <Label>
+                                                Priority{' '}
+                                                <span className="text-status-critical">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Select
+                                                value={form.data.priority}
+                                                onValueChange={(val) =>
+                                                    set('priority', val)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
                                                 <SelectContent>
                                                     {priorities.map((p) => (
-                                                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                                        <SelectItem
+                                                            key={p.value}
+                                                            value={p.value}
+                                                        >
+                                                            {p.label}
+                                                        </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {form.errors.priority && <p className="mt-1 text-sm text-status-critical">{form.errors.priority}</p>}
+                                            {form.errors.priority && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.priority}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label>Start Date <span className="text-status-critical">*</span></Label>
+                                            <Label>
+                                                Start Date{' '}
+                                                <span className="text-status-critical">
+                                                    *
+                                                </span>
+                                            </Label>
                                             <Input
                                                 type="date"
                                                 value={form.data.start_date}
-                                                onChange={(e) => set('start_date', e.target.value)}
+                                                onChange={(e) =>
+                                                    set(
+                                                        'start_date',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 required
                                             />
-                                            {form.errors.start_date && <p className="mt-1 text-sm text-status-critical">{form.errors.start_date}</p>}
+                                            {form.errors.start_date && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.start_date}
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div>
-                                            <Label>Due Date <span className="text-status-critical">*</span></Label>
+                                            <Label>
+                                                Due Date{' '}
+                                                <span className="text-status-critical">
+                                                    *
+                                                </span>
+                                            </Label>
                                             <Input
                                                 type="date"
                                                 value={form.data.due_date}
-                                                onChange={(e) => set('due_date', e.target.value)}
+                                                onChange={(e) =>
+                                                    set(
+                                                        'due_date',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 required
                                             />
-                                            {form.errors.due_date && <p className="mt-1 text-sm text-status-critical">{form.errors.due_date}</p>}
+                                            {form.errors.due_date && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.due_date}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </CardContent>
@@ -277,47 +424,84 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 type="number"
                                                 step="0.01"
                                                 value={form.data.target_value}
-                                                onChange={(e) => set('target_value', e.target.value)}
+                                                onChange={(e) =>
+                                                    set(
+                                                        'target_value',
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="e.g. 100"
                                             />
-                                            {form.errors.target_value && <p className="mt-1 text-sm text-status-critical">{form.errors.target_value}</p>}
+                                            {form.errors.target_value && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.target_value}
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div>
                                             <Label>Unit</Label>
                                             <Input
                                                 value={form.data.unit}
-                                                onChange={(e) => set('unit', e.target.value)}
+                                                onChange={(e) =>
+                                                    set('unit', e.target.value)
+                                                }
                                                 placeholder="e.g. %, deals, hours"
                                             />
-                                            {form.errors.unit && <p className="mt-1 text-sm text-status-critical">{form.errors.unit}</p>}
+                                            {form.errors.unit && (
+                                                <p className="mt-1 text-sm text-status-critical">
+                                                    {form.errors.unit}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
                                     <div>
                                         <Label>Parent Objective</Label>
                                         <Select
-                                            value={form.data.parent_goal_id || 'none'}
-                                            onValueChange={(val) => set('parent_goal_id', val === 'none' ? '' : val)}
+                                            value={
+                                                form.data.parent_goal_id ||
+                                                'none'
+                                            }
+                                            onValueChange={(val) =>
+                                                set(
+                                                    'parent_goal_id',
+                                                    val === 'none' ? '' : val,
+                                                )
+                                            }
                                         >
-                                            <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="None" />
+                                            </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="none">None</SelectItem>
-                                                {filteredParentGoals.map((g) => (
-                                                    <SelectItem key={g.id} value={String(g.id)}>
-                                                        {g.title}
-                                                    </SelectItem>
-                                                ))}
+                                                <SelectItem value="none">
+                                                    None
+                                                </SelectItem>
+                                                {filteredParentGoals.map(
+                                                    (g) => (
+                                                        <SelectItem
+                                                            key={g.id}
+                                                            value={String(g.id)}
+                                                        >
+                                                            {g.title}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
                                             </SelectContent>
                                         </Select>
                                         <p className="mt-1 text-xs text-muted-foreground">
                                             {form.data.goal_type === 'team'
                                                 ? 'Showing company-level objectives as potential parents'
-                                                : form.data.goal_type === 'individual'
+                                                : form.data.goal_type ===
+                                                    'individual'
                                                   ? 'Showing team-level objectives as potential parents'
                                                   : 'Company objectives have no parent'}
                                         </p>
-                                        {form.errors.parent_goal_id && <p className="mt-1 text-sm text-status-critical">{form.errors.parent_goal_id}</p>}
+                                        {form.errors.parent_goal_id && (
+                                            <p className="mt-1 text-sm text-status-critical">
+                                                {form.errors.parent_goal_id}
+                                            </p>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -325,7 +509,9 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                             {/* Card 4: Initial Status */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Initial Status</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Initial Status
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex gap-4">
@@ -334,13 +520,22 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 type="radio"
                                                 name="status"
                                                 value="draft"
-                                                checked={form.data.status === 'draft'}
-                                                onChange={() => set('status', 'draft')}
+                                                checked={
+                                                    form.data.status === 'draft'
+                                                }
+                                                onChange={() =>
+                                                    set('status', 'draft')
+                                                }
                                                 className="accent-emerald-600"
                                             />
                                             <div>
-                                                <div className="font-medium">Draft</div>
-                                                <div className="text-xs text-muted-foreground">Save as draft for review before activation</div>
+                                                <div className="font-medium">
+                                                    Draft
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    Save as draft for review
+                                                    before activation
+                                                </div>
                                             </div>
                                         </label>
                                         <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition hover:bg-muted has-[:checked]:border-status-success/30 has-[:checked]:bg-status-success-bg">
@@ -348,26 +543,46 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 type="radio"
                                                 name="status"
                                                 value="active"
-                                                checked={form.data.status === 'active'}
-                                                onChange={() => set('status', 'active')}
+                                                checked={
+                                                    form.data.status ===
+                                                    'active'
+                                                }
+                                                onChange={() =>
+                                                    set('status', 'active')
+                                                }
                                                 className="accent-emerald-600"
                                             />
                                             <div>
-                                                <div className="font-medium">Active</div>
-                                                <div className="text-xs text-muted-foreground">Start tracking progress immediately</div>
+                                                <div className="font-medium">
+                                                    Active
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    Start tracking progress
+                                                    immediately
+                                                </div>
                                             </div>
                                         </label>
                                     </div>
-                                    {form.errors.status && <p className="mt-1 text-sm text-status-critical">{form.errors.status}</p>}
+                                    {form.errors.status && (
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {form.errors.status}
+                                        </p>
+                                    )}
                                 </CardContent>
                             </Card>
 
                             {/* Actions */}
                             <div className="flex items-center justify-end gap-3">
                                 <Link href="/hr/goals">
-                                    <Button type="button" variant="outline">Cancel</Button>
+                                    <Button type="button" variant="outline">
+                                        Cancel
+                                    </Button>
                                 </Link>
-                                <Button type="submit" disabled={form.processing} className="bg-status-success hover:bg-status-success">
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                    className="bg-status-success hover:bg-status-success"
+                                >
                                     <Target className="mr-2 h-4 w-4" />
                                     Create Objective
                                 </Button>
@@ -381,12 +596,17 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                         {parentContext && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Parent Objective</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Parent Objective
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <div className="flex items-start gap-3">
                                         {(() => {
-                                            const Icon = goalTypeIcons[parentContext.goal_type] ?? Target;
+                                            const Icon =
+                                                goalTypeIcons[
+                                                    parentContext.goal_type
+                                                ] ?? Target;
                                             return (
                                                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
                                                     <Icon className="h-4 w-4" />
@@ -396,16 +616,24 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                         <div className="min-w-0">
                                             <Link
                                                 href={`/hr/goals/${parentContext.id}`}
-                                                className="font-medium text-sm hover:underline"
+                                                className="text-sm font-medium hover:underline"
                                             >
                                                 {parentContext.title}
                                             </Link>
                                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                                <Badge variant="outline" className="text-xs capitalize">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-xs capitalize"
+                                                >
                                                     {parentContext.goal_type}
                                                 </Badge>
-                                                <Badge className={`text-xs ${statusColors[parentContext.status] ?? 'bg-muted text-foreground'}`}>
-                                                    {parentContext.status.replace(/_/g, ' ')}
+                                                <Badge
+                                                    className={`text-xs ${statusColors[parentContext.status] ?? 'bg-muted text-foreground'}`}
+                                                >
+                                                    {parentContext.status.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
                                                 </Badge>
                                             </div>
                                         </div>
@@ -415,12 +643,19 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                     <div>
                                         <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                                             <span>Progress</span>
-                                            <span>{parentContext.progress_percentage}%</span>
+                                            <span>
+                                                {
+                                                    parentContext.progress_percentage
+                                                }
+                                                %
+                                            </span>
                                         </div>
                                         <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                             <div
                                                 className="h-full rounded-full bg-status-success transition-all"
-                                                style={{ width: `${parentContext.progress_percentage}%` }}
+                                                style={{
+                                                    width: `${parentContext.progress_percentage}%`,
+                                                }}
                                             />
                                         </div>
                                     </div>
@@ -428,13 +663,22 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                     {parentContext.user && (
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <User className="h-3 w-3" />
-                                            <span>Owner: {parentContext.user.name}</span>
+                                            <span>
+                                                Owner: {parentContext.user.name}
+                                            </span>
                                         </div>
                                     )}
 
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <Target className="h-3 w-3" />
-                                        <span>{parentContext.key_results_count} key result{parentContext.key_results_count !== 1 ? 's' : ''}</span>
+                                        <span>
+                                            {parentContext.key_results_count}{' '}
+                                            key result
+                                            {parentContext.key_results_count !==
+                                            1
+                                                ? 's'
+                                                : ''}
+                                        </span>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -452,15 +696,26 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                 <ul className="space-y-3 text-sm text-muted-foreground">
                                     <li className="flex gap-2">
                                         <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
-                                        <span>Company objectives cascade to teams, which cascade to individuals.</span>
+                                        <span>
+                                            Company objectives cascade to teams,
+                                            which cascade to individuals.
+                                        </span>
                                     </li>
                                     <li className="flex gap-2">
                                         <Target className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
-                                        <span>Add Key Results after creating the objective to define measurable outcomes.</span>
+                                        <span>
+                                            Add Key Results after creating the
+                                            objective to define measurable
+                                            outcomes.
+                                        </span>
                                     </li>
                                     <li className="flex gap-2">
                                         <Users className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
-                                        <span>Keep objectives ambitious but achievable. Aim for 70% completion as a healthy target.</span>
+                                        <span>
+                                            Keep objectives ambitious but
+                                            achievable. Aim for 70% completion
+                                            as a healthy target.
+                                        </span>
                                     </li>
                                 </ul>
                             </CardContent>

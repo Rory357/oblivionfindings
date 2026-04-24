@@ -1,11 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -13,9 +12,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
 import { Briefcase, Plus, Search, Users } from 'lucide-react';
 import { useState } from 'react';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type Position = {
     id: number;
@@ -65,7 +65,12 @@ const employmentTypeLabels: Record<string, string> = {
     fixed_term: 'Fixed Term',
 };
 
-export default function PositionsIndex({ positions, departments, filters, can }: Props) {
+export default function PositionsIndex({
+    positions,
+    departments,
+    filters,
+    can,
+}: Props) {
     const [searchValue, setSearchValue] = useState(filters.q ?? '');
 
     const updateFilter = (key: string, value: string | null) => {
@@ -73,7 +78,10 @@ export default function PositionsIndex({ positions, departments, filters, can }:
         if (value === null || value === 'all') {
             delete newFilters[key as keyof typeof newFilters];
         }
-        router.get('/hr/positions', newFilters, { preserveState: true, replace: true });
+        router.get('/hr/positions', newFilters, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const handleSearch = (e: React.FormEvent) => {
@@ -93,7 +101,7 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                         can.manage ? (
                             <Button asChild>
                                 <Link href="/hr/positions/create">
-                                    <Plus className="h-4 w-4 mr-2" />
+                                    <Plus className="mr-2 h-4 w-4" />
                                     New Position
                                 </Link>
                             </Button>
@@ -102,15 +110,18 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                 />
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border bg-card">
-                    <form onSubmit={handleSearch} className="flex items-center gap-2">
+                <Card className="flex flex-wrap items-center gap-2 p-3">
+                    <form
+                        onSubmit={handleSearch}
+                        className="flex items-center gap-2"
+                    >
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search positions..."
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
-                                className="pl-8 w-[200px]"
+                                className="w-[200px] pl-8"
                             />
                         </div>
                         <Button type="submit" variant="outline" size="sm">
@@ -120,7 +131,9 @@ export default function PositionsIndex({ positions, departments, filters, can }:
 
                     <Select
                         value={filters.department ?? 'all'}
-                        onValueChange={(v) => updateFilter('department', v === 'all' ? null : v)}
+                        onValueChange={(v) =>
+                            updateFilter('department', v === 'all' ? null : v)
+                        }
                     >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Departments" />
@@ -128,7 +141,10 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                         <SelectContent>
                             <SelectItem value="all">All Departments</SelectItem>
                             {departments.map((dept) => (
-                                <SelectItem key={dept.id} value={String(dept.id)}>
+                                <SelectItem
+                                    key={dept.id}
+                                    value={String(dept.id)}
+                                >
                                     {dept.name}
                                 </SelectItem>
                             ))}
@@ -137,7 +153,9 @@ export default function PositionsIndex({ positions, departments, filters, can }:
 
                     <Select
                         value={filters.status ?? 'all'}
-                        onValueChange={(v) => updateFilter('status', v === 'all' ? null : v)}
+                        onValueChange={(v) =>
+                            updateFilter('status', v === 'all' ? null : v)
+                        }
                     >
                         <SelectTrigger className="w-[140px]">
                             <SelectValue placeholder="All Statuses" />
@@ -154,12 +172,16 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                         size="sm"
                         onClick={() => {
                             setSearchValue('');
-                            router.get('/hr/positions', {}, { preserveState: true });
+                            router.get(
+                                '/hr/positions',
+                                {},
+                                { preserveState: true },
+                            );
                         }}
                     >
                         Clear Filters
                     </Button>
-                </div>
+                </Card>
 
                 {/* Positions Table */}
                 <Card>
@@ -171,8 +193,8 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                     </CardHeader>
                     <CardContent className="p-0">
                         {positions.data.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                                <Briefcase className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <div className="py-12 text-center text-muted-foreground">
+                                <Briefcase className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                 <p>No positions found.</p>
                             </div>
                         ) : (
@@ -180,29 +202,55 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-muted/5">
                                         <tr>
-                                            <th className="px-4 py-3 text-left font-medium">Title</th>
-                                            <th className="px-4 py-3 text-left font-medium">Code</th>
-                                            <th className="px-4 py-3 text-left font-medium">Department</th>
-                                            <th className="px-4 py-3 text-left font-medium">Type</th>
-                                            <th className="px-4 py-3 text-left font-medium">FTE</th>
-                                            <th className="px-4 py-3 text-left font-medium">Headcount</th>
-                                            <th className="px-4 py-3 text-left font-medium">Vacancies</th>
-                                            <th className="px-4 py-3 text-left font-medium">Status</th>
-                                            <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Title
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Code
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Department
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Type
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                FTE
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Headcount
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Vacancies
+                                            </th>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                Status
+                                            </th>
+                                            <th className="px-4 py-3 text-right font-medium">
+                                                Actions
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {positions.data.map((position) => (
-                                            <tr key={position.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                                <td className="px-4 py-3 font-medium">{position.title}</td>
-                                                <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
+                                            <tr
+                                                key={position.id}
+                                                className="border-b last:border-b-0 hover:bg-muted/50"
+                                            >
+                                                <td className="px-4 py-3 font-medium">
+                                                    {position.title}
+                                                </td>
+                                                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                                                     {position.code}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {position.department ?? '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {employmentTypeLabels[position.employment_type] ?? position.employment_type}
+                                                    {employmentTypeLabels[
+                                                        position.employment_type
+                                                    ] ??
+                                                        position.employment_type}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {position.fte}
@@ -210,39 +258,76 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-1">
                                                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <span>{position.current_headcount}/{position.headcount_budget}</span>
+                                                        <span>
+                                                            {
+                                                                position.current_headcount
+                                                            }
+                                                            /
+                                                            {
+                                                                position.headcount_budget
+                                                            }
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {position.vacancies > 0 ? (
-                                                        <Badge variant="outline" className="border-status-info/30 text-status-info bg-status-info">
-                                                            {position.vacancies} open
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-info/30 bg-status-info text-status-info"
+                                                        >
+                                                            {position.vacancies}{' '}
+                                                            open
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-border/30 text-muted-foreground"
+                                                        >
                                                             Filled
                                                         </Badge>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {position.is_active ? (
-                                                        <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-success/30 bg-status-success text-status-success"
+                                                        >
                                                             Active
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-status-critical/30 text-status-critical bg-status-critical">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-critical/30 bg-status-critical text-status-critical"
+                                                        >
                                                             Inactive
                                                         </Badge>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/hr/positions/${position.id}`}>View</Link>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/hr/positions/${position.id}`}
+                                                            >
+                                                                View
+                                                            </Link>
                                                         </Button>
                                                         {can.manage && (
-                                                            <Button variant="ghost" size="sm" asChild>
-                                                                <Link href={`/hr/positions/${position.id}/edit`}>Edit</Link>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                asChild
+                                                            >
+                                                                <Link
+                                                                    href={`/hr/positions/${position.id}/edit`}
+                                                                >
+                                                                    Edit
+                                                                </Link>
                                                             </Button>
                                                         )}
                                                     </div>
@@ -260,9 +345,15 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                 {positions.last_page > 1 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {(positions.current_page - 1) * positions.per_page + 1} to{' '}
-                            {Math.min(positions.current_page * positions.per_page, positions.total)} of{' '}
-                            {positions.total} results
+                            Showing{' '}
+                            {(positions.current_page - 1) * positions.per_page +
+                                1}{' '}
+                            to{' '}
+                            {Math.min(
+                                positions.current_page * positions.per_page,
+                                positions.total,
+                            )}{' '}
+                            of {positions.total} results
                         </p>
                         <LaravelPagination links={positions.links} />
                     </div>

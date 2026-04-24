@@ -1,13 +1,13 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { PenTool, X, RotateCcw, FileText } from 'lucide-react';
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { FileText, PenTool, RotateCcw, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type SignatureData = {
     id: number;
@@ -33,9 +33,21 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    pending: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Pending' },
-    signed: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Signed' },
-    declined: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Declined' },
+    pending: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Pending',
+    },
+    signed: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Signed',
+    },
+    declined: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Declined',
+    },
 };
 
 export default function SignDocument({ signature, can }: Props) {
@@ -156,7 +168,9 @@ export default function SignDocument({ signature, can }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 <div>
                     <h1 className="text-2xl font-bold">Sign Document</h1>
-                    <p className="text-sm text-muted-foreground">Review the document and provide your signature</p>
+                    <p className="text-sm text-muted-foreground">
+                        Review the document and provide your signature
+                    </p>
                 </div>
 
                 {/* Document Info */}
@@ -170,31 +184,51 @@ export default function SignDocument({ signature, can }: Props) {
                     <CardContent className="space-y-3">
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                                <span className="text-muted-foreground">Category: </span>
-                                <span className="capitalize">{signature.document_category || 'General'}</span>
+                                <span className="text-muted-foreground">
+                                    Category:{' '}
+                                </span>
+                                <span className="capitalize">
+                                    {signature.document_category || 'General'}
+                                </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground">File: </span>
-                                <span>{signature.document_original_name || 'N/A'}</span>
+                                <span className="text-muted-foreground">
+                                    File:{' '}
+                                </span>
+                                <span>
+                                    {signature.document_original_name || 'N/A'}
+                                </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground">Requested by: </span>
+                                <span className="text-muted-foreground">
+                                    Requested by:{' '}
+                                </span>
                                 <span>{signature.requested_by}</span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground">Requested: </span>
+                                <span className="text-muted-foreground">
+                                    Requested:{' '}
+                                </span>
                                 <span>{signature.requested_at}</span>
                             </div>
                         </div>
                         <div>
-                            <Badge variant="outline" className={config.className}>{config.label}</Badge>
+                            <Badge
+                                variant="outline"
+                                className={config.className}
+                            >
+                                {config.label}
+                            </Badge>
                         </div>
                         {signature.signed_at && (
-                            <p className="text-sm text-status-success">Signed on {signature.signed_at}</p>
+                            <p className="text-sm text-status-success">
+                                Signed on {signature.signed_at}
+                            </p>
                         )}
                         {signature.declined_reason && (
                             <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical">
-                                <strong>Decline reason:</strong> {signature.declined_reason}
+                                <strong>Decline reason:</strong>{' '}
+                                {signature.declined_reason}
                             </div>
                         )}
                     </CardContent>
@@ -210,19 +244,27 @@ export default function SignDocument({ signature, can }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {/* eslint-disable-next-line no-restricted-syntax -- Signature canvas frame is an input surface, not a content card. */}
                             <div className="rounded-lg border-2 border-dashed border-muted bg-white p-1">
                                 <canvas
                                     ref={canvasRef}
                                     className="w-full cursor-crosshair"
-                                    style={{ height: '200px', touchAction: 'none' }}
+                                    style={{
+                                        height: '200px',
+                                        touchAction: 'none',
+                                    }}
                                 />
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Draw your signature above using your mouse or touch input
+                                Draw your signature above using your mouse or
+                                touch input
                             </p>
 
                             <div className="flex gap-2">
-                                <Button onClick={handleSign} disabled={!hasDrawn || signForm.processing}>
+                                <Button
+                                    onClick={handleSign}
+                                    disabled={!hasDrawn || signForm.processing}
+                                >
                                     <PenTool className="mr-1.5 h-4 w-4" />
                                     Sign Document
                                 </Button>
@@ -232,7 +274,9 @@ export default function SignDocument({ signature, can }: Props) {
                                 </Button>
                                 <Button
                                     variant="destructive"
-                                    onClick={() => setShowDeclineForm(!showDeclineForm)}
+                                    onClick={() =>
+                                        setShowDeclineForm(!showDeclineForm)
+                                    }
                                 >
                                     <X className="mr-1.5 h-4 w-4" />
                                     Decline
@@ -240,24 +284,44 @@ export default function SignDocument({ signature, can }: Props) {
                             </div>
 
                             {showDeclineForm && (
-                                <form onSubmit={handleDecline} className="space-y-3 rounded-md border p-4">
+                                <form
+                                    onSubmit={handleDecline}
+                                    className="space-y-3 rounded-md border p-4"
+                                >
                                     <div className="space-y-2">
                                         <Label>Reason for declining</Label>
                                         <Textarea
                                             value={declineForm.data.reason}
-                                            onChange={(e) => declineForm.setData('reason', e.target.value)}
+                                            onChange={(e) =>
+                                                declineForm.setData(
+                                                    'reason',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="Please provide a reason for declining to sign..."
                                             className="h-24"
                                         />
                                         {declineForm.errors.reason && (
-                                            <p className="text-sm text-status-critical">{declineForm.errors.reason}</p>
+                                            <p className="text-sm text-status-critical">
+                                                {declineForm.errors.reason}
+                                            </p>
                                         )}
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button type="submit" variant="destructive" disabled={declineForm.processing}>
+                                        <Button
+                                            type="submit"
+                                            variant="destructive"
+                                            disabled={declineForm.processing}
+                                        >
                                             Confirm Decline
                                         </Button>
-                                        <Button type="button" variant="outline" onClick={() => setShowDeclineForm(false)}>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setShowDeclineForm(false)
+                                            }
+                                        >
                                             Cancel
                                         </Button>
                                     </div>

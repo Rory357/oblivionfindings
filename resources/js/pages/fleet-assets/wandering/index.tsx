@@ -85,7 +85,7 @@ function alertTypeLabel(type: string): string {
 }
 
 export default function WanderingAlertsIndex({ alerts, stats, filters, can }: Props) {
-    const alertData = alerts?.data ?? [];
+    const alertData = useMemo(() => alerts?.data ?? [], [alerts?.data]);
     const canManage = can.manage;
 
     // Real-time WebSocket listener for wandering alert broadcasts.

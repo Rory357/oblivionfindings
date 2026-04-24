@@ -1,13 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, useForm, Link } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
 
 interface Competency {
     id: number;
@@ -52,7 +56,11 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
         })) as AssessmentRow[],
     });
 
-    const updateAssessment = (index: number, field: keyof AssessmentRow, value: string) => {
+    const updateAssessment = (
+        index: number,
+        field: keyof AssessmentRow,
+        value: string,
+    ) => {
         const updated = [...data.assessments];
         updated[index] = { ...updated[index], [field]: value };
         setData('assessments', updated);
@@ -63,11 +71,14 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
         post('/hr/performance/competencies/assess');
     };
 
-    const grouped = competencies.reduce((acc, comp) => {
-        if (!acc[comp.category]) acc[comp.category] = [];
-        acc[comp.category].push(comp);
-        return acc;
-    }, {} as Record<string, Competency[]>);
+    const grouped = competencies.reduce(
+        (acc, comp) => {
+            if (!acc[comp.category]) acc[comp.category] = [];
+            acc[comp.category].push(comp);
+            return acc;
+        },
+        {} as Record<string, Competency[]>,
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -75,7 +86,9 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
 
             <div className="space-y-4">
                 <div>
-                    <h1 className="text-lg font-semibold">Competency Assessment</h1>
+                    <h1 className="text-lg font-semibold">
+                        Competency Assessment
+                    </h1>
                     <div className="mt-1 text-sm text-muted-foreground">
                         Rate an employee against the competency framework
                     </div>
@@ -84,19 +97,37 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                 <form onSubmit={submit} className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Select Employee</CardTitle>
+                            <CardTitle className="text-base">
+                                Select Employee
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="max-w-sm">
-                                <Select value={data.employee_user_id} onValueChange={(val) => setData('employee_user_id', val)}>
-                                    <SelectTrigger><SelectValue placeholder="Choose employee..." /></SelectTrigger>
+                                <Select
+                                    value={data.employee_user_id}
+                                    onValueChange={(val) =>
+                                        setData('employee_user_id', val)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Choose employee..." />
+                                    </SelectTrigger>
                                     <SelectContent>
                                         {staff.map((s) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                            <SelectItem
+                                                key={s.id}
+                                                value={String(s.id)}
+                                            >
+                                                {s.name}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.employee_user_id && <p className="mt-1 text-xs text-status-critical">{errors.employee_user_id}</p>}
+                                {errors.employee_user_id && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {errors.employee_user_id}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -104,55 +135,130 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                     {Object.entries(grouped).map(([category, comps]) => (
                         <Card key={category}>
                             <CardHeader>
-                                <CardTitle className="text-base">{category}</CardTitle>
+                                <CardTitle className="text-base">
+                                    {category}
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {comps.map((comp) => {
-                                    const index = data.assessments.findIndex((a) => a.competency_id === comp.id);
+                                    const index = data.assessments.findIndex(
+                                        (a) => a.competency_id === comp.id,
+                                    );
                                     if (index === -1) return null;
-                                    const levels = comp.proficiency_levels || ['1', '2', '3', '4', '5'];
+                                    const levels = comp.proficiency_levels || [
+                                        '1',
+                                        '2',
+                                        '3',
+                                        '4',
+                                        '5',
+                                    ];
 
                                     return (
-                                        <div key={comp.id} className="rounded-lg border p-4 space-y-3">
-                                            <div className="font-medium">{comp.name}</div>
+                                        <div
+                                            key={comp.id}
+                                            className="space-y-3 rounded-lg border p-4"
+                                        >
+                                            <div className="font-medium">
+                                                {comp.name}
+                                            </div>
                                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                                 <div>
-                                                    <Label className="text-xs text-muted-foreground">Current Level</Label>
+                                                    <Label className="text-xs text-muted-foreground">
+                                                        Current Level
+                                                    </Label>
                                                     <Select
-                                                        value={data.assessments[index].proficiency_level}
-                                                        onValueChange={(val) => updateAssessment(index, 'proficiency_level', val)}
+                                                        value={
+                                                            data.assessments[
+                                                                index
+                                                            ].proficiency_level
+                                                        }
+                                                        onValueChange={(val) =>
+                                                            updateAssessment(
+                                                                index,
+                                                                'proficiency_level',
+                                                                val,
+                                                            )
+                                                        }
                                                     >
-                                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select..." />
+                                                        </SelectTrigger>
                                                         <SelectContent>
-                                                            {levels.map((level, i) => (
-                                                                <SelectItem key={i} value={String(i + 1)}>
-                                                                    {i + 1} - {level}
-                                                                </SelectItem>
-                                                            ))}
+                                                            {levels.map(
+                                                                (level, i) => (
+                                                                    <SelectItem
+                                                                        key={i}
+                                                                        value={String(
+                                                                            i +
+                                                                                1,
+                                                                        )}
+                                                                    >
+                                                                        {i + 1}{' '}
+                                                                        -{' '}
+                                                                        {level}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs text-muted-foreground">Target Level</Label>
+                                                    <Label className="text-xs text-muted-foreground">
+                                                        Target Level
+                                                    </Label>
                                                     <Select
-                                                        value={data.assessments[index].target_level}
-                                                        onValueChange={(val) => updateAssessment(index, 'target_level', val)}
+                                                        value={
+                                                            data.assessments[
+                                                                index
+                                                            ].target_level
+                                                        }
+                                                        onValueChange={(val) =>
+                                                            updateAssessment(
+                                                                index,
+                                                                'target_level',
+                                                                val,
+                                                            )
+                                                        }
                                                     >
-                                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select..." />
+                                                        </SelectTrigger>
                                                         <SelectContent>
-                                                            {levels.map((level, i) => (
-                                                                <SelectItem key={i} value={String(i + 1)}>
-                                                                    {i + 1} - {level}
-                                                                </SelectItem>
-                                                            ))}
+                                                            {levels.map(
+                                                                (level, i) => (
+                                                                    <SelectItem
+                                                                        key={i}
+                                                                        value={String(
+                                                                            i +
+                                                                                1,
+                                                                        )}
+                                                                    >
+                                                                        {i + 1}{' '}
+                                                                        -{' '}
+                                                                        {level}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs text-muted-foreground">Notes</Label>
+                                                    <Label className="text-xs text-muted-foreground">
+                                                        Notes
+                                                    </Label>
                                                     <Textarea
-                                                        value={data.assessments[index].notes}
-                                                        onChange={(e) => updateAssessment(index, 'notes', e.target.value)}
+                                                        value={
+                                                            data.assessments[
+                                                                index
+                                                            ].notes
+                                                        }
+                                                        onChange={(e) =>
+                                                            updateAssessment(
+                                                                index,
+                                                                'notes',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         rows={1}
                                                     />
                                                 </div>
@@ -165,9 +271,13 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                     ))}
 
                     <div className="flex items-center gap-3">
-                        <Button type="submit" disabled={processing}>Save Assessment</Button>
+                        <Button type="submit" disabled={processing}>
+                            Save Assessment
+                        </Button>
                         <Button type="button" variant="outline" asChild>
-                            <Link href="/hr/performance/competencies">Cancel</Link>
+                            <Link href="/hr/performance/competencies">
+                                Cancel
+                            </Link>
                         </Button>
                     </div>
                 </form>

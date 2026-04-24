@@ -1,9 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import { Calendar, Clock } from 'lucide-react';
 
 interface CalendarEvent {
@@ -32,12 +38,17 @@ const typeColors: Record<string, string> = {
     compliance: 'bg-status-info-bg text-status-info border-status-info/30',
     vetting: 'bg-primary/10 text-primary border-primary',
     driver: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    training: 'bg-status-success-bg text-status-success border-status-success/30',
+    training:
+        'bg-status-success-bg text-status-success border-status-success/30',
 };
 
 export default function ComplianceCalendar({ events, filters }: Props) {
     function applyFilter(key: string, value: string | null) {
-        router.get('/hr/compliance/calendar', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/hr/compliance/calendar',
+            { ...filters, [key]: value || undefined },
+            { preserveState: true, replace: true },
+        );
     }
 
     // Group events by month
@@ -53,11 +64,19 @@ export default function ComplianceCalendar({ events, filters }: Props) {
 
     const formatMonthLabel = (key: string) => {
         const [year, month] = key.split('-');
-        return new Date(Number(year), Number(month) - 1).toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+        return new Date(Number(year), Number(month) - 1).toLocaleDateString(
+            'en-NZ',
+            { month: 'long', year: 'numeric' },
+        );
     };
 
     const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString('en-NZ', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+        new Date(d).toLocaleDateString('en-NZ', {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -71,14 +90,18 @@ export default function ComplianceCalendar({ events, filters }: Props) {
                 <div className="flex flex-wrap items-center gap-3">
                     <Select
                         value={filters.type || '__none__'}
-                        onValueChange={(v) => applyFilter('type', v === '__none__' ? null : v)}
+                        onValueChange={(v) =>
+                            applyFilter('type', v === '__none__' ? null : v)
+                        }
                     >
                         <SelectTrigger className="w-48">
                             <SelectValue placeholder="Event Type" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="__none__">All Types</SelectItem>
-                            <SelectItem value="compliance">Compliance</SelectItem>
+                            <SelectItem value="compliance">
+                                Compliance
+                            </SelectItem>
                             <SelectItem value="vetting">Vetting</SelectItem>
                             <SelectItem value="driver">Driver</SelectItem>
                             <SelectItem value="training">Training</SelectItem>
@@ -92,7 +115,10 @@ export default function ComplianceCalendar({ events, filters }: Props) {
                         <CardContent className="pt-6">
                             <div className="py-8 text-center text-sm text-muted-foreground">
                                 <Calendar className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                <p>No compliance events found for the selected filter.</p>
+                                <p>
+                                    No compliance events found for the selected
+                                    filter.
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -108,33 +134,64 @@ export default function ComplianceCalendar({ events, filters }: Props) {
                             <CardContent>
                                 <div className="space-y-2">
                                     {grouped[monthKey]
-                                        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+                                        .sort(
+                                            (a, b) =>
+                                                new Date(a.start).getTime() -
+                                                new Date(b.start).getTime(),
+                                        )
                                         .map((evt) => (
                                             <div
                                                 key={evt.id}
-                                                className="flex items-center gap-4 p-3 rounded-lg border hover:bg-muted/30"
+                                                className="flex items-center gap-4 rounded-lg border p-3 hover:bg-muted/30"
                                             >
                                                 <div
-                                                    className="w-1 h-10 rounded-full shrink-0"
-                                                    style={{ backgroundColor: evt.color || '#6b7280' }}
+                                                    className="h-10 w-1 shrink-0 rounded-full"
+                                                    style={{
+                                                        backgroundColor:
+                                                            evt.color ||
+                                                            '#6b7280',
+                                                    }}
                                                 />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-medium">{evt.title}</span>
-                                                        <Badge className={typeColors[evt.type] ?? 'bg-muted text-foreground'}>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="font-medium">
+                                                            {evt.title}
+                                                        </span>
+                                                        <Badge
+                                                            className={
+                                                                typeColors[
+                                                                    evt.type
+                                                                ] ??
+                                                                'bg-muted text-foreground'
+                                                            }
+                                                        >
                                                             {evt.type}
                                                         </Badge>
                                                     </div>
-                                                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                                                         <span className="flex items-center gap-1">
                                                             <Clock className="h-3 w-3" />
-                                                            {formatDate(evt.start)}
+                                                            {formatDate(
+                                                                evt.start,
+                                                            )}
                                                         </span>
-                                                        {evt.meta?.employee_name && (
-                                                            <span>{evt.meta.employee_name}</span>
+                                                        {evt.meta
+                                                            ?.employee_name && (
+                                                            <span>
+                                                                {
+                                                                    evt.meta
+                                                                        .employee_name
+                                                                }
+                                                            </span>
                                                         )}
-                                                        {evt.meta?.requirement && (
-                                                            <span>{evt.meta.requirement}</span>
+                                                        {evt.meta
+                                                            ?.requirement && (
+                                                            <span>
+                                                                {
+                                                                    evt.meta
+                                                                        .requirement
+                                                                }
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>

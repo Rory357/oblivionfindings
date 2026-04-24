@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Camera, Upload, X } from 'lucide-react';
 import { FormEvent, useCallback, useRef, useState } from 'react';
 
@@ -45,7 +45,12 @@ function formatDate(iso: string): string {
     });
 }
 
-export default function Photos({ client, photos, canUpload, requiresApproval }: Props) {
+export default function Photos({
+    client,
+    photos,
+    canUpload,
+    requiresApproval,
+}: Props) {
     const clientName = `${client.first_name} ${client.last_name}`;
     const [lightboxPhoto, setLightboxPhoto] = useState<Photo | null>(null);
     const [uploadOpen, setUploadOpen] = useState(false);
@@ -103,7 +108,11 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
 
     const loadMore = () => {
         if (photos.links?.next) {
-            router.get(photos.links.next, {}, { preserveState: true, preserveScroll: true });
+            router.get(
+                photos.links.next,
+                {},
+                { preserveState: true, preserveScroll: true },
+            );
         }
     };
 
@@ -111,15 +120,23 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
         <AppLayout
             breadcrumbs={[
                 { title: 'Portal', href: '/portal' },
-                { title: clientName, href: `/portal/clients/${client.id}/dashboard` },
-                { title: 'Photos', href: `/portal/clients/${client.id}/photos` },
+                {
+                    title: clientName,
+                    href: `/portal/clients/${client.id}/dashboard`,
+                },
+                {
+                    title: 'Photos',
+                    href: `/portal/clients/${client.id}/photos`,
+                },
             ]}
         >
             <Head title={`Photos - ${clientName}`} />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight">Photos</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        Photos
+                    </h1>
                     {canUpload && (
                         <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                             <DialogTrigger asChild>
@@ -133,11 +150,15 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                                     <DialogTitle>Upload Photo</DialogTitle>
                                     {requiresApproval && (
                                         <DialogDescription>
-                                            Photos will be reviewed by the care team before appearing.
+                                            Photos will be reviewed by the care
+                                            team before appearing.
                                         </DialogDescription>
                                     )}
                                 </DialogHeader>
-                                <form onSubmit={handleUpload} className="space-y-4">
+                                <form
+                                    onSubmit={handleUpload}
+                                    className="space-y-4"
+                                >
                                     <div
                                         className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
                                             dragActive
@@ -148,27 +169,37 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                                         onDragLeave={handleDrag}
                                         onDragOver={handleDrag}
                                         onDrop={handleDrop}
-                                        onClick={() => fileInputRef.current?.click()}
+                                        onClick={() =>
+                                            fileInputRef.current?.click()
+                                        }
                                     >
                                         {form.data.photo ? (
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">{form.data.photo.name}</span>
-                                                <button
+                                                <span className="text-sm font-medium">
+                                                    {form.data.photo.name}
+                                                </span>
+                                                <Button
                                                     type="button"
-                                                    className="text-muted-foreground hover:text-foreground"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        form.setData('photo', null);
+                                                        form.setData(
+                                                            'photo',
+                                                            null,
+                                                        );
                                                     }}
                                                 >
                                                     <X className="h-4 w-4" />
-                                                </button>
+                                                </Button>
                                             </div>
                                         ) : (
                                             <>
                                                 <Camera className="mb-2 h-8 w-8 text-muted-foreground" />
                                                 <p className="text-sm text-muted-foreground">
-                                                    Drag and drop or click to select
+                                                    Drag and drop or click to
+                                                    select
                                                 </p>
                                             </>
                                         )}
@@ -181,7 +212,9 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                                         />
                                     </div>
                                     {form.errors.photo && (
-                                        <p className="text-sm text-destructive">{form.errors.photo}</p>
+                                        <p className="text-sm text-destructive">
+                                            {form.errors.photo}
+                                        </p>
                                     )}
 
                                     <div className="space-y-2">
@@ -189,30 +222,54 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                                         <Input
                                             id="caption"
                                             value={form.data.caption}
-                                            onChange={(e) => form.setData('caption', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'caption',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="Add a caption..."
                                         />
                                         {form.errors.caption && (
-                                            <p className="text-sm text-destructive">{form.errors.caption}</p>
+                                            <p className="text-sm text-destructive">
+                                                {form.errors.caption}
+                                            </p>
                                         )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="tags">Tags (comma separated)</Label>
+                                        <Label htmlFor="tags">
+                                            Tags (comma separated)
+                                        </Label>
                                         <Input
                                             id="tags"
                                             value={form.data.tags}
-                                            onChange={(e) => form.setData('tags', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'tags',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="e.g. outing, birthday, activity"
                                         />
                                         {form.errors.tags && (
-                                            <p className="text-sm text-destructive">{form.errors.tags}</p>
+                                            <p className="text-sm text-destructive">
+                                                {form.errors.tags}
+                                            </p>
                                         )}
                                     </div>
 
                                     <DialogFooter>
-                                        <Button type="submit" disabled={!form.data.photo || form.processing}>
-                                            {form.processing ? 'Uploading...' : 'Upload'}
+                                        <Button
+                                            type="submit"
+                                            disabled={
+                                                !form.data.photo ||
+                                                form.processing
+                                            }
+                                        >
+                                            {form.processing
+                                                ? 'Uploading...'
+                                                : 'Upload'}
                                         </Button>
                                     </DialogFooter>
                                 </form>
@@ -225,7 +282,9 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16">
                             <Camera className="mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-lg font-medium text-muted-foreground">No photos shared yet</p>
+                            <p className="text-lg font-medium text-muted-foreground">
+                                No photos shared yet
+                            </p>
                         </CardContent>
                     </Card>
                 ) : (
@@ -239,27 +298,37 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                                 >
                                     <div className="aspect-square overflow-hidden">
                                         <img
-                                            src={photo.thumbnail_url || photo.url}
+                                            src={
+                                                photo.thumbnail_url || photo.url
+                                            }
                                             alt={photo.caption || 'Photo'}
                                             className="h-full w-full object-cover"
                                         />
                                     </div>
                                     <CardContent className="space-y-2 p-3">
                                         {photo.caption && (
-                                            <p className="text-sm font-medium leading-snug">{photo.caption}</p>
+                                            <p className="text-sm leading-snug font-medium">
+                                                {photo.caption}
+                                            </p>
                                         )}
-                                        {photo.tags && photo.tags.length > 0 && (
-                                            <div className="flex flex-wrap gap-1">
-                                                {photo.tags.map((tag) => (
-                                                    <Badge key={tag} variant="secondary" className="text-xs">
-                                                        {tag}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        )}
+                                        {photo.tags &&
+                                            photo.tags.length > 0 && (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {photo.tags.map((tag) => (
+                                                        <Badge
+                                                            key={tag}
+                                                            variant="secondary"
+                                                            className="text-xs"
+                                                        >
+                                                            {tag}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
                                         <p className="text-xs text-muted-foreground">
                                             {formatDate(photo.created_at)}
-                                            {photo.uploaded_by_name && ` · ${photo.uploaded_by_name}`}
+                                            {photo.uploaded_by_name &&
+                                                ` · ${photo.uploaded_by_name}`}
                                         </p>
                                     </CardContent>
                                 </Card>
@@ -277,7 +346,10 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                 )}
 
                 {/* Lightbox */}
-                <Dialog open={!!lightboxPhoto} onOpenChange={() => setLightboxPhoto(null)}>
+                <Dialog
+                    open={!!lightboxPhoto}
+                    onOpenChange={() => setLightboxPhoto(null)}
+                >
                     <DialogContent className="max-w-3xl">
                         {lightboxPhoto && (
                             <>
@@ -294,20 +366,30 @@ export default function Photos({ client, photos, canUpload, requiresApproval }: 
                                     />
                                 </div>
                                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                    <span>{formatDate(lightboxPhoto.created_at)}</span>
+                                    <span>
+                                        {formatDate(lightboxPhoto.created_at)}
+                                    </span>
                                     {lightboxPhoto.uploaded_by_name && (
-                                        <span>Uploaded by {lightboxPhoto.uploaded_by_name}</span>
+                                        <span>
+                                            Uploaded by{' '}
+                                            {lightboxPhoto.uploaded_by_name}
+                                        </span>
                                     )}
                                 </div>
-                                {lightboxPhoto.tags && lightboxPhoto.tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1">
-                                        {lightboxPhoto.tags.map((tag) => (
-                                            <Badge key={tag} variant="secondary" className="text-xs">
-                                                {tag}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                )}
+                                {lightboxPhoto.tags &&
+                                    lightboxPhoto.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                            {lightboxPhoto.tags.map((tag) => (
+                                                <Badge
+                                                    key={tag}
+                                                    variant="secondary"
+                                                    className="text-xs"
+                                                >
+                                                    {tag}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
                             </>
                         )}
                     </DialogContent>

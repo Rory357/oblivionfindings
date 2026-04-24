@@ -491,12 +491,14 @@ export default function PortalClient({
                             </form>
 
                             {rag_answer?.text && (
+                                /* eslint-disable-next-line no-restricted-syntax -- RAG answer panel is a compact result surface inside the ask widget. */
                                 <div className="rounded-md border bg-white p-3 text-sm whitespace-pre-wrap">
                                     {rag_answer.text}
                                 </div>
                             )}
 
                             {!!rag_answer?.sources?.length && (
+                                /* eslint-disable-next-line no-restricted-syntax -- Source snippets are compact result surfaces inside the ask widget. */
                                 <div className="rounded-md border bg-white p-3">
                                     <div className="text-xs font-medium text-muted-foreground">
                                         Sources

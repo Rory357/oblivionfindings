@@ -1,18 +1,7 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -20,19 +9,27 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Head, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-    Radio,
-    AlertTriangle,
-    Clock,
-    Siren,
-    UserCheck,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
+import {
+    CheckCircle2,
     MapPin,
     PhoneCall,
-    CheckCircle2,
+    Radio,
+    Siren,
     XCircle,
 } from 'lucide-react';
+import { useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -90,7 +87,13 @@ type Props = {
 const NONE = '__none__';
 
 const fmtDate = (v: string | null) =>
-    v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+    v
+        ? new Date(v).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '-';
 
 const fmtDateTime = (v: string | null) =>
     v
@@ -148,15 +151,27 @@ const alertStatusColor = (status: string) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites, clients, can_manage }: Props) {
+export default function LoneWorkerIndex({
+    sessions,
+    alerts,
+    stats,
+    staff,
+    sites,
+    clients,
+    can_manage,
+}: Props) {
     /* Dialog visibility states */
     const [startOpen, setStartOpen] = useState(false);
     const [checkInOpen, setCheckInOpen] = useState(false);
-    const [checkInSessionId, setCheckInSessionId] = useState<number | null>(null);
+    const [checkInSessionId, setCheckInSessionId] = useState<number | null>(
+        null,
+    );
     const [endOpen, setEndOpen] = useState(false);
     const [endSessionId, setEndSessionId] = useState<number | null>(null);
     const [emergencyOpen, setEmergencyOpen] = useState(false);
-    const [emergencySessionId, setEmergencySessionId] = useState<number | null>(null);
+    const [emergencySessionId, setEmergencySessionId] = useState<number | null>(
+        null,
+    );
     const [ackOpen, setAckOpen] = useState(false);
     const [ackAlertId, setAckAlertId] = useState<number | null>(null);
     const [resolveOpen, setResolveOpen] = useState(false);
@@ -193,12 +208,15 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
 
     const submitCheckIn = () => {
         if (!checkInSessionId) return;
-        checkInForm.post(`/health-safety/lone-workers/sessions/${checkInSessionId}/check-in`, {
-            onSuccess: () => {
-                setCheckInOpen(false);
-                checkInForm.reset();
+        checkInForm.post(
+            `/health-safety/lone-workers/sessions/${checkInSessionId}/check-in`,
+            {
+                onSuccess: () => {
+                    setCheckInOpen(false);
+                    checkInForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitEnd = () => {
@@ -225,29 +243,38 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
 
     const submitAcknowledge = () => {
         if (!ackAlertId) return;
-        ackForm.post(`/health-safety/lone-workers/alerts/${ackAlertId}/acknowledge`, {
-            onSuccess: () => {
-                setAckOpen(false);
-                ackForm.reset();
+        ackForm.post(
+            `/health-safety/lone-workers/alerts/${ackAlertId}/acknowledge`,
+            {
+                onSuccess: () => {
+                    setAckOpen(false);
+                    ackForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitResolve = () => {
         if (!resolveAlertId) return;
-        resolveForm.post(`/health-safety/lone-workers/alerts/${resolveAlertId}/resolve`, {
-            onSuccess: () => {
-                setResolveOpen(false);
-                resolveForm.reset();
+        resolveForm.post(
+            `/health-safety/lone-workers/alerts/${resolveAlertId}/resolve`,
+            {
+                onSuccess: () => {
+                    setResolveOpen(false);
+                    resolveForm.reset();
+                },
             },
-        });
+        );
     };
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Lone Worker Safety', href: '/health-safety/lone-workers' },
+                {
+                    title: 'Lone Worker Safety',
+                    href: '/health-safety/lone-workers',
+                },
             ]}
         >
             <Head title="Lone Worker Safety" />
@@ -259,14 +286,23 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                     description="Monitor active lone worker sessions, check-ins, and emergency alerts"
                     icon={<Radio className="h-7 w-7 text-white" />}
                     stats={[
-                        { label: 'Active Sessions', value: stats.active_sessions },
-                        { label: 'Overdue Check-ins', value: stats.overdue_check_ins },
+                        {
+                            label: 'Active Sessions',
+                            value: stats.active_sessions,
+                        },
+                        {
+                            label: 'Overdue Check-ins',
+                            value: stats.overdue_check_ins,
+                        },
                         { label: 'Alerts Today', value: stats.alerts_today },
                         { label: 'Emergency', value: stats.emergency_alerts },
                     ]}
                     actions={
                         can_manage ? (
-                            <Button size="sm" onClick={() => setStartOpen(true)}>
+                            <Button
+                                size="sm"
+                                onClick={() => setStartOpen(true)}
+                            >
                                 <Radio className="mr-1.5 h-4 w-4" />
                                 Start Session
                             </Button>
@@ -277,27 +313,48 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                 {/* Active Sessions Table */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Active Sessions</CardTitle>
+                        <CardTitle className="text-base">
+                            Active Sessions
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="pb-2 pr-4 font-medium">Worker</th>
-                                        <th className="pb-2 pr-4 font-medium">Site / Client</th>
-                                        <th className="pb-2 pr-4 font-medium">Started</th>
-                                        <th className="pb-2 pr-4 font-medium">Expected End</th>
-                                        <th className="pb-2 pr-4 font-medium">Last Check-in</th>
-                                        <th className="pb-2 pr-4 font-medium">Status</th>
-                                        <th className="pb-2 font-medium">Actions</th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Worker
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Site / Client
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Started
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Expected End
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Last Check-in
+                                        </th>
+                                        <th className="pr-4 pb-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="pb-2 font-medium">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {sessions.data.map((s) => (
-                                        <tr key={s.id} className="border-b last:border-0">
+                                        <tr
+                                            key={s.id}
+                                            className="border-b last:border-0"
+                                        >
                                             <td className="py-2.5 pr-4">
-                                                <div className="font-medium">{s.user?.name ?? '-'}</div>
+                                                <div className="font-medium">
+                                                    {s.user?.name ?? '-'}
+                                                </div>
                                                 {s.location && (
                                                     <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                                                         <MapPin className="h-3 w-3" />
@@ -308,59 +365,93 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                             <td className="py-2.5 pr-4 text-xs">
                                                 {s.site?.name ?? '-'}
                                                 {s.client && (
-                                                    <span className="text-muted-foreground"> / {s.client.name}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {' '}
+                                                        / {s.client.name}
+                                                    </span>
                                                 )}
                                             </td>
-                                            <td className="py-2.5 pr-4 text-xs">{fmtDateTime(s.started_at)}</td>
-                                            <td className="py-2.5 pr-4 text-xs">{fmtDateTime(s.expected_end_at)}</td>
-                                            <td className="py-2.5 pr-4 text-xs">{fmtDateTime(s.last_check_in_at)}</td>
+                                            <td className="py-2.5 pr-4 text-xs">
+                                                {fmtDateTime(s.started_at)}
+                                            </td>
+                                            <td className="py-2.5 pr-4 text-xs">
+                                                {fmtDateTime(s.expected_end_at)}
+                                            </td>
+                                            <td className="py-2.5 pr-4 text-xs">
+                                                {fmtDateTime(
+                                                    s.last_check_in_at,
+                                                )}
+                                            </td>
                                             <td className="py-2.5 pr-4">
-                                                <Badge className={sessionStatusColor(s.status)}>
-                                                    {s.status.replace(/_/g, ' ')}
+                                                <Badge
+                                                    className={sessionStatusColor(
+                                                        s.status,
+                                                    )}
+                                                >
+                                                    {s.status.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
                                                 </Badge>
                                             </td>
                                             <td className="py-2.5">
                                                 <div className="flex flex-wrap gap-1.5">
-                                                    {can_manage && (s.status === 'active' || s.status === 'overdue') && (
-                                                        <>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 text-xs"
-                                                                onClick={() => {
-                                                                    setCheckInSessionId(s.id);
-                                                                    setCheckInOpen(true);
-                                                                }}
-                                                            >
-                                                                <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                                Check In
-                                                            </Button>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 text-xs"
-                                                                onClick={() => {
-                                                                    setEndSessionId(s.id);
-                                                                    setEndOpen(true);
-                                                                }}
-                                                            >
-                                                                <XCircle className="mr-1 h-3 w-3" />
-                                                                End
-                                                            </Button>
-                                                            <Button
-                                                                variant="destructive"
-                                                                size="sm"
-                                                                className="h-7 text-xs"
-                                                                onClick={() => {
-                                                                    setEmergencySessionId(s.id);
-                                                                    setEmergencyOpen(true);
-                                                                }}
-                                                            >
-                                                                <Siren className="mr-1 h-3 w-3" />
-                                                                Emergency
-                                                            </Button>
-                                                        </>
-                                                    )}
+                                                    {can_manage &&
+                                                        (s.status ===
+                                                            'active' ||
+                                                            s.status ===
+                                                                'overdue') && (
+                                                            <>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => {
+                                                                        setCheckInSessionId(
+                                                                            s.id,
+                                                                        );
+                                                                        setCheckInOpen(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                                                                    Check In
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => {
+                                                                        setEndSessionId(
+                                                                            s.id,
+                                                                        );
+                                                                        setEndOpen(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <XCircle className="mr-1 h-3 w-3" />
+                                                                    End
+                                                                </Button>
+                                                                <Button
+                                                                    variant="destructive"
+                                                                    size="sm"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => {
+                                                                        setEmergencySessionId(
+                                                                            s.id,
+                                                                        );
+                                                                        setEmergencyOpen(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Siren className="mr-1 h-3 w-3" />
+                                                                    Emergency
+                                                                </Button>
+                                                            </>
+                                                        )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -380,12 +471,23 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                 {sessions?.links?.length ? (
                     <div className="flex flex-wrap gap-2">
                         {sessions.links.map((l) => (
-                            <button
+                            <Button
+                                type="button"
                                 key={l.label}
                                 disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
+                                variant={l.active ? 'secondary' : 'outline'}
+                                size="sm"
+                                className="text-xs"
                                 onClick={() =>
-                                    l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
                                 }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
@@ -396,78 +498,123 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                 {/* Recent Alerts */}
                 {alerts.length > 0 && (
                     <div className="space-y-3">
-                        <h2 className="text-base font-semibold">Recent Alerts</h2>
+                        <h2 className="text-base font-semibold">
+                            Recent Alerts
+                        </h2>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {alerts.map((alert) => (
-                                <Card key={alert.id} className={alert.type === 'emergency' ? 'border-status-critical/30 bg-status-critical-bg' : ''}>
+                                <Card
+                                    key={alert.id}
+                                    className={
+                                        alert.type === 'emergency'
+                                            ? 'border-status-critical/30 bg-status-critical-bg'
+                                            : ''
+                                    }
+                                >
                                     <CardContent className="pt-5">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="space-y-1.5">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <Badge className={alertTypeColor(alert.type)}>
-                                                        {alert.type.replace(/_/g, ' ')}
+                                                    <Badge
+                                                        className={alertTypeColor(
+                                                            alert.type,
+                                                        )}
+                                                    >
+                                                        {alert.type.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
-                                                    <Badge className={alertStatusColor(alert.status)}>
+                                                    <Badge
+                                                        className={alertStatusColor(
+                                                            alert.status,
+                                                        )}
+                                                    >
                                                         {alert.status}
                                                     </Badge>
                                                 </div>
                                                 {alert.session?.user && (
-                                                    <div className="text-sm font-medium">{alert.session.user.name}</div>
+                                                    <div className="text-sm font-medium">
+                                                        {
+                                                            alert.session.user
+                                                                .name
+                                                        }
+                                                    </div>
                                                 )}
                                                 {alert.session?.site && (
                                                     <div className="text-xs text-muted-foreground">
-                                                        {alert.session.site.name}
+                                                        {
+                                                            alert.session.site
+                                                                .name
+                                                        }
                                                     </div>
                                                 )}
                                                 <div className="text-xs text-muted-foreground">
-                                                    Triggered: {fmtDateTime(alert.triggered_at)}
+                                                    Triggered:{' '}
+                                                    {fmtDateTime(
+                                                        alert.triggered_at,
+                                                    )}
                                                 </div>
                                                 {alert.notes && (
-                                                    <div className="text-xs text-muted-foreground">{alert.notes}</div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {alert.notes}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
-                                        {can_manage && alert.status === 'active' && (
-                                            <div className="mt-3 flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-7 text-xs"
-                                                    onClick={() => {
-                                                        setAckAlertId(alert.id);
-                                                        setAckOpen(true);
-                                                    }}
-                                                >
-                                                    Acknowledge
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-7 text-xs"
-                                                    onClick={() => {
-                                                        setResolveAlertId(alert.id);
-                                                        setResolveOpen(true);
-                                                    }}
-                                                >
-                                                    Resolve
-                                                </Button>
-                                            </div>
-                                        )}
-                                        {can_manage && alert.status === 'acknowledged' && (
-                                            <div className="mt-3">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-7 text-xs"
-                                                    onClick={() => {
-                                                        setResolveAlertId(alert.id);
-                                                        setResolveOpen(true);
-                                                    }}
-                                                >
-                                                    Resolve
-                                                </Button>
-                                            </div>
-                                        )}
+                                        {can_manage &&
+                                            alert.status === 'active' && (
+                                                <div className="mt-3 flex gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => {
+                                                            setAckAlertId(
+                                                                alert.id,
+                                                            );
+                                                            setAckOpen(true);
+                                                        }}
+                                                    >
+                                                        Acknowledge
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => {
+                                                            setResolveAlertId(
+                                                                alert.id,
+                                                            );
+                                                            setResolveOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                    >
+                                                        Resolve
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        {can_manage &&
+                                            alert.status === 'acknowledged' && (
+                                                <div className="mt-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => {
+                                                            setResolveAlertId(
+                                                                alert.id,
+                                                            );
+                                                            setResolveOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                    >
+                                                        Resolve
+                                                    </Button>
+                                                </div>
+                                            )}
                                     </CardContent>
                                 </Card>
                             ))}
@@ -491,21 +638,28 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <Label>Worker</Label>
                             <Select
                                 value={startForm.data.user_id}
-                                onValueChange={(v) => startForm.setData('user_id', v)}
+                                onValueChange={(v) =>
+                                    startForm.setData('user_id', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select staff member" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {staff.map((s) => (
-                                        <SelectItem key={s.id} value={String(s.id)}>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={String(s.id)}
+                                        >
                                             {s.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                             {startForm.errors.user_id && (
-                                <p className="mt-1 text-xs text-status-critical">{startForm.errors.user_id}</p>
+                                <p className="mt-1 text-xs text-status-critical">
+                                    {startForm.errors.user_id}
+                                </p>
                             )}
                         </div>
 
@@ -514,15 +668,25 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                 <Label>Site (optional)</Label>
                                 <Select
                                     value={startForm.data.site_id || NONE}
-                                    onValueChange={(v) => startForm.setData('site_id', v === NONE ? '' : v)}
+                                    onValueChange={(v) =>
+                                        startForm.setData(
+                                            'site_id',
+                                            v === NONE ? '' : v,
+                                        )
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select site" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={NONE}>None</SelectItem>
+                                        <SelectItem value={NONE}>
+                                            None
+                                        </SelectItem>
                                         {sites.map((s) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>
+                                            <SelectItem
+                                                key={s.id}
+                                                value={String(s.id)}
+                                            >
                                                 {s.name}
                                             </SelectItem>
                                         ))}
@@ -533,15 +697,25 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                 <Label>Client (optional)</Label>
                                 <Select
                                     value={startForm.data.client_id || NONE}
-                                    onValueChange={(v) => startForm.setData('client_id', v === NONE ? '' : v)}
+                                    onValueChange={(v) =>
+                                        startForm.setData(
+                                            'client_id',
+                                            v === NONE ? '' : v,
+                                        )
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select client" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={NONE}>None</SelectItem>
+                                        <SelectItem value={NONE}>
+                                            None
+                                        </SelectItem>
                                         {clients.map((c) => (
-                                            <SelectItem key={c.id} value={String(c.id)}>
+                                            <SelectItem
+                                                key={c.id}
+                                                value={String(c.id)}
+                                            >
                                                 {c.name}
                                             </SelectItem>
                                         ))}
@@ -556,26 +730,48 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                 <Input
                                     type="datetime-local"
                                     value={startForm.data.expected_end_at}
-                                    onChange={(e) => startForm.setData('expected_end_at', e.target.value)}
+                                    onChange={(e) =>
+                                        startForm.setData(
+                                            'expected_end_at',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                                 {startForm.errors.expected_end_at && (
-                                    <p className="mt-1 text-xs text-status-critical">{startForm.errors.expected_end_at}</p>
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {startForm.errors.expected_end_at}
+                                    </p>
                                 )}
                             </div>
                             <div>
                                 <Label>Check-in Interval</Label>
                                 <Select
-                                    value={startForm.data.check_in_interval_minutes}
-                                    onValueChange={(v) => startForm.setData('check_in_interval_minutes', v)}
+                                    value={
+                                        startForm.data.check_in_interval_minutes
+                                    }
+                                    onValueChange={(v) =>
+                                        startForm.setData(
+                                            'check_in_interval_minutes',
+                                            v,
+                                        )
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="15">Every 15 minutes</SelectItem>
-                                        <SelectItem value="30">Every 30 minutes</SelectItem>
-                                        <SelectItem value="60">Every 60 minutes</SelectItem>
-                                        <SelectItem value="120">Every 2 hours</SelectItem>
+                                        <SelectItem value="15">
+                                            Every 15 minutes
+                                        </SelectItem>
+                                        <SelectItem value="30">
+                                            Every 30 minutes
+                                        </SelectItem>
+                                        <SelectItem value="60">
+                                            Every 60 minutes
+                                        </SelectItem>
+                                        <SelectItem value="120">
+                                            Every 2 hours
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -585,7 +781,12 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <Label>Location</Label>
                             <Input
                                 value={startForm.data.location}
-                                onChange={(e) => startForm.setData('location', e.target.value)}
+                                onChange={(e) =>
+                                    startForm.setData(
+                                        'location',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. 23 Queen Street, Hamilton"
                             />
                         </div>
@@ -594,17 +795,28 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <Label>Activity Description</Label>
                             <Textarea
                                 value={startForm.data.activity_description}
-                                onChange={(e) => startForm.setData('activity_description', e.target.value)}
+                                onChange={(e) =>
+                                    startForm.setData(
+                                        'activity_description',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Describe the lone work activity"
                                 rows={3}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setStartOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setStartOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={submitStart} disabled={startForm.processing}>
+                        <Button
+                            onClick={submitStart}
+                            disabled={startForm.processing}
+                        >
                             Start Session
                         </Button>
                     </DialogFooter>
@@ -622,14 +834,20 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <Label>Status</Label>
                             <Select
                                 value={checkInForm.data.status}
-                                onValueChange={(v) => checkInForm.setData('status', v)}
+                                onValueChange={(v) =>
+                                    checkInForm.setData('status', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="ok">OK - All good</SelectItem>
-                                    <SelectItem value="concern">Concern - Need assistance</SelectItem>
+                                    <SelectItem value="ok">
+                                        OK - All good
+                                    </SelectItem>
+                                    <SelectItem value="concern">
+                                        Concern - Need assistance
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -637,17 +855,25 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <Label>Notes (optional)</Label>
                             <Textarea
                                 value={checkInForm.data.notes}
-                                onChange={(e) => checkInForm.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    checkInForm.setData('notes', e.target.value)
+                                }
                                 placeholder="Any additional notes"
                                 rows={3}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setCheckInOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCheckInOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={submitCheckIn} disabled={checkInForm.processing}>
+                        <Button
+                            onClick={submitCheckIn}
+                            disabled={checkInForm.processing}
+                        >
                             Submit Check-in
                         </Button>
                     </DialogFooter>
@@ -661,10 +887,14 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         <DialogTitle>End Session</DialogTitle>
                     </DialogHeader>
                     <p className="text-sm text-muted-foreground">
-                        Are you sure you want to end this lone worker session? The worker will no longer be monitored.
+                        Are you sure you want to end this lone worker session?
+                        The worker will no longer be monitored.
                     </p>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEndOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setEndOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button onClick={submitEnd}>End Session</Button>
@@ -682,11 +912,15 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         </DialogTitle>
                     </DialogHeader>
                     <p className="text-sm text-muted-foreground">
-                        This will immediately trigger an emergency alert for this lone worker. Emergency contacts will be
-                        notified. Are you sure you want to proceed?
+                        This will immediately trigger an emergency alert for
+                        this lone worker. Emergency contacts will be notified.
+                        Are you sure you want to proceed?
                     </p>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEmergencyOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setEmergencyOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button variant="destructive" onClick={submitEmergency}>
@@ -707,16 +941,24 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         <Label>Notes (optional)</Label>
                         <Textarea
                             value={ackForm.data.notes}
-                            onChange={(e) => ackForm.setData('notes', e.target.value)}
+                            onChange={(e) =>
+                                ackForm.setData('notes', e.target.value)
+                            }
                             placeholder="e.g. Contacted worker, awaiting response"
                             rows={3}
                         />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setAckOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAckOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={submitAcknowledge} disabled={ackForm.processing}>
+                        <Button
+                            onClick={submitAcknowledge}
+                            disabled={ackForm.processing}
+                        >
                             Acknowledge
                         </Button>
                     </DialogFooter>
@@ -733,16 +975,24 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         <Label>Resolution Notes</Label>
                         <Textarea
                             value={resolveForm.data.notes}
-                            onChange={(e) => resolveForm.setData('notes', e.target.value)}
+                            onChange={(e) =>
+                                resolveForm.setData('notes', e.target.value)
+                            }
                             placeholder="Describe the resolution"
                             rows={3}
                         />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setResolveOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setResolveOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={submitResolve} disabled={resolveForm.processing}>
+                        <Button
+                            onClick={submitResolve}
+                            disabled={resolveForm.processing}
+                        >
                             Resolve
                         </Button>
                     </DialogFooter>

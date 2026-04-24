@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
-import { router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     Dialog,
     DialogContent,
@@ -20,26 +20,26 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { router } from '@inertiajs/react';
 import {
     Camera,
+    CheckCircle,
     ChevronDown,
     Download,
     FileCode,
     FileText,
-    CheckCircle,
     Mic,
+    PackagePlus,
     Plus,
+    StickyNote,
     Upload,
     Video,
     X,
-    StickyNote,
-    PackagePlus,
 } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 /* ------------------------------------------------------------------
  * Types
@@ -131,7 +131,11 @@ function formatDate(iso: string): string {
  * Component
  * ---------------------------------------------------------------- */
 
-export default function EvidencePackPanel({ alertId, packs, canManage }: EvidencePackPanelProps) {
+export default function EvidencePackPanel({
+    alertId,
+    packs,
+    canManage,
+}: EvidencePackPanelProps) {
     const [showCreatePack, setShowCreatePack] = useState(false);
     const [packTitle, setPackTitle] = useState('');
     const [creatingPack, setCreatingPack] = useState(false);
@@ -203,7 +207,11 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
         setSavingCctv(true);
         router.post(
             `/control-room/evidence/${cctvPackId}/items`,
-            { item_type: 'cctv_bookmark', camera_id: cctvCameraId, timestamp: cctvTimestamp },
+            {
+                item_type: 'cctv_bookmark',
+                camera_id: cctvCameraId,
+                timestamp: cctvTimestamp,
+            },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -225,9 +233,13 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
     }
 
     function handleCompletePack(packId: number) {
-        router.post(`/control-room/evidence/${packId}/complete`, {}, {
-            preserveScroll: true,
-        });
+        router.post(
+            `/control-room/evidence/${packId}/complete`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
     }
 
     /* --- Render --- */
@@ -236,9 +248,15 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
         <>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                    <CardTitle className="text-base font-semibold">Evidence</CardTitle>
+                    <CardTitle className="text-base font-semibold">
+                        Evidence
+                    </CardTitle>
                     {canManage && (
-                        <Button size="sm" variant="outline" onClick={() => setShowCreatePack(true)}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowCreatePack(true)}
+                        >
                             <PackagePlus className="mr-1.5 h-4 w-4" />
                             New Pack
                         </Button>
@@ -246,7 +264,9 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {packs.length === 0 && (
-                        <p className="text-sm text-muted-foreground">No evidence packs yet.</p>
+                        <p className="text-sm text-muted-foreground">
+                            No evidence packs yet.
+                        </p>
                     )}
                     {packs.map((pack) => (
                         <PackSection
@@ -275,7 +295,10 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>New Evidence Pack</DialogTitle>
-                        <DialogDescription>Create a new pack to collect evidence for this alert.</DialogDescription>
+                        <DialogDescription>
+                            Create a new pack to collect evidence for this
+                            alert.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2">
                         <Label htmlFor="pack-title">Title</Label>
@@ -288,10 +311,16 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                         />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowCreatePack(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowCreatePack(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleCreatePack} disabled={!packTitle.trim() || creatingPack}>
+                        <Button
+                            onClick={handleCreatePack}
+                            disabled={!packTitle.trim() || creatingPack}
+                        >
                             {creatingPack ? 'Creating...' : 'Create Pack'}
                         </Button>
                     </DialogFooter>
@@ -303,7 +332,9 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Add Note</DialogTitle>
-                        <DialogDescription>Add a text note to the evidence pack.</DialogDescription>
+                        <DialogDescription>
+                            Add a text note to the evidence pack.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2">
                         <Label htmlFor="note-content">Note</Label>
@@ -317,10 +348,16 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                         />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowNoteDialog(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowNoteDialog(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleAddNote} disabled={!noteContent.trim() || savingNote}>
+                        <Button
+                            onClick={handleAddNote}
+                            disabled={!noteContent.trim() || savingNote}
+                        >
                             {savingNote ? 'Saving...' : 'Add Note'}
                         </Button>
                     </DialogFooter>
@@ -332,7 +369,9 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Add CCTV Bookmark</DialogTitle>
-                        <DialogDescription>Bookmark a CCTV camera timestamp for review.</DialogDescription>
+                        <DialogDescription>
+                            Bookmark a CCTV camera timestamp for review.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="space-y-2">
@@ -340,7 +379,9 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                             <Input
                                 id="cctv-camera"
                                 value={cctvCameraId}
-                                onChange={(e) => setCctvCameraId(e.target.value)}
+                                onChange={(e) =>
+                                    setCctvCameraId(e.target.value)
+                                }
                                 placeholder="e.g. CAM-LOBBY-01"
                                 maxLength={100}
                             />
@@ -351,17 +392,26 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
                                 id="cctv-timestamp"
                                 type="datetime-local"
                                 value={cctvTimestamp}
-                                onChange={(e) => setCctvTimestamp(e.target.value)}
+                                onChange={(e) =>
+                                    setCctvTimestamp(e.target.value)
+                                }
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowCctvDialog(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowCctvDialog(false)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             onClick={handleAddCctvBookmark}
-                            disabled={!cctvCameraId.trim() || !cctvTimestamp || savingCctv}
+                            disabled={
+                                !cctvCameraId.trim() ||
+                                !cctvTimestamp ||
+                                savingCctv
+                            }
                         >
                             {savingCctv ? 'Saving...' : 'Add Bookmark'}
                         </Button>
@@ -370,21 +420,31 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
             </Dialog>
 
             {/* Delete Confirmation Dialog */}
-            <Dialog open={deletingItemId !== null} onOpenChange={() => setDeletingItemId(null)}>
+            <Dialog
+                open={deletingItemId !== null}
+                onOpenChange={() => setDeletingItemId(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Remove Evidence Item</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to remove this evidence item? This action cannot be undone.
+                            Are you sure you want to remove this evidence item?
+                            This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingItemId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeletingItemId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             variant="destructive"
-                            onClick={() => deletingItemId && handleDeleteItem(deletingItemId)}
+                            onClick={() =>
+                                deletingItemId &&
+                                handleDeleteItem(deletingItemId)
+                            }
                         >
                             Remove
                         </Button>
@@ -402,7 +462,9 @@ export default function EvidencePackPanel({ alertId, packs, canManage }: Evidenc
 interface PackSectionProps {
     pack: EvidencePack;
     canManage: boolean;
-    fileInputRefs: React.MutableRefObject<Record<number, HTMLInputElement | null>>;
+    fileInputRefs: React.MutableRefObject<
+        Record<number, HTMLInputElement | null>
+    >;
     onFileUpload: (packId: number, file: File) => void;
     onOpenNoteDialog: (packId: number) => void;
     onOpenCctvDialog: (packId: number) => void;
@@ -423,11 +485,16 @@ function PackSection({
     const [open, setOpen] = useState(true);
 
     return (
-        <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border">
+        <Collapsible
+            open={open}
+            onOpenChange={setOpen}
+            className="rounded-md border"
+        >
             <CollapsibleTrigger asChild>
-                <button
+                <Button
                     type="button"
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50"
+                    variant="ghost"
+                    className="h-auto w-full justify-between gap-2 rounded-none px-3 py-2 text-left text-sm font-medium hover:bg-muted/50"
                 >
                     <div className="flex items-center gap-2">
                         <ChevronDown
@@ -436,37 +503,53 @@ function PackSection({
                         <span className="truncate">{pack.title}</span>
                         {statusBadge(pack.status)}
                         <span className="text-xs text-muted-foreground">
-                            {pack.item_count} {pack.item_count === 1 ? 'item' : 'items'}
+                            {pack.item_count}{' '}
+                            {pack.item_count === 1 ? 'item' : 'items'}
                         </span>
                     </div>
-                </button>
+                </Button>
             </CollapsibleTrigger>
 
             <CollapsibleContent>
-                <div className="border-t px-3 py-2 space-y-2">
+                <div className="space-y-2 border-t px-3 py-2">
                     {/* Items list */}
                     {pack.items.length === 0 && (
-                        <p className="text-xs text-muted-foreground py-1">No items in this pack.</p>
+                        <p className="py-1 text-xs text-muted-foreground">
+                            No items in this pack.
+                        </p>
                     )}
                     {pack.items.map((item) => (
                         <div
                             key={item.id}
                             className="flex items-start justify-between gap-2 rounded-md bg-muted/30 px-2.5 py-1.5 text-sm"
                         >
-                            <div className="flex items-start gap-2 min-w-0">
-                                <span className="mt-0.5 shrink-0">{typeIcon(item.type)}</span>
+                            <div className="flex min-w-0 items-start gap-2">
+                                <span className="mt-0.5 shrink-0">
+                                    {typeIcon(item.type)}
+                                </span>
                                 <div className="min-w-0">
-                                    <p className="truncate font-medium text-sm">
-                                        {item.title || item.description || item.type}
+                                    <p className="truncate text-sm font-medium">
+                                        {item.title ||
+                                            item.description ||
+                                            item.type}
                                     </p>
-                                    {item.description && item.type === 'note' && (
-                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                            {item.description}
-                                        </p>
-                                    )}
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                        {item.file_size ? <span>{formatBytes(item.file_size)}</span> : null}
-                                        {item.created_at && <span>{formatDate(item.created_at)}</span>}
+                                    {item.description &&
+                                        item.type === 'note' && (
+                                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                {item.description}
+                                            </p>
+                                        )}
+                                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                                        {item.file_size ? (
+                                            <span>
+                                                {formatBytes(item.file_size)}
+                                            </span>
+                                        ) : null}
+                                        {item.created_at && (
+                                            <span>
+                                                {formatDate(item.created_at)}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -514,16 +597,28 @@ function PackSection({
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="start">
                                             <DropdownMenuItem
-                                                onClick={() => fileInputRefs.current[pack.id]?.click()}
+                                                onClick={() =>
+                                                    fileInputRefs.current[
+                                                        pack.id
+                                                    ]?.click()
+                                                }
                                             >
                                                 <Upload className="mr-2 h-4 w-4" />
                                                 Upload File
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => onOpenNoteDialog(pack.id)}>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    onOpenNoteDialog(pack.id)
+                                                }
+                                            >
                                                 <StickyNote className="mr-2 h-4 w-4" />
                                                 Add Note
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => onOpenCctvDialog(pack.id)}>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    onOpenCctvDialog(pack.id)
+                                                }
+                                            >
                                                 <Video className="mr-2 h-4 w-4" />
                                                 Add CCTV Bookmark
                                             </DropdownMenuItem>

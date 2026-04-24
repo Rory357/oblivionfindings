@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
     Select,
     SelectContent,
@@ -259,12 +260,13 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                         <CardContent>
                             <div className="grid grid-cols-5 gap-3">
                                 {FUEL_LEVELS.map((level) => (
-                                    <button
+                                    <Button
                                         key={level.value}
                                         type="button"
+                                        variant="outline"
                                         onClick={() => form.setData('fuel_level', level.value)}
                                         className={cn(
-                                            "flex flex-col items-center rounded-xl border-2 px-3 py-5 transition-all",
+                                            "h-auto flex-col rounded-xl border-2 px-3 py-5 whitespace-normal transition-all",
                                             form.data.fuel_level === level.value
                                                 ? 'border-primary bg-primary/10 shadow-md dark:bg-primary/20 dark:border-primary'
                                                 : 'border-transparent bg-muted hover:bg-muted/80 hover:border-muted-foreground/20'
@@ -284,7 +286,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                         </div>
                                         <span className="text-sm font-bold">{level.label}</span>
                                         <span className="text-[10px] text-muted-foreground">{level.pct}%</span>
-                                    </button>
+                                    </Button>
                                 ))}
                             </div>
                         </CardContent>
@@ -305,12 +307,13 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                         { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg dark:bg-status-warning', textColor: 'text-status-warning dark:text-status-warning' },
                                         { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg dark:bg-status-critical', textColor: 'text-status-critical dark:text-status-critical' },
                                     ].map((opt) => (
-                                        <button
+                                        <Button
                                             key={opt.value}
                                             type="button"
+                                            variant="outline"
                                             onClick={() => form.setData('exterior_condition', opt.value)}
                                             className={cn(
-                                                "flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm font-semibold transition-all",
+                                                "h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all",
                                                 form.data.exterior_condition === opt.value
                                                     ? `${opt.borderColor} ${opt.bgColor} ${opt.textColor} shadow-md`
                                                     : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80'
@@ -320,7 +323,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                                 <Check className="h-5 w-5" />
                                             )}
                                             {opt.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                                 {form.errors.exterior_condition && (
@@ -337,12 +340,13 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                         { value: 'acceptable', label: 'Acceptable', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg dark:bg-status-warning', textColor: 'text-status-warning dark:text-status-warning' },
                                         { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg dark:bg-status-critical', textColor: 'text-status-critical dark:text-status-critical' },
                                     ].map((opt) => (
-                                        <button
+                                        <Button
                                             key={opt.value}
                                             type="button"
+                                            variant="outline"
                                             onClick={() => form.setData('interior_condition', opt.value)}
                                             className={cn(
-                                                "flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm font-semibold transition-all",
+                                                "h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all",
                                                 form.data.interior_condition === opt.value
                                                     ? `${opt.borderColor} ${opt.bgColor} ${opt.textColor} shadow-md`
                                                     : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80'
@@ -352,7 +356,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                                 <Check className="h-5 w-5" />
                                             )}
                                             {opt.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                                 {form.errors.interior_condition && (
@@ -394,7 +398,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                                 </div>
                                                 <Label htmlFor={item.key} className="cursor-pointer font-medium">{item.label}</Label>
                                             </div>
-                                            <button type="button" onClick={() => form.setData(item.key, !form.data[item.key])} className={cn("h-7 w-12 rounded-full transition-colors", form.data[item.key] ? "bg-primary" : "bg-muted")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data[item.key] ? "translate-x-6" : "translate-x-1")} /></button>
+                                            <Switch checked={form.data[item.key]} onCheckedChange={() => form.setData(item.key, !form.data[item.key])} />
                                         </div>
                                     );
                                 })}

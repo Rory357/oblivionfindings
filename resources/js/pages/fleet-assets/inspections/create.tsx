@@ -330,11 +330,12 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                         <span className="text-sm font-medium">{item.label}</span>
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        <button
+                                                        <Button
                                                             type="button"
+                                                            variant="outline"
                                                             onClick={() => setChecklistItem(item.key, 'result', 'pass')}
                                                             className={cn(
-                                                                "rounded-lg border-2 py-3 text-sm font-medium transition-all",
+                                                                "h-auto flex-col rounded-lg border-2 py-3 transition-all",
                                                                 val?.result === 'pass'
                                                                     ? "border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary dark:border-primary"
                                                                     : "border-transparent bg-muted hover:border-primary"
@@ -342,12 +343,13 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                         >
                                                             <CheckCircle className="mx-auto mb-1 h-4 w-4" />
                                                             Pass
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
                                                             type="button"
+                                                            variant="outline"
                                                             onClick={() => setChecklistItem(item.key, 'result', 'fail')}
                                                             className={cn(
-                                                                "rounded-lg border-2 py-3 text-sm font-medium transition-all",
+                                                                "h-auto flex-col rounded-lg border-2 py-3 transition-all",
                                                                 val?.result === 'fail'
                                                                     ? "border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30"
                                                                     : "border-transparent bg-muted hover:border-status-critical/30"
@@ -355,12 +357,13 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                         >
                                                             <XCircle className="mx-auto mb-1 h-4 w-4" />
                                                             Fail
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
                                                             type="button"
+                                                            variant="outline"
                                                             onClick={() => setChecklistItem(item.key, 'result', 'na')}
                                                             className={cn(
-                                                                "rounded-lg border-2 py-3 text-sm font-medium transition-all",
+                                                                "h-auto flex-col rounded-lg border-2 py-3 transition-all",
                                                                 val?.result === 'na'
                                                                     ? "border-border bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-border"
                                                                     : "border-transparent bg-muted hover:border-border"
@@ -368,7 +371,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                         >
                                                             <MinusCircle className="mx-auto mb-1 h-4 w-4" />
                                                             N/A
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                     <Input
                                                         value={val?.notes ?? ''}

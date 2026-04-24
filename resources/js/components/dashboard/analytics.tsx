@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
 import { useMemo, useState, type ReactNode } from 'react';
 
@@ -35,6 +36,7 @@ function Tooltip({
     children: ReactNode;
 }) {
     return (
+        /* eslint-disable-next-line no-restricted-syntax -- Chart tooltip is an anchored overlay, not a reusable Card surface. */
         <div
             className="pointer-events-none absolute z-10 min-w-[160px] -translate-x-1/2 rounded-xl border bg-background/95 p-2 text-xs shadow"
             style={{ left: x, top: y }}
@@ -753,28 +755,32 @@ export function DashboardAnalytics({
                                     </div>
 
                                     <div className="flex items-center gap-2 rounded-xl border p-1">
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="ghost"
+                                            size="sm"
                                             onClick={() => setRange('7d')}
-                                            className={`rounded-lg px-3 py-1.5 text-xs ${
+                                            className={`h-auto rounded-lg px-3 py-1.5 text-xs ${
                                                 range === '7d'
                                                     ? 'bg-muted font-medium'
                                                     : 'text-muted-foreground hover:bg-muted/50'
                                             }`}
                                         >
                                             Next 7 days
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                             type="button"
+                                            variant="ghost"
+                                            size="sm"
                                             onClick={() => setRange('30d')}
-                                            className={`rounded-lg px-3 py-1.5 text-xs ${
+                                            className={`h-auto rounded-lg px-3 py-1.5 text-xs ${
                                                 range === '30d'
                                                     ? 'bg-muted font-medium'
                                                     : 'text-muted-foreground hover:bg-muted/50'
                                             }`}
                                         >
                                             Last 30 days
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
 

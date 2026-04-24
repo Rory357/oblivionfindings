@@ -276,7 +276,7 @@ export default function MedsToday({
                     given in response to a symptom right now, and shouldn't
                     be buried behind the rounds walk. Disabled only when
                     no PRN meds are configured for today's assigned clients. */}
-                <button
+                <Button
                     type="button"
                     onClick={() => setPrnOpen(true)}
                     disabled={prn_medications.length === 0}
@@ -285,7 +285,8 @@ export default function MedsToday({
                             ? 'Give as-needed med — none set up'
                             : `Give as-needed med (${prn_medications.length} available)`
                     }
-                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
+                    variant="outline"
+                    className="frontline-focus group h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
@@ -299,7 +300,7 @@ export default function MedsToday({
                         </p>
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
-                </button>
+                </Button>
 
                 {/* ── Active round banner (resume / start) ─────────────── */}
                 {active_round && (

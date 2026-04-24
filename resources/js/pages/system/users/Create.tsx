@@ -144,13 +144,14 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                         : 'grid-cols-1'
                             }`}>
                                 {can.createStaff && (
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={() => {
                                             setUserType('staff');
                                             form.setData('user_type', 'staff');
                                         }}
-                                        className={`flex flex-col items-center justify-between rounded-md border-2 p-4 transition-colors ${
+                                        className={`h-auto flex-col justify-between whitespace-normal rounded-md border-2 p-4 transition-colors ${
                                             userType === 'staff'
                                                 ? 'border-primary bg-primary/5'
                                                 : 'border-muted bg-transparent hover:bg-muted'
@@ -163,16 +164,17 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                 Organization employee
                                             </div>
                                         </div>
-                                    </button>
+                                    </Button>
                                 )}
                                 {can.createClient && (
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={() => {
                                             setUserType('client');
                                             form.setData('user_type', 'client');
                                         }}
-                                        className={`flex flex-col items-center justify-between rounded-md border-2 p-4 transition-colors ${
+                                        className={`h-auto flex-col justify-between whitespace-normal rounded-md border-2 p-4 transition-colors ${
                                             userType === 'client'
                                                 ? 'border-primary bg-primary/5'
                                                 : 'border-muted bg-transparent hover:bg-muted'
@@ -185,16 +187,17 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                 Service recipient
                                             </div>
                                         </div>
-                                    </button>
+                                    </Button>
                                 )}
                                 {can.createClient && (
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="outline"
                                         onClick={() => {
                                             setUserType('next_of_kin');
                                             form.setData('user_type', 'next_of_kin');
                                         }}
-                                        className={`flex flex-col items-center justify-between rounded-md border-2 p-4 transition-colors ${
+                                        className={`h-auto flex-col justify-between whitespace-normal rounded-md border-2 p-4 transition-colors ${
                                             userType === 'next_of_kin'
                                                 ? 'border-primary bg-primary/5'
                                                 : 'border-muted bg-transparent hover:bg-muted'
@@ -207,7 +210,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                 Family member
                                             </div>
                                         </div>
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         </CardContent>

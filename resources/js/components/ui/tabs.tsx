@@ -165,16 +165,25 @@ export function Tabs({
                     {t.icon && <span className="shrink-0">{t.icon}</span>}
                     <span className="truncate">{t.label}</span>
                     {t.closable && onClose && (
-                        <button
+                        <span
+                            role="button"
+                            tabIndex={0}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onClose(t.key);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onClose(t.key);
+                                }
                             }}
                             className="absolute right-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-muted-foreground/20 group-hover:opacity-100"
                             aria-label={`Close ${t.label}`}
                         >
                             <X className="h-3 w-3" />
-                        </button>
+                        </span>
                     )}
                 </Tab>
             ))}

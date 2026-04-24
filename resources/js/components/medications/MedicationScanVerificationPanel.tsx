@@ -1,14 +1,14 @@
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     emptyMedicationScanCapture,
     type MedicationScanCapture,
     type MedicationScanVerification,
     verifyMedicationScan,
 } from '@/lib/medication-scan';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
+import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Props = {
@@ -193,6 +193,7 @@ export default function MedicationScanVerificationPanel({
                 </div>
 
                 <div className="space-y-2">
+                    {/* eslint-disable-next-line no-restricted-syntax -- QR code needs a tight white scan surface, not a full Card frame. */}
                     <div className="rounded-md border bg-white p-2">
                         <img
                             src={scanVerification.svg_url}

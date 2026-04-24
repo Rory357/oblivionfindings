@@ -139,10 +139,10 @@ export default function TransportCreate({
     auth_user,
 }: Props) {
     const safeVehicles = vehicles ?? [];
-    const safeRecentResidents = recent_residents ?? [];
+    const safeRecentResidents = useMemo(() => recent_residents ?? [], [recent_residents]);
     const safeClients = clients ?? [];
-    const safeMedications = client_medications ?? [];
-    const safeShifts = shifts ?? [];
+    const safeMedications = useMemo(() => client_medications ?? [], [client_medications]);
+    const safeShifts = useMemo(() => shifts ?? [], [shifts]);
 
     const form = useForm({
         asset_id: '',
@@ -202,6 +202,7 @@ export default function TransportCreate({
         if (!form.data.pickup_location && selectedShift.location) {
             form.setData('pickup_location', selectedShift.location);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia form helpers are intentionally used to hydrate dependent fields from the selected shift.
     }, [selectedShift]);
 
     useEffect(() => {
@@ -303,7 +304,7 @@ export default function TransportCreate({
                 ],
             });
         },
-        [safeShifts, form.data.resident_name, form.data.pickup_location],
+        [form, safeShifts],
     );
 
     const handleMedToggle = useCallback((med: ClientMedication) => {
@@ -323,7 +324,7 @@ export default function TransportCreate({
             }
             return next;
         });
-    }, []);
+    }, [form]);
 
     const submitTransport = useCallback(
         (mode: 'transport' | 'pack') => {
@@ -445,9 +446,10 @@ export default function TransportCreate({
                                 {TRANSPORT_TYPES.map((type) => {
                                     const IconComp = type.icon;
                                     return (
-                                        <button
+                                        <Button
                                             key={type.value}
                                             type="button"
+                                            variant="outline"
                                             onClick={() =>
                                                 form.setData(
                                                     'transport_type',
@@ -455,7 +457,7 @@ export default function TransportCreate({
                                                 )
                                             }
                                             className={cn(
-                                                'flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm transition-all',
+                                                'h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all',
                                                 form.data.transport_type ===
                                                     type.value
                                                     ? `${type.color} shadow-md`
@@ -466,7 +468,7 @@ export default function TransportCreate({
                                             <span className="font-semibold">
                                                 {type.label}
                                             </span>
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -651,7 +653,7 @@ export default function TransportCreate({
                                     />
                                     {showSuggestions &&
                                         filteredResidents.length > 0 && (
-                                            <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-lg">
+                                            <menu className="absolute z-10 mt-1 w-full rounded-md border bg-background p-0 shadow-lg">
                                                 {filteredResidents.map(
                                                     (name) => (
                                                         <button
@@ -675,7 +677,7 @@ export default function TransportCreate({
                                                         </button>
                                                     ),
                                                 )}
-                                            </div>
+                                            </menu>
                                         )}
                                     {form.errors.resident_name && (
                                         <p className="mt-1 text-xs text-destructive">

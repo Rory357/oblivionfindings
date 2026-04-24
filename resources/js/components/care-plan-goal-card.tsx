@@ -1,10 +1,18 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, Clock, Circle, Pause, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
-import { useState } from 'react';
 import { router } from '@inertiajs/react';
+import {
+    Calendar,
+    CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    Circle,
+    Clock,
+    Pause,
+} from 'lucide-react';
+import { useState } from 'react';
 
 interface GoalCardProps {
     goal: {
@@ -19,7 +27,11 @@ interface GoalCardProps {
         outcome_notes?: string | null;
     };
     carePlanId: number;
-    onProgressUpdate?: (goalId: number, progress: number, status: string) => void;
+    onProgressUpdate?: (
+        goalId: number,
+        progress: number,
+        status: string,
+    ) => void;
     compact?: boolean;
 }
 
@@ -40,12 +52,17 @@ const PRIORITY_TEXT: Record<string, string> = {
 const CATEGORY_BADGE: Record<string, string> = {
     health: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     social: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
-    independence: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
+    independence:
+        'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     skills: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    wellbeing: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    wellbeing:
+        'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
 };
 
-const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; className: string }> = {
+const STATUS_ICON: Record<
+    string,
+    { icon: typeof CheckCircle2; className: string }
+> = {
     completed: { icon: CheckCircle2, className: 'text-status-success' },
     in_progress: { icon: Clock, className: 'text-status-info' },
     not_started: { icon: Circle, className: 'text-muted-foreground' },
@@ -61,7 +78,11 @@ const PROGRESS_COLOR: Record<string, string> = {
 
 function formatDate(date: string | null | undefined): string {
     if (!date) return '—';
-    return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(date).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 function isOverdue(date: string | null | undefined, status: string): boolean {
@@ -69,15 +90,24 @@ function isOverdue(date: string | null | undefined, status: string): boolean {
     return new Date(date).getTime() < Date.now();
 }
 
-export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact = false }: GoalCardProps) {
+export function CarePlanGoalCard({
+    goal,
+    carePlanId,
+    onProgressUpdate,
+    compact = false,
+}: GoalCardProps) {
     const [expanded, setExpanded] = useState(false);
 
-    const borderColor = PRIORITY_BORDER[goal.priority] ?? PRIORITY_BORDER.medium;
+    const borderColor =
+        PRIORITY_BORDER[goal.priority] ?? PRIORITY_BORDER.medium;
     const priorityText = PRIORITY_TEXT[goal.priority] ?? PRIORITY_TEXT.medium;
-    const categoryBadge = CATEGORY_BADGE[goal.category] ?? 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground';
+    const categoryBadge =
+        CATEGORY_BADGE[goal.category] ??
+        'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground';
     const statusInfo = STATUS_ICON[goal.status] ?? STATUS_ICON.not_started;
     const StatusIcon = statusInfo.icon;
-    const progressColor = PROGRESS_COLOR[goal.status] ?? PROGRESS_COLOR.not_started;
+    const progressColor =
+        PROGRESS_COLOR[goal.status] ?? PROGRESS_COLOR.not_started;
 
     const descriptionLong = (goal.description?.length ?? 0) > 100;
     const overdue = isOverdue(goal.target_date, goal.status);
@@ -86,10 +116,14 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
         if (onProgressUpdate) {
             onProgressUpdate(goal.id, 100, 'completed');
         } else {
-            router.patch(`/operations/care-plans/${carePlanId}/goals/${goal.id}/progress`, {
-                progress_percentage: 100,
-                status: 'completed',
-            }, { preserveScroll: true });
+            router.patch(
+                `/operations/care-plans/${carePlanId}/goals/${goal.id}/progress`,
+                {
+                    progress_percentage: 100,
+                    status: 'completed',
+                },
+                { preserveScroll: true },
+            );
         }
     }
 
@@ -97,32 +131,46 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
         if (onProgressUpdate) {
             onProgressUpdate(goal.id, goal.progress_percentage, 'in_progress');
         } else {
-            router.patch(`/operations/care-plans/${carePlanId}/goals/${goal.id}/progress`, {
-                status: 'in_progress',
-            }, { preserveScroll: true });
+            router.patch(
+                `/operations/care-plans/${carePlanId}/goals/${goal.id}/progress`,
+                {
+                    status: 'in_progress',
+                },
+                { preserveScroll: true },
+            );
         }
     }
 
     return (
-        <Card className={`border-l-4 ${borderColor} transition-shadow hover:shadow-md`}>
+        <Card
+            className={`border-l-4 ${borderColor} transition-shadow hover:shadow-md`}
+        >
             <CardContent className={compact ? 'p-3' : 'p-4'}>
                 <div className="flex items-start gap-3">
                     {/* Status icon */}
-                    <div className="shrink-0 mt-0.5">
-                        <StatusIcon className={`h-5 w-5 ${statusInfo.className}`} />
+                    <div className="mt-0.5 shrink-0">
+                        <StatusIcon
+                            className={`h-5 w-5 ${statusInfo.className}`}
+                        />
                     </div>
 
                     {/* Main content */}
                     <div className="min-w-0 flex-1">
                         {/* Header */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className={`font-semibold text-foreground ${compact ? 'text-sm' : 'text-base'}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h4
+                                className={`font-semibold text-foreground ${compact ? 'text-sm' : 'text-base'}`}
+                            >
                                 {goal.title}
                             </h4>
-                            <Badge className={`${categoryBadge} border-0 text-[10px] capitalize`}>
+                            <Badge
+                                className={`${categoryBadge} border-0 text-[10px] capitalize`}
+                            >
                                 {goal.category}
                             </Badge>
-                            <span className={`text-[10px] font-medium uppercase tracking-wider ${priorityText}`}>
+                            <span
+                                className={`text-[10px] font-medium tracking-wider uppercase ${priorityText}`}
+                            >
                                 {goal.priority}
                             </span>
                         </div>
@@ -141,7 +189,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                             : '[&>div]:bg-muted'
                                 }`}
                             />
-                            <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                                 {goal.progress_percentage}%
                             </span>
                         </div>
@@ -149,8 +197,12 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                         {/* Target date */}
                         {goal.target_date && (
                             <div className="mt-1.5 flex items-center gap-1">
-                                <Calendar className={`h-3 w-3 ${overdue ? 'text-status-critical' : 'text-muted-foreground'}`} />
-                                <span className={`text-[11px] ${overdue ? 'text-status-critical dark:text-status-critical font-medium' : 'text-muted-foreground'}`}>
+                                <Calendar
+                                    className={`h-3 w-3 ${overdue ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                />
+                                <span
+                                    className={`text-[11px] ${overdue ? 'font-medium text-status-critical dark:text-status-critical' : 'text-muted-foreground'}`}
+                                >
                                     {overdue ? 'Overdue: ' : 'Target: '}
                                     {formatDate(goal.target_date)}
                                 </span>
@@ -160,26 +212,31 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                         {/* Description (expandable) */}
                         {!compact && goal.description && (
                             <div className="mt-2">
-                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                <p className="text-xs leading-relaxed text-muted-foreground">
                                     {descriptionLong && !expanded
                                         ? `${goal.description.slice(0, 100)}...`
                                         : goal.description}
                                 </p>
                                 {descriptionLong && (
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        size="sm"
                                         onClick={() => setExpanded(!expanded)}
-                                        className="mt-0.5 flex items-center gap-0.5 text-[10px] text-primary dark:text-primary hover:underline"
+                                        className="mt-0.5 h-auto gap-0.5 p-0 text-[10px] text-primary dark:text-primary"
                                     >
                                         {expanded ? (
                                             <>
-                                                <ChevronUp className="h-3 w-3" /> Show less
+                                                <ChevronUp className="h-3 w-3" />{' '}
+                                                Show less
                                             </>
                                         ) : (
                                             <>
-                                                <ChevronDown className="h-3 w-3" /> Show more
+                                                <ChevronDown className="h-3 w-3" />{' '}
+                                                Show more
                                             </>
                                         )}
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         )}
@@ -191,7 +248,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-6 text-[11px] px-2 text-status-info border-status-info/30 hover:bg-status-info-bg dark:text-status-info dark:border-status-info/30 dark:hover:bg-status-info"
+                                        className="h-6 border-status-info/30 px-2 text-[11px] text-status-info hover:bg-status-info-bg dark:border-status-info/30 dark:text-status-info dark:hover:bg-status-info"
                                         onClick={handleStart}
                                     >
                                         Start
@@ -201,10 +258,10 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-6 text-[11px] px-2 text-status-success border-status-success/30 hover:bg-status-success-bg dark:text-status-success dark:border-status-success/30 dark:hover:bg-status-success"
+                                        className="h-6 border-status-success/30 px-2 text-[11px] text-status-success hover:bg-status-success-bg dark:border-status-success/30 dark:text-status-success dark:hover:bg-status-success"
                                         onClick={handleMarkAchieved}
                                     >
-                                        <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                        <CheckCircle2 className="mr-0.5 h-3 w-3" />
                                         Mark Achieved
                                     </Button>
                                 )}

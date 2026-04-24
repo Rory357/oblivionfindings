@@ -2,6 +2,12 @@ import { router, usePage } from '@inertiajs/react';
 import { Clock, LogIn, LogOut, MapPin, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import HandoverWriteForm, {
+    emptyHandoverWriteValue,
+    type HandoverWriteValue,
+} from '@/components/handover-write-form';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -13,12 +19,6 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import HandoverWriteForm, {
-    emptyHandoverWriteValue,
-    type HandoverWriteValue,
-} from '@/components/handover-write-form';
-import DraftSavedIndicator from '@/components/draft-saved-indicator';
-import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import { formatTime } from '@/lib/datetime';
@@ -114,7 +114,9 @@ export default function ClockInCard({
     const [handoverValue, setHandoverValue] = useState<HandoverWriteValue>(
         emptyHandoverWriteValue,
     );
-    const [resumeAvailable, setResumeAvailable] = useState<{ savedAt: number } | null>(null);
+    const [resumeAvailable, setResumeAvailable] = useState<{
+        savedAt: number;
+    } | null>(null);
 
     // Per-shift draft key so two parallel shifts never collide on the same device.
     const handoverDraftKey = openSession?.shift_id
@@ -122,11 +124,15 @@ export default function ClockInCard({
         : null;
 
     const handoverEligibleForSave =
-        !!openSession?.shift_id && !openSession?.handover_submitted && confirmOpen;
+        !!openSession?.shift_id &&
+        !openSession?.handover_submitted &&
+        confirmOpen;
 
-    const { savedAt: handoverSavedAt, load: loadHandoverDraft, clear: clearHandoverDraft } = useFormAutosave<
-        Record<string, unknown>
-    >(
+    const {
+        savedAt: handoverSavedAt,
+        load: loadHandoverDraft,
+        clear: clearHandoverDraft,
+    } = useFormAutosave<Record<string, unknown>>(
         handoverValue as unknown as Record<string, unknown>,
         {},
         {
@@ -156,7 +162,8 @@ export default function ClockInCard({
         return breakPreset;
     }, [breakPreset, customBreak]);
 
-    const ambiguous = !openSession && !activeShift && (eligibleShifts?.length ?? 0) > 1;
+    const ambiguous =
+        !openSession && !activeShift && (eligibleShifts?.length ?? 0) > 1;
 
     // Early exits: no permission, or nothing to show on home.
     if (!canClock) return null;
@@ -278,7 +285,10 @@ export default function ClockInCard({
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <span className="relative flex h-2.5 w-2.5" aria-hidden>
+                                <span
+                                    className="relative flex h-2.5 w-2.5"
+                                    aria-hidden
+                                >
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
                                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
                                 </span>
@@ -305,7 +315,7 @@ export default function ClockInCard({
                                 )}
                             </div>
                             <div className="mt-3 flex items-baseline gap-2">
-                                <span className="text-3xl font-semibold tabular-nums text-status-success dark:text-status-success">
+                                <span className="text-3xl font-semibold text-status-success tabular-nums dark:text-status-success">
                                     {elapsed ?? '—'}
                                 </span>
                                 <span className="text-xs text-status-success dark:text-status-success">
@@ -323,19 +333,28 @@ export default function ClockInCard({
                                     setBreakPreset(0);
                                     setCustomBreak('');
                                     // Look for a saved draft for this shift; if present, offer resume.
-                                    const existing = handoverDraftKey ? loadHandoverDraft() : null;
-                                    const draftData = existing?.data as HandoverWriteValue | undefined;
+                                    const existing = handoverDraftKey
+                                        ? loadHandoverDraft()
+                                        : null;
+                                    const draftData = existing?.data as
+                                        | HandoverWriteValue
+                                        | undefined;
                                     const hasDraft =
                                         !!draftData &&
                                         (!!draftData.handover_notes?.trim() ||
                                             draftData.shift_rating !== null ||
-                                            draftData.follow_up_needed === true ||
+                                            draftData.follow_up_needed ===
+                                                true ||
                                             draftData.meds_completed === false);
                                     if (hasDraft && draftData) {
                                         setHandoverValue(draftData);
-                                        setResumeAvailable({ savedAt: existing!.savedAt });
+                                        setResumeAvailable({
+                                            savedAt: existing!.savedAt,
+                                        });
                                     } else {
-                                        setHandoverValue(emptyHandoverWriteValue);
+                                        setHandoverValue(
+                                            emptyHandoverWriteValue,
+                                        );
                                         setResumeAvailable(null);
                                     }
                                     setConfirmOpen(true);
@@ -366,40 +385,52 @@ export default function ClockInCard({
                         </AlertDialogHeader>
 
                         <div className="space-y-4 py-2">
-                            <div className="text-sm font-medium">Break (minutes)</div>
+                            <div className="text-sm font-medium">
+                                Break (minutes)
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {BREAK_CHIPS.map((chip) => {
                                     const active = breakPreset === chip.value;
                                     return (
-                                        <button
+                                        <Button
                                             key={chip.value}
                                             type="button"
-                                            onClick={() => setBreakPreset(chip.value)}
+                                            variant={
+                                                active ? 'default' : 'outline'
+                                            }
+                                            onClick={() =>
+                                                setBreakPreset(chip.value)
+                                            }
                                             className={cn(
-                                                'min-h-11 min-w-14 rounded-full border px-4 text-sm font-medium transition-colors',
+                                                'min-h-11 min-w-14 rounded-full px-4 text-sm font-medium transition-colors',
                                                 active
-                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    ? 'bg-primary text-primary-foreground'
                                                     : 'border-border bg-background hover:bg-muted',
                                             )}
                                             aria-pressed={active}
                                         >
                                             {chip.label}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
-                                <button
+                                <Button
                                     type="button"
+                                    variant={
+                                        breakPreset === 'custom'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
                                     onClick={() => setBreakPreset('custom')}
                                     className={cn(
-                                        'min-h-11 rounded-full border px-4 text-sm font-medium transition-colors',
+                                        'min-h-11 rounded-full px-4 text-sm font-medium transition-colors',
                                         breakPreset === 'custom'
-                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            ? 'bg-primary text-primary-foreground'
                                             : 'border-border bg-background hover:bg-muted',
                                     )}
                                     aria-pressed={breakPreset === 'custom'}
                                 >
                                     Custom
-                                </button>
+                                </Button>
                             </div>
                             {breakPreset === 'custom' && (
                                 <div>
@@ -412,8 +443,10 @@ export default function ClockInCard({
                                         min={0}
                                         max={240}
                                         value={customBreak}
-                                        onChange={(e) => setCustomBreak(e.target.value)}
-                                        className="mt-1 h-11 w-32 rounded-md border border-input bg-background px-3 text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                        onChange={(e) =>
+                                            setCustomBreak(e.target.value)
+                                        }
+                                        className="mt-1 h-11 w-32 rounded-md border border-input bg-background px-3 text-base shadow-sm focus:ring-2 focus:ring-ring focus:outline-none"
                                         autoFocus
                                     />
                                 </div>
@@ -421,27 +454,38 @@ export default function ClockInCard({
 
                             {openSession.shift_id ? (
                                 <div className="space-y-3 border-t pt-4">
-                                    {resumeAvailable && !openSession.handover_submitted && (
-                                        <DraftResumePrompt
-                                            savedAt={resumeAvailable.savedAt}
-                                            onResume={() => setResumeAvailable(null)}
-                                            onDiscard={() => {
-                                                clearHandoverDraft();
-                                                setHandoverValue(emptyHandoverWriteValue);
-                                                setResumeAvailable(null);
-                                            }}
-                                            title="Resume your unfinished handover?"
-                                            description="We kept your handover answers from earlier on this device."
-                                        />
-                                    )}
+                                    {resumeAvailable &&
+                                        !openSession.handover_submitted && (
+                                            <DraftResumePrompt
+                                                savedAt={
+                                                    resumeAvailable.savedAt
+                                                }
+                                                onResume={() =>
+                                                    setResumeAvailable(null)
+                                                }
+                                                onDiscard={() => {
+                                                    clearHandoverDraft();
+                                                    setHandoverValue(
+                                                        emptyHandoverWriteValue,
+                                                    );
+                                                    setResumeAvailable(null);
+                                                }}
+                                                title="Resume your unfinished handover?"
+                                                description="We kept your handover answers from earlier on this device."
+                                            />
+                                        )}
                                     <HandoverWriteForm
                                         value={handoverValue}
                                         onChange={setHandoverValue}
                                         disabled={submitting}
-                                        alreadySubmitted={!!openSession.handover_submitted}
+                                        alreadySubmitted={
+                                            !!openSession.handover_submitted
+                                        }
                                     />
                                     {!openSession.handover_submitted && (
-                                        <DraftSavedIndicator savedAt={handoverSavedAt} />
+                                        <DraftSavedIndicator
+                                            savedAt={handoverSavedAt}
+                                        />
                                     )}
                                 </div>
                             ) : null}
@@ -484,7 +528,9 @@ export default function ClockInCard({
                 className="scroll-mt-20 rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-sm"
             >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-base font-semibold">Pick a shift to start</h2>
+                    <h2 className="text-base font-semibold">
+                        Pick a shift to start
+                    </h2>
                     <span className="text-xs text-muted-foreground">
                         {eligibleShiftCount} ready
                     </span>
@@ -506,14 +552,15 @@ export default function ClockInCard({
                                 : null;
                         return (
                             <li key={shift.id}>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
                                     role="radio"
                                     aria-checked={picked}
                                     onClick={() => setPickedShiftId(shift.id)}
                                     disabled={submitting}
                                     className={cn(
-                                        'flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
+                                        'h-auto w-full justify-start gap-3 rounded-lg px-3 py-3 text-left font-normal transition-colors',
                                         picked
                                             ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
                                             : 'border-border bg-background hover:bg-muted',
@@ -535,7 +582,8 @@ export default function ClockInCard({
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-1.5 text-sm font-medium">
                                             <User className="h-4 w-4 text-muted-foreground" />
-                                            {shift.client_name ?? 'Unassigned client'}
+                                            {shift.client_name ??
+                                                'Unassigned client'}
                                         </span>
                                         <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                                             {label && (
@@ -552,7 +600,7 @@ export default function ClockInCard({
                                             )}
                                         </span>
                                     </span>
-                                </button>
+                                </Button>
                             </li>
                         );
                     })}
@@ -568,7 +616,9 @@ export default function ClockInCard({
                     <Button
                         size="lg"
                         className="h-12 w-full min-w-40 text-base sm:w-auto"
-                        onClick={() => handleClockIn(pickedShiftId ?? undefined)}
+                        onClick={() =>
+                            handleClockIn(pickedShiftId ?? undefined)
+                        }
                         disabled={submitting || pickedShiftId === null}
                     >
                         <LogIn className="mr-2 h-5 w-5" />

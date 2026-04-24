@@ -10,20 +10,22 @@ type Flash = {
 };
 
 export default function FlashToaster() {
-    const flash = (usePage().props as any).flash as Flash | undefined;
-
-    const errors = (usePage().props as any).errors as Record<string, any> | undefined;
+    const props = usePage().props as any;
+    const flash = props.flash as Flash | undefined;
+    const errors = props.errors as Record<string, any> | undefined;
+    const success = flash?.success;
+    const error = flash?.error;
+    const warning = flash?.warning;
+    const info = flash?.info;
     const last = useRef<string>('');
     const seq = useRef(0);
 
     useEffect(() => {
-        if (!flash) return;
-
         const entries: Array<[keyof Flash, string]> = [];
-        if (flash.success) entries.push(['success', flash.success]);
-        if (flash.error) entries.push(['error', flash.error]);
-        if (flash.warning) entries.push(['warning', flash.warning]);
-        if (flash.info) entries.push(['info', flash.info]);
+        if (success) entries.push(['success', success]);
+        if (error) entries.push(['error', error]);
+        if (warning) entries.push(['warning', warning]);
+        if (info) entries.push(['info', info]);
 
         // Only show the most important message if multiple exist
         const [level, message] = entries[0] ?? [];
@@ -40,9 +42,7 @@ export default function FlashToaster() {
         else if (level === 'error') toast.error(message);
         else if (level === 'warning') toast.warning(message);
         else toast(message);
-    }, [flash?.success, flash?.error, flash?.warning, flash?.info]);
-
-
+    }, [success, error, warning, info]);
 
     useEffect(() => {
         if (!errors) return;

@@ -1,4 +1,3 @@
-import 'leaflet/dist/leaflet.css';
 import PageHeader from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
+import 'leaflet/dist/leaflet.css';
 import {
     Activity,
     AlertTriangle,
@@ -180,7 +180,10 @@ export default function ControlRoomMap({
 
     const applyFilter = useCallback(
         (key: string, value: string) => {
-            const newFilters = { ...filters, [key]: value === 'all' ? undefined : value };
+            const newFilters = {
+                ...filters,
+                [key]: value === 'all' ? undefined : value,
+            };
             // Clean undefined values
             Object.keys(newFilters).forEach((k) => {
                 if (!newFilters[k]) delete newFilters[k];
@@ -253,11 +256,16 @@ export default function ControlRoomMap({
     // ── Render markers ───────────────────────────────────────────────────────
 
     useEffect(() => {
-        if (!isMapReady || !mapInstanceRef.current || !layerGroupRef.current) return;
+        if (!isMapReady || !mapInstanceRef.current || !layerGroupRef.current)
+            return;
 
         async function renderMarkers() {
             const leaflet = await import('leaflet');
-            const L = 'default' in leaflet ? (leaflet as Record<string, unknown>).default as typeof leaflet : leaflet;
+            const L =
+                'default' in leaflet
+                    ? ((leaflet as Record<string, unknown>)
+                          .default as typeof leaflet)
+                    : leaflet;
             const map = mapInstanceRef.current!;
             const layers = layerGroupRef.current!;
 
@@ -270,7 +278,12 @@ export default function ControlRoomMap({
             geofences.forEach((gf) => {
                 if (!gf.shape) return;
 
-                if (gf.type === 'circle' && gf.shape.lat && gf.shape.lon && gf.shape.radius_m) {
+                if (
+                    gf.type === 'circle' &&
+                    gf.shape.lat &&
+                    gf.shape.lon &&
+                    gf.shape.radius_m
+                ) {
                     L.circle([gf.shape.lat, gf.shape.lon], {
                         radius: gf.shape.radius_m,
                         color: '#6366f1',
@@ -285,8 +298,14 @@ export default function ControlRoomMap({
                                 `Radius: ${gf.shape.radius_m}m</div>`,
                         )
                         .addTo(layers);
-                } else if (gf.type === 'polygon' && gf.shape.points && gf.shape.points.length > 2) {
-                    const points: L.LatLngExpression[] = gf.shape.points.map((p) => [p.lat, p.lng]);
+                } else if (
+                    gf.type === 'polygon' &&
+                    gf.shape.points &&
+                    gf.shape.points.length > 2
+                ) {
+                    const points: L.LatLngExpression[] = gf.shape.points.map(
+                        (p) => [p.lat, p.lng],
+                    );
                     L.polygon(points, {
                         color: '#6366f1',
                         fillColor: '#6366f1',
@@ -321,7 +340,9 @@ export default function ControlRoomMap({
                     popupAnchor: [0, -16],
                 });
 
-                const marker = L.marker([site.latitude, site.longitude], { icon: siteIcon })
+                const marker = L.marker([site.latitude, site.longitude], {
+                    icon: siteIcon,
+                })
                     .bindPopup(
                         `<div class="text-sm">` +
                             `<strong>${site.name}</strong><br/>` +
@@ -342,7 +363,10 @@ export default function ControlRoomMap({
                 if (device.type === 'personal_tracker') {
                     color = '#8b5cf6'; // purple
                     label = 'Resident tracker';
-                } else if (device.status === 'online' && isRecentlySeen(device.last_seen_at, 5)) {
+                } else if (
+                    device.status === 'online' &&
+                    isRecentlySeen(device.last_seen_at, 5)
+                ) {
                     color = '#3b82f6'; // blue - moving/recently seen
                     label = 'Moving';
                 } else if (device.status === 'online') {
@@ -366,7 +390,9 @@ export default function ControlRoomMap({
                 });
 
                 const batteryStr =
-                    device.battery_level !== null ? `${device.battery_level}%` : 'N/A';
+                    device.battery_level !== null
+                        ? `${device.battery_level}%`
+                        : 'N/A';
 
                 const popupContent =
                     `<div class="text-sm" style="min-width:180px">` +
@@ -384,7 +410,9 @@ export default function ControlRoomMap({
                         : '') +
                     `</div>`;
 
-                L.marker([device.latitude, device.longitude], { icon: deviceIcon })
+                L.marker([device.latitude, device.longitude], {
+                    icon: deviceIcon,
+                })
                     .bindPopup(popupContent)
                     .addTo(layers);
 
@@ -420,7 +448,9 @@ export default function ControlRoomMap({
                         : '') +
                     `</div>`;
 
-                L.marker([alert.latitude!, alert.longitude!], { icon: alertIcon })
+                L.marker([alert.latitude!, alert.longitude!], {
+                    icon: alertIcon,
+                })
                     .bindPopup(popupContent)
                     .addTo(layers);
 
@@ -430,7 +460,10 @@ export default function ControlRoomMap({
             // ── Fit bounds ───────────────────────────────────────────────────
 
             if (bounds.length > 1) {
-                map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 14 });
+                map.fitBounds(L.latLngBounds(bounds), {
+                    padding: [40, 40],
+                    maxZoom: 14,
+                });
             } else if (bounds.length === 1) {
                 map.setView(bounds[0] as L.LatLngExpression, 13);
             }
@@ -472,7 +505,11 @@ export default function ControlRoomMap({
                     backHref="/control-room"
                     backLabel="Control Room"
                     actions={
-                        <Button variant="outline" size="sm" onClick={manualRefresh}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={manualRefresh}
+                        >
                             <RefreshCw className="mr-2 h-4 w-4" />
                             Refresh
                         </Button>
@@ -487,8 +524,12 @@ export default function ControlRoomMap({
                                 <Radio className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Total Devices</p>
-                                <p className="text-2xl font-bold">{stats.total_devices}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Total Devices
+                                </p>
+                                <p className="text-2xl font-bold">
+                                    {stats.total_devices}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -498,8 +539,12 @@ export default function ControlRoomMap({
                                 <Wifi className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Online</p>
-                                <p className="text-2xl font-bold text-status-success">{stats.online}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Online
+                                </p>
+                                <p className="text-2xl font-bold text-status-success">
+                                    {stats.online}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -509,8 +554,12 @@ export default function ControlRoomMap({
                                 <WifiOff className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Offline</p>
-                                <p className="text-2xl font-bold text-status-critical">{stats.offline}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Offline
+                                </p>
+                                <p className="text-2xl font-bold text-status-critical">
+                                    {stats.offline}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -520,7 +569,9 @@ export default function ControlRoomMap({
                                 <AlertTriangle className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Active Alerts</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Active Alerts
+                                </p>
                                 <p className="text-2xl font-bold text-status-warning">
                                     {stats.active_alerts}
                                 </p>
@@ -535,21 +586,32 @@ export default function ControlRoomMap({
                     <div className="w-full shrink-0 space-y-4 lg:w-64">
                         <Card>
                             <CardContent className="space-y-4 p-4">
-                                <h3 className="text-sm font-semibold">Filters</h3>
+                                <h3 className="text-sm font-semibold">
+                                    Filters
+                                </h3>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs text-muted-foreground">Site</label>
+                                    <label className="text-xs text-muted-foreground">
+                                        Site
+                                    </label>
                                     <Select
                                         value={filters.site_id || 'all'}
-                                        onValueChange={(v) => applyFilter('site_id', v)}
+                                        onValueChange={(v) =>
+                                            applyFilter('site_id', v)
+                                        }
                                     >
                                         <SelectTrigger className="w-full">
                                             <SelectValue placeholder="All Sites" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Sites</SelectItem>
+                                            <SelectItem value="all">
+                                                All Sites
+                                            </SelectItem>
                                             {all_sites.map((s) => (
-                                                <SelectItem key={s.id} value={s.id.toString()}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={s.id.toString()}
+                                                >
                                                     {s.name}
                                                 </SelectItem>
                                             ))}
@@ -563,13 +625,17 @@ export default function ControlRoomMap({
                                     </label>
                                     <Select
                                         value={filters.type || 'all'}
-                                        onValueChange={(v) => applyFilter('type', v)}
+                                        onValueChange={(v) =>
+                                            applyFilter('type', v)
+                                        }
                                     >
                                         <SelectTrigger className="w-full">
                                             <SelectValue placeholder="All Types" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Trackers</SelectItem>
+                                            <SelectItem value="all">
+                                                All Trackers
+                                            </SelectItem>
                                             <SelectItem value="vehicle_tracker">
                                                 Vehicle Tracker
                                             </SelectItem>
@@ -581,18 +647,28 @@ export default function ControlRoomMap({
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs text-muted-foreground">Status</label>
+                                    <label className="text-xs text-muted-foreground">
+                                        Status
+                                    </label>
                                     <Select
                                         value={filters.status || 'all'}
-                                        onValueChange={(v) => applyFilter('status', v)}
+                                        onValueChange={(v) =>
+                                            applyFilter('status', v)
+                                        }
                                     >
                                         <SelectTrigger className="w-full">
                                             <SelectValue placeholder="All Statuses" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All</SelectItem>
-                                            <SelectItem value="online">Online</SelectItem>
-                                            <SelectItem value="offline">Offline</SelectItem>
+                                            <SelectItem value="all">
+                                                All
+                                            </SelectItem>
+                                            <SelectItem value="online">
+                                                Online
+                                            </SelectItem>
+                                            <SelectItem value="offline">
+                                                Offline
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -603,14 +679,20 @@ export default function ControlRoomMap({
                                     </label>
                                     <Select
                                         value={filters.alert_only || '0'}
-                                        onValueChange={(v) => applyFilter('alert_only', v)}
+                                        onValueChange={(v) =>
+                                            applyFilter('alert_only', v)
+                                        }
                                     >
                                         <SelectTrigger className="w-full">
                                             <SelectValue placeholder="No" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="0">Show All</SelectItem>
-                                            <SelectItem value="1">Alerts Only</SelectItem>
+                                            <SelectItem value="0">
+                                                Show All
+                                            </SelectItem>
+                                            <SelectItem value="1">
+                                                Alerts Only
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -631,7 +713,9 @@ export default function ControlRoomMap({
                         {/* Legend */}
                         <Card>
                             <CardContent className="space-y-2 p-4">
-                                <h3 className="text-sm font-semibold">Legend</h3>
+                                <h3 className="text-sm font-semibold">
+                                    Legend
+                                </h3>
                                 <div className="space-y-1.5 text-xs">
                                     <div className="flex items-center gap-2">
                                         <span className="inline-block h-3 w-3 rounded-full bg-status-success" />
@@ -684,14 +768,18 @@ export default function ControlRoomMap({
                                         </p>
                                     )}
                                     {devices.map((d) => (
-                                        <button
+                                        <Button
                                             key={d.id}
                                             type="button"
-                                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted"
+                                            variant="ghost"
+                                            className="h-auto w-full justify-start gap-2 rounded px-2 py-1.5 text-left text-xs"
                                             onClick={() => {
                                                 if (mapInstanceRef.current) {
                                                     mapInstanceRef.current.setView(
-                                                        [d.latitude, d.longitude],
+                                                        [
+                                                            d.latitude,
+                                                            d.longitude,
+                                                        ],
                                                         16,
                                                     );
                                                 }
@@ -699,10 +787,14 @@ export default function ControlRoomMap({
                                         >
                                             <span
                                                 className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-                                                    d.type === 'personal_tracker'
+                                                    d.type ===
+                                                    'personal_tracker'
                                                         ? 'bg-primary'
                                                         : d.status === 'online'
-                                                          ? isRecentlySeen(d.last_seen_at, 5)
+                                                          ? isRecentlySeen(
+                                                                d.last_seen_at,
+                                                                5,
+                                                            )
                                                               ? 'bg-status-info'
                                                               : 'bg-status-success'
                                                           : 'bg-status-critical'
@@ -711,15 +803,16 @@ export default function ControlRoomMap({
                                             <span className="min-w-0 flex-1 truncate">
                                                 {d.name || d.device_uid}
                                             </span>
-                                            {d.battery_level !== null && d.battery_level <= 20 && (
-                                                <Badge
-                                                    variant="destructive"
-                                                    className="shrink-0 px-1 text-[10px]"
-                                                >
-                                                    {d.battery_level}%
-                                                </Badge>
-                                            )}
-                                        </button>
+                                            {d.battery_level !== null &&
+                                                d.battery_level <= 20 && (
+                                                    <Badge
+                                                        variant="destructive"
+                                                        className="shrink-0 px-1 text-[10px]"
+                                                    >
+                                                        {d.battery_level}%
+                                                    </Badge>
+                                                )}
+                                        </Button>
                                     ))}
                                 </div>
                             </CardContent>
@@ -748,8 +841,8 @@ export default function ControlRoomMap({
                             <div className="flex items-center gap-1">
                                 <MapPin className="h-3 w-3" />
                                 <span>
-                                    {devices.length} devices, {sites.length} sites,{' '}
-                                    {alerts.length} alerts
+                                    {devices.length} devices, {sites.length}{' '}
+                                    sites, {alerts.length} alerts
                                 </span>
                             </div>
                         </div>

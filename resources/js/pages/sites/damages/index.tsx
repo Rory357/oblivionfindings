@@ -1,11 +1,22 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -14,22 +25,19 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from '@/components/ui/dialog';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { AlertTriangle, Plus, ShieldAlert, DollarSign, Eye, Pencil, ClipboardCheck } from 'lucide-react';
-import { useState, useMemo } from 'react';
+    AlertTriangle,
+    ClipboardCheck,
+    DollarSign,
+    Eye,
+    Pencil,
+    Plus,
+    ShieldAlert,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type Site = {
     id: number;
@@ -43,7 +51,13 @@ type Damage = {
     title: string;
     description?: string;
     severity: 'minor' | 'moderate' | 'major' | 'critical';
-    status: 'reported' | 'assessed' | 'repair_scheduled' | 'repair_in_progress' | 'repaired' | 'closed';
+    status:
+        | 'reported'
+        | 'assessed'
+        | 'repair_scheduled'
+        | 'repair_in_progress'
+        | 'repaired'
+        | 'closed';
     location_in_site?: string;
     damage_date?: string;
     discovered_date?: string;
@@ -67,22 +81,30 @@ type Props = {
 
 const formatCurrency = (amount: number | undefined | null) => {
     if (amount == null) return '-';
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(amount);
 };
 
 const severityColors: Record<string, string> = {
     minor: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
-    moderate: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    moderate:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     major: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    critical:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const statusColors: Record<string, string> = {
     reported: 'bg-status-info-bg text-status-info border-status-info/30',
-    assessed: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    assessed:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     repair_scheduled: 'bg-primary/20 text-primary/70 border-primary/30',
-    repair_in_progress: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    repaired: 'bg-status-success-bg text-status-success border-status-success/30',
+    repair_in_progress:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
+    repaired:
+        'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
 };
 
@@ -102,10 +124,22 @@ const severityLabels: Record<string, string> = {
     critical: 'Critical',
 };
 
-const allStatuses = ['reported', 'assessed', 'repair_scheduled', 'repair_in_progress', 'repaired', 'closed'] as const;
+const allStatuses = [
+    'reported',
+    'assessed',
+    'repair_scheduled',
+    'repair_in_progress',
+    'repaired',
+    'closed',
+] as const;
 const allSeverities = ['minor', 'moderate', 'major', 'critical'] as const;
 
-export default function SiteDamages({ site, damages, canCreate, canManage }: Props) {
+export default function SiteDamages({
+    site,
+    damages,
+    canCreate,
+    canManage,
+}: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editingDamage, setEditingDamage] = useState<Damage | null>(null);
@@ -135,25 +169,38 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
 
     const filteredDamages = useMemo(() => {
         return damages.filter((d) => {
-            if (filterStatus !== 'all' && d.status !== filterStatus) return false;
-            if (filterSeverity !== 'all' && d.severity !== filterSeverity) return false;
+            if (filterStatus !== 'all' && d.status !== filterStatus)
+                return false;
+            if (filterSeverity !== 'all' && d.severity !== filterSeverity)
+                return false;
             return true;
         });
     }, [damages, filterStatus, filterSeverity]);
 
-    const openDamages = damages.filter((d) => d.status !== 'repaired' && d.status !== 'closed');
+    const openDamages = useMemo(
+        () =>
+            damages.filter(
+                (d) => d.status !== 'repaired' && d.status !== 'closed',
+            ),
+        [damages],
+    );
 
     const severityCounts = useMemo(() => {
-        const counts: Record<string, number> = { minor: 0, moderate: 0, major: 0, critical: 0 };
+        const counts: Record<string, number> = {
+            minor: 0,
+            moderate: 0,
+            major: 0,
+            critical: 0,
+        };
         openDamages.forEach((d) => {
             counts[d.severity] = (counts[d.severity] || 0) + 1;
         });
         return counts;
-    }, [damages]);
+    }, [openDamages]);
 
     const totalEstimatedCost = useMemo(() => {
         return openDamages.reduce((sum, d) => sum + (d.estimated_cost || 0), 0);
-    }, [damages]);
+    }, [openDamages]);
 
     const handleCreate = (e: React.FormEvent) => {
         e.preventDefault();
@@ -191,31 +238,44 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
     };
 
     const handleStatusChange = (damage: Damage, newStatus: string) => {
-        if (!confirm(`Change status of "${damage.title}" to "${statusLabels[newStatus] ?? newStatus}"?`)) return;
-        router.put(`/sites/${site.id}/damages/${damage.id}`, { status: newStatus }, { preserveScroll: true });
+        if (
+            !confirm(
+                `Change status of "${damage.title}" to "${statusLabels[newStatus] ?? newStatus}"?`,
+            )
+        )
+            return;
+        router.put(
+            `/sites/${site.id}/damages/${damage.id}`,
+            { status: newStatus },
+            { preserveScroll: true },
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Sites', href: '/sites' },
-            { title: site.name, href: `/sites/${site.id}` },
-            { title: 'Damages', href: `/sites/${site.id}/damages` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Damages', href: `/sites/${site.id}/damages` },
+            ]}
+        >
             <Head title={`${site.name} - Damages`} />
 
             <div className="m-4 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <ShieldAlert className="w-5 h-5" />
+                        <h1 className="flex items-center gap-2 text-lg font-semibold">
+                            <ShieldAlert className="h-5 w-5" />
                             Damage Tracking
                         </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {site.name}
+                        </p>
                     </div>
                     {canCreate && (
                         <Button onClick={() => setCreateOpen(true)}>
-                            <Plus className="w-4 h-4 mr-1" />
+                            <Plus className="mr-1 h-4 w-4" />
                             Report Damage
                         </Button>
                     )}
@@ -225,29 +285,41 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{openDamages.length}</div>
-                            <div className="text-sm text-muted-foreground">Total Open</div>
+                            <div className="text-2xl font-bold">
+                                {openDamages.length}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Total Open
+                            </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex flex-wrap gap-2">
                                 {allSeverities.map((sev) => (
-                                    <Badge key={sev} className={severityColors[sev]}>
-                                        {severityLabels[sev]}: {severityCounts[sev]}
+                                    <Badge
+                                        key={sev}
+                                        className={severityColors[sev]}
+                                    >
+                                        {severityLabels[sev]}:{' '}
+                                        {severityCounts[sev]}
                                     </Badge>
                                 ))}
                             </div>
-                            <div className="text-sm text-muted-foreground mt-2">By Severity</div>
+                            <div className="mt-2 text-sm text-muted-foreground">
+                                By Severity
+                            </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-warning border-status-warning/20">
+                    <Card className="border-status-warning/20 bg-status-warning">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning flex items-center gap-1">
-                                <DollarSign className="w-5 h-5" />
+                            <div className="flex items-center gap-1 text-2xl font-bold text-status-warning">
+                                <DollarSign className="h-5 w-5" />
                                 {formatCurrency(totalEstimatedCost)}
                             </div>
-                            <div className="text-sm text-muted-foreground">Total Estimated Cost</div>
+                            <div className="text-sm text-muted-foreground">
+                                Total Estimated Cost
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -255,27 +327,41 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                 {/* Filters */}
                 <div className="flex flex-wrap gap-3">
                     <div className="w-48">
-                        <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <Select
+                            value={filterStatus}
+                            onValueChange={setFilterStatus}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="all">
+                                    All Statuses
+                                </SelectItem>
                                 {allStatuses.map((s) => (
-                                    <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                    <SelectItem key={s} value={s}>
+                                        {statusLabels[s]}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
                     <div className="w-48">
-                        <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+                        <Select
+                            value={filterSeverity}
+                            onValueChange={setFilterSeverity}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Filter by severity" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Severities</SelectItem>
+                                <SelectItem value="all">
+                                    All Severities
+                                </SelectItem>
                                 {allSeverities.map((s) => (
-                                    <SelectItem key={s} value={s}>{severityLabels[s]}</SelectItem>
+                                    <SelectItem key={s} value={s}>
+                                        {severityLabels[s]}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -286,11 +372,14 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                 <Card>
                     <CardContent className="p-0">
                         {filteredDamages.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                                <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <div className="py-12 text-center text-muted-foreground">
+                                <AlertTriangle className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                 <p>No damages recorded</p>
                                 {canCreate && (
-                                    <p className="text-sm mt-1">Click "Report Damage" to log a new damage report</p>
+                                    <p className="mt-1 text-sm">
+                                        Click "Report Damage" to log a new
+                                        damage report
+                                    </p>
                                 )}
                             </div>
                         ) : (
@@ -304,7 +393,9 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         <TableHead>Date</TableHead>
                                         <TableHead>Est. Cost</TableHead>
                                         <TableHead>Reported By</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -314,51 +405,90 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                                 <div className="flex items-center gap-2">
                                                     {damage.title}
                                                     {damage.checklist_run_id && (
-                                                        <Badge className="bg-primary/20 text-primary/70 border-primary/30 text-[10px] px-1.5 py-0">
-                                                            <ClipboardCheck className="w-3 h-3 mr-0.5" />
+                                                        <Badge className="border-primary/30 bg-primary/20 px-1.5 py-0 text-[10px] text-primary/70">
+                                                            <ClipboardCheck className="mr-0.5 h-3 w-3" />
                                                             Checklist
                                                         </Badge>
                                                     )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge className={severityColors[damage.severity]}>
-                                                    {severityLabels[damage.severity]}
+                                                <Badge
+                                                    className={
+                                                        severityColors[
+                                                            damage.severity
+                                                        ]
+                                                    }
+                                                >
+                                                    {
+                                                        severityLabels[
+                                                            damage.severity
+                                                        ]
+                                                    }
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge className={statusColors[damage.status]}>
-                                                    {statusLabels[damage.status]}
+                                                <Badge
+                                                    className={
+                                                        statusColors[
+                                                            damage.status
+                                                        ]
+                                                    }
+                                                >
+                                                    {
+                                                        statusLabels[
+                                                            damage.status
+                                                        ]
+                                                    }
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>{damage.location_in_site || '-'}</TableCell>
+                                            <TableCell>
+                                                {damage.location_in_site || '-'}
+                                            </TableCell>
                                             <TableCell>
                                                 {damage.damage_date
-                                                    ? new Date(damage.damage_date).toLocaleDateString()
+                                                    ? new Date(
+                                                          damage.damage_date,
+                                                      ).toLocaleDateString()
                                                     : '-'}
                                             </TableCell>
-                                            <TableCell>{formatCurrency(damage.estimated_cost)}</TableCell>
-                                            <TableCell>{damage.reported_by.name}</TableCell>
+                                            <TableCell>
+                                                {formatCurrency(
+                                                    damage.estimated_cost,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {damage.reported_by.name}
+                                            </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    {canManage && damage.status === 'reported' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleStatusChange(damage, 'assessed')}
-                                                            title="Mark as Assessed"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
+                                                    {canManage &&
+                                                        damage.status ===
+                                                            'reported' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleStatusChange(
+                                                                        damage,
+                                                                        'assessed',
+                                                                    )
+                                                                }
+                                                                title="Mark as Assessed"
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
                                                     {canManage && (
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => openEdit(damage)}
+                                                            onClick={() =>
+                                                                openEdit(damage)
+                                                            }
                                                             title="Edit"
                                                         >
-                                                            <Pencil className="w-4 h-4" />
+                                                            <Pencil className="h-4 w-4" />
                                                         </Button>
                                                     )}
                                                 </div>
@@ -383,28 +513,45 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                     <Label>Title *</Label>
                                     <Input
                                         value={createForm.data.title}
-                                        onChange={(e) => createForm.setData('title', e.target.value)}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'title',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="e.g., Broken window in lounge"
                                         required
                                     />
                                     {createForm.errors.title && (
-                                        <p className="text-sm text-status-critical mt-1">{createForm.errors.title}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {createForm.errors.title}
+                                        </p>
                                     )}
                                 </div>
                                 <div>
                                     <Label>Severity *</Label>
                                     <Select
                                         value={createForm.data.severity}
-                                        onValueChange={(v) => createForm.setData('severity', v)}
+                                        onValueChange={(v) =>
+                                            createForm.setData('severity', v)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="minor">Minor</SelectItem>
-                                            <SelectItem value="moderate">Moderate</SelectItem>
-                                            <SelectItem value="major">Major</SelectItem>
-                                            <SelectItem value="critical">Critical</SelectItem>
+                                            <SelectItem value="minor">
+                                                Minor
+                                            </SelectItem>
+                                            <SelectItem value="moderate">
+                                                Moderate
+                                            </SelectItem>
+                                            <SelectItem value="major">
+                                                Major
+                                            </SelectItem>
+                                            <SelectItem value="critical">
+                                                Critical
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -413,13 +560,20 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                 <Label>Description *</Label>
                                 <Textarea
                                     value={createForm.data.description}
-                                    onChange={(e) => createForm.setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Describe the damage in detail..."
                                     required
                                 />
                                 {createForm.errors.description && (
-                                    <p className="text-sm text-status-critical mt-1">{createForm.errors.description}</p>
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {createForm.errors.description}
+                                    </p>
                                 )}
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -427,7 +581,12 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                     <Label>Location in Site</Label>
                                     <Input
                                         value={createForm.data.location_in_site}
-                                        onChange={(e) => createForm.setData('location_in_site', e.target.value)}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'location_in_site',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="e.g., Bedroom 3, Kitchen"
                                     />
                                 </div>
@@ -438,7 +597,12 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         min="0"
                                         step="0.01"
                                         value={createForm.data.estimated_cost}
-                                        onChange={(e) => createForm.setData('estimated_cost', e.target.value)}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'estimated_cost',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="0.00"
                                     />
                                 </div>
@@ -449,11 +613,18 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                     <Input
                                         type="date"
                                         value={createForm.data.damage_date}
-                                        onChange={(e) => createForm.setData('damage_date', e.target.value)}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'damage_date',
+                                                e.target.value,
+                                            )
+                                        }
                                         required
                                     />
                                     {createForm.errors.damage_date && (
-                                        <p className="text-sm text-status-critical mt-1">{createForm.errors.damage_date}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {createForm.errors.damage_date}
+                                        </p>
                                     )}
                                 </div>
                                 <div>
@@ -461,11 +632,18 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                     <Input
                                         type="date"
                                         value={createForm.data.discovered_date}
-                                        onChange={(e) => createForm.setData('discovered_date', e.target.value)}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'discovered_date',
+                                                e.target.value,
+                                            )
+                                        }
                                         required
                                     />
                                     {createForm.errors.discovered_date && (
-                                        <p className="text-sm text-status-critical mt-1">{createForm.errors.discovered_date}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {createForm.errors.discovered_date}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -473,35 +651,67 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                 <div>
                                     <Label>Insurance Claim Ref</Label>
                                     <Input
-                                        value={createForm.data.insurance_claim_ref}
-                                        onChange={(e) => createForm.setData('insurance_claim_ref', e.target.value)}
+                                        value={
+                                            createForm.data.insurance_claim_ref
+                                        }
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'insurance_claim_ref',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Optional"
                                     />
                                 </div>
                                 <div>
                                     <Label>Insurance Status</Label>
                                     <Select
-                                        value={createForm.data.insurance_status || undefined}
-                                        onValueChange={(v) => createForm.setData('insurance_status', v)}
+                                        value={
+                                            createForm.data.insurance_status ||
+                                            undefined
+                                        }
+                                        onValueChange={(v) =>
+                                            createForm.setData(
+                                                'insurance_status',
+                                                v,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Not applicable" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="not_applicable">Not Applicable</SelectItem>
-                                            <SelectItem value="pending">Pending</SelectItem>
-                                            <SelectItem value="submitted">Submitted</SelectItem>
-                                            <SelectItem value="approved">Approved</SelectItem>
-                                            <SelectItem value="declined">Declined</SelectItem>
+                                            <SelectItem value="not_applicable">
+                                                Not Applicable
+                                            </SelectItem>
+                                            <SelectItem value="pending">
+                                                Pending
+                                            </SelectItem>
+                                            <SelectItem value="submitted">
+                                                Submitted
+                                            </SelectItem>
+                                            <SelectItem value="approved">
+                                                Approved
+                                            </SelectItem>
+                                            <SelectItem value="declined">
+                                                Declined
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setCreateOpen(false)}
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={createForm.processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={createForm.processing}
+                                >
                                     Report Damage
                                 </Button>
                             </DialogFooter>
@@ -510,7 +720,13 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                 </Dialog>
 
                 {/* Edit Dialog */}
-                <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) setEditingDamage(null); }}>
+                <Dialog
+                    open={editOpen}
+                    onOpenChange={(open) => {
+                        setEditOpen(open);
+                        if (!open) setEditingDamage(null);
+                    }}
+                >
                     <DialogContent className="sm:max-w-lg">
                         <DialogHeader>
                             <DialogTitle>
@@ -522,14 +738,18 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                 <Label>Status *</Label>
                                 <Select
                                     value={editForm.data.status}
-                                    onValueChange={(v) => editForm.setData('status', v)}
+                                    onValueChange={(v) =>
+                                        editForm.setData('status', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {allStatuses.map((s) => (
-                                            <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                            <SelectItem key={s} value={s}>
+                                                {statusLabels[s]}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -542,7 +762,12 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         min="0"
                                         step="0.01"
                                         value={editForm.data.estimated_cost}
-                                        onChange={(e) => editForm.setData('estimated_cost', e.target.value)}
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'estimated_cost',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="0.00"
                                     />
                                 </div>
@@ -553,7 +778,12 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         min="0"
                                         step="0.01"
                                         value={editForm.data.actual_cost}
-                                        onChange={(e) => editForm.setData('actual_cost', e.target.value)}
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'actual_cost',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="0.00"
                                     />
                                 </div>
@@ -562,25 +792,50 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                 <div>
                                     <Label>Insurance Claim Ref</Label>
                                     <Input
-                                        value={editForm.data.insurance_claim_ref}
-                                        onChange={(e) => editForm.setData('insurance_claim_ref', e.target.value)}
+                                        value={
+                                            editForm.data.insurance_claim_ref
+                                        }
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'insurance_claim_ref',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div>
                                     <Label>Insurance Status</Label>
                                     <Select
-                                        value={editForm.data.insurance_status || undefined}
-                                        onValueChange={(v) => editForm.setData('insurance_status', v)}
+                                        value={
+                                            editForm.data.insurance_status ||
+                                            undefined
+                                        }
+                                        onValueChange={(v) =>
+                                            editForm.setData(
+                                                'insurance_status',
+                                                v,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Not applicable" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="not_applicable">Not Applicable</SelectItem>
-                                            <SelectItem value="pending">Pending</SelectItem>
-                                            <SelectItem value="submitted">Submitted</SelectItem>
-                                            <SelectItem value="approved">Approved</SelectItem>
-                                            <SelectItem value="declined">Declined</SelectItem>
+                                            <SelectItem value="not_applicable">
+                                                Not Applicable
+                                            </SelectItem>
+                                            <SelectItem value="pending">
+                                                Pending
+                                            </SelectItem>
+                                            <SelectItem value="submitted">
+                                                Submitted
+                                            </SelectItem>
+                                            <SelectItem value="approved">
+                                                Approved
+                                            </SelectItem>
+                                            <SelectItem value="declined">
+                                                Declined
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -589,16 +844,28 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                 <Label>Repair Notes</Label>
                                 <Textarea
                                     value={editForm.data.repair_notes}
-                                    onChange={(e) => editForm.setData('repair_notes', e.target.value)}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'repair_notes',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     placeholder="Add notes about this damage..."
                                 />
                             </div>
                             <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setEditOpen(false)}
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={editForm.processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={editForm.processing}
+                                >
                                     Save Changes
                                 </Button>
                             </DialogFooter>

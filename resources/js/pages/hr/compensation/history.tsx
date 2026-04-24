@@ -1,10 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowLeft, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -40,14 +40,23 @@ type Props = {
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const formatCurrency = (value: string | null) => {
     if (!value) return '-';
     const num = parseFloat(value);
     if (Number.isNaN(num)) return value;
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(num);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(num);
 };
 
 const getChangeTypeColor = (type: string) => {
@@ -72,7 +81,10 @@ export default function CompensationHistory({ profile, history, can }: Props) {
         { title: 'HR', href: '/hr' },
         { title: 'People', href: '/hr/people' },
         { title: profile.user.name, href: `/hr/people/${profile.id}` },
-        { title: 'Compensation History', href: `/hr/compensation/history/${profile.id}` },
+        {
+            title: 'Compensation History',
+            href: `/hr/compensation/history/${profile.id}`,
+        },
     ];
 
     return (
@@ -89,10 +101,13 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                                     Back
                                 </Button>
                             </Link>
-                            <h1 className="text-lg font-semibold">Compensation History</h1>
+                            <h1 className="text-lg font-semibold">
+                                Compensation History
+                            </h1>
                         </div>
                         <div className="mt-1 text-sm text-muted-foreground">
-                            {profile.user.name} &middot; {profile.position_title}
+                            {profile.user.name} &middot;{' '}
+                            {profile.position_title}
                         </div>
                     </div>
                 </div>
@@ -100,80 +115,147 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Current Annual Salary</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Current Annual Salary
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">{formatCurrency(profile.annual_salary)}</div>
+                            <div className="text-2xl font-semibold">
+                                {formatCurrency(profile.annual_salary)}
+                            </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Current Hourly Rate</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Current Hourly Rate
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">{formatCurrency(profile.hourly_rate)}</div>
+                            <div className="text-2xl font-semibold">
+                                {formatCurrency(profile.hourly_rate)}
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">History Timeline</CardTitle>
+                        <CardTitle className="text-base">
+                            History Timeline
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {history.data.length === 0 && (
-                            <p className="py-8 text-center text-sm text-muted-foreground">No compensation history recorded.</p>
+                            <p className="py-8 text-center text-sm text-muted-foreground">
+                                No compensation history recorded.
+                            </p>
                         )}
                         <div className="space-y-4">
                             {history.data.map((entry, idx) => {
                                 const pctVal = entry.change_percentage;
-                                const isPositive = pctVal !== null && pctVal > 0;
-                                const isNegative = pctVal !== null && pctVal < 0;
+                                const isPositive =
+                                    pctVal !== null && pctVal > 0;
+                                const isNegative =
+                                    pctVal !== null && pctVal < 0;
 
                                 return (
-                                    <div key={entry.id} className="relative flex gap-4 border-l-2 border-border pb-4 pl-6 last:border-transparent last:pb-0">
-                                        <div className="absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-white bg-muted" />
+                                    <div
+                                        key={entry.id}
+                                        className="relative flex gap-4 border-l-2 border-border pb-4 pl-6 last:border-transparent last:pb-0"
+                                    >
+                                        <div className="absolute top-0 -left-2 h-4 w-4 rounded-full border-2 border-white bg-muted" />
 
                                         <div className="flex-1 space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">{formatDate(entry.effective_date)}</span>
-                                                <Badge className={getChangeTypeColor(entry.change_type)}>
-                                                    {entry.change_type.replace(/_/g, ' ')}
+                                                <span className="text-sm font-medium">
+                                                    {formatDate(
+                                                        entry.effective_date,
+                                                    )}
+                                                </span>
+                                                <Badge
+                                                    className={getChangeTypeColor(
+                                                        entry.change_type,
+                                                    )}
+                                                >
+                                                    {entry.change_type.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
                                                 </Badge>
                                                 {pctVal !== null && (
-                                                    <span className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-status-success' : isNegative ? 'text-status-critical' : 'text-muted-foreground'}`}>
-                                                        {isPositive ? <TrendingUp className="h-3 w-3" /> : isNegative ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                                                        {isPositive ? '+' : ''}{pctVal}%
+                                                    <span
+                                                        className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-status-success' : isNegative ? 'text-status-critical' : 'text-muted-foreground'}`}
+                                                    >
+                                                        {isPositive ? (
+                                                            <TrendingUp className="h-3 w-3" />
+                                                        ) : isNegative ? (
+                                                            <TrendingDown className="h-3 w-3" />
+                                                        ) : (
+                                                            <Minus className="h-3 w-3" />
+                                                        )}
+                                                        {isPositive ? '+' : ''}
+                                                        {pctVal}%
                                                     </span>
                                                 )}
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4 text-sm">
                                                 <div>
-                                                    <span className="text-muted-foreground">Hourly Rate: </span>
+                                                    <span className="text-muted-foreground">
+                                                        Hourly Rate:{' '}
+                                                    </span>
                                                     {entry.previous_hourly_rate && (
-                                                        <span className="text-muted-foreground line-through">{formatCurrency(entry.previous_hourly_rate)}</span>
-                                                    )}
-                                                    {' '}
-                                                    <span className="font-medium">{formatCurrency(entry.new_hourly_rate)}</span>
+                                                        <span className="text-muted-foreground line-through">
+                                                            {formatCurrency(
+                                                                entry.previous_hourly_rate,
+                                                            )}
+                                                        </span>
+                                                    )}{' '}
+                                                    <span className="font-medium">
+                                                        {formatCurrency(
+                                                            entry.new_hourly_rate,
+                                                        )}
+                                                    </span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-muted-foreground">Annual Salary: </span>
+                                                    <span className="text-muted-foreground">
+                                                        Annual Salary:{' '}
+                                                    </span>
                                                     {entry.previous_annual_salary && (
-                                                        <span className="text-muted-foreground line-through">{formatCurrency(entry.previous_annual_salary)}</span>
-                                                    )}
-                                                    {' '}
-                                                    <span className="font-medium">{formatCurrency(entry.new_annual_salary)}</span>
+                                                        <span className="text-muted-foreground line-through">
+                                                            {formatCurrency(
+                                                                entry.previous_annual_salary,
+                                                            )}
+                                                        </span>
+                                                    )}{' '}
+                                                    <span className="font-medium">
+                                                        {formatCurrency(
+                                                            entry.new_annual_salary,
+                                                        )}
+                                                    </span>
                                                 </div>
                                             </div>
 
                                             {entry.reason && (
-                                                <p className="text-sm text-muted-foreground">{entry.reason}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {entry.reason}
+                                                </p>
                                             )}
 
                                             <div className="flex gap-4 text-xs text-muted-foreground">
-                                                {entry.approver && <span>Approved by {entry.approver.name}</span>}
-                                                {entry.creator && <span>Created by {entry.creator.name}</span>}
+                                                {entry.approver && (
+                                                    <span>
+                                                        Approved by{' '}
+                                                        {entry.approver.name}
+                                                    </span>
+                                                )}
+                                                {entry.creator && (
+                                                    <span>
+                                                        Created by{' '}
+                                                        {entry.creator.name}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

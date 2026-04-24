@@ -1,11 +1,22 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -14,22 +25,22 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from '@/components/ui/dialog';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { BookOpen, Plus, DollarSign, TrendingUp, TrendingDown, CalendarCheck, Wallet, Paperclip, Upload, X } from 'lucide-react';
-import { useState, useMemo, useRef } from 'react';
+    BookOpen,
+    CalendarCheck,
+    DollarSign,
+    Paperclip,
+    Plus,
+    TrendingDown,
+    TrendingUp,
+    Upload,
+    Wallet,
+    X,
+} from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 
 type Site = {
     id: number;
@@ -95,13 +106,18 @@ type Props = {
 
 const formatCurrency = (amount: number | undefined | null) => {
     if (amount == null) return '-';
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+    }).format(amount);
 };
 
 const entryTypeColors: Record<string, string> = {
     income: 'bg-status-success-bg text-status-success border-status-success/30',
-    expense: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    adjustment: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    expense:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    adjustment:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
     transfer: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
@@ -121,7 +137,13 @@ const categoryLabels: Record<string, string> = {
     other: 'Other',
 };
 
-export default function SiteLedger({ site, ledger, entries, canCreate, canManage }: Props) {
+export default function SiteLedger({
+    site,
+    ledger,
+    entries,
+    canCreate,
+    canManage,
+}: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -169,37 +191,48 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
     };
 
     const handleReconcile = () => {
-        router.post(`/sites/${site.id}/ledger/reconcile`, {}, { preserveScroll: true });
+        router.post(
+            `/sites/${site.id}/ledger/reconcile`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Sites', href: '/sites' },
-            { title: site.name, href: `/sites/${site.id}` },
-            { title: 'Ledger', href: `/sites/${site.id}/ledger` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Ledger', href: `/sites/${site.id}/ledger` },
+            ]}
+        >
             <Head title={`${site.name} - Ledger`} />
 
             <div className="m-4 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <BookOpen className="w-5 h-5" />
+                        <h1 className="flex items-center gap-2 text-lg font-semibold">
+                            <BookOpen className="h-5 w-5" />
                             House Ledger
                         </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {site.name}
+                        </p>
                     </div>
                     <div className="flex gap-2">
                         {canManage && (
-                            <Button variant="secondary" onClick={handleReconcile}>
-                                <CalendarCheck className="w-4 h-4 mr-1" />
+                            <Button
+                                variant="secondary"
+                                onClick={handleReconcile}
+                            >
+                                <CalendarCheck className="mr-1 h-4 w-4" />
                                 Reconcile
                             </Button>
                         )}
                         {canCreate && (
                             <Button onClick={() => setCreateOpen(true)}>
-                                <Plus className="w-4 h-4 mr-1" />
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add Entry
                             </Button>
                         )}
@@ -208,33 +241,39 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
 
                 {/* Balance Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card className="bg-primary/5 border-primary/20">
+                    <Card className="border-primary/20 bg-primary/5">
                         <CardContent className="p-4">
-                            <div className="flex items-center gap-2 mb-1">
-                                <Wallet className="w-5 h-5 text-primary" />
-                                <span className="text-sm text-muted-foreground">Current Balance</span>
+                            <div className="mb-1 flex items-center gap-2">
+                                <Wallet className="h-5 w-5 text-primary" />
+                                <span className="text-sm text-muted-foreground">
+                                    Current Balance
+                                </span>
                             </div>
                             <div className="text-3xl font-bold text-primary">
                                 {formatCurrency(ledger.current_balance)}
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-success border-status-success/20">
+                    <Card className="border-status-success/20 bg-status-success">
                         <CardContent className="p-4">
-                            <div className="flex items-center gap-2 mb-1">
-                                <TrendingUp className="w-4 h-4 text-status-success" />
-                                <span className="text-sm text-muted-foreground">Income</span>
+                            <div className="mb-1 flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-status-success" />
+                                <span className="text-sm text-muted-foreground">
+                                    Income
+                                </span>
                             </div>
                             <div className="text-2xl font-bold text-status-success">
                                 {formatCurrency(incomeTotal)}
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
+                    <Card className="border-status-critical/20 bg-status-critical">
                         <CardContent className="p-4">
-                            <div className="flex items-center gap-2 mb-1">
-                                <TrendingDown className="w-4 h-4 text-status-critical" />
-                                <span className="text-sm text-muted-foreground">Expenses</span>
+                            <div className="mb-1 flex items-center gap-2">
+                                <TrendingDown className="h-4 w-4 text-status-critical" />
+                                <span className="text-sm text-muted-foreground">
+                                    Expenses
+                                </span>
                             </div>
                             <div className="text-2xl font-bold text-status-critical">
                                 {formatCurrency(expenseTotal)}
@@ -243,13 +282,17 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                     </Card>
                     <Card>
                         <CardContent className="p-4">
-                            <div className="flex items-center gap-2 mb-1">
-                                <CalendarCheck className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Last Reconciled</span>
+                            <div className="mb-1 flex items-center gap-2">
+                                <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                    Last Reconciled
+                                </span>
                             </div>
                             <div className="text-lg font-semibold">
                                 {ledger.last_reconciled_at
-                                    ? new Date(ledger.last_reconciled_at).toLocaleDateString()
+                                    ? new Date(
+                                          ledger.last_reconciled_at,
+                                      ).toLocaleDateString()
                                     : 'Never'}
                             </div>
                         </CardContent>
@@ -260,11 +303,14 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                 <Card>
                     <CardContent className="p-0">
                         {entries.data.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                                <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <div className="py-12 text-center text-muted-foreground">
+                                <DollarSign className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                 <p>No ledger entries yet</p>
                                 {canCreate && (
-                                    <p className="text-sm mt-1">Click "Add Entry" to record your first transaction</p>
+                                    <p className="mt-1 text-sm">
+                                        Click "Add Entry" to record your first
+                                        transaction
+                                    </p>
                                 )}
                             </div>
                         ) : (
@@ -276,8 +322,12 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                         <TableHead>Category</TableHead>
                                         <TableHead>Description</TableHead>
                                         <TableHead>Reference</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                        <TableHead className="text-right">Running Balance</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Running Balance
+                                        </TableHead>
                                         <TableHead>Attachment</TableHead>
                                         <TableHead>Recorded By</TableHead>
                                     </TableRow>
@@ -286,15 +336,29 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     {entries.data.map((entry) => (
                                         <TableRow key={entry.id}>
                                             <TableCell>
-                                                {new Date(entry.entry_date).toLocaleDateString()}
+                                                {new Date(
+                                                    entry.entry_date,
+                                                ).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge className={entryTypeColors[entry.entry_type]}>
-                                                    {entryTypeLabels[entry.entry_type]}
+                                                <Badge
+                                                    className={
+                                                        entryTypeColors[
+                                                            entry.entry_type
+                                                        ]
+                                                    }
+                                                >
+                                                    {
+                                                        entryTypeLabels[
+                                                            entry.entry_type
+                                                        ]
+                                                    }
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                {categoryLabels[entry.category] || entry.category}
+                                                {categoryLabels[
+                                                    entry.category
+                                                ] || entry.category}
                                             </TableCell>
                                             <TableCell className="max-w-[200px] truncate">
                                                 {entry.description}
@@ -303,36 +367,55 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                                 {entry.reference || '-'}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                <span className={
-                                                    entry.entry_type === 'income'
-                                                        ? 'text-status-success'
-                                                        : entry.entry_type === 'expense'
-                                                            ? 'text-status-critical'
-                                                            : ''
-                                                }>
-                                                    {entry.entry_type === 'expense' ? '-' : ''}
-                                                    {formatCurrency(entry.amount)}
+                                                <span
+                                                    className={
+                                                        entry.entry_type ===
+                                                        'income'
+                                                            ? 'text-status-success'
+                                                            : entry.entry_type ===
+                                                                'expense'
+                                                              ? 'text-status-critical'
+                                                              : ''
+                                                    }
+                                                >
+                                                    {entry.entry_type ===
+                                                    'expense'
+                                                        ? '-'
+                                                        : ''}
+                                                    {formatCurrency(
+                                                        entry.amount,
+                                                    )}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                {formatCurrency(entry.running_balance)}
+                                                {formatCurrency(
+                                                    entry.running_balance,
+                                                )}
                                             </TableCell>
                                             <TableCell>
-                                                {entry.attachments && entry.attachments.length > 0 ? (
+                                                {entry.attachments &&
+                                                entry.attachments.length > 0 ? (
                                                     <a
                                                         href={`/sites/${site.id}/ledger/entries/${entry.id}/attachment`}
                                                         className="inline-flex items-center gap-1 text-sm text-status-info hover:text-status-info"
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                     >
-                                                        <Paperclip className="w-3.5 h-3.5" />
-                                                        {entry.attachments[0].original_name}
+                                                        <Paperclip className="h-3.5 w-3.5" />
+                                                        {
+                                                            entry.attachments[0]
+                                                                .original_name
+                                                        }
                                                     </a>
                                                 ) : (
-                                                    <span className="text-muted-foreground">-</span>
+                                                    <span className="text-muted-foreground">
+                                                        -
+                                                    </span>
                                                 )}
                                             </TableCell>
-                                            <TableCell>{entry.recorded_by.name}</TableCell>
+                                            <TableCell>
+                                                {entry.recorded_by.name}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -342,28 +425,33 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                 </Card>
 
                 {/* Pagination */}
-                {entries.data.length > 0 && (entries.links.prev || entries.links.next) && (
-                    <div className="flex justify-center gap-2">
-                        {entries.links.prev && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.visit(entries.links.prev!)}
-                            >
-                                Previous
-                            </Button>
-                        )}
-                        {entries.links.next && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.visit(entries.links.next!)}
-                            >
-                                Next
-                            </Button>
-                        )}
-                    </div>
-                )}
+                {entries.data.length > 0 &&
+                    (entries.links.prev || entries.links.next) && (
+                        <div className="flex justify-center gap-2">
+                            {entries.links.prev && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        router.visit(entries.links.prev!)
+                                    }
+                                >
+                                    Previous
+                                </Button>
+                            )}
+                            {entries.links.next && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        router.visit(entries.links.next!)
+                                    }
+                                >
+                                    Next
+                                </Button>
+                            )}
+                        </div>
+                    )}
 
                 {/* Add Entry Dialog */}
                 <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -377,16 +465,26 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     <Label>Entry Type *</Label>
                                     <Select
                                         value={form.data.entry_type}
-                                        onValueChange={(v) => form.setData('entry_type', v)}
+                                        onValueChange={(v) =>
+                                            form.setData('entry_type', v)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="income">Income</SelectItem>
-                                            <SelectItem value="expense">Expense</SelectItem>
-                                            <SelectItem value="adjustment">Adjustment</SelectItem>
-                                            <SelectItem value="transfer">Transfer</SelectItem>
+                                            <SelectItem value="income">
+                                                Income
+                                            </SelectItem>
+                                            <SelectItem value="expense">
+                                                Expense
+                                            </SelectItem>
+                                            <SelectItem value="adjustment">
+                                                Adjustment
+                                            </SelectItem>
+                                            <SelectItem value="transfer">
+                                                Transfer
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -394,18 +492,32 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     <Label>Category *</Label>
                                     <Select
                                         value={form.data.category}
-                                        onValueChange={(v) => form.setData('category', v)}
+                                        onValueChange={(v) =>
+                                            form.setData('category', v)
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="groceries">Groceries</SelectItem>
-                                            <SelectItem value="utilities">Utilities</SelectItem>
-                                            <SelectItem value="maintenance">Maintenance</SelectItem>
-                                            <SelectItem value="petty_cash">Petty Cash</SelectItem>
-                                            <SelectItem value="funding">Funding</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
+                                            <SelectItem value="groceries">
+                                                Groceries
+                                            </SelectItem>
+                                            <SelectItem value="utilities">
+                                                Utilities
+                                            </SelectItem>
+                                            <SelectItem value="maintenance">
+                                                Maintenance
+                                            </SelectItem>
+                                            <SelectItem value="petty_cash">
+                                                Petty Cash
+                                            </SelectItem>
+                                            <SelectItem value="funding">
+                                                Funding
+                                            </SelectItem>
+                                            <SelectItem value="other">
+                                                Other
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -414,12 +526,19 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                 <Label>Description *</Label>
                                 <Input
                                     value={form.data.description}
-                                    onChange={(e) => form.setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="What was this transaction for?"
                                     required
                                 />
                                 {form.errors.description && (
-                                    <p className="text-sm text-status-critical mt-1">{form.errors.description}</p>
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {form.errors.description}
+                                    </p>
                                 )}
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -430,12 +549,19 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                         min="0"
                                         step="0.01"
                                         value={form.data.amount}
-                                        onChange={(e) => form.setData('amount', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'amount',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="0.00"
                                         required
                                     />
                                     {form.errors.amount && (
-                                        <p className="text-sm text-status-critical mt-1">{form.errors.amount}</p>
+                                        <p className="mt-1 text-sm text-status-critical">
+                                            {form.errors.amount}
+                                        </p>
                                     )}
                                 </div>
                                 <div>
@@ -443,7 +569,12 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     <Input
                                         type="date"
                                         value={form.data.entry_date}
-                                        onChange={(e) => form.setData('entry_date', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'entry_date',
+                                                e.target.value,
+                                            )
+                                        }
                                         required
                                     />
                                 </div>
@@ -452,7 +583,12 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                 <Label>Reference</Label>
                                 <Input
                                     value={form.data.reference}
-                                    onChange={(e) => form.setData('reference', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'reference',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Invoice #, receipt #, etc."
                                 />
                             </div>
@@ -460,7 +596,9 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                 <Label>Notes</Label>
                                 <Textarea
                                     value={form.data.notes}
-                                    onChange={(e) => form.setData('notes', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('notes', e.target.value)
+                                    }
                                     rows={2}
                                     placeholder="Optional notes..."
                                 />
@@ -472,42 +610,68 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     type="file"
                                     accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
                                     className="hidden"
-                                    onChange={(e) => form.setData('attachment', e.target.files?.[0] ?? null)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'attachment',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
                                 />
                                 {form.data.attachment ? (
-                                    <div className="flex items-center gap-2 rounded-md border border-status-info/30 bg-status-info px-3 py-2 mt-1">
-                                        <Paperclip className="w-4 h-4 text-status-info shrink-0" />
-                                        <span className="text-sm text-status-info truncate flex-1">{form.data.attachment.name}</span>
-                                        <button
+                                    <div className="mt-1 flex items-center gap-2 rounded-md border border-status-info/30 bg-status-info px-3 py-2">
+                                        <Paperclip className="h-4 w-4 shrink-0 text-status-info" />
+                                        <span className="flex-1 truncate text-sm text-status-info">
+                                            {form.data.attachment.name}
+                                        </span>
+                                        <Button
                                             type="button"
+                                            variant="ghost"
+                                            size="icon"
                                             onClick={() => {
-                                                form.setData('attachment', null);
-                                                if (fileInputRef.current) fileInputRef.current.value = '';
+                                                form.setData(
+                                                    'attachment',
+                                                    null,
+                                                );
+                                                if (fileInputRef.current)
+                                                    fileInputRef.current.value =
+                                                        '';
                                             }}
-                                            className="text-muted-foreground hover:text-status-critical transition-colors"
+                                            className="h-7 w-7 text-muted-foreground hover:text-status-critical"
                                         >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                            <X className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 ) : (
-                                    <button
+                                    <Button
                                         type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-full mt-1 flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-border px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-status-info/50 hover:text-status-info hover:bg-status-info cursor-pointer"
+                                        variant="outline"
+                                        onClick={() =>
+                                            fileInputRef.current?.click()
+                                        }
+                                        className="mt-1 h-auto w-full cursor-pointer gap-2 rounded-md border-2 border-dashed border-border px-3 py-3 text-sm text-muted-foreground hover:border-status-info/50 hover:bg-status-info hover:text-status-info"
                                     >
-                                        <Upload className="w-4 h-4" />
+                                        <Upload className="h-4 w-4" />
                                         Choose file (PDF or image, max 10MB)
-                                    </button>
+                                    </Button>
                                 )}
                                 {form.errors.attachment && (
-                                    <p className="text-sm text-status-critical mt-1">{form.errors.attachment}</p>
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {form.errors.attachment}
+                                    </p>
                                 )}
                             </div>
                             <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setCreateOpen(false)}
+                                >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={form.processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
                                     Add Entry
                                 </Button>
                             </DialogFooter>

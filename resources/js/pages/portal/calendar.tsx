@@ -392,14 +392,17 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                                     {v.status}
                                                 </Badge>
                                                 {v.status === 'pending' && (
-                                                    <button
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
                                                         onClick={() =>
                                                             cancelVisit(v.id)
                                                         }
-                                                        className="text-muted-foreground hover:text-status-critical"
+                                                        className="h-6 w-6 text-muted-foreground hover:text-status-critical"
                                                     >
                                                         <X className="h-3 w-3" />
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </div>
                                         </div>
@@ -510,20 +513,21 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                                                 .visit_type ===
                                                             type;
                                                         return (
-                                                            <button
+                                                            <Button
                                                                 key={type}
                                                                 type="button"
+                                                                variant="outline"
                                                                 onClick={() =>
                                                                     form.setData(
                                                                         'visit_type',
                                                                         type,
                                                                     )
                                                                 }
-                                                                className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${selected ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'}`}
+                                                                className={`h-auto flex-col gap-1.5 rounded-lg border-2 p-3 text-xs font-medium ${selected ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'}`}
                                                             >
                                                                 <Icon className="h-5 w-5" />
                                                                 {label}
-                                                            </button>
+                                                            </Button>
                                                         );
                                                     })}
                                                 </div>
@@ -579,25 +583,34 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                     {calTitle}
                                 </h1>
                                 <div className="flex items-center">
-                                    <button
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={goPrev}
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                                        className="h-9 w-9 rounded-full"
                                     >
                                         <ChevronLeft className="h-5 w-5" />
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={goNext}
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                                        className="h-9 w-9 rounded-full"
                                     >
                                         <ChevronRight className="h-5 w-5" />
-                                    </button>
+                                    </Button>
                                 </div>
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
                                     onClick={goToday}
-                                    className="rounded-full border px-5 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"
+                                    className="rounded-full px-5 font-semibold"
                                 >
                                     Today
-                                </button>
+                                </Button>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Button
@@ -610,13 +623,15 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                 </Button>
                                 <div className="inline-flex items-center gap-1 rounded-full border bg-muted/20 p-1">
                                     {viewOptions.map((v) => (
-                                        <button
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
                                             key={v.key}
                                             onClick={() => changeView(v.key)}
-                                            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                                            className={`h-auto rounded-full px-4 py-1.5 text-sm font-semibold ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}
                                         >
                                             {v.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
@@ -788,7 +803,10 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         style={{ top: ctxMenu.y, left: ctxMenu.x }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
                             onClick={() => {
                                 setCtxMenu(null);
                                 setBookingOpen(true);
@@ -796,9 +814,12 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         >
                             <CalendarPlus className="h-4 w-4 text-status-success" />
                             <span>Request a Visit</span>
-                        </button>
+                        </Button>
                         <hr />
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
                             onClick={() => {
                                 setCtxMenu(null);
                                 changeView('timeGridDay');
@@ -806,8 +827,11 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         >
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span>View Day</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start gap-2 px-3 py-2"
                             onClick={() => {
                                 setCtxMenu(null);
                                 changeView('listWeek');
@@ -815,7 +839,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         >
                             <CalendarDays className="h-4 w-4 text-muted-foreground" />
                             <span>View List</span>
-                        </button>
+                        </Button>
                     </div>
                 )}
             </PageShell>

@@ -1,9 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -13,42 +19,40 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    TabsContent,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Head, useForm, router } from '@inertiajs/react';
-import { useState, useRef, useEffect } from 'react';
-import {
-    Users,
+    AlertTriangle,
     Building2,
+    Calendar,
     CalendarDays,
-    MessageSquare,
-    Plus,
-    ShieldCheck,
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    Download,
+    FileText,
     GraduationCap,
     MapPin,
-    Clock,
-    CheckCircle2,
-    XCircle,
-    AlertTriangle,
-    FileText,
-    Trash2,
-    ClipboardList,
-    UserPlus,
     Megaphone,
-    Download,
-    Upload,
-    Calendar,
+    MessageSquare,
     Paperclip,
-    ChevronRight,
     Pencil,
+    Plus,
+    ShieldCheck,
+    Trash2,
+    Upload,
+    UserPlus,
+    Users,
+    XCircle,
 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -137,26 +141,58 @@ type Props = {
 const statusBadge = (status: string) => {
     switch (status) {
         case 'active':
-            return <Badge className="bg-status-success-bg text-status-success border-status-success/30">{status}</Badge>;
+            return (
+                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
+                    {status}
+                </Badge>
+            );
         case 'completed':
         case 'closed':
-            return <Badge className="bg-muted text-foreground border-border">{status}</Badge>;
+            return (
+                <Badge className="border-border bg-muted text-foreground">
+                    {status}
+                </Badge>
+            );
         case 'scheduled':
         case 'pending':
-            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">{status}</Badge>;
+            return (
+                <Badge className="border-status-info/30 bg-status-info-bg text-status-info">
+                    {status}
+                </Badge>
+            );
         case 'in_progress':
         case 'open':
-            return <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">{status}</Badge>;
+            return (
+                <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                    {status}
+                </Badge>
+            );
         case 'feedback_received':
-            return <Badge className="bg-primary/10 text-primary border-primary">feedback received</Badge>;
+            return (
+                <Badge className="border-primary bg-primary/10 text-primary">
+                    feedback received
+                </Badge>
+            );
         case 'actioned':
-            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">actioned</Badge>;
+            return (
+                <Badge className="border-status-info/30 bg-status-info-bg text-status-info">
+                    actioned
+                </Badge>
+            );
         case 'inactive':
         case 'expired':
         case 'cancelled':
-            return <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">{status}</Badge>;
+            return (
+                <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                    {status}
+                </Badge>
+            );
         default:
-            return <Badge className="bg-muted text-foreground border-border">{status}</Badge>;
+            return (
+                <Badge className="border-border bg-muted text-foreground">
+                    {status}
+                </Badge>
+            );
     }
 };
 
@@ -187,11 +223,15 @@ const consultationTypeLabel: Record<string, string> = {
 };
 
 const consultationTypeColor: Record<string, string> = {
-    hazard_identified: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    risk_assessment: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    procedure_change: 'bg-status-info-bg text-status-info border-status-info/30',
+    hazard_identified:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
+    risk_assessment:
+        'bg-status-warning-bg text-status-warning border-status-warning/30',
+    procedure_change:
+        'bg-status-info-bg text-status-info border-status-info/30',
     policy_change: 'bg-primary/10 text-primary border-primary',
-    equipment_change: 'bg-status-info-bg text-status-info border-status-info/30',
+    equipment_change:
+        'bg-status-info-bg text-status-info border-status-info/30',
     other: 'bg-muted text-foreground border-border',
     general: 'bg-muted text-foreground border-border',
     workplace_change: 'bg-primary/10 text-primary border-primary',
@@ -229,7 +269,12 @@ const formatDateTime = (d: string) => {
 /*  Consultation workflow steps                                        */
 /* ------------------------------------------------------------------ */
 
-const CONSULTATION_STEPS = ['open', 'feedback_received', 'actioned', 'closed'] as const;
+const CONSULTATION_STEPS = [
+    'open',
+    'feedback_received',
+    'actioned',
+    'closed',
+] as const;
 const CONSULTATION_STEP_LABELS: Record<string, string> = {
     open: 'Open',
     feedback_received: 'Feedback Received',
@@ -245,8 +290,8 @@ function ConsultationProgressBar({ status }: { status: string }) {
                 const isCompleted = currentIdx > idx;
                 const isCurrent = currentIdx === idx;
                 return (
-                    <div key={step} className="flex items-center gap-1 flex-1">
-                        <div className="flex flex-col items-center flex-1">
+                    <div key={step} className="flex flex-1 items-center gap-1">
+                        <div className="flex flex-1 flex-col items-center">
                             <div
                                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${
                                     isCompleted
@@ -263,8 +308,10 @@ function ConsultationProgressBar({ status }: { status: string }) {
                                 )}
                             </div>
                             <span
-                                className={`mt-1 text-[10px] leading-tight text-center ${
-                                    isCurrent ? 'font-semibold text-status-info' : 'text-muted-foreground'
+                                className={`mt-1 text-center text-[10px] leading-tight ${
+                                    isCurrent
+                                        ? 'font-semibold text-status-info'
+                                        : 'text-muted-foreground'
                                 }`}
                             >
                                 {CONSULTATION_STEP_LABELS[step]}
@@ -272,8 +319,10 @@ function ConsultationProgressBar({ status }: { status: string }) {
                         </div>
                         {idx < CONSULTATION_STEPS.length - 1 && (
                             <div
-                                className={`h-0.5 flex-1 rounded-full mb-4 ${
-                                    isCompleted ? 'bg-status-success' : 'bg-muted'
+                                className={`mb-4 h-0.5 flex-1 rounded-full ${
+                                    isCompleted
+                                        ? 'bg-status-success'
+                                        : 'bg-muted'
                                 }`}
                             />
                         )}
@@ -289,12 +338,42 @@ function ConsultationProgressBar({ status }: { status: string }) {
 /* ------------------------------------------------------------------ */
 
 const consultationTypes = [
-    { value: 'hazard_identified', label: 'Hazard Identified', icon: AlertTriangle, color: 'text-status-critical bg-status-critical-bg border-status-critical/30' },
-    { value: 'risk_assessment', label: 'Risk Assessment', icon: ShieldCheck, color: 'text-status-warning bg-status-warning-bg border-status-warning/30' },
-    { value: 'procedure_change', label: 'Procedure Change', icon: ClipboardList, color: 'text-status-info bg-status-info-bg border-status-info/30' },
-    { value: 'policy_change', label: 'Policy Change', icon: FileText, color: 'text-primary bg-primary/10 border-primary' },
-    { value: 'equipment_change', label: 'Equipment Change', icon: Building2, color: 'text-status-info bg-status-info-bg border-status-info/30' },
-    { value: 'other', label: 'Other', icon: MessageSquare, color: 'text-muted-foreground bg-muted border-border' },
+    {
+        value: 'hazard_identified',
+        label: 'Hazard Identified',
+        icon: AlertTriangle,
+        color: 'text-status-critical bg-status-critical-bg border-status-critical/30',
+    },
+    {
+        value: 'risk_assessment',
+        label: 'Risk Assessment',
+        icon: ShieldCheck,
+        color: 'text-status-warning bg-status-warning-bg border-status-warning/30',
+    },
+    {
+        value: 'procedure_change',
+        label: 'Procedure Change',
+        icon: ClipboardList,
+        color: 'text-status-info bg-status-info-bg border-status-info/30',
+    },
+    {
+        value: 'policy_change',
+        label: 'Policy Change',
+        icon: FileText,
+        color: 'text-primary bg-primary/10 border-primary',
+    },
+    {
+        value: 'equipment_change',
+        label: 'Equipment Change',
+        icon: Building2,
+        color: 'text-status-info bg-status-info-bg border-status-info/30',
+    },
+    {
+        value: 'other',
+        label: 'Other',
+        icon: MessageSquare,
+        color: 'text-muted-foreground bg-muted border-border',
+    },
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -315,27 +394,42 @@ export default function WorkerParticipationIndex({
     const [repOpen, setRepOpen] = useState(false);
     const [meetingOpen, setMeetingOpen] = useState(false);
     const [consultationOpen, setConsultationOpen] = useState(false);
-    const [meetingLocationMode, setMeetingLocationMode] = useState<'site' | 'custom'>('site');
+    const [meetingLocationMode, setMeetingLocationMode] = useState<
+        'site' | 'custom'
+    >('site');
 
     /* Consultation workflow dialogs */
-    const [feedbackDialogId, setFeedbackDialogId] = useState<number | null>(null);
+    const [feedbackDialogId, setFeedbackDialogId] = useState<number | null>(
+        null,
+    );
     const [outcomeDialogId, setOutcomeDialogId] = useState<number | null>(null);
     const [closeDialogId, setCloseDialogId] = useState<number | null>(null);
-    const [consultDocUploadId, setConsultDocUploadId] = useState<number | null>(null);
-    const [consultDocUploadType, setConsultDocUploadType] = useState<'document' | 'outcome'>('document');
+    const [consultDocUploadId, setConsultDocUploadId] = useState<number | null>(
+        null,
+    );
+    const [consultDocUploadType, setConsultDocUploadType] = useState<
+        'document' | 'outcome'
+    >('document');
 
     /* Meeting workflow dialogs */
-    const [completeMeetingId, setCompleteMeetingId] = useState<number | null>(null);
+    const [completeMeetingId, setCompleteMeetingId] = useState<number | null>(
+        null,
+    );
     const [cancelMeetingId, setCancelMeetingId] = useState<number | null>(null);
     const [manageMembersId, setManageMembersId] = useState<number | null>(null);
     const [minutesUploadId, setMinutesUploadId] = useState<number | null>(null);
-    const [meetingSuccessMessage, setMeetingSuccessMessage] = useState<string | null>(null);
+    const [meetingSuccessMessage, setMeetingSuccessMessage] = useState<
+        string | null
+    >(null);
     const [committeeDialogOpen, setCommitteeDialogOpen] = useState(false);
 
     /* Edit dialogs */
-    const [editingConsultation, setEditingConsultation] = useState<Consultation | null>(null);
+    const [editingConsultation, setEditingConsultation] =
+        useState<Consultation | null>(null);
     const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
-    const [editMeetingLocationMode, setEditMeetingLocationMode] = useState<'site' | 'custom'>('site');
+    const [editMeetingLocationMode, setEditMeetingLocationMode] = useState<
+        'site' | 'custom'
+    >('site');
 
     const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -397,7 +491,12 @@ export default function WorkerParticipationIndex({
     const completeMeetingForm = useForm<{
         confirmed_attendees: number[];
         minutes: string;
-        action_items: Array<{ description: string; assigned_to: string; due_date: string; status: string }>;
+        action_items: Array<{
+            description: string;
+            assigned_to: string;
+            due_date: string;
+            status: string;
+        }>;
     }>({
         confirmed_attendees: [],
         minutes: '',
@@ -452,22 +551,33 @@ export default function WorkerParticipationIndex({
                 consultation_date: editingConsultation.consultation_date || '',
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia edit form helper is stable; only the selected consultation should rehydrate it.
     }, [editingConsultation]);
 
     useEffect(() => {
         if (editingMeeting) {
             const loc = editingMeeting.location || '';
             const isSiteLocation = sites.some((s) => s.name === loc);
-            setEditMeetingLocationMode(loc && !isSiteLocation ? 'custom' : 'site');
+            setEditMeetingLocationMode(
+                loc && !isSiteLocation ? 'custom' : 'site',
+            );
             editMeetingForm.setData({
-                meeting_date: editingMeeting.meeting_date ? editingMeeting.meeting_date.slice(0, 16) : '',
+                meeting_date: editingMeeting.meeting_date
+                    ? editingMeeting.meeting_date.slice(0, 16)
+                    : '',
                 location: loc,
                 agenda_items:
                     (editingMeeting as any).agenda_items?.length > 0
-                        ? (editingMeeting as any).agenda_items.map((a: any) => ({ title: a.title || '', notes: a.notes || '' }))
+                        ? (editingMeeting as any).agenda_items.map(
+                              (a: any) => ({
+                                  title: a.title || '',
+                                  notes: a.notes || '',
+                              }),
+                          )
                         : [{ title: '', notes: '' }],
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia edit form helper is stable; only the selected meeting should rehydrate it.
     }, [editingMeeting]);
 
     /* ---- Agenda item helpers ---- */
@@ -486,7 +596,11 @@ export default function WorkerParticipationIndex({
         );
     };
 
-    const updateAgendaItem = (idx: number, field: 'title' | 'notes', value: string) => {
+    const updateAgendaItem = (
+        idx: number,
+        field: 'title' | 'notes',
+        value: string,
+    ) => {
         const updated = [...meetingForm.data.agenda_items];
         updated[idx] = { ...updated[idx], [field]: value };
         meetingForm.setData('agenda_items', updated);
@@ -508,7 +622,11 @@ export default function WorkerParticipationIndex({
         );
     };
 
-    const updateEditAgendaItem = (idx: number, field: 'title' | 'notes', value: string) => {
+    const updateEditAgendaItem = (
+        idx: number,
+        field: 'title' | 'notes',
+        value: string,
+    ) => {
         const updated = [...editMeetingForm.data.agenda_items];
         updated[idx] = { ...updated[idx], [field]: value };
         editMeetingForm.setData('agenda_items', updated);
@@ -561,51 +679,64 @@ export default function WorkerParticipationIndex({
 
     const submitMeeting = () => {
         if (committees.length === 0) return;
-        const committeeId = meetingForm.data.committee_id || (committees[0]?.id ?? 0);
+        const committeeId =
+            meetingForm.data.committee_id || (committees[0]?.id ?? 0);
         const attendeeCount = meetingForm.data.attendees.length;
-        meetingForm.post(`/health-safety/worker-participation/committees/${committeeId}/meetings`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setMeetingOpen(false);
-                setMeetingSuccessMessage(
-                    `Meeting scheduled. Calendar events created for ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''}.`,
-                );
-                meetingForm.reset();
-                setMeetingLocationMode('site');
-                setTimeout(() => setMeetingSuccessMessage(null), 5000);
+        meetingForm.post(
+            `/health-safety/worker-participation/committees/${committeeId}/meetings`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setMeetingOpen(false);
+                    setMeetingSuccessMessage(
+                        `Meeting scheduled. Calendar events created for ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''}.`,
+                    );
+                    meetingForm.reset();
+                    setMeetingLocationMode('site');
+                    setTimeout(() => setMeetingSuccessMessage(null), 5000);
+                },
             },
-        });
+        );
     };
 
     const submitConsultation = () => {
-        consultationForm.post('/health-safety/worker-participation/consultations', {
-            preserveScroll: true,
-            onSuccess: () => {
-                setConsultationOpen(false);
-                consultationForm.reset();
+        consultationForm.post(
+            '/health-safety/worker-participation/consultations',
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setConsultationOpen(false);
+                    consultationForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitFeedback = (consultationId: number) => {
-        feedbackForm.post(`/health-safety/worker-participation/consultations/${consultationId}/status`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setFeedbackDialogId(null);
-                feedbackForm.reset();
+        feedbackForm.post(
+            `/health-safety/worker-participation/consultations/${consultationId}/status`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setFeedbackDialogId(null);
+                    feedbackForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitOutcome = (consultationId: number) => {
-        outcomeForm.post(`/health-safety/worker-participation/consultations/${consultationId}/status`, {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => {
-                setOutcomeDialogId(null);
-                outcomeForm.reset();
+        outcomeForm.post(
+            `/health-safety/worker-participation/consultations/${consultationId}/status`,
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => {
+                    setOutcomeDialogId(null);
+                    outcomeForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitClose = (consultationId: number) => {
@@ -620,24 +751,30 @@ export default function WorkerParticipationIndex({
     };
 
     const submitConsultDocUpload = (consultationId: number) => {
-        consultDocForm.post(`/health-safety/worker-participation/consultations/${consultationId}/documents`, {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => {
-                setConsultDocUploadId(null);
-                consultDocForm.reset();
+        consultDocForm.post(
+            `/health-safety/worker-participation/consultations/${consultationId}/documents`,
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => {
+                    setConsultDocUploadId(null);
+                    consultDocForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitCompleteMeeting = (meetingId: number) => {
-        completeMeetingForm.post(`/health-safety/worker-participation/meetings/${meetingId}/complete`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setCompleteMeetingId(null);
-                completeMeetingForm.reset();
+        completeMeetingForm.post(
+            `/health-safety/worker-participation/meetings/${meetingId}/complete`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setCompleteMeetingId(null);
+                    completeMeetingForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitCancelMeeting = (meetingId: number) => {
@@ -652,24 +789,30 @@ export default function WorkerParticipationIndex({
     };
 
     const submitManageMembers = (meetingId: number) => {
-        membersForm.post(`/health-safety/worker-participation/meetings/${meetingId}/attendees`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setManageMembersId(null);
-                membersForm.reset();
+        membersForm.post(
+            `/health-safety/worker-participation/meetings/${meetingId}/attendees`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setManageMembersId(null);
+                    membersForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitMinutesUpload = (meetingId: number) => {
-        minutesForm.post(`/health-safety/worker-participation/meetings/${meetingId}/minutes`, {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => {
-                setMinutesUploadId(null);
-                minutesForm.reset();
+        minutesForm.post(
+            `/health-safety/worker-participation/meetings/${meetingId}/minutes`,
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => {
+                    setMinutesUploadId(null);
+                    minutesForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitCommittee = () => {
@@ -683,23 +826,29 @@ export default function WorkerParticipationIndex({
     };
 
     const submitEditConsultation = (consultationId: number) => {
-        editConsultationForm.put(`/health-safety/worker-participation/consultations/${consultationId}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEditingConsultation(null);
-                editConsultationForm.reset();
+        editConsultationForm.put(
+            `/health-safety/worker-participation/consultations/${consultationId}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingConsultation(null);
+                    editConsultationForm.reset();
+                },
             },
-        });
+        );
     };
 
     const submitEditMeeting = (meetingId: number) => {
-        editMeetingForm.put(`/health-safety/worker-participation/meetings/${meetingId}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEditingMeeting(null);
-                editMeetingForm.reset();
+        editMeetingForm.put(
+            `/health-safety/worker-participation/meetings/${meetingId}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingMeeting(null);
+                    editMeetingForm.reset();
+                },
             },
-        });
+        );
     };
 
     /* ---- Training progress ---- */
@@ -719,7 +868,10 @@ export default function WorkerParticipationIndex({
             icon: Users,
             bg: 'bg-status-info-bg',
             iconColor: 'text-status-info',
-            borderColor: stats.active_reps > 0 ? 'border-status-info/30' : 'border-border',
+            borderColor:
+                stats.active_reps > 0
+                    ? 'border-status-info/30'
+                    : 'border-border',
             tab: 'representatives',
         },
         {
@@ -728,7 +880,10 @@ export default function WorkerParticipationIndex({
             icon: Building2,
             bg: 'bg-status-success-bg',
             iconColor: 'text-status-success',
-            borderColor: stats.active_committees > 0 ? 'border-status-success/30' : 'border-border',
+            borderColor:
+                stats.active_committees > 0
+                    ? 'border-status-success/30'
+                    : 'border-border',
             tab: 'meetings',
         },
         {
@@ -737,7 +892,10 @@ export default function WorkerParticipationIndex({
             icon: CalendarDays,
             bg: 'bg-status-warning-bg',
             iconColor: 'text-status-warning',
-            borderColor: stats.meetings_this_month > 0 ? 'border-status-warning/30' : 'border-border',
+            borderColor:
+                stats.meetings_this_month > 0
+                    ? 'border-status-warning/30'
+                    : 'border-border',
             tab: 'meetings',
         },
         {
@@ -746,7 +904,10 @@ export default function WorkerParticipationIndex({
             icon: MessageSquare,
             bg: 'bg-primary/10',
             iconColor: 'text-primary',
-            borderColor: stats.open_consultations > 0 ? 'border-primary' : 'border-border',
+            borderColor:
+                stats.open_consultations > 0
+                    ? 'border-primary'
+                    : 'border-border',
             tab: 'consultations',
         },
     ];
@@ -755,7 +916,10 @@ export default function WorkerParticipationIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Worker Participation', href: '/health-safety/worker-participation' },
+                {
+                    title: 'Worker Participation',
+                    href: '/health-safety/worker-participation',
+                },
             ]}
         >
             <Head title="Worker Participation" />
@@ -766,7 +930,10 @@ export default function WorkerParticipationIndex({
                     title="Worker Participation"
                     description="Manage H&S representatives, committee meetings, and worker consultations under HSWA 2015"
                     icon={<Users className="h-7 w-7 text-white" />}
-                    stats={statCards.map((s) => ({ label: s.label, value: s.value }))}
+                    stats={statCards.map((s) => ({
+                        label: s.label,
+                        value: s.value,
+                    }))}
                 />
 
                 {/* ---- Stats Row ---- */}
@@ -774,24 +941,38 @@ export default function WorkerParticipationIndex({
                     {statCards.map((s) => {
                         const Icon = s.icon;
                         return (
-                            <button
+                            <Card
                                 key={s.label}
-                                type="button"
-                                className="text-left"
+                                role="button"
+                                tabIndex={0}
+                                className={`cursor-pointer border text-left transition-shadow hover:shadow-md ${s.borderColor}`}
                                 onClick={() => scrollToTab(s.tab)}
+                                onKeyDown={(event) => {
+                                    if (
+                                        event.key === 'Enter' ||
+                                        event.key === ' '
+                                    ) {
+                                        event.preventDefault();
+                                        scrollToTab(s.tab);
+                                    }
+                                }}
                             >
-                                <Card className={`border transition-shadow hover:shadow-md cursor-pointer ${s.borderColor}`}>
-                                    <CardContent className="flex items-center gap-3 pt-6">
-                                        <div className={`rounded-lg p-2.5 ${s.bg}`}>
-                                            <Icon className={`h-5 w-5 ${s.iconColor}`} />
+                                <CardContent className="flex items-center gap-3 pt-6">
+                                    <div className={`rounded-lg p-2.5 ${s.bg}`}>
+                                        <Icon
+                                            className={`h-5 w-5 ${s.iconColor}`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="text-2xl font-bold">
+                                            {s.value}
                                         </div>
-                                        <div>
-                                            <div className="text-2xl font-bold">{s.value}</div>
-                                            <div className="text-xs text-muted-foreground">{s.label}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {s.label}
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            </button>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         );
                     })}
                 </div>
@@ -826,7 +1007,10 @@ export default function WorkerParticipationIndex({
                                             H&S Representatives
                                         </CardTitle>
                                         {can_manage && (
-                                            <Button size="sm" onClick={() => setRepOpen(true)}>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => setRepOpen(true)}
+                                            >
                                                 <UserPlus className="mr-1.5 h-4 w-4" />
                                                 Add Representative
                                             </Button>
@@ -836,88 +1020,145 @@ export default function WorkerParticipationIndex({
                                 <CardContent>
                                     {representatives.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-info-bg mb-4">
+                                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-status-info-bg">
                                                 <ShieldCheck className="h-7 w-7 text-status-info" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
                                                 No H&S representatives yet
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                                                Health and safety representatives are elected or appointed workers
-                                                who represent their colleagues on H&S matters. Under HSWA, workers
-                                                can request to elect an H&S rep at any time.
+                                                Health and safety
+                                                representatives are elected or
+                                                appointed workers who represent
+                                                their colleagues on H&S matters.
+                                                Under HSWA, workers can request
+                                                to elect an H&S rep at any time.
                                             </p>
                                             {can_manage && (
-                                                <Button size="sm" className="mt-4" onClick={() => setRepOpen(true)}>
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-4"
+                                                    onClick={() =>
+                                                        setRepOpen(true)
+                                                    }
+                                                >
                                                     <UserPlus className="mr-1.5 h-4 w-4" />
-                                                    Add Your First Representative
+                                                    Add Your First
+                                                    Representative
                                                 </Button>
                                             )}
                                         </div>
                                     ) : (
                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                             {representatives.map((rep) => {
-                                                const { pct, max } = trainingProgress(rep.training_days);
+                                                const { pct, max } =
+                                                    trainingProgress(
+                                                        rep.training_days,
+                                                    );
                                                 return (
-                                                    <Card key={rep.id} className="border">
-                                                        <CardContent className="pt-5 space-y-3">
+                                                    <Card
+                                                        key={rep.id}
+                                                        className="border"
+                                                    >
+                                                        <CardContent className="space-y-3 pt-5">
                                                             <div className="flex items-start justify-between">
                                                                 <div className="flex items-center gap-3">
                                                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg text-sm font-semibold text-status-info">
-                                                                        {(rep.user?.name ?? 'U').charAt(0).toUpperCase()}
+                                                                        {(
+                                                                            rep
+                                                                                .user
+                                                                                ?.name ??
+                                                                            'U'
+                                                                        )
+                                                                            .charAt(
+                                                                                0,
+                                                                            )
+                                                                            .toUpperCase()}
                                                                     </div>
                                                                     <div>
-                                                                        <div className="font-medium text-sm">
-                                                                            {rep.user?.name ?? 'Unknown'}
+                                                                        <div className="text-sm font-medium">
+                                                                            {rep
+                                                                                .user
+                                                                                ?.name ??
+                                                                                'Unknown'}
                                                                         </div>
                                                                         <div className="text-xs text-muted-foreground">
-                                                                            {rep.site?.name ?? 'No site assigned'}
+                                                                            {rep
+                                                                                .site
+                                                                                ?.name ??
+                                                                                'No site assigned'}
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                                {statusBadge(rep.status)}
+                                                                {statusBadge(
+                                                                    rep.status,
+                                                                )}
                                                             </div>
 
                                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                                 <div>
-                                                                    <span className="text-muted-foreground">Work Group</span>
-                                                                    <div className="font-medium">{rep.work_group ?? '-'}</div>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-muted-foreground">Method</span>
-                                                                    <div className="font-medium capitalize">
-                                                                        {rep.election_method ?? '-'}
+                                                                    <span className="text-muted-foreground">
+                                                                        Work
+                                                                        Group
+                                                                    </span>
+                                                                    <div className="font-medium">
+                                                                        {rep.work_group ??
+                                                                            '-'}
                                                                     </div>
                                                                 </div>
                                                                 <div>
-                                                                    <span className="text-muted-foreground">Elected</span>
+                                                                    <span className="text-muted-foreground">
+                                                                        Method
+                                                                    </span>
+                                                                    <div className="font-medium capitalize">
+                                                                        {rep.election_method ??
+                                                                            '-'}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-muted-foreground">
+                                                                        Elected
+                                                                    </span>
                                                                     <div className="font-medium">
-                                                                        {rep.elected_date ? formatDate(rep.elected_date) : '-'}
+                                                                        {rep.elected_date
+                                                                            ? formatDate(
+                                                                                  rep.elected_date,
+                                                                              )
+                                                                            : '-'}
                                                                     </div>
                                                                 </div>
                                                             </div>
 
                                                             {/* Training progress */}
                                                             <div>
-                                                                <div className="flex items-center justify-between text-xs mb-1">
+                                                                <div className="mb-1 flex items-center justify-between text-xs">
                                                                     <span className="flex items-center gap-1 text-muted-foreground">
                                                                         <GraduationCap className="h-3.5 w-3.5" />
-                                                                        Training days
+                                                                        Training
+                                                                        days
                                                                     </span>
                                                                     <span className="font-medium">
-                                                                        {rep.training_days}/{max} days
+                                                                        {
+                                                                            rep.training_days
+                                                                        }
+                                                                        /{max}{' '}
+                                                                        days
                                                                     </span>
                                                                 </div>
                                                                 <div className="h-1.5 w-full rounded-full bg-muted">
                                                                     <div
                                                                         className={`h-1.5 rounded-full transition-all ${
-                                                                            pct >= 100
+                                                                            pct >=
+                                                                            100
                                                                                 ? 'bg-status-success'
-                                                                                : pct >= 60
+                                                                                : pct >=
+                                                                                    60
                                                                                   ? 'bg-status-info'
                                                                                   : 'bg-status-warning'
                                                                         }`}
-                                                                        style={{ width: `${pct}%` }}
+                                                                        style={{
+                                                                            width: `${pct}%`,
+                                                                        }}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -946,8 +1187,12 @@ export default function WorkerParticipationIndex({
                                             <Button
                                                 size="sm"
                                                 onClick={() => {
-                                                    if (committees.length === 0) {
-                                                        setCommitteeDialogOpen(true);
+                                                    if (
+                                                        committees.length === 0
+                                                    ) {
+                                                        setCommitteeDialogOpen(
+                                                            true,
+                                                        );
                                                     } else {
                                                         setMeetingOpen(true);
                                                     }
@@ -965,31 +1210,50 @@ export default function WorkerParticipationIndex({
                                         <div className="mb-4 flex items-center gap-2 rounded-lg border border-status-success/30 bg-status-success-bg p-3 text-sm text-status-success">
                                             <CheckCircle2 className="h-4 w-4 shrink-0" />
                                             {meetingSuccessMessage}
-                                            <button
+                                            <Button
                                                 type="button"
-                                                className="ml-auto text-status-success hover:text-status-success"
-                                                onClick={() => setMeetingSuccessMessage(null)}
+                                                variant="ghost"
+                                                size="icon"
+                                                className="ml-auto h-7 w-7 text-status-success hover:text-status-success"
+                                                onClick={() =>
+                                                    setMeetingSuccessMessage(
+                                                        null,
+                                                    )
+                                                }
                                             >
                                                 <XCircle className="h-4 w-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     )}
 
                                     {/* No committee warning */}
                                     {committees.length === 0 && (
                                         <div className="mb-4 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-status-warning/30 bg-status-warning-bg py-8 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg mb-4">
+                                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg">
                                                 <Building2 className="h-7 w-7 text-status-warning" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
-                                                You need to create an H&S Committee before scheduling meetings
+                                                You need to create an H&S
+                                                Committee before scheduling
+                                                meetings
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                                                An H&S committee is required under the HSWA to facilitate meetings
-                                                between workers and management on health and safety matters.
+                                                An H&S committee is required
+                                                under the HSWA to facilitate
+                                                meetings between workers and
+                                                management on health and safety
+                                                matters.
                                             </p>
                                             {can_manage && (
-                                                <Button size="sm" className="mt-4" onClick={() => setCommitteeDialogOpen(true)}>
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-4"
+                                                    onClick={() =>
+                                                        setCommitteeDialogOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                >
                                                     <Plus className="mr-1.5 h-4 w-4" />
                                                     Create Committee
                                                 </Button>
@@ -997,24 +1261,29 @@ export default function WorkerParticipationIndex({
                                         </div>
                                     )}
 
-                                    {committees.length > 0 && meetings.length === 0 ? (
+                                    {committees.length > 0 &&
+                                    meetings.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg mb-4">
+                                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg">
                                                 <CalendarDays className="h-7 w-7 text-status-warning" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
                                                 No meetings scheduled
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                                                H&S committee meetings are where representatives and management
-                                                discuss workplace health and safety issues, review incidents, and
-                                                plan improvements.
+                                                H&S committee meetings are where
+                                                representatives and management
+                                                discuss workplace health and
+                                                safety issues, review incidents,
+                                                and plan improvements.
                                             </p>
                                             {can_manage && (
                                                 <Button
                                                     size="sm"
                                                     className="mt-4"
-                                                    onClick={() => setMeetingOpen(true)}
+                                                    onClick={() =>
+                                                        setMeetingOpen(true)
+                                                    }
                                                 >
                                                     <Plus className="mr-1.5 h-4 w-4" />
                                                     Schedule Your First Meeting
@@ -1028,77 +1297,104 @@ export default function WorkerParticipationIndex({
                                                     key={meeting.id}
                                                     className={`border border-l-4 ${meetingStatusBorder(meeting.status)}`}
                                                 >
-                                                    <CardContent className="pt-5 space-y-4">
+                                                    <CardContent className="space-y-4 pt-5">
                                                         {/* Header row */}
                                                         <div className="flex items-start justify-between">
                                                             <div>
-                                                                <div className="font-medium text-sm">
-                                                                    {meeting.committee_name}
+                                                                <div className="text-sm font-medium">
+                                                                    {
+                                                                        meeting.committee_name
+                                                                    }
                                                                 </div>
-                                                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                                <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                                                                     <span className="flex items-center gap-1">
                                                                         <Clock className="h-3.5 w-3.5" />
-                                                                        {formatDateTime(meeting.meeting_date)}
+                                                                        {formatDateTime(
+                                                                            meeting.meeting_date,
+                                                                        )}
                                                                     </span>
                                                                     {meeting.location && (
                                                                         <span className="flex items-center gap-1">
                                                                             <MapPin className="h-3.5 w-3.5" />
-                                                                            {meeting.location}
+                                                                            {
+                                                                                meeting.location
+                                                                            }
                                                                         </span>
                                                                     )}
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {can_manage && meeting.status === 'scheduled' && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                                                                        onClick={() => setEditingMeeting(meeting)}
-                                                                    >
-                                                                        <Pencil className="h-3.5 w-3.5" />
-                                                                    </Button>
+                                                                {can_manage &&
+                                                                    meeting.status ===
+                                                                        'scheduled' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                                            onClick={() =>
+                                                                                setEditingMeeting(
+                                                                                    meeting,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <Pencil className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    )}
+                                                                {statusBadge(
+                                                                    meeting.status,
                                                                 )}
-                                                                {statusBadge(meeting.status)}
                                                             </div>
                                                         </div>
 
                                                         {/* Attendees section */}
-                                                        {meeting.confirmed_attendees && meeting.confirmed_attendees.length > 0 && (
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                                                        Attendees
-                                                                    </h4>
+                                                        {meeting.confirmed_attendees &&
+                                                            meeting
+                                                                .confirmed_attendees
+                                                                .length > 0 && (
+                                                                <div className="space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                            Attendees
+                                                                        </h4>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {meeting.confirmed_attendees.map(
+                                                                            (
+                                                                                att,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        att.id
+                                                                                    }
+                                                                                    className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                                                                                >
+                                                                                    {att.confirmed ? (
+                                                                                        <CheckCircle2 className="h-3 w-3 text-status-success" />
+                                                                                    ) : (
+                                                                                        <Clock className="h-3 w-3 text-status-warning" />
+                                                                                    )}
+                                                                                    {
+                                                                                        att.name
+                                                                                    }
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {meeting.confirmed_attendees.map((att) => (
-                                                                        <div
-                                                                            key={att.id}
-                                                                            className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
-                                                                        >
-                                                                            {att.confirmed ? (
-                                                                                <CheckCircle2 className="h-3 w-3 text-status-success" />
-                                                                            ) : (
-                                                                                <Clock className="h-3 w-3 text-status-warning" />
-                                                                            )}
-                                                                            {att.name}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                            )}
 
                                                         {/* Minutes document */}
                                                         {meeting.minutes_document_name && (
                                                             <div className="flex items-center gap-2 rounded-lg border bg-muted p-2.5 text-xs">
-                                                                <FileText className="h-4 w-4 text-status-info shrink-0" />
-                                                                <span className="font-medium truncate flex-1">
-                                                                    {meeting.minutes_document_name}
+                                                                <FileText className="h-4 w-4 shrink-0 text-status-info" />
+                                                                <span className="flex-1 truncate font-medium">
+                                                                    {
+                                                                        meeting.minutes_document_name
+                                                                    }
                                                                 </span>
                                                                 <a
                                                                     href={`/health-safety/worker-participation/meetings/${meeting.id}/minutes/download`}
-                                                                    className="flex items-center gap-1 text-status-info hover:text-status-info font-medium shrink-0"
+                                                                    className="flex shrink-0 items-center gap-1 font-medium text-status-info hover:text-status-info"
                                                                 >
                                                                     <Download className="h-3.5 w-3.5" />
                                                                     Download
@@ -1107,110 +1403,190 @@ export default function WorkerParticipationIndex({
                                                         )}
 
                                                         {/* Action items */}
-                                                        {meeting.action_items && meeting.action_items.length > 0 && (
-                                                            <div className="space-y-2">
-                                                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                                                    Action Items
-                                                                </h4>
-                                                                <div className="space-y-1.5">
-                                                                    {meeting.action_items.map((item, idx) => (
-                                                                        <div
-                                                                            key={item.id ?? idx}
-                                                                            className="flex items-start gap-2 rounded-lg border bg-white p-2.5 text-xs"
-                                                                        >
-                                                                            <CheckCircle2 className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${
-                                                                                item.status === 'completed' ? 'text-status-success' : 'text-muted-foreground'
-                                                                            }`} />
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div className="font-medium">{item.description}</div>
-                                                                                <div className="flex items-center gap-3 mt-1 text-muted-foreground">
-                                                                                    {item.assignee_name && (
-                                                                                        <span className="flex items-center gap-1">
-                                                                                            <Users className="h-3 w-3" />
-                                                                                            {item.assignee_name}
-                                                                                        </span>
+                                                        {meeting.action_items &&
+                                                            meeting.action_items
+                                                                .length > 0 && (
+                                                                <div className="space-y-2">
+                                                                    <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                        Action
+                                                                        Items
+                                                                    </h4>
+                                                                    <div className="space-y-1.5">
+                                                                        {meeting.action_items.map(
+                                                                            (
+                                                                                item,
+                                                                                idx,
+                                                                            ) => (
+                                                                                <article
+                                                                                    key={
+                                                                                        item.id ??
+                                                                                        idx
+                                                                                    }
+                                                                                    className="flex items-start gap-2 rounded-lg border bg-white p-2.5 text-xs"
+                                                                                >
+                                                                                    <CheckCircle2
+                                                                                        className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
+                                                                                            item.status ===
+                                                                                            'completed'
+                                                                                                ? 'text-status-success'
+                                                                                                : 'text-muted-foreground'
+                                                                                        }`}
+                                                                                    />
+                                                                                    <div className="min-w-0 flex-1">
+                                                                                        <div className="font-medium">
+                                                                                            {
+                                                                                                item.description
+                                                                                            }
+                                                                                        </div>
+                                                                                        <div className="mt-1 flex items-center gap-3 text-muted-foreground">
+                                                                                            {item.assignee_name && (
+                                                                                                <span className="flex items-center gap-1">
+                                                                                                    <Users className="h-3 w-3" />
+                                                                                                    {
+                                                                                                        item.assignee_name
+                                                                                                    }
+                                                                                                </span>
+                                                                                            )}
+                                                                                            {item.due_date && (
+                                                                                                <span className="flex items-center gap-1">
+                                                                                                    <Calendar className="h-3 w-3" />
+                                                                                                    {formatDate(
+                                                                                                        item.due_date,
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    {statusBadge(
+                                                                                        item.status,
                                                                                     )}
-                                                                                    {item.due_date && (
-                                                                                        <span className="flex items-center gap-1">
-                                                                                            <Calendar className="h-3 w-3" />
-                                                                                            {formatDate(item.due_date)}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            {statusBadge(item.status)}
-                                                                        </div>
-                                                                    ))}
+                                                                                </article>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            )}
 
                                                         {/* Footer with counts + actions */}
                                                         <div className="flex items-center justify-between border-t pt-3">
                                                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                                                {typeof meeting.attendees_count === 'number' && (
+                                                                {typeof meeting.attendees_count ===
+                                                                    'number' && (
                                                                     <span className="flex items-center gap-1">
                                                                         <Users className="h-3.5 w-3.5" />
-                                                                        {meeting.attendees_count} attendee{meeting.attendees_count !== 1 ? 's' : ''}
+                                                                        {
+                                                                            meeting.attendees_count
+                                                                        }{' '}
+                                                                        attendee
+                                                                        {meeting.attendees_count !==
+                                                                        1
+                                                                            ? 's'
+                                                                            : ''}
                                                                     </span>
                                                                 )}
                                                                 <span className="flex items-center gap-1">
                                                                     <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                    {meeting.action_items_count} action item{meeting.action_items_count !== 1 ? 's' : ''}
+                                                                    {
+                                                                        meeting.action_items_count
+                                                                    }{' '}
+                                                                    action item
+                                                                    {meeting.action_items_count !==
+                                                                    1
+                                                                        ? 's'
+                                                                        : ''}
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {can_manage && meeting.status === 'scheduled' && (
-                                                                    <>
+                                                                {can_manage &&
+                                                                    meeting.status ===
+                                                                        'scheduled' && (
+                                                                        <>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    setManageMembersId(
+                                                                                        meeting.id,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Users className="mr-1.5 h-3.5 w-3.5" />
+                                                                                Manage
+                                                                                Members
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    setMinutesUploadId(
+                                                                                        meeting.id,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                                                Upload
+                                                                                Minutes
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                                                onClick={() =>
+                                                                                    setCancelMeetingId(
+                                                                                        meeting.id,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                                                                Cancel
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    completeMeetingForm.reset();
+                                                                                    const attendeeIds =
+                                                                                        (
+                                                                                            meeting.confirmed_attendees ??
+                                                                                            []
+                                                                                        ).map(
+                                                                                            (
+                                                                                                a,
+                                                                                            ) =>
+                                                                                                a.user_id,
+                                                                                        );
+                                                                                    completeMeetingForm.setData(
+                                                                                        'confirmed_attendees',
+                                                                                        attendeeIds,
+                                                                                    );
+                                                                                    setCompleteMeetingId(
+                                                                                        meeting.id,
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                                                                Complete
+                                                                                Meeting
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                {can_manage &&
+                                                                    meeting.status ===
+                                                                        'completed' &&
+                                                                    !meeting.minutes_document_name && (
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            onClick={() => setManageMembersId(meeting.id)}
-                                                                        >
-                                                                            <Users className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Manage Members
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => setMinutesUploadId(meeting.id)}
+                                                                            onClick={() =>
+                                                                                setMinutesUploadId(
+                                                                                    meeting.id,
+                                                                                )
+                                                                            }
                                                                         >
                                                                             <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Upload Minutes
+                                                                            Upload
+                                                                            Minutes
                                                                         </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
-                                                                            onClick={() => setCancelMeetingId(meeting.id)}
-                                                                        >
-                                                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Cancel
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            onClick={() => {
-                                                                                completeMeetingForm.reset();
-                                                                                const attendeeIds = (meeting.confirmed_attendees ?? []).map(a => a.user_id);
-                                                                                completeMeetingForm.setData('confirmed_attendees', attendeeIds);
-                                                                                setCompleteMeetingId(meeting.id);
-                                                                            }}
-                                                                        >
-                                                                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Complete Meeting
-                                                                        </Button>
-                                                                    </>
-                                                                )}
-                                                                {can_manage && meeting.status === 'completed' && !meeting.minutes_document_name && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={() => setMinutesUploadId(meeting.id)}
-                                                                    >
-                                                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                                                        Upload Minutes
-                                                                    </Button>
-                                                                )}
+                                                                    )}
                                                             </div>
                                                         </div>
                                                     </CardContent>
@@ -1234,7 +1610,12 @@ export default function WorkerParticipationIndex({
                                             Worker Consultations
                                         </CardTitle>
                                         {can_manage && (
-                                            <Button size="sm" onClick={() => setConsultationOpen(true)}>
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    setConsultationOpen(true)
+                                                }
+                                            >
                                                 <Plus className="mr-1.5 h-4 w-4" />
                                                 New Consultation
                                             </Button>
@@ -1244,22 +1625,29 @@ export default function WorkerParticipationIndex({
                                 <CardContent>
                                     {consultations.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+                                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                                                 <Megaphone className="h-7 w-7 text-primary" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
                                                 No consultations recorded
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                                                Record consultations with workers about health and safety matters
-                                                such as hazard identification, risk assessments, and changes to
+                                                Record consultations with
+                                                workers about health and safety
+                                                matters such as hazard
+                                                identification, risk
+                                                assessments, and changes to
                                                 procedures or equipment.
                                             </p>
                                             {can_manage && (
                                                 <Button
                                                     size="sm"
                                                     className="mt-4"
-                                                    onClick={() => setConsultationOpen(true)}
+                                                    onClick={() =>
+                                                        setConsultationOpen(
+                                                            true,
+                                                        )
+                                                    }
                                                 >
                                                     <Plus className="mr-1.5 h-4 w-4" />
                                                     Record First Consultation
@@ -1269,32 +1657,47 @@ export default function WorkerParticipationIndex({
                                     ) : (
                                         <div className="space-y-4">
                                             {consultations.map((c) => (
-                                                <Card key={c.id} className="border">
-                                                    <CardContent className="pt-5 space-y-4">
+                                                <Card
+                                                    key={c.id}
+                                                    className="border"
+                                                >
+                                                    <CardContent className="space-y-4 pt-5">
                                                         {/* Header row */}
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div>
-                                                                <div className="font-medium text-sm leading-snug">
+                                                                <div className="text-sm leading-snug font-medium">
                                                                     {c.title}
                                                                 </div>
-                                                                <div className="flex items-center gap-2 mt-1.5">
+                                                                <div className="mt-1.5 flex items-center gap-2">
                                                                     <Badge
                                                                         className={
-                                                                            consultationTypeColor[c.consultation_type] ??
-                                                                            'bg-muted text-foreground border-border'
+                                                                            consultationTypeColor[
+                                                                                c
+                                                                                    .consultation_type
+                                                                            ] ??
+                                                                            'border-border bg-muted text-foreground'
                                                                         }
                                                                     >
-                                                                        {consultationTypeLabel[c.consultation_type] ??
+                                                                        {consultationTypeLabel[
+                                                                            c
+                                                                                .consultation_type
+                                                                        ] ??
                                                                             c.consultation_type}
                                                                     </Badge>
-                                                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                                                         <Clock className="h-3 w-3" />
-                                                                        {formatDate(c.consultation_date)}
+                                                                        {formatDate(
+                                                                            c.consultation_date,
+                                                                        )}
                                                                     </span>
                                                                     {c.site && (
-                                                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                                                             <MapPin className="h-3 w-3" />
-                                                                            {c.site.name}
+                                                                            {
+                                                                                c
+                                                                                    .site
+                                                                                    .name
+                                                                            }
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -1305,74 +1708,111 @@ export default function WorkerParticipationIndex({
                                                                         size="sm"
                                                                         variant="ghost"
                                                                         className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                                                                        onClick={() => setEditingConsultation(c)}
+                                                                        onClick={() =>
+                                                                            setEditingConsultation(
+                                                                                c,
+                                                                            )
+                                                                        }
                                                                     >
                                                                         <Pencil className="h-3.5 w-3.5" />
                                                                     </Button>
                                                                 )}
-                                                                {statusBadge(c.status)}
+                                                                {statusBadge(
+                                                                    c.status,
+                                                                )}
                                                             </div>
                                                         </div>
 
                                                         {/* Workflow progress bar */}
-                                                        <ConsultationProgressBar status={c.status} />
+                                                        <ConsultationProgressBar
+                                                            status={c.status}
+                                                        />
 
                                                         {/* Description */}
                                                         {c.description && (
-                                                            <div className="text-xs text-muted-foreground bg-muted rounded-lg p-3">
-                                                                <span className="font-semibold text-foreground">Description: </span>
+                                                            <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+                                                                <span className="font-semibold text-foreground">
+                                                                    Description:{' '}
+                                                                </span>
                                                                 {c.description}
                                                             </div>
                                                         )}
 
                                                         {/* Worker feedback summary */}
                                                         {c.worker_feedback_summary && (
-                                                            <div className="text-xs bg-primary/10 rounded-lg p-3">
-                                                                <span className="font-semibold text-primary">Worker Feedback: </span>
-                                                                <span className="text-primary">{c.worker_feedback_summary}</span>
+                                                            <div className="rounded-lg bg-primary/10 p-3 text-xs">
+                                                                <span className="font-semibold text-primary">
+                                                                    Worker
+                                                                    Feedback:{' '}
+                                                                </span>
+                                                                <span className="text-primary">
+                                                                    {
+                                                                        c.worker_feedback_summary
+                                                                    }
+                                                                </span>
                                                             </div>
                                                         )}
 
                                                         {/* Outcome */}
                                                         {c.outcome && (
-                                                            <div className="text-xs bg-status-info-bg rounded-lg p-3">
-                                                                <span className="font-semibold text-status-info">Outcome: </span>
-                                                                <span className="text-status-info">{c.outcome}</span>
+                                                            <div className="rounded-lg bg-status-info-bg p-3 text-xs">
+                                                                <span className="font-semibold text-status-info">
+                                                                    Outcome:{' '}
+                                                                </span>
+                                                                <span className="text-status-info">
+                                                                    {c.outcome}
+                                                                </span>
                                                             </div>
                                                         )}
 
                                                         {/* Changes made */}
                                                         {c.changes_made && (
-                                                            <div className="text-xs bg-status-success-bg rounded-lg p-3">
-                                                                <span className="font-semibold text-status-success">Changes Made: </span>
-                                                                <span className="text-status-success">{c.changes_made}</span>
+                                                            <div className="rounded-lg bg-status-success-bg p-3 text-xs">
+                                                                <span className="font-semibold text-status-success">
+                                                                    Changes
+                                                                    Made:{' '}
+                                                                </span>
+                                                                <span className="text-status-success">
+                                                                    {
+                                                                        c.changes_made
+                                                                    }
+                                                                </span>
                                                             </div>
                                                         )}
 
                                                         {/* Documents section */}
                                                         <div className="space-y-2">
-                                                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                                                            <h4 className="flex items-center gap-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                                                 <Paperclip className="h-3.5 w-3.5" />
                                                                 Documents
                                                             </h4>
-                                                            {!c.document_name && !c.outcome_document_name ? (
+                                                            {!c.document_name &&
+                                                            !c.outcome_document_name ? (
                                                                 <div className="rounded-lg border-2 border-dashed border-border p-3 text-center text-xs text-muted-foreground">
-                                                                    No documents yet
+                                                                    No documents
+                                                                    yet
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">
                                                                     {c.document_name && (
                                                                         <div className="flex items-center gap-3 rounded-lg border bg-muted p-3">
-                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg shrink-0">
+                                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-info-bg">
                                                                                 <FileText className="h-4.5 w-4.5 text-status-info" />
                                                                             </div>
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div className="text-xs font-medium truncate">{c.document_name}</div>
-                                                                                <div className="text-[10px] text-muted-foreground">Supporting Document</div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="truncate text-xs font-medium">
+                                                                                    {
+                                                                                        c.document_name
+                                                                                    }
+                                                                                </div>
+                                                                                <div className="text-[10px] text-muted-foreground">
+                                                                                    Supporting
+                                                                                    Document
+                                                                                </div>
                                                                             </div>
                                                                             <a
                                                                                 href={`/health-safety/worker-participation/consultations/${c.id}/documents/document`}
-                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info hover:text-status-info hover:bg-status-info-bg transition-colors shrink-0"
+                                                                                className="flex shrink-0 items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info transition-colors hover:bg-status-info-bg hover:text-status-info"
                                                                             >
                                                                                 <Download className="h-3.5 w-3.5" />
                                                                                 Download
@@ -1381,16 +1821,23 @@ export default function WorkerParticipationIndex({
                                                                     )}
                                                                     {c.outcome_document_name && (
                                                                         <div className="flex items-center gap-3 rounded-lg border bg-status-info-bg p-3">
-                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg shrink-0">
+                                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-info-bg">
                                                                                 <FileText className="h-4.5 w-4.5 text-status-info" />
                                                                             </div>
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div className="text-xs font-medium truncate">{c.outcome_document_name}</div>
-                                                                                <div className="text-[10px] text-muted-foreground">Outcome Document</div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="truncate text-xs font-medium">
+                                                                                    {
+                                                                                        c.outcome_document_name
+                                                                                    }
+                                                                                </div>
+                                                                                <div className="text-[10px] text-muted-foreground">
+                                                                                    Outcome
+                                                                                    Document
+                                                                                </div>
                                                                             </div>
                                                                             <a
                                                                                 href={`/health-safety/worker-participation/consultations/${c.id}/documents/outcome`}
-                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info hover:text-status-info hover:bg-status-info-bg transition-colors shrink-0"
+                                                                                className="flex shrink-0 items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info transition-colors hover:bg-status-info-bg hover:text-status-info"
                                                                             >
                                                                                 <Download className="h-3.5 w-3.5" />
                                                                                 Download
@@ -1405,7 +1852,15 @@ export default function WorkerParticipationIndex({
                                                         <div className="flex items-center justify-between border-t pt-3">
                                                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                                                 <Users className="h-3.5 w-3.5" />
-                                                                {c.workers_consulted} worker{c.workers_consulted !== 1 ? 's' : ''} consulted
+                                                                {
+                                                                    c.workers_consulted
+                                                                }{' '}
+                                                                worker
+                                                                {c.workers_consulted !==
+                                                                1
+                                                                    ? 's'
+                                                                    : ''}{' '}
+                                                                consulted
                                                             </div>
                                                             {can_manage && (
                                                                 <div className="flex items-center gap-2">
@@ -1414,46 +1869,68 @@ export default function WorkerParticipationIndex({
                                                                         variant="outline"
                                                                         onClick={() => {
                                                                             consultDocForm.reset();
-                                                                            consultDocForm.setData('type', 'document');
-                                                                            setConsultDocUploadType('document');
-                                                                            setConsultDocUploadId(c.id);
+                                                                            consultDocForm.setData(
+                                                                                'type',
+                                                                                'document',
+                                                                            );
+                                                                            setConsultDocUploadType(
+                                                                                'document',
+                                                                            );
+                                                                            setConsultDocUploadId(
+                                                                                c.id,
+                                                                            );
                                                                         }}
                                                                     >
                                                                         <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                                                        Upload Document
+                                                                        Upload
+                                                                        Document
                                                                     </Button>
 
-                                                                    {c.status === 'open' && (
+                                                                    {c.status ===
+                                                                        'open' && (
                                                                         <Button
                                                                             size="sm"
                                                                             onClick={() => {
                                                                                 feedbackForm.reset();
-                                                                                setFeedbackDialogId(c.id);
+                                                                                setFeedbackDialogId(
+                                                                                    c.id,
+                                                                                );
                                                                             }}
                                                                         >
                                                                             <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Record Feedback
+                                                                            Record
+                                                                            Feedback
                                                                         </Button>
                                                                     )}
-                                                                    {c.status === 'feedback_received' && (
+                                                                    {c.status ===
+                                                                        'feedback_received' && (
                                                                         <Button
                                                                             size="sm"
                                                                             onClick={() => {
                                                                                 outcomeForm.reset();
-                                                                                setOutcomeDialogId(c.id);
+                                                                                setOutcomeDialogId(
+                                                                                    c.id,
+                                                                                );
                                                                             }}
                                                                         >
                                                                             <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Record Outcome
+                                                                            Record
+                                                                            Outcome
                                                                         </Button>
                                                                     )}
-                                                                    {c.status === 'actioned' && (
+                                                                    {c.status ===
+                                                                        'actioned' && (
                                                                         <Button
                                                                             size="sm"
-                                                                            onClick={() => setCloseDialogId(c.id)}
+                                                                            onClick={() =>
+                                                                                setCloseDialogId(
+                                                                                    c.id,
+                                                                                )
+                                                                            }
                                                                         >
                                                                             <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                                                            Close Consultation
+                                                                            Close
+                                                                            Consultation
                                                                         </Button>
                                                                     )}
                                                                 </div>
@@ -1488,56 +1965,90 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Section: Person */}
                         <div className="space-y-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Person Details
                             </h4>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label>Staff Member <span className="text-status-critical">*</span></Label>
+                                    <Label>
+                                        Staff Member{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
                                     <Select
-                                        value={repForm.data.user_id || '__none__'}
+                                        value={
+                                            repForm.data.user_id || '__none__'
+                                        }
                                         onValueChange={(v) =>
-                                            repForm.setData('user_id', v === '__none__' ? '' : v)
+                                            repForm.setData(
+                                                'user_id',
+                                                v === '__none__' ? '' : v,
+                                            )
                                         }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select staff member" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Select...
+                                            </SelectItem>
                                             {staff.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {repForm.errors.user_id && (
-                                        <p className="text-xs text-status-critical">{repForm.errors.user_id}</p>
+                                        <p className="text-xs text-status-critical">
+                                            {repForm.errors.user_id}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label>Site <span className="text-status-critical">*</span></Label>
+                                    <Label>
+                                        Site{' '}
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
+                                    </Label>
                                     <Select
-                                        value={repForm.data.site_id || '__none__'}
+                                        value={
+                                            repForm.data.site_id || '__none__'
+                                        }
                                         onValueChange={(v) =>
-                                            repForm.setData('site_id', v === '__none__' ? '' : v)
+                                            repForm.setData(
+                                                'site_id',
+                                                v === '__none__' ? '' : v,
+                                            )
                                         }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select site" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Select...
+                                            </SelectItem>
                                             {sites.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {repForm.errors.site_id && (
-                                        <p className="text-xs text-status-critical">{repForm.errors.site_id}</p>
+                                        <p className="text-xs text-status-critical">
+                                            {repForm.errors.site_id}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -1546,14 +2057,19 @@ export default function WorkerParticipationIndex({
                                 <Input
                                     placeholder="e.g. Kitchen, Nursing, Maintenance"
                                     value={repForm.data.work_group}
-                                    onChange={(e) => repForm.setData('work_group', e.target.value)}
+                                    onChange={(e) =>
+                                        repForm.setData(
+                                            'work_group',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
 
                         {/* Section: Election */}
                         <div className="space-y-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Election Information
                             </h4>
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -1561,15 +2077,26 @@ export default function WorkerParticipationIndex({
                                     <Label>Election Method</Label>
                                     <Select
                                         value={repForm.data.election_method}
-                                        onValueChange={(v) => repForm.setData('election_method', v)}
+                                        onValueChange={(v) =>
+                                            repForm.setData(
+                                                'election_method',
+                                                v,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="elected">Elected</SelectItem>
-                                            <SelectItem value="appointed">Appointed</SelectItem>
-                                            <SelectItem value="volunteered">Volunteered</SelectItem>
+                                            <SelectItem value="elected">
+                                                Elected
+                                            </SelectItem>
+                                            <SelectItem value="appointed">
+                                                Appointed
+                                            </SelectItem>
+                                            <SelectItem value="volunteered">
+                                                Volunteered
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1578,7 +2105,12 @@ export default function WorkerParticipationIndex({
                                     <Input
                                         type="date"
                                         value={repForm.data.elected_date}
-                                        onChange={(e) => repForm.setData('elected_date', e.target.value)}
+                                        onChange={(e) =>
+                                            repForm.setData(
+                                                'elected_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
@@ -1586,7 +2118,7 @@ export default function WorkerParticipationIndex({
 
                         {/* Section: Training */}
                         <div className="space-y-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Training
                             </h4>
                             <div className="space-y-1.5">
@@ -1597,21 +2129,31 @@ export default function WorkerParticipationIndex({
                                     max={10}
                                     value={repForm.data.training_days}
                                     onChange={(e) =>
-                                        repForm.setData('training_days', parseInt(e.target.value) || 0)
+                                        repForm.setData(
+                                            'training_days',
+                                            parseInt(e.target.value) || 0,
+                                        )
                                     }
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Under HSWA, H&S reps are entitled to up to 5 days paid training per year.
+                                    Under HSWA, H&S reps are entitled to up to 5
+                                    days paid training per year.
                                 </p>
                             </div>
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setRepOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setRepOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button disabled={repForm.processing} onClick={submitRep}>
+                        <Button
+                            disabled={repForm.processing}
+                            onClick={submitRep}
+                        >
                             <UserPlus className="mr-1.5 h-4 w-4" />
                             Add Representative
                         </Button>
@@ -1632,7 +2174,7 @@ export default function WorkerParticipationIndex({
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-warning-bg">
@@ -1645,14 +2187,16 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {committees.length === 0 ? (
                             <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-status-warning/30 bg-status-warning-bg py-8 text-center">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg mb-4">
+                                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg">
                                     <Building2 className="h-7 w-7 text-status-warning" />
                                 </div>
                                 <h3 className="text-sm font-semibold text-foreground">
-                                    Create a committee first before scheduling a meeting
+                                    Create a committee first before scheduling a
+                                    meeting
                                 </h3>
                                 <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-                                    An H&S committee is required to schedule meetings.
+                                    An H&S committee is required to schedule
+                                    meetings.
                                 </p>
                                 <Button
                                     size="sm"
@@ -1667,204 +2211,326 @@ export default function WorkerParticipationIndex({
                                 </Button>
                             </div>
                         ) : (
-                        <>
-                        {/* Section: Meeting Details */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Meeting Details
-                            </h4>
+                            <>
+                                {/* Section: Meeting Details */}
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                        Meeting Details
+                                    </h4>
 
-                            {/* Committee select */}
-                            <div className="space-y-1.5">
-                                <Label>Committee <span className="text-status-critical">*</span></Label>
-                                <Select
-                                    value={meetingForm.data.committee_id || '__none__'}
-                                    onValueChange={(v) =>
-                                        meetingForm.setData('committee_id', v === '__none__' ? '' : v)
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select committee" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="__none__">Select committee...</SelectItem>
-                                        {committees.map((c) => (
-                                            <SelectItem key={c.id} value={String(c.id)}>
-                                                {c.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {meetingForm.errors.committee_id && (
-                                    <p className="text-xs text-status-critical">{meetingForm.errors.committee_id}</p>
-                                )}
-                            </div>
-
-                            {/* Date/time */}
-                            <div className="space-y-1.5">
-                                <Label>Date & Time <span className="text-status-critical">*</span></Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={meetingForm.data.meeting_date}
-                                    onChange={(e) => meetingForm.setData('meeting_date', e.target.value)}
-                                />
-                                {meetingForm.errors.meeting_date && (
-                                    <p className="text-xs text-status-critical">{meetingForm.errors.meeting_date}</p>
-                                )}
-                            </div>
-
-                            {/* Location */}
-                            <div className="space-y-1.5">
-                                <Label>Location <span className="text-status-critical">*</span></Label>
-                                <Select
-                                    value={
-                                        meetingLocationMode === 'custom'
-                                            ? '__custom__'
-                                            : meetingForm.data.location || '__none__'
-                                    }
-                                    onValueChange={(v) => {
-                                        if (v === '__custom__') {
-                                            setMeetingLocationMode('custom');
-                                            meetingForm.setData('location', '');
-                                        } else if (v === '__none__') {
-                                            setMeetingLocationMode('site');
-                                            meetingForm.setData('location', '');
-                                        } else {
-                                            setMeetingLocationMode('site');
-                                            meetingForm.setData('location', v);
-                                        }
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select location" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="__none__">Select location...</SelectItem>
-                                        {sites.map((s) => (
-                                            <SelectItem key={s.id} value={s.name}>
-                                                {s.name}
-                                            </SelectItem>
-                                        ))}
-                                        <SelectItem value="__custom__">Other / Custom Location</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                {meetingLocationMode === 'custom' && (
-                                    <Input
-                                        className="mt-2"
-                                        placeholder="Enter custom location"
-                                        value={meetingForm.data.location}
-                                        onChange={(e) => meetingForm.setData('location', e.target.value)}
-                                    />
-                                )}
-
-                                {meetingForm.errors.location && (
-                                    <p className="text-xs text-status-critical">{meetingForm.errors.location}</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Section: Agenda Items */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Agenda Items
-                                </h4>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={addAgendaItem}
-                                >
-                                    <Plus className="mr-1 h-3.5 w-3.5" />
-                                    Add Item
-                                </Button>
-                            </div>
-
-                            {meetingForm.data.agenda_items.length === 0 && (
-                                <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                                    No agenda items yet. Click "Add Item" to start building your agenda.
-                                </div>
-                            )}
-
-                            <div className="space-y-3">
-                                {meetingForm.data.agenda_items.map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="rounded-lg border bg-muted/50 p-3 space-y-2"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-muted-foreground">
-                                                Item {idx + 1}
+                                    {/* Committee select */}
+                                    <div className="space-y-1.5">
+                                        <Label>
+                                            Committee{' '}
+                                            <span className="text-status-critical">
+                                                *
                                             </span>
-                                            {meetingForm.data.agenda_items.length > 1 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 w-7 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
-                                                    onClick={() => removeAgendaItem(idx)}
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <Input
-                                            placeholder="Agenda item title"
-                                            value={item.title}
-                                            onChange={(e) =>
-                                                updateAgendaItem(idx, 'title', e.target.value)
+                                        </Label>
+                                        <Select
+                                            value={
+                                                meetingForm.data.committee_id ||
+                                                '__none__'
                                             }
-                                        />
-                                        <Textarea
-                                            placeholder="Notes or talking points (optional)"
-                                            rows={2}
-                                            value={item.notes}
-                                            onChange={(e) =>
-                                                updateAgendaItem(idx, 'notes', e.target.value)
+                                            onValueChange={(v) =>
+                                                meetingForm.setData(
+                                                    'committee_id',
+                                                    v === '__none__' ? '' : v,
+                                                )
                                             }
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Section: Attendees */}
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Attendees
-                            </h4>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {staff.map((s) => {
-                                    const isChecked = meetingForm.data.attendees.includes(s.id);
-                                    return (
-                                        <label
-                                            key={s.id}
-                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
                                         >
-                                            <Checkbox
-                                                checked={isChecked}
-                                                onCheckedChange={(checked) => {
-                                                    const current = meetingForm.data.attendees;
-                                                    if (checked) {
-                                                        meetingForm.setData('attendees', [...current, s.id]);
-                                                    } else {
-                                                        meetingForm.setData('attendees', current.filter((id) => id !== s.id));
-                                                    }
-                                                }}
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select committee" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">
+                                                    Select committee...
+                                                </SelectItem>
+                                                {committees.map((c) => (
+                                                    <SelectItem
+                                                        key={c.id}
+                                                        value={String(c.id)}
+                                                    >
+                                                        {c.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {meetingForm.errors.committee_id && (
+                                            <p className="text-xs text-status-critical">
+                                                {
+                                                    meetingForm.errors
+                                                        .committee_id
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Date/time */}
+                                    <div className="space-y-1.5">
+                                        <Label>
+                                            Date & Time{' '}
+                                            <span className="text-status-critical">
+                                                *
+                                            </span>
+                                        </Label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={
+                                                meetingForm.data.meeting_date
+                                            }
+                                            onChange={(e) =>
+                                                meetingForm.setData(
+                                                    'meeting_date',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {meetingForm.errors.meeting_date && (
+                                            <p className="text-xs text-status-critical">
+                                                {
+                                                    meetingForm.errors
+                                                        .meeting_date
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Location */}
+                                    <div className="space-y-1.5">
+                                        <Label>
+                                            Location{' '}
+                                            <span className="text-status-critical">
+                                                *
+                                            </span>
+                                        </Label>
+                                        <Select
+                                            value={
+                                                meetingLocationMode === 'custom'
+                                                    ? '__custom__'
+                                                    : meetingForm.data
+                                                          .location ||
+                                                      '__none__'
+                                            }
+                                            onValueChange={(v) => {
+                                                if (v === '__custom__') {
+                                                    setMeetingLocationMode(
+                                                        'custom',
+                                                    );
+                                                    meetingForm.setData(
+                                                        'location',
+                                                        '',
+                                                    );
+                                                } else if (v === '__none__') {
+                                                    setMeetingLocationMode(
+                                                        'site',
+                                                    );
+                                                    meetingForm.setData(
+                                                        'location',
+                                                        '',
+                                                    );
+                                                } else {
+                                                    setMeetingLocationMode(
+                                                        'site',
+                                                    );
+                                                    meetingForm.setData(
+                                                        'location',
+                                                        v,
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select location" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">
+                                                    Select location...
+                                                </SelectItem>
+                                                {sites.map((s) => (
+                                                    <SelectItem
+                                                        key={s.id}
+                                                        value={s.name}
+                                                    >
+                                                        {s.name}
+                                                    </SelectItem>
+                                                ))}
+                                                <SelectItem value="__custom__">
+                                                    Other / Custom Location
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+
+                                        {meetingLocationMode === 'custom' && (
+                                            <Input
+                                                className="mt-2"
+                                                placeholder="Enter custom location"
+                                                value={
+                                                    meetingForm.data.location
+                                                }
+                                                onChange={(e) =>
+                                                    meetingForm.setData(
+                                                        'location',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
-                                            <span className="text-sm">{s.name}</span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                            {meetingForm.data.attendees.length > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    {meetingForm.data.attendees.length} attendee{meetingForm.data.attendees.length !== 1 ? 's' : ''} selected
-                                </p>
-                            )}
-                        </div>
-                        </>
+                                        )}
+
+                                        {meetingForm.errors.location && (
+                                            <p className="text-xs text-status-critical">
+                                                {meetingForm.errors.location}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Section: Agenda Items */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                            Agenda Items
+                                        </h4>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={addAgendaItem}
+                                        >
+                                            <Plus className="mr-1 h-3.5 w-3.5" />
+                                            Add Item
+                                        </Button>
+                                    </div>
+
+                                    {meetingForm.data.agenda_items.length ===
+                                        0 && (
+                                        <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                                            No agenda items yet. Click "Add
+                                            Item" to start building your agenda.
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                        {meetingForm.data.agenda_items.map(
+                                            (item, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="space-y-2 rounded-lg border bg-muted/50 p-3"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs font-medium text-muted-foreground">
+                                                            Item {idx + 1}
+                                                        </span>
+                                                        {meetingForm.data
+                                                            .agenda_items
+                                                            .length > 1 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-7 w-7 p-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                                onClick={() =>
+                                                                    removeAgendaItem(
+                                                                        idx,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                    <Input
+                                                        placeholder="Agenda item title"
+                                                        value={item.title}
+                                                        onChange={(e) =>
+                                                            updateAgendaItem(
+                                                                idx,
+                                                                'title',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                    <Textarea
+                                                        placeholder="Notes or talking points (optional)"
+                                                        rows={2}
+                                                        value={item.notes}
+                                                        onChange={(e) =>
+                                                            updateAgendaItem(
+                                                                idx,
+                                                                'notes',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Section: Attendees */}
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                        Attendees
+                                    </h4>
+                                    <div className="max-h-48 space-y-2 overflow-y-auto">
+                                        {staff.map((s) => {
+                                            const isChecked =
+                                                meetingForm.data.attendees.includes(
+                                                    s.id,
+                                                );
+                                            return (
+                                                <label
+                                                    key={s.id}
+                                                    className="flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 hover:bg-muted"
+                                                >
+                                                    <Checkbox
+                                                        checked={isChecked}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) => {
+                                                            const current =
+                                                                meetingForm.data
+                                                                    .attendees;
+                                                            if (checked) {
+                                                                meetingForm.setData(
+                                                                    'attendees',
+                                                                    [
+                                                                        ...current,
+                                                                        s.id,
+                                                                    ],
+                                                                );
+                                                            } else {
+                                                                meetingForm.setData(
+                                                                    'attendees',
+                                                                    current.filter(
+                                                                        (id) =>
+                                                                            id !==
+                                                                            s.id,
+                                                                    ),
+                                                                );
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm">
+                                                        {s.name}
+                                                    </span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                    {meetingForm.data.attendees.length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {meetingForm.data.attendees.length}{' '}
+                                            attendee
+                                            {meetingForm.data.attendees
+                                                .length !== 1
+                                                ? 's'
+                                                : ''}{' '}
+                                            selected
+                                        </p>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
 
@@ -1880,7 +2546,10 @@ export default function WorkerParticipationIndex({
                             Cancel
                         </Button>
                         <Button
-                            disabled={meetingForm.processing || committees.length === 0}
+                            disabled={
+                                meetingForm.processing ||
+                                committees.length === 0
+                            }
                             onClick={submitMeeting}
                         >
                             <CalendarDays className="mr-1.5 h-4 w-4" />
@@ -1907,41 +2576,59 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Title */}
                         <div className="space-y-1.5">
-                            <Label>Title <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Title{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Input
                                 placeholder="Brief description of the consultation topic"
                                 value={consultationForm.data.title}
-                                onChange={(e) => consultationForm.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    consultationForm.setData(
+                                        'title',
+                                        e.target.value,
+                                    )
+                                }
                             />
                             {consultationForm.errors.title && (
-                                <p className="text-xs text-status-critical">{consultationForm.errors.title}</p>
+                                <p className="text-xs text-status-critical">
+                                    {consultationForm.errors.title}
+                                </p>
                             )}
                         </div>
 
                         {/* Type: card buttons */}
                         <div className="space-y-1.5">
-                            <Label>Type <span className="text-status-critical">*</span></Label>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <Label>
+                                Type{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                 {consultationTypes.map((ct) => {
                                     const Icon = ct.icon;
                                     const isSelected =
-                                        consultationForm.data.consultation_type === ct.value;
+                                        consultationForm.data
+                                            .consultation_type === ct.value;
                                     return (
-                                        <button
+                                        <Button
                                             key={ct.value}
                                             type="button"
-                                            className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${
+                                            variant="outline"
+                                            className={`h-auto flex-col gap-1.5 rounded-lg border-2 p-3 text-xs font-medium ${
                                                 isSelected
                                                     ? `${ct.color} border-current ring-1 ring-current/20`
                                                     : 'border-border text-muted-foreground hover:border-border hover:bg-muted'
                                             }`}
                                             onClick={() =>
-                                                consultationForm.setData('consultation_type', ct.value)
+                                                consultationForm.setData(
+                                                    'consultation_type',
+                                                    ct.value,
+                                                )
                                             }
                                         >
                                             <Icon className="h-5 w-5" />
                                             {ct.label}
-                                        </button>
+                                        </Button>
                                     );
                                 })}
                             </div>
@@ -1950,35 +2637,59 @@ export default function WorkerParticipationIndex({
                         {/* Date & Site */}
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1.5">
-                                <Label>Date <span className="text-status-critical">*</span></Label>
+                                <Label>
+                                    Date{' '}
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
+                                </Label>
                                 <Input
                                     type="date"
-                                    value={consultationForm.data.consultation_date}
+                                    value={
+                                        consultationForm.data.consultation_date
+                                    }
                                     onChange={(e) =>
-                                        consultationForm.setData('consultation_date', e.target.value)
+                                        consultationForm.setData(
+                                            'consultation_date',
+                                            e.target.value,
+                                        )
                                     }
                                 />
                                 {consultationForm.errors.consultation_date && (
                                     <p className="text-xs text-status-critical">
-                                        {consultationForm.errors.consultation_date}
+                                        {
+                                            consultationForm.errors
+                                                .consultation_date
+                                        }
                                     </p>
                                 )}
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Site / Location</Label>
                                 <Select
-                                    value={consultationForm.data.site_id || '__none__'}
+                                    value={
+                                        consultationForm.data.site_id ||
+                                        '__none__'
+                                    }
                                     onValueChange={(v) =>
-                                        consultationForm.setData('site_id', v === '__none__' ? '' : v)
+                                        consultationForm.setData(
+                                            'site_id',
+                                            v === '__none__' ? '' : v,
+                                        )
                                     }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select site" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__none__">All sites</SelectItem>
+                                        <SelectItem value="__none__">
+                                            All sites
+                                        </SelectItem>
                                         {sites.map((s) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>
+                                            <SelectItem
+                                                key={s.id}
+                                                value={String(s.id)}
+                                            >
                                                 {s.name}
                                             </SelectItem>
                                         ))}
@@ -1995,17 +2706,26 @@ export default function WorkerParticipationIndex({
                                 rows={4}
                                 value={consultationForm.data.description}
                                 onChange={(e) =>
-                                    consultationForm.setData('description', e.target.value)
+                                    consultationForm.setData(
+                                        'description',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConsultationOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConsultationOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button disabled={consultationForm.processing} onClick={submitConsultation}>
+                        <Button
+                            disabled={consultationForm.processing}
+                            onClick={submitConsultation}
+                        >
                             <Megaphone className="mr-1.5 h-4 w-4" />
                             Create Consultation
                         </Button>
@@ -2016,7 +2736,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  RECORD FEEDBACK DIALOG (Consultation: open -> feedback_received) */}
             {/* ================================================================ */}
-            <Dialog open={feedbackDialogId !== null} onOpenChange={(open) => !open && setFeedbackDialogId(null)}>
+            <Dialog
+                open={feedbackDialogId !== null}
+                onOpenChange={(open) => !open && setFeedbackDialogId(null)}
+            >
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2029,59 +2752,102 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label>Worker Feedback Summary <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Worker Feedback Summary{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Textarea
                                 placeholder="Summarise the feedback received from workers..."
                                 rows={4}
-                                value={feedbackForm.data.worker_feedback_summary}
-                                onChange={(e) => feedbackForm.setData('worker_feedback_summary', e.target.value)}
+                                value={
+                                    feedbackForm.data.worker_feedback_summary
+                                }
+                                onChange={(e) =>
+                                    feedbackForm.setData(
+                                        'worker_feedback_summary',
+                                        e.target.value,
+                                    )
+                                }
                             />
                             {feedbackForm.errors.worker_feedback_summary && (
-                                <p className="text-xs text-status-critical">{feedbackForm.errors.worker_feedback_summary}</p>
+                                <p className="text-xs text-status-critical">
+                                    {
+                                        feedbackForm.errors
+                                            .worker_feedback_summary
+                                    }
+                                </p>
                             )}
                         </div>
 
                         <div className="space-y-1.5">
                             <Label>Workers Consulted</Label>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                            <div className="max-h-48 space-y-2 overflow-y-auto">
                                 {staff.map((s) => {
-                                    const isChecked = feedbackForm.data.workers_consulted.includes(s.id);
+                                    const isChecked =
+                                        feedbackForm.data.workers_consulted.includes(
+                                            s.id,
+                                        );
                                     return (
                                         <label
                                             key={s.id}
-                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
+                                            className="flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 hover:bg-muted"
                                         >
                                             <Checkbox
                                                 checked={isChecked}
                                                 onCheckedChange={(checked) => {
-                                                    const current = feedbackForm.data.workers_consulted;
+                                                    const current =
+                                                        feedbackForm.data
+                                                            .workers_consulted;
                                                     if (checked) {
-                                                        feedbackForm.setData('workers_consulted', [...current, s.id]);
+                                                        feedbackForm.setData(
+                                                            'workers_consulted',
+                                                            [...current, s.id],
+                                                        );
                                                     } else {
-                                                        feedbackForm.setData('workers_consulted', current.filter((id) => id !== s.id));
+                                                        feedbackForm.setData(
+                                                            'workers_consulted',
+                                                            current.filter(
+                                                                (id) =>
+                                                                    id !== s.id,
+                                                            ),
+                                                        );
                                                     }
                                                 }}
                                             />
-                                            <span className="text-sm">{s.name}</span>
+                                            <span className="text-sm">
+                                                {s.name}
+                                            </span>
                                         </label>
                                     );
                                 })}
                             </div>
                             {feedbackForm.data.workers_consulted.length > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                    {feedbackForm.data.workers_consulted.length} worker{feedbackForm.data.workers_consulted.length !== 1 ? 's' : ''} selected
+                                    {feedbackForm.data.workers_consulted.length}{' '}
+                                    worker
+                                    {feedbackForm.data.workers_consulted
+                                        .length !== 1
+                                        ? 's'
+                                        : ''}{' '}
+                                    selected
                                 </p>
                             )}
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setFeedbackDialogId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setFeedbackDialogId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             disabled={feedbackForm.processing}
-                            onClick={() => feedbackDialogId && submitFeedback(feedbackDialogId)}
+                            onClick={() =>
+                                feedbackDialogId &&
+                                submitFeedback(feedbackDialogId)
+                            }
                         >
                             <CheckCircle2 className="mr-1.5 h-4 w-4" />
                             Record Feedback
@@ -2093,7 +2859,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  RECORD OUTCOME DIALOG (Consultation: feedback_received -> actioned) */}
             {/* ================================================================ */}
-            <Dialog open={outcomeDialogId !== null} onOpenChange={(open) => !open && setOutcomeDialogId(null)}>
+            <Dialog
+                open={outcomeDialogId !== null}
+                onOpenChange={(open) => !open && setOutcomeDialogId(null)}
+            >
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2106,15 +2875,25 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label>Outcome <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Outcome{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Textarea
                                 placeholder="Describe the outcome of this consultation..."
                                 rows={4}
                                 value={outcomeForm.data.outcome}
-                                onChange={(e) => outcomeForm.setData('outcome', e.target.value)}
+                                onChange={(e) =>
+                                    outcomeForm.setData(
+                                        'outcome',
+                                        e.target.value,
+                                    )
+                                }
                             />
                             {outcomeForm.errors.outcome && (
-                                <p className="text-xs text-status-critical">{outcomeForm.errors.outcome}</p>
+                                <p className="text-xs text-status-critical">
+                                    {outcomeForm.errors.outcome}
+                                </p>
                             )}
                         </div>
 
@@ -2124,7 +2903,12 @@ export default function WorkerParticipationIndex({
                                 placeholder="Describe any changes implemented as a result..."
                                 rows={3}
                                 value={outcomeForm.data.changes_made}
-                                onChange={(e) => outcomeForm.setData('changes_made', e.target.value)}
+                                onChange={(e) =>
+                                    outcomeForm.setData(
+                                        'changes_made',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </div>
 
@@ -2132,21 +2916,33 @@ export default function WorkerParticipationIndex({
                             <Label>Outcome Document (optional)</Label>
                             <Input
                                 type="file"
-                                onChange={(e) => outcomeForm.setData('document', e.target.files?.[0] || null)}
+                                onChange={(e) =>
+                                    outcomeForm.setData(
+                                        'document',
+                                        e.target.files?.[0] || null,
+                                    )
+                                }
                             />
                             <p className="text-xs text-muted-foreground">
-                                Upload a supporting document for the outcome (e.g. updated procedure, risk assessment).
+                                Upload a supporting document for the outcome
+                                (e.g. updated procedure, risk assessment).
                             </p>
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOutcomeDialogId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOutcomeDialogId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             disabled={outcomeForm.processing}
-                            onClick={() => outcomeDialogId && submitOutcome(outcomeDialogId)}
+                            onClick={() =>
+                                outcomeDialogId &&
+                                submitOutcome(outcomeDialogId)
+                            }
                         >
                             <CheckCircle2 className="mr-1.5 h-4 w-4" />
                             Record Outcome
@@ -2158,7 +2954,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  CLOSE CONSULTATION DIALOG (Consultation: actioned -> closed)     */}
             {/* ================================================================ */}
-            <Dialog open={closeDialogId !== null} onOpenChange={(open) => !open && setCloseDialogId(null)}>
+            <Dialog
+                open={closeDialogId !== null}
+                onOpenChange={(open) => !open && setCloseDialogId(null)}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2170,15 +2969,23 @@ export default function WorkerParticipationIndex({
                     </DialogHeader>
 
                     <p className="text-sm text-muted-foreground">
-                        Are you sure you want to close this consultation? This indicates that all actions
-                        have been completed and the consultation is finalised.
+                        Are you sure you want to close this consultation? This
+                        indicates that all actions have been completed and the
+                        consultation is finalised.
                     </p>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setCloseDialogId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCloseDialogId(null)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={() => closeDialogId && submitClose(closeDialogId)}>
+                        <Button
+                            onClick={() =>
+                                closeDialogId && submitClose(closeDialogId)
+                            }
+                        >
                             <CheckCircle2 className="mr-1.5 h-4 w-4" />
                             Confirm Close
                         </Button>
@@ -2189,7 +2996,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  CONSULTATION DOCUMENT UPLOAD DIALOG                             */}
             {/* ================================================================ */}
-            <Dialog open={consultDocUploadId !== null} onOpenChange={(open) => !open && setConsultDocUploadId(null)}>
+            <Dialog
+                open={consultDocUploadId !== null}
+                onOpenChange={(open) => !open && setConsultDocUploadId(null)}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2207,35 +3017,58 @@ export default function WorkerParticipationIndex({
                                 value={consultDocForm.data.type}
                                 onValueChange={(v) => {
                                     consultDocForm.setData('type', v);
-                                    setConsultDocUploadType(v as 'document' | 'outcome');
+                                    setConsultDocUploadType(
+                                        v as 'document' | 'outcome',
+                                    );
                                 }}
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="document">Supporting Document</SelectItem>
-                                    <SelectItem value="outcome">Outcome Document</SelectItem>
+                                    <SelectItem value="document">
+                                        Supporting Document
+                                    </SelectItem>
+                                    <SelectItem value="outcome">
+                                        Outcome Document
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>File <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                File{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Input
                                 type="file"
-                                onChange={(e) => consultDocForm.setData('document', e.target.files?.[0] || null)}
+                                onChange={(e) =>
+                                    consultDocForm.setData(
+                                        'document',
+                                        e.target.files?.[0] || null,
+                                    )
+                                }
                             />
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConsultDocUploadId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConsultDocUploadId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
-                            disabled={consultDocForm.processing || !consultDocForm.data.document}
-                            onClick={() => consultDocUploadId && submitConsultDocUpload(consultDocUploadId)}
+                            disabled={
+                                consultDocForm.processing ||
+                                !consultDocForm.data.document
+                            }
+                            onClick={() =>
+                                consultDocUploadId &&
+                                submitConsultDocUpload(consultDocUploadId)
+                            }
                         >
                             <Upload className="mr-1.5 h-4 w-4" />
                             Upload
@@ -2247,8 +3080,11 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  COMPLETE MEETING DIALOG                                         */}
             {/* ================================================================ */}
-            <Dialog open={completeMeetingId !== null} onOpenChange={(open) => !open && setCompleteMeetingId(null)}>
-                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            <Dialog
+                open={completeMeetingId !== null}
+                onOpenChange={(open) => !open && setCompleteMeetingId(null)}
+            >
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-success-bg">
@@ -2261,34 +3097,60 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Actual Attendees */}
                         {(() => {
-                            const meeting = meetings.find((m) => m.id === completeMeetingId);
-                            const attendees = meeting?.confirmed_attendees ?? [];
+                            const meeting = meetings.find(
+                                (m) => m.id === completeMeetingId,
+                            );
+                            const attendees =
+                                meeting?.confirmed_attendees ?? [];
                             if (attendees.length === 0) return null;
                             return (
                                 <div className="space-y-3">
-                                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                         Actual Attendees
                                     </h4>
                                     <div className="space-y-2">
                                         {attendees.map((att) => {
-                                            const isChecked = completeMeetingForm.data.confirmed_attendees.includes(att.user_id);
+                                            const isChecked =
+                                                completeMeetingForm.data.confirmed_attendees.includes(
+                                                    att.user_id,
+                                                );
                                             return (
                                                 <label
                                                     key={att.id}
-                                                    className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
+                                                    className="flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 hover:bg-muted"
                                                 >
                                                     <Checkbox
                                                         checked={isChecked}
-                                                        onCheckedChange={(checked) => {
-                                                            const current = completeMeetingForm.data.confirmed_attendees;
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) => {
+                                                            const current =
+                                                                completeMeetingForm
+                                                                    .data
+                                                                    .confirmed_attendees;
                                                             if (checked) {
-                                                                completeMeetingForm.setData('confirmed_attendees', [...current, att.user_id]);
+                                                                completeMeetingForm.setData(
+                                                                    'confirmed_attendees',
+                                                                    [
+                                                                        ...current,
+                                                                        att.user_id,
+                                                                    ],
+                                                                );
                                                             } else {
-                                                                completeMeetingForm.setData('confirmed_attendees', current.filter((id) => id !== att.user_id));
+                                                                completeMeetingForm.setData(
+                                                                    'confirmed_attendees',
+                                                                    current.filter(
+                                                                        (id) =>
+                                                                            id !==
+                                                                            att.user_id,
+                                                                    ),
+                                                                );
                                                             }
                                                         }}
                                                     />
-                                                    <span className="text-sm">{att.name}</span>
+                                                    <span className="text-sm">
+                                                        {att.name}
+                                                    </span>
                                                 </label>
                                             );
                                         })}
@@ -2304,14 +3166,19 @@ export default function WorkerParticipationIndex({
                                 placeholder="Record the meeting minutes..."
                                 rows={5}
                                 value={completeMeetingForm.data.minutes}
-                                onChange={(e) => completeMeetingForm.setData('minutes', e.target.value)}
+                                onChange={(e) =>
+                                    completeMeetingForm.setData(
+                                        'minutes',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </div>
 
                         {/* Action Items */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                     Action Items
                                 </h4>
                                 <Button
@@ -2325,79 +3192,117 @@ export default function WorkerParticipationIndex({
                                 </Button>
                             </div>
 
-                            {completeMeetingForm.data.action_items.length === 0 && (
+                            {completeMeetingForm.data.action_items.length ===
+                                0 && (
                                 <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                                    No action items. Click "Add Action Item" to add follow-up tasks.
+                                    No action items. Click "Add Action Item" to
+                                    add follow-up tasks.
                                 </div>
                             )}
 
                             <div className="space-y-3">
-                                {completeMeetingForm.data.action_items.map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="rounded-lg border bg-muted/50 p-3 space-y-2"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-muted-foreground">
-                                                Action Item {idx + 1}
-                                            </span>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 w-7 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
-                                                onClick={() => removeCompleteMeetingActionItem(idx)}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                        <Input
-                                            placeholder="Description of the action item"
-                                            value={item.description}
-                                            onChange={(e) =>
-                                                updateCompleteMeetingActionItem(idx, 'description', e.target.value)
-                                            }
-                                        />
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                            <Select
-                                                value={item.assigned_to || '__none__'}
-                                                onValueChange={(v) =>
-                                                    updateCompleteMeetingActionItem(idx, 'assigned_to', v === '__none__' ? '' : v)
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Assign to..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="__none__">Assign to...</SelectItem>
-                                                    {staff.map((s) => (
-                                                        <SelectItem key={s.id} value={String(s.id)}>
-                                                            {s.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                {completeMeetingForm.data.action_items.map(
+                                    (item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="space-y-2 rounded-lg border bg-muted/50 p-3"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    Action Item {idx + 1}
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                    onClick={() =>
+                                                        removeCompleteMeetingActionItem(
+                                                            idx,
+                                                        )
+                                                    }
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                             <Input
-                                                type="date"
-                                                value={item.due_date}
+                                                placeholder="Description of the action item"
+                                                value={item.description}
                                                 onChange={(e) =>
-                                                    updateCompleteMeetingActionItem(idx, 'due_date', e.target.value)
+                                                    updateCompleteMeetingActionItem(
+                                                        idx,
+                                                        'description',
+                                                        e.target.value,
+                                                    )
                                                 }
                                             />
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                <Select
+                                                    value={
+                                                        item.assigned_to ||
+                                                        '__none__'
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        updateCompleteMeetingActionItem(
+                                                            idx,
+                                                            'assigned_to',
+                                                            v === '__none__'
+                                                                ? ''
+                                                                : v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Assign to..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="__none__">
+                                                            Assign to...
+                                                        </SelectItem>
+                                                        {staff.map((s) => (
+                                                            <SelectItem
+                                                                key={s.id}
+                                                                value={String(
+                                                                    s.id,
+                                                                )}
+                                                            >
+                                                                {s.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Input
+                                                    type="date"
+                                                    value={item.due_date}
+                                                    onChange={(e) =>
+                                                        updateCompleteMeetingActionItem(
+                                                            idx,
+                                                            'due_date',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ),
+                                )}
                             </div>
                         </div>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setCompleteMeetingId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCompleteMeetingId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             disabled={completeMeetingForm.processing}
-                            onClick={() => completeMeetingId && submitCompleteMeeting(completeMeetingId)}
+                            onClick={() =>
+                                completeMeetingId &&
+                                submitCompleteMeeting(completeMeetingId)
+                            }
                         >
                             <CheckCircle2 className="mr-1.5 h-4 w-4" />
                             Complete Meeting
@@ -2409,7 +3314,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  CANCEL MEETING DIALOG                                           */}
             {/* ================================================================ */}
-            <Dialog open={cancelMeetingId !== null} onOpenChange={(open) => !open && setCancelMeetingId(null)}>
+            <Dialog
+                open={cancelMeetingId !== null}
+                onOpenChange={(open) => !open && setCancelMeetingId(null)}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2421,16 +3329,23 @@ export default function WorkerParticipationIndex({
                     </DialogHeader>
 
                     <p className="text-sm text-muted-foreground">
-                        Are you sure you want to cancel this meeting? This action cannot be undone.
+                        Are you sure you want to cancel this meeting? This
+                        action cannot be undone.
                     </p>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setCancelMeetingId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCancelMeetingId(null)}
+                        >
                             Keep Meeting
                         </Button>
                         <Button
                             variant="destructive"
-                            onClick={() => cancelMeetingId && submitCancelMeeting(cancelMeetingId)}
+                            onClick={() =>
+                                cancelMeetingId &&
+                                submitCancelMeeting(cancelMeetingId)
+                            }
                         >
                             <XCircle className="mr-1.5 h-4 w-4" />
                             Cancel Meeting
@@ -2442,8 +3357,11 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  MANAGE MEMBERS DIALOG                                           */}
             {/* ================================================================ */}
-            <Dialog open={manageMembersId !== null} onOpenChange={(open) => !open && setManageMembersId(null)}>
-                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <Dialog
+                open={manageMembersId !== null}
+                onOpenChange={(open) => !open && setManageMembersId(null)}
+            >
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-info-bg">
@@ -2455,28 +3373,48 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
-                            Select staff members to add as attendees for this meeting.
+                            Select staff members to add as attendees for this
+                            meeting.
                         </p>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                        <div className="max-h-64 space-y-2 overflow-y-auto">
                             {staff.map((s) => {
-                                const isChecked = membersForm.data.user_ids.includes(String(s.id));
+                                const isChecked =
+                                    membersForm.data.user_ids.includes(
+                                        String(s.id),
+                                    );
                                 return (
                                     <label
                                         key={s.id}
-                                        className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
+                                        className="flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 hover:bg-muted"
                                     >
                                         <Checkbox
                                             checked={isChecked}
                                             onCheckedChange={(checked) => {
-                                                const current = membersForm.data.user_ids;
+                                                const current =
+                                                    membersForm.data.user_ids;
                                                 if (checked) {
-                                                    membersForm.setData('user_ids', [...current, String(s.id)]);
+                                                    membersForm.setData(
+                                                        'user_ids',
+                                                        [
+                                                            ...current,
+                                                            String(s.id),
+                                                        ],
+                                                    );
                                                 } else {
-                                                    membersForm.setData('user_ids', current.filter((id) => id !== String(s.id)));
+                                                    membersForm.setData(
+                                                        'user_ids',
+                                                        current.filter(
+                                                            (id) =>
+                                                                id !==
+                                                                String(s.id),
+                                                        ),
+                                                    );
                                                 }
                                             }}
                                         />
-                                        <span className="text-sm">{s.name}</span>
+                                        <span className="text-sm">
+                                            {s.name}
+                                        </span>
                                     </label>
                                 );
                             })}
@@ -2484,12 +3422,21 @@ export default function WorkerParticipationIndex({
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setManageMembersId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setManageMembersId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
-                            disabled={membersForm.processing || membersForm.data.user_ids.length === 0}
-                            onClick={() => manageMembersId && submitManageMembers(manageMembersId)}
+                            disabled={
+                                membersForm.processing ||
+                                membersForm.data.user_ids.length === 0
+                            }
+                            onClick={() =>
+                                manageMembersId &&
+                                submitManageMembers(manageMembersId)
+                            }
                         >
                             <Users className="mr-1.5 h-4 w-4" />
                             Save Attendees
@@ -2501,7 +3448,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  UPLOAD MINUTES DIALOG                                           */}
             {/* ================================================================ */}
-            <Dialog open={minutesUploadId !== null} onOpenChange={(open) => !open && setMinutesUploadId(null)}>
+            <Dialog
+                open={minutesUploadId !== null}
+                onOpenChange={(open) => !open && setMinutesUploadId(null)}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2513,23 +3463,41 @@ export default function WorkerParticipationIndex({
                     </DialogHeader>
 
                     <div className="space-y-1.5">
-                        <Label>Minutes Document <span className="text-status-critical">*</span></Label>
+                        <Label>
+                            Minutes Document{' '}
+                            <span className="text-status-critical">*</span>
+                        </Label>
                         <Input
                             type="file"
-                            onChange={(e) => minutesForm.setData('document', e.target.files?.[0] || null)}
+                            onChange={(e) =>
+                                minutesForm.setData(
+                                    'document',
+                                    e.target.files?.[0] || null,
+                                )
+                            }
                         />
                         <p className="text-xs text-muted-foreground">
-                            Upload the meeting minutes document (PDF, Word, etc.).
+                            Upload the meeting minutes document (PDF, Word,
+                            etc.).
                         </p>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setMinutesUploadId(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setMinutesUploadId(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
-                            disabled={minutesForm.processing || !minutesForm.data.document}
-                            onClick={() => minutesUploadId && submitMinutesUpload(minutesUploadId)}
+                            disabled={
+                                minutesForm.processing ||
+                                !minutesForm.data.document
+                            }
+                            onClick={() =>
+                                minutesUploadId &&
+                                submitMinutesUpload(minutesUploadId)
+                            }
                         >
                             <Upload className="mr-1.5 h-4 w-4" />
                             Upload Minutes
@@ -2541,7 +3509,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  CREATE COMMITTEE DIALOG                                         */}
             {/* ================================================================ */}
-            <Dialog open={committeeDialogOpen} onOpenChange={setCommitteeDialogOpen}>
+            <Dialog
+                open={committeeDialogOpen}
+                onOpenChange={setCommitteeDialogOpen}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2554,14 +3525,24 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label>Committee Name <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Committee Name{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Input
                                 placeholder="e.g. Health & Safety Committee"
                                 value={committeeForm.data.name}
-                                onChange={(e) => committeeForm.setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    committeeForm.setData(
+                                        'name',
+                                        e.target.value,
+                                    )
+                                }
                             />
                             {committeeForm.errors.name && (
-                                <p className="text-xs text-status-critical">{committeeForm.errors.name}</p>
+                                <p className="text-xs text-status-critical">
+                                    {committeeForm.errors.name}
+                                </p>
                             )}
                         </div>
                         <div className="space-y-1.5">
@@ -2569,16 +3550,24 @@ export default function WorkerParticipationIndex({
                             <Select
                                 value={committeeForm.data.site_id || '__none__'}
                                 onValueChange={(v) =>
-                                    committeeForm.setData('site_id', v === '__none__' ? '' : v)
+                                    committeeForm.setData(
+                                        'site_id',
+                                        v === '__none__' ? '' : v,
+                                    )
                                 }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select site (optional)" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">All sites</SelectItem>
+                                    <SelectItem value="__none__">
+                                        All sites
+                                    </SelectItem>
                                     {sites.map((s) => (
-                                        <SelectItem key={s.id} value={String(s.id)}>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={String(s.id)}
+                                        >
                                             {s.name}
                                         </SelectItem>
                                     ))}
@@ -2588,10 +3577,16 @@ export default function WorkerParticipationIndex({
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setCommitteeDialogOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCommitteeDialogOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button disabled={committeeForm.processing} onClick={submitCommittee}>
+                        <Button
+                            disabled={committeeForm.processing}
+                            onClick={submitCommittee}
+                        >
                             <Building2 className="mr-1.5 h-4 w-4" />
                             Create Committee
                         </Button>
@@ -2602,7 +3597,10 @@ export default function WorkerParticipationIndex({
             {/* ================================================================ */}
             {/*  EDIT CONSULTATION DIALOG                                        */}
             {/* ================================================================ */}
-            <Dialog open={editingConsultation !== null} onOpenChange={(open) => !open && setEditingConsultation(null)}>
+            <Dialog
+                open={editingConsultation !== null}
+                onOpenChange={(open) => !open && setEditingConsultation(null)}
+            >
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -2616,40 +3614,69 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Title */}
                         <div className="space-y-1.5">
-                            <Label>Title <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Title{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Input
                                 placeholder="Brief description of the consultation topic"
                                 value={editConsultationForm.data.title}
-                                onChange={(e) => editConsultationForm.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    editConsultationForm.setData(
+                                        'title',
+                                        e.target.value,
+                                    )
+                                }
                             />
                             {editConsultationForm.errors.title && (
-                                <p className="text-xs text-status-critical">{editConsultationForm.errors.title}</p>
+                                <p className="text-xs text-status-critical">
+                                    {editConsultationForm.errors.title}
+                                </p>
                             )}
                         </div>
 
                         {/* Type */}
                         <div className="space-y-1.5">
-                            <Label>Consultation Type <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Consultation Type{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Select
-                                value={editConsultationForm.data.consultation_type || '__none__'}
+                                value={
+                                    editConsultationForm.data
+                                        .consultation_type || '__none__'
+                                }
                                 onValueChange={(v) =>
-                                    editConsultationForm.setData('consultation_type', v === '__none__' ? '' : v)
+                                    editConsultationForm.setData(
+                                        'consultation_type',
+                                        v === '__none__' ? '' : v,
+                                    )
                                 }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">Select type...</SelectItem>
+                                    <SelectItem value="__none__">
+                                        Select type...
+                                    </SelectItem>
                                     {consultationTypes.map((ct) => (
-                                        <SelectItem key={ct.value} value={ct.value}>
+                                        <SelectItem
+                                            key={ct.value}
+                                            value={ct.value}
+                                        >
                                             {ct.label}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                             {editConsultationForm.errors.consultation_type && (
-                                <p className="text-xs text-status-critical">{editConsultationForm.errors.consultation_type}</p>
+                                <p className="text-xs text-status-critical">
+                                    {
+                                        editConsultationForm.errors
+                                            .consultation_type
+                                    }
+                                </p>
                             )}
                         </div>
 
@@ -2661,7 +3688,10 @@ export default function WorkerParticipationIndex({
                                 rows={4}
                                 value={editConsultationForm.data.description}
                                 onChange={(e) =>
-                                    editConsultationForm.setData('description', e.target.value)
+                                    editConsultationForm.setData(
+                                        'description',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </div>
@@ -2671,18 +3701,29 @@ export default function WorkerParticipationIndex({
                             <div className="space-y-1.5">
                                 <Label>Site / Location</Label>
                                 <Select
-                                    value={editConsultationForm.data.site_id || '__none__'}
+                                    value={
+                                        editConsultationForm.data.site_id ||
+                                        '__none__'
+                                    }
                                     onValueChange={(v) =>
-                                        editConsultationForm.setData('site_id', v === '__none__' ? '' : v)
+                                        editConsultationForm.setData(
+                                            'site_id',
+                                            v === '__none__' ? '' : v,
+                                        )
                                     }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select site" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__none__">All sites</SelectItem>
+                                        <SelectItem value="__none__">
+                                            All sites
+                                        </SelectItem>
                                         {sites.map((s) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>
+                                            <SelectItem
+                                                key={s.id}
+                                                value={String(s.id)}
+                                            >
                                                 {s.name}
                                             </SelectItem>
                                         ))}
@@ -2690,17 +3731,32 @@ export default function WorkerParticipationIndex({
                                 </Select>
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Consultation Date <span className="text-status-critical">*</span></Label>
+                                <Label>
+                                    Consultation Date{' '}
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
+                                </Label>
                                 <Input
                                     type="date"
-                                    value={editConsultationForm.data.consultation_date}
+                                    value={
+                                        editConsultationForm.data
+                                            .consultation_date
+                                    }
                                     onChange={(e) =>
-                                        editConsultationForm.setData('consultation_date', e.target.value)
+                                        editConsultationForm.setData(
+                                            'consultation_date',
+                                            e.target.value,
+                                        )
                                     }
                                 />
-                                {editConsultationForm.errors.consultation_date && (
+                                {editConsultationForm.errors
+                                    .consultation_date && (
                                     <p className="text-xs text-status-critical">
-                                        {editConsultationForm.errors.consultation_date}
+                                        {
+                                            editConsultationForm.errors
+                                                .consultation_date
+                                        }
                                     </p>
                                 )}
                             </div>
@@ -2708,12 +3764,18 @@ export default function WorkerParticipationIndex({
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditingConsultation(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setEditingConsultation(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             disabled={editConsultationForm.processing}
-                            onClick={() => editingConsultation && submitEditConsultation(editingConsultation.id)}
+                            onClick={() =>
+                                editingConsultation &&
+                                submitEditConsultation(editingConsultation.id)
+                            }
                         >
                             <CheckCircle2 className="mr-1.5 h-4 w-4" />
                             Save Changes
@@ -2734,7 +3796,7 @@ export default function WorkerParticipationIndex({
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-warning-bg">
@@ -2747,25 +3809,39 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Date/Time */}
                         <div className="space-y-1.5">
-                            <Label>Date & Time <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Date & Time{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Input
                                 type="datetime-local"
                                 value={editMeetingForm.data.meeting_date}
-                                onChange={(e) => editMeetingForm.setData('meeting_date', e.target.value)}
+                                onChange={(e) =>
+                                    editMeetingForm.setData(
+                                        'meeting_date',
+                                        e.target.value,
+                                    )
+                                }
                             />
                             {editMeetingForm.errors.meeting_date && (
-                                <p className="text-xs text-status-critical">{editMeetingForm.errors.meeting_date}</p>
+                                <p className="text-xs text-status-critical">
+                                    {editMeetingForm.errors.meeting_date}
+                                </p>
                             )}
                         </div>
 
                         {/* Location */}
                         <div className="space-y-1.5">
-                            <Label>Location <span className="text-status-critical">*</span></Label>
+                            <Label>
+                                Location{' '}
+                                <span className="text-status-critical">*</span>
+                            </Label>
                             <Select
                                 value={
                                     editMeetingLocationMode === 'custom'
                                         ? '__custom__'
-                                        : editMeetingForm.data.location || '__none__'
+                                        : editMeetingForm.data.location ||
+                                          '__none__'
                                 }
                                 onValueChange={(v) => {
                                     if (v === '__custom__') {
@@ -2784,13 +3860,17 @@ export default function WorkerParticipationIndex({
                                     <SelectValue placeholder="Select location" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">Select location...</SelectItem>
+                                    <SelectItem value="__none__">
+                                        Select location...
+                                    </SelectItem>
                                     {sites.map((s) => (
                                         <SelectItem key={s.id} value={s.name}>
                                             {s.name}
                                         </SelectItem>
                                     ))}
-                                    <SelectItem value="__custom__">Other / Custom Location</SelectItem>
+                                    <SelectItem value="__custom__">
+                                        Other / Custom Location
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -2799,19 +3879,26 @@ export default function WorkerParticipationIndex({
                                     className="mt-2"
                                     placeholder="Enter custom location"
                                     value={editMeetingForm.data.location}
-                                    onChange={(e) => editMeetingForm.setData('location', e.target.value)}
+                                    onChange={(e) =>
+                                        editMeetingForm.setData(
+                                            'location',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             )}
 
                             {editMeetingForm.errors.location && (
-                                <p className="text-xs text-status-critical">{editMeetingForm.errors.location}</p>
+                                <p className="text-xs text-status-critical">
+                                    {editMeetingForm.errors.location}
+                                </p>
                             )}
                         </div>
 
                         {/* Agenda Items */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                     Agenda Items
                                 </h4>
                                 <Button
@@ -2827,49 +3914,66 @@ export default function WorkerParticipationIndex({
 
                             {editMeetingForm.data.agenda_items.length === 0 && (
                                 <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                                    No agenda items yet. Click "Add Item" to start building your agenda.
+                                    No agenda items yet. Click "Add Item" to
+                                    start building your agenda.
                                 </div>
                             )}
 
                             <div className="space-y-3">
-                                {editMeetingForm.data.agenda_items.map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="rounded-lg border bg-muted/50 p-3 space-y-2"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-muted-foreground">
-                                                Item {idx + 1}
-                                            </span>
-                                            {editMeetingForm.data.agenda_items.length > 1 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 w-7 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
-                                                    onClick={() => removeEditAgendaItem(idx)}
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            )}
+                                {editMeetingForm.data.agenda_items.map(
+                                    (item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="space-y-2 rounded-lg border bg-muted/50 p-3"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    Item {idx + 1}
+                                                </span>
+                                                {editMeetingForm.data
+                                                    .agenda_items.length >
+                                                    1 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                        onClick={() =>
+                                                            removeEditAgendaItem(
+                                                                idx,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <Input
+                                                placeholder="Agenda item title"
+                                                value={item.title}
+                                                onChange={(e) =>
+                                                    updateEditAgendaItem(
+                                                        idx,
+                                                        'title',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <Textarea
+                                                placeholder="Notes or talking points (optional)"
+                                                rows={2}
+                                                value={item.notes}
+                                                onChange={(e) =>
+                                                    updateEditAgendaItem(
+                                                        idx,
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
-                                        <Input
-                                            placeholder="Agenda item title"
-                                            value={item.title}
-                                            onChange={(e) =>
-                                                updateEditAgendaItem(idx, 'title', e.target.value)
-                                            }
-                                        />
-                                        <Textarea
-                                            placeholder="Notes or talking points (optional)"
-                                            rows={2}
-                                            value={item.notes}
-                                            onChange={(e) =>
-                                                updateEditAgendaItem(idx, 'notes', e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                ))}
+                                    ),
+                                )}
                             </div>
                         </div>
                     </div>
@@ -2886,7 +3990,10 @@ export default function WorkerParticipationIndex({
                         </Button>
                         <Button
                             disabled={editMeetingForm.processing}
-                            onClick={() => editingMeeting && submitEditMeeting(editingMeeting.id)}
+                            onClick={() =>
+                                editingMeeting &&
+                                submitEditMeeting(editingMeeting.id)
+                            }
                         >
                             <CheckCircle2 className="mr-1.5 h-4 w-4" />
                             Save Changes

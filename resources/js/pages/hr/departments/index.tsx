@@ -1,4 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,12 +11,27 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { type BreadcrumbItem } from '@/types';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Briefcase, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
+import {
+    Briefcase,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    Users,
+    X,
+} from 'lucide-react';
 import { useState } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -95,7 +109,9 @@ function DepartmentDialog({
         name: department?.name || '',
         code: department?.code || '',
         description: department?.description || '',
-        manager_user_id: department?.manager_user_id ? String(department.manager_user_id) : '',
+        manager_user_id: department?.manager_user_id
+            ? String(department.manager_user_id)
+            : '',
         parent_id: department?.parent_id ? String(department.parent_id) : '',
         sort_order: department?.sort_order || 0,
         is_active: department?.is_active ?? true,
@@ -128,15 +144,21 @@ function DepartmentDialog({
     }
 
     // Filter out current department from parent options
-    const filteredParents = parentOptions.filter((p) => !department || p.id !== department.id);
+    const filteredParents = parentOptions.filter(
+        (p) => !department || p.id !== department.id,
+    );
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{isEdit ? 'Edit Department' : 'New Department'}</DialogTitle>
+                    <DialogTitle>
+                        {isEdit ? 'Edit Department' : 'New Department'}
+                    </DialogTitle>
                     <DialogDescription>
-                        {isEdit ? 'Update department details.' : 'Create a new department for your organisation.'}
+                        {isEdit
+                            ? 'Update department details.'
+                            : 'Create a new department for your organisation.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -147,10 +169,16 @@ function DepartmentDialog({
                             <Input
                                 id="name"
                                 value={form.data.name}
-                                onChange={(e) => form.setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Care Services"
                             />
-                            {form.errors.name && <p className="text-xs text-status-critical">{form.errors.name}</p>}
+                            {form.errors.name && (
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.name}
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -158,7 +186,9 @@ function DepartmentDialog({
                             <Input
                                 id="code"
                                 value={form.data.code}
-                                onChange={(e) => form.setData('code', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('code', e.target.value)
+                                }
                                 placeholder="e.g. CS"
                             />
                         </div>
@@ -170,7 +200,12 @@ function DepartmentDialog({
                                 type="number"
                                 min={0}
                                 value={form.data.sort_order}
-                                onChange={(e) => form.setData('sort_order', parseInt(e.target.value) || 0)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'sort_order',
+                                        parseInt(e.target.value) || 0,
+                                    )
+                                }
                             />
                         </div>
                     </div>
@@ -180,7 +215,9 @@ function DepartmentDialog({
                         <Textarea
                             id="description"
                             value={form.data.description}
-                            onChange={(e) => form.setData('description', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('description', e.target.value)
+                            }
                             rows={2}
                             placeholder="Brief description of the department"
                         />
@@ -191,7 +228,12 @@ function DepartmentDialog({
                             <Label>Manager</Label>
                             <Select
                                 value={form.data.manager_user_id || NONE}
-                                onValueChange={(v) => form.setData('manager_user_id', v === NONE ? '' : v)}
+                                onValueChange={(v) =>
+                                    form.setData(
+                                        'manager_user_id',
+                                        v === NONE ? '' : v,
+                                    )
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select manager" />
@@ -199,7 +241,12 @@ function DepartmentDialog({
                                 <SelectContent>
                                     <SelectItem value={NONE}>None</SelectItem>
                                     {managers.map((m) => (
-                                        <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+                                        <SelectItem
+                                            key={m.id}
+                                            value={String(m.id)}
+                                        >
+                                            {m.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -209,15 +256,27 @@ function DepartmentDialog({
                             <Label>Parent Department</Label>
                             <Select
                                 value={form.data.parent_id || NONE}
-                                onValueChange={(v) => form.setData('parent_id', v === NONE ? '' : v)}
+                                onValueChange={(v) =>
+                                    form.setData(
+                                        'parent_id',
+                                        v === NONE ? '' : v,
+                                    )
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="None (top-level)" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>None (top-level)</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        None (top-level)
+                                    </SelectItem>
                                     {filteredParents.map((p) => (
-                                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                                        <SelectItem
+                                            key={p.id}
+                                            value={String(p.id)}
+                                        >
+                                            {p.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -230,7 +289,9 @@ function DepartmentDialog({
                                 type="checkbox"
                                 id="is_active"
                                 checked={form.data.is_active}
-                                onChange={(e) => form.setData('is_active', e.target.checked)}
+                                onChange={(e) =>
+                                    form.setData('is_active', e.target.checked)
+                                }
                                 className="rounded border-border"
                             />
                             <Label htmlFor="is_active">Active</Label>
@@ -238,7 +299,13 @@ function DepartmentDialog({
                     )}
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={form.processing}>
                             {isEdit ? 'Save Changes' : 'Create Department'}
                         </Button>
@@ -253,12 +320,21 @@ function DepartmentDialog({
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function DepartmentsIndex({ departments, managers, parentOptions, filters }: Props) {
+export default function DepartmentsIndex({
+    departments,
+    managers,
+    parentOptions,
+    filters,
+}: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Department | null>(null);
 
     function applyFilter(key: string, value: string | null) {
-        router.get('/hr/departments', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/hr/departments',
+            { ...filters, [key]: value || undefined },
+            { preserveState: true, replace: true },
+        );
     }
 
     const hasFilters = !!(filters.q || filters.status);
@@ -279,7 +355,12 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
     }
 
     function handleDeactivate(dept: Department) {
-        if (!confirm(`Deactivate "${dept.name}"? Employees must be reassigned first.`)) return;
+        if (
+            !confirm(
+                `Deactivate "${dept.name}"? Employees must be reassigned first.`,
+            )
+        )
+            return;
         router.delete(`/hr/departments/${dept.id}`, { preserveScroll: true });
     }
 
@@ -291,9 +372,12 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Departments</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            Departments
+                        </h1>
                         <p className="text-sm text-muted-foreground">
-                            Manage organisational departments &mdash; {departments.total} total
+                            Manage organisational departments &mdash;{' '}
+                            {departments.total} total
                         </p>
                     </div>
                     <Button onClick={openCreate} className="gap-1.5">
@@ -305,18 +389,27 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search by name or code..."
                             defaultValue={filters.q}
                             className="w-64 pl-9"
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') applyFilter('q', (e.target as HTMLInputElement).value);
+                                if (e.key === 'Enter')
+                                    applyFilter(
+                                        'q',
+                                        (e.target as HTMLInputElement).value,
+                                    );
                             }}
                         />
                     </div>
 
-                    <Select value={filters.status || NONE} onValueChange={(v) => applyFilter('status', v === NONE ? null : v)}>
+                    <Select
+                        value={filters.status || NONE}
+                        onValueChange={(v) =>
+                            applyFilter('status', v === NONE ? null : v)
+                        }
+                    >
                         <SelectTrigger className="w-36">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -331,7 +424,13 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => router.get('/hr/departments', {}, { preserveState: true, replace: true })}
+                            onClick={() =>
+                                router.get(
+                                    '/hr/departments',
+                                    {},
+                                    { preserveState: true, replace: true },
+                                )
+                            }
                             className="gap-1.5 text-muted-foreground"
                         >
                             <X className="h-3.5 w-3.5" />
@@ -347,28 +446,55 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                             <table className="w-full text-sm">
                                 <thead className="border-b bg-muted/50">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Department</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Code</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Manager</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Parent</th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Employees</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Department
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase sm:table-cell">
+                                            Code
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase md:table-cell">
+                                            Manager
+                                        </th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase lg:table-cell">
+                                            Parent
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Employees
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Status
+                                        </th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {departments.data.map((dept) => (
-                                        <tr key={dept.id} className="transition-colors hover:bg-muted/40">
+                                        <tr
+                                            key={dept.id}
+                                            className="transition-colors hover:bg-muted/40"
+                                        >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                         <Briefcase className="h-4 w-4" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium">{dept.name}</p>
+                                                        <p className="font-medium">
+                                                            {dept.name}
+                                                        </p>
                                                         {dept.description && (
-                                                            <p className="truncate text-xs text-muted-foreground" style={{ maxWidth: '300px' }}>
-                                                                {dept.description}
+                                                            <p
+                                                                className="truncate text-xs text-muted-foreground"
+                                                                style={{
+                                                                    maxWidth:
+                                                                        '300px',
+                                                                }}
+                                                            >
+                                                                {
+                                                                    dept.description
+                                                                }
                                                             </p>
                                                         )}
                                                     </div>
@@ -395,22 +521,35 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                                                     className={
                                                         dept.is_active
                                                             ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
-                                                            : 'border-border bg-muted text-muted-foreground dark:border-border/30 dark:bg-muted-foreground/80/10 dark:text-muted-foreground'
+                                                            : 'dark:bg-muted-foreground/80/10 border-border bg-muted text-muted-foreground dark:border-border/30 dark:text-muted-foreground'
                                                     }
                                                 >
-                                                    {dept.is_active ? 'Active' : 'Inactive'}
+                                                    {dept.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(dept)} className="h-8 w-8 p-0">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            openEdit(dept)
+                                                        }
+                                                        className="h-8 w-8 p-0"
+                                                    >
                                                         <Pencil className="h-3.5 w-3.5" />
                                                     </Button>
                                                     {dept.is_active && (
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => handleDeactivate(dept)}
+                                                            onClick={() =>
+                                                                handleDeactivate(
+                                                                    dept,
+                                                                )
+                                                            }
                                                             className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
                                                         >
                                                             <Trash2 className="h-3.5 w-3.5" />
@@ -422,11 +561,24 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                                     ))}
                                     {departments.data.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-16 text-center">
+                                            <td
+                                                colSpan={7}
+                                                className="px-4 py-16 text-center"
+                                            >
                                                 <Briefcase className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                                                <p className="font-medium text-muted-foreground">No departments yet</p>
-                                                <p className="mt-1 text-sm text-muted-foreground/70">Create your first department to get started</p>
-                                                <Button onClick={openCreate} variant="outline" size="sm" className="mt-4 gap-1.5">
+                                                <p className="font-medium text-muted-foreground">
+                                                    No departments yet
+                                                </p>
+                                                <p className="mt-1 text-sm text-muted-foreground/70">
+                                                    Create your first department
+                                                    to get started
+                                                </p>
+                                                <Button
+                                                    onClick={openCreate}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="mt-4 gap-1.5"
+                                                >
                                                     <Plus className="h-4 w-4" />
                                                     Add Department
                                                 </Button>

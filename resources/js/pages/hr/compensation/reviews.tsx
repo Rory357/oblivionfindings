@@ -1,13 +1,26 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus } from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -37,7 +50,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const getStatusColor = (status: string) => {
@@ -57,10 +76,14 @@ const getStatusColor = (status: string) => {
 
 const getCycleLabel = (cycle: string) => {
     switch (cycle) {
-        case 'annual': return 'Annual';
-        case 'mid_year': return 'Mid-Year';
-        case 'ad_hoc': return 'Ad Hoc';
-        default: return cycle;
+        case 'annual':
+            return 'Annual';
+        case 'mid_year':
+            return 'Mid-Year';
+        case 'ad_hoc':
+            return 'Ad Hoc';
+        default:
+            return cycle;
     }
 };
 
@@ -70,7 +93,11 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/compensation/reviews', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/hr/compensation/reviews',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -80,15 +107,20 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">Compensation Reviews</h1>
+                        <h1 className="text-lg font-semibold">
+                            Compensation Reviews
+                        </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
-                            Manage compensation review cycles and bulk salary adjustments
+                            Manage compensation review cycles and bulk salary
+                            adjustments
                         </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                         <Link href="/hr/compensation/bands">
-                            <Button size="sm" variant="outline">Salary Bands</Button>
+                            <Button size="sm" variant="outline">
+                                Salary Bands
+                            </Button>
                         </Link>
                         {can.manage && (
                             <Link href="/hr/compensation/reviews/create">
@@ -107,16 +139,28 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? NONE}
-                                onValueChange={(v) => onFilter({ status: v === NONE ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === NONE ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All statuses" />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>All Statuses</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        All Statuses
+                                    </SelectItem>
                                     {statuses.map((s) => (
-                                        <SelectItem key={s} value={s} className="capitalize">
+                                        <SelectItem
+                                            key={s}
+                                            value={s}
+                                            className="capitalize"
+                                        >
                                             {s.replace(/_/g, ' ')}
                                         </SelectItem>
                                     ))}
@@ -143,13 +187,28 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                             <TableBody>
                                 {reviews.data.map((review) => (
                                     <TableRow key={review.id}>
-                                        <TableCell className="font-medium">{review.title}</TableCell>
-                                        <TableCell>{getCycleLabel(review.review_cycle)}</TableCell>
-                                        <TableCell>{formatDate(review.effective_date)}</TableCell>
-                                        <TableCell>{review.items_count}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {review.title}
+                                        </TableCell>
                                         <TableCell>
-                                            <Badge className={getStatusColor(review.status)}>
-                                                {review.status.replace(/_/g, ' ')}
+                                            {getCycleLabel(review.review_cycle)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {formatDate(review.effective_date)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {review.items_count}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                className={getStatusColor(
+                                                    review.status,
+                                                )}
+                                            >
+                                                {review.status.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
@@ -167,7 +226,10 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                                 ))}
                                 {!reviews.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                                        <TableCell
+                                            colSpan={7}
+                                            className="py-8 text-center text-sm text-muted-foreground"
+                                        >
                                             No compensation reviews found.
                                         </TableCell>
                                     </TableRow>

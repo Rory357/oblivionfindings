@@ -578,16 +578,17 @@ export default function FamilyDashboard({
                                                     form.data.visit_type ===
                                                     type;
                                                 return (
-                                                    <button
+                                                    <Button
                                                         key={type}
                                                         type="button"
+                                                        variant="outline"
                                                         onClick={() =>
                                                             form.setData(
                                                                 'visit_type',
                                                                 type,
                                                             )
                                                         }
-                                                        className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${
+                                                        className={`h-auto flex-col gap-1.5 rounded-lg border-2 p-3 text-xs font-medium ${
                                                             selected
                                                                 ? 'border-primary bg-primary/5 text-primary'
                                                                 : 'border-border text-muted-foreground hover:border-primary/30'
@@ -595,7 +596,7 @@ export default function FamilyDashboard({
                                                     >
                                                         <Icon className="h-5 w-5" />
                                                         {label}
-                                                    </button>
+                                                    </Button>
                                                 );
                                             })}
                                         </div>
@@ -654,12 +655,14 @@ export default function FamilyDashboard({
                     >
                         <span>💬</span> Send a Message
                     </Link>
-                    <button
+                    <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => setBookingOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                        className="h-auto gap-2 rounded-full bg-card px-4 py-2 text-sm font-medium shadow-sm hover:border-primary/30 hover:shadow-md"
                     >
                         <span>📅</span> Plan a Visit
-                    </button>
+                    </Button>
                     <Link
                         href={`/portal/clients/${client.id}/photos`}
                         className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
@@ -1118,26 +1121,40 @@ export default function FamilyDashboard({
                                     Coming Up
                                 </CardTitle>
                                 <div className="flex gap-1 rounded-lg border p-0.5">
-                                    <button
-                                        onClick={() => setCalendarView('week')}
-                                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                    <Button
+                                        type="button"
+                                        variant={
                                             calendarView === 'week'
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'default'
+                                                : 'ghost'
+                                        }
+                                        size="xs"
+                                        onClick={() => setCalendarView('week')}
+                                        className={`h-auto rounded-md px-3 py-1 text-xs font-medium ${
+                                            calendarView === 'week'
+                                                ? ''
                                                 : 'text-muted-foreground hover:text-foreground'
                                         }`}
                                     >
                                         Week
-                                    </button>
-                                    <button
-                                        onClick={() => setCalendarView('month')}
-                                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={
                                             calendarView === 'month'
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'default'
+                                                : 'ghost'
+                                        }
+                                        size="xs"
+                                        onClick={() => setCalendarView('month')}
+                                        className={`h-auto rounded-md px-3 py-1 text-xs font-medium ${
+                                            calendarView === 'month'
+                                                ? ''
                                                 : 'text-muted-foreground hover:text-foreground'
                                         }`}
                                     >
                                         Month
-                                    </button>
+                                    </Button>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -1284,33 +1301,46 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="space-y-3">
                                         {pendingConsentRequests.map((cr) => (
+                                            /* eslint-disable-next-line no-restricted-syntax -- Compact review rows live inside an existing Card panel, so nesting Card would add visual weight. */
                                             <div
                                                 key={cr.id}
                                                 className="flex items-start justify-between gap-3 rounded-lg border bg-white p-3"
                                             >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-sm font-medium">
-                                                        {cr.consent_type?.name ?? 'Consent request'}
+                                                        {cr.consent_type
+                                                            ?.name ??
+                                                            'Consent request'}
                                                     </div>
                                                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                                                         {cr.purpose}
                                                     </p>
                                                     <div className="mt-1 text-xs text-muted-foreground">
-                                                        From {cr.requested_by?.name ?? 'care team'}
+                                                        From{' '}
+                                                        {cr.requested_by
+                                                            ?.name ??
+                                                            'care team'}
                                                         {cr.expires_at && (
                                                             <>
                                                                 {' '}
                                                                 · respond by{' '}
-                                                                {new Date(cr.expires_at).toLocaleDateString(
+                                                                {new Date(
+                                                                    cr.expires_at,
+                                                                ).toLocaleDateString(
                                                                     'en-NZ',
-                                                                    { day: 'numeric', month: 'short' },
+                                                                    {
+                                                                        day: 'numeric',
+                                                                        month: 'short',
+                                                                    },
                                                                 )}
                                                             </>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <Button asChild size="sm">
-                                                    <a href={cr.action_url}>Review</a>
+                                                    <a href={cr.action_url}>
+                                                        Review
+                                                    </a>
                                                 </Button>
                                             </div>
                                         ))}
@@ -1970,6 +2000,7 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="space-y-3">
                                         {criticalAlerts.map((alert) => (
+                                            /* eslint-disable-next-line no-restricted-syntax -- Alert rows are compact entries inside an existing Card panel rather than standalone cards. */
                                             <div
                                                 key={alert.id}
                                                 className="rounded-lg border border-status-critical/30 bg-white p-3"

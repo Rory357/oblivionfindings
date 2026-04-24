@@ -96,7 +96,7 @@ const PURPOSE_LABELS: Record<string, string> = {
 };
 
 export default function OutingShow({ outing, vehicle_state, can }: Props) {
-    const safeOuting = outing ?? ({} as OutingData);
+    const safeOuting = useMemo(() => outing ?? ({} as OutingData), [outing]);
     const safeResidents = safeOuting.residents ?? [];
     const canManage = can?.manage ?? false;
     const statusConfig = STATUS_CONFIG[safeOuting.status] ?? STATUS_CONFIG.planned;

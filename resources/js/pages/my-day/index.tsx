@@ -484,38 +484,40 @@ export default function MyDay({
             ? 'Pick shift'
             : 'Clock';
 
-    const clockBadge = isClockedIn ? (
-        <span
-            aria-hidden
-            className="block h-2 w-2 rounded-full bg-status-success"
-        />
-    ) : isAmbiguous ? (
-        <span
-            aria-hidden
-            className="block h-2 w-2 rounded-full bg-status-warning"
-        />
-    ) : undefined;
-
     const bottomNavItems = useMemo<StaffBottomNavItem[]>(
-        () => [
-            { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
-            { key: 'meds', label: 'Meds', icon: Pill, href: '/meds/today' },
-            {
-                key: 'clock',
-                label: clockLabel,
-                icon: Clock,
-                href: hasClockContext ? '/my-day#clock' : '/attendance',
-                badge: clockBadge,
-            },
-            {
-                key: 'report',
-                label: 'Report',
-                icon: ClipboardList,
-                href: '/incidents',
-            },
-            { key: 'more', label: 'More', icon: Menu, href: '/' },
-        ],
-        [clockLabel, clockBadge, hasClockContext],
+        () => {
+            const clockBadge = isClockedIn ? (
+                <span
+                    aria-hidden
+                    className="block h-2 w-2 rounded-full bg-status-success"
+                />
+            ) : isAmbiguous ? (
+                <span
+                    aria-hidden
+                    className="block h-2 w-2 rounded-full bg-status-warning"
+                />
+            ) : undefined;
+
+            return [
+                { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
+                { key: 'meds', label: 'Meds', icon: Pill, href: '/meds/today' },
+                {
+                    key: 'clock',
+                    label: clockLabel,
+                    icon: Clock,
+                    href: hasClockContext ? '/my-day#clock' : '/attendance',
+                    badge: clockBadge,
+                },
+                {
+                    key: 'report',
+                    label: 'Report',
+                    icon: ClipboardList,
+                    href: '/incidents',
+                },
+                { key: 'more', label: 'More', icon: Menu, href: '/' },
+            ];
+        },
+        [clockLabel, hasClockContext, isAmbiguous, isClockedIn],
     );
 
     const headerAction = (
@@ -832,13 +834,14 @@ export default function MyDay({
                                     { key: 'followup', label: 'Follow-ups' },
                                 ] as const
                             ).map((tab) => (
-                                <button
+                                <Button
                                     key={tab.key}
                                     type="button"
+                                    variant="ghost"
                                     role="tab"
                                     aria-selected={openItemFilter === tab.key}
                                     onClick={() => setOpenItemFilter(tab.key)}
-                                    className={`frontline-focus flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                                    className={`frontline-focus min-h-11 shrink-0 gap-1.5 rounded-md px-3 py-1.5 ${
                                         openItemFilter === tab.key
                                             ? 'bg-background text-foreground shadow-sm'
                                             : 'text-muted-foreground hover:text-foreground'
@@ -854,7 +857,7 @@ export default function MyDay({
                                     >
                                         {openItemCounts[tab.key]}
                                     </span>
-                                </button>
+                                </Button>
                             ))}
                         </div>
 

@@ -312,6 +312,7 @@ export default function ShiftSeriesShow({
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
+                            {/* eslint-disable-next-line no-restricted-syntax -- Summary tiles are nested inside the series Card content. */}
                             <div className="rounded-xl border bg-background/80 p-4">
                                 <div className="text-xs tracking-wide text-muted-foreground uppercase">
                                     Next occurrence
@@ -325,6 +326,7 @@ export default function ShiftSeriesShow({
                                         : 'No future occurrence'}
                                 </div>
                             </div>
+                            {/* eslint-disable-next-line no-restricted-syntax -- Summary tiles are nested inside the series Card content. */}
                             <div className="rounded-xl border bg-background/80 p-4">
                                 <div className="text-xs tracking-wide text-muted-foreground uppercase">
                                     Action needed
@@ -684,6 +686,7 @@ export default function ShiftSeriesShow({
                                             {coverageAlignment.linked_rule_issues
                                                 .slice(0, 3)
                                                 .map((issue, index) => (
+                                                    // eslint-disable-next-line no-restricted-syntax -- Coverage issue rows live inside an alert panel, not as standalone Cards.
                                                     <div
                                                         key={`${issue.rule_name}-${index}`}
                                                         className="rounded-lg border border-status-critical/30 bg-white/80 p-3"

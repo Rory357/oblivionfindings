@@ -31,7 +31,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
+import {
+    TabsContent,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -49,8 +54,8 @@ import {
     Search,
     Settings,
     ShieldAlert,
-    Users,
     UserPlus,
+    Users,
     Wrench,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -107,23 +112,52 @@ const MODULE_DEFINITIONS: {
         label: 'Operations',
         icon: ClipboardList,
         prefixes: [
-            'clients', 'shifts', 'timesheets', 'care_plans', 'care_notes',
-            'medications', 'service_agreements', 'funding', 'rosters',
-            'appointments', 'goals', 'progress_notes', 'support_plans',
-            'contacts', 'documents', 'portal',
+            'clients',
+            'shifts',
+            'timesheets',
+            'care_plans',
+            'care_notes',
+            'medications',
+            'service_agreements',
+            'funding',
+            'rosters',
+            'appointments',
+            'goals',
+            'progress_notes',
+            'support_plans',
+            'contacts',
+            'documents',
+            'portal',
         ],
     },
     {
         key: 'sites',
         label: 'Sites & Locations',
         icon: Building2,
-        prefixes: ['sites', 'hazards', 'checklists', 'rooms', 'inspections', 'locations', 'maintenance'],
+        prefixes: [
+            'sites',
+            'hazards',
+            'checklists',
+            'rooms',
+            'inspections',
+            'locations',
+            'maintenance',
+        ],
     },
     {
         key: 'hr',
         label: 'HR & People',
         icon: Users,
-        prefixes: ['staff', 'leave', 'training', 'qualifications', 'certifications', 'payroll', 'onboarding', 'competencies'],
+        prefixes: [
+            'staff',
+            'leave',
+            'training',
+            'qualifications',
+            'certifications',
+            'payroll',
+            'onboarding',
+            'competencies',
+        ],
     },
     {
         key: 'fleet',
@@ -141,13 +175,26 @@ const MODULE_DEFINITIONS: {
         key: 'incidents',
         label: 'Incidents & Safety',
         icon: ShieldAlert,
-        prefixes: ['incidents', 'risks', 'investigations', 'notifications', 'safety'],
+        prefixes: [
+            'incidents',
+            'risks',
+            'investigations',
+            'notifications',
+            'safety',
+        ],
     },
     {
         key: 'settings',
         label: 'Settings',
         icon: Settings,
-        prefixes: ['settings', 'integrations', 'roles', 'permissions', 'billing', 'organisation'],
+        prefixes: [
+            'settings',
+            'integrations',
+            'roles',
+            'permissions',
+            'billing',
+            'organisation',
+        ],
     },
     {
         key: 'system',
@@ -157,7 +204,9 @@ const MODULE_DEFINITIONS: {
     },
 ];
 
-function modeFromOverride(val: boolean | undefined): 'inherit' | 'allow' | 'deny' {
+function modeFromOverride(
+    val: boolean | undefined,
+): 'inherit' | 'allow' | 'deny' {
     if (val === undefined) return 'inherit';
     return val ? 'allow' : 'deny';
 }
@@ -184,10 +233,13 @@ function getInitials(name: string) {
 
 const BOARD_ROLE_COLOURS: Record<string, string> = {
     chair: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70',
-    secretary: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
-    treasurer: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    secretary:
+        'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    treasurer:
+        'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     member: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
-    observer: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground',
+    observer:
+        'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground',
 };
 
 // --- Three-state override toggle ---
@@ -201,48 +253,57 @@ function OverrideToggle({
 }) {
     return (
         <div className="inline-flex items-center gap-0.5 rounded-full border bg-muted/30 p-0.5">
-            <button
+            <Button
                 type="button"
+                variant="ghost"
                 onClick={() => onChange('inherit')}
-                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`h-auto rounded-full px-2.5 py-1 text-xs font-medium ${
                     value === 'inherit'
                         ? 'bg-muted text-foreground shadow-sm dark:bg-muted dark:text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
                 <span className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'inherit' ? 'bg-muted-foreground/80' : 'bg-muted'}`} />
+                    <span
+                        className={`inline-block h-2 w-2 rounded-full ${value === 'inherit' ? 'bg-muted-foreground/80' : 'bg-muted'}`}
+                    />
                     Inherit
                 </span>
-            </button>
-            <button
+            </Button>
+            <Button
                 type="button"
+                variant="ghost"
                 onClick={() => onChange('allow')}
-                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`h-auto rounded-full px-2.5 py-1 text-xs font-medium ${
                     value === 'allow'
                         ? 'bg-status-success-bg text-status-success shadow-sm dark:bg-status-success-bg dark:text-status-success'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
                 <span className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'allow' ? 'bg-status-success' : 'bg-muted'}`} />
+                    <span
+                        className={`inline-block h-2 w-2 rounded-full ${value === 'allow' ? 'bg-status-success' : 'bg-muted'}`}
+                    />
                     Allow
                 </span>
-            </button>
-            <button
+            </Button>
+            <Button
                 type="button"
+                variant="ghost"
                 onClick={() => onChange('deny')}
-                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`h-auto rounded-full px-2.5 py-1 text-xs font-medium ${
                     value === 'deny'
                         ? 'bg-status-critical-bg text-status-critical shadow-sm dark:bg-status-critical-bg dark:text-status-critical'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
                 <span className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'deny' ? 'bg-status-critical' : 'bg-muted'}`} />
+                    <span
+                        className={`inline-block h-2 w-2 rounded-full ${value === 'deny' ? 'bg-status-critical' : 'bg-muted'}`}
+                    />
                     Deny
                 </span>
-            </button>
+            </Button>
         </div>
     );
 }
@@ -323,11 +384,16 @@ function PermissionOverridesTab({
     // Count overrides for a module
     const getOverrideCount = (perms: Permission[]) => {
         return perms.filter(
-            (p) => form.data.overrides[String(p.id)] && form.data.overrides[String(p.id)] !== 'inherit',
+            (p) =>
+                form.data.overrides[String(p.id)] &&
+                form.data.overrides[String(p.id)] !== 'inherit',
         ).length;
     };
 
-    const setGroupOverride = (permIds: number[], value: 'inherit' | 'allow' | 'deny') => {
+    const setGroupOverride = (
+        permIds: number[],
+        value: 'inherit' | 'allow' | 'deny',
+    ) => {
         const next = { ...form.data.overrides };
         for (const id of permIds) next[String(id)] = value;
         form.setData('overrides', next);
@@ -336,12 +402,15 @@ function PermissionOverridesTab({
     return (
         <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-                Override role-based permissions for specific users. Use this for exceptions — most users should get permissions via roles.
+                Override role-based permissions for specific users. Use this for
+                exceptions — most users should get permissions via roles.
             </p>
 
             {/* User selector */}
             <div className="max-w-sm">
-                <Label className="mb-2 block text-sm font-medium">Select User</Label>
+                <Label className="mb-2 block text-sm font-medium">
+                    Select User
+                </Label>
                 <Select value={selectedUserId} onValueChange={selectUser}>
                     <SelectTrigger>
                         <SelectValue placeholder="Search and select a user..." />
@@ -363,7 +432,8 @@ function PermissionOverridesTab({
                             <Key className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            Select a user above to manage their permission overrides
+                            Select a user above to manage their permission
+                            overrides
                         </p>
                     </CardContent>
                 </Card>
@@ -377,12 +447,20 @@ function PermissionOverridesTab({
                                     {getInitials(selectedUser.name)}
                                 </div>
                                 <div>
-                                    <div className="font-medium">{selectedUser.name}</div>
-                                    <div className="text-sm text-muted-foreground">{selectedUser.email}</div>
+                                    <div className="font-medium">
+                                        {selectedUser.name}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        {selectedUser.email}
+                                    </div>
                                     {selectedUser.roles.length > 0 && (
                                         <div className="mt-1.5 flex flex-wrap gap-1">
                                             {selectedUser.roles.map((r) => (
-                                                <Badge key={r.id} variant="secondary" className="text-xs">
+                                                <Badge
+                                                    key={r.id}
+                                                    variant="secondary"
+                                                    className="text-xs"
+                                                >
                                                     {r.label}
                                                 </Badge>
                                             ))}
@@ -391,7 +469,9 @@ function PermissionOverridesTab({
                                 </div>
                             </div>
                             <Button variant="ghost" size="sm" asChild>
-                                <Link href={`/settings/users/${selectedUser.id}`}>
+                                <Link
+                                    href={`/settings/users/${selectedUser.id}`}
+                                >
                                     Edit in User Profile
                                     <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                                 </Link>
@@ -401,7 +481,7 @@ function PermissionOverridesTab({
 
                     {/* Permission search */}
                     <div className="relative max-w-sm">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Filter permissions..."
                             value={permQuery}
@@ -420,24 +500,53 @@ function PermissionOverridesTab({
                     >
                         {moduleGroups.map((mod) => {
                             const Icon = mod.icon;
-                            const overrideCount = getOverrideCount(mod.permissions);
+                            const overrideCount = getOverrideCount(
+                                mod.permissions,
+                            );
                             const permIds = mod.permissions.map((p) => p.id);
 
                             return (
-                                <Collapsible key={mod.key} defaultOpen={Boolean(permQuery) || overrideCount > 0}>
+                                <Collapsible
+                                    key={mod.key}
+                                    defaultOpen={
+                                        Boolean(permQuery) || overrideCount > 0
+                                    }
+                                >
                                     <Card>
                                         <CollapsibleTrigger asChild>
-                                            <CardHeader className="cursor-pointer select-none transition-colors hover:bg-muted/50">
+                                            <CardHeader className="cursor-pointer transition-colors select-none hover:bg-muted/50">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
                                                         <Icon className="h-5 w-5 text-primary" />
                                                         <div>
-                                                            <CardTitle className="text-sm">{mod.label}</CardTitle>
+                                                            <CardTitle className="text-sm">
+                                                                {mod.label}
+                                                            </CardTitle>
                                                             <CardDescription className="text-xs">
-                                                                {mod.permissions.length} permission{mod.permissions.length !== 1 ? 's' : ''}
-                                                                {overrideCount > 0 && (
+                                                                {
+                                                                    mod
+                                                                        .permissions
+                                                                        .length
+                                                                }{' '}
+                                                                permission
+                                                                {mod.permissions
+                                                                    .length !==
+                                                                1
+                                                                    ? 's'
+                                                                    : ''}
+                                                                {overrideCount >
+                                                                    0 && (
                                                                     <span className="ml-1.5 text-primary">
-                                                                        ({overrideCount} override{overrideCount !== 1 ? 's' : ''})
+                                                                        (
+                                                                        {
+                                                                            overrideCount
+                                                                        }{' '}
+                                                                        override
+                                                                        {overrideCount !==
+                                                                        1
+                                                                            ? 's'
+                                                                            : ''}
+                                                                        )
                                                                     </span>
                                                                 )}
                                                             </CardDescription>
@@ -455,7 +564,12 @@ function PermissionOverridesTab({
                                                         type="button"
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => setGroupOverride(permIds, 'inherit')}
+                                                        onClick={() =>
+                                                            setGroupOverride(
+                                                                permIds,
+                                                                'inherit',
+                                                            )
+                                                        }
                                                     >
                                                         All Inherit
                                                     </Button>
@@ -463,7 +577,12 @@ function PermissionOverridesTab({
                                                         type="button"
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => setGroupOverride(permIds, 'allow')}
+                                                        onClick={() =>
+                                                            setGroupOverride(
+                                                                permIds,
+                                                                'allow',
+                                                            )
+                                                        }
                                                     >
                                                         All Allow
                                                     </Button>
@@ -471,35 +590,67 @@ function PermissionOverridesTab({
                                                         type="button"
                                                         size="sm"
                                                         variant="outline"
-                                                        onClick={() => setGroupOverride(permIds, 'deny')}
+                                                        onClick={() =>
+                                                            setGroupOverride(
+                                                                permIds,
+                                                                'deny',
+                                                            )
+                                                        }
                                                     >
                                                         All Deny
                                                     </Button>
                                                 </div>
 
                                                 <div className="space-y-2">
-                                                    {mod.permissions.map((p) => (
-                                                        <div
-                                                            key={p.id}
-                                                            className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-                                                        >
-                                                            <div className="min-w-0">
-                                                                <div className="font-mono text-sm">{p.key}</div>
-                                                                {p.description && (
-                                                                    <div className="text-xs text-muted-foreground">{p.description}</div>
-                                                                )}
+                                                    {mod.permissions.map(
+                                                        (p) => (
+                                                            <div
+                                                                key={p.id}
+                                                                className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                                                            >
+                                                                <div className="min-w-0">
+                                                                    <div className="font-mono text-sm">
+                                                                        {p.key}
+                                                                    </div>
+                                                                    {p.description && (
+                                                                        <div className="text-xs text-muted-foreground">
+                                                                            {
+                                                                                p.description
+                                                                            }
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <OverrideToggle
+                                                                    value={
+                                                                        form
+                                                                            .data
+                                                                            .overrides[
+                                                                            String(
+                                                                                p.id,
+                                                                            )
+                                                                        ] ??
+                                                                        'inherit'
+                                                                    }
+                                                                    onChange={(
+                                                                        v,
+                                                                    ) =>
+                                                                        form.setData(
+                                                                            'overrides',
+                                                                            {
+                                                                                ...form
+                                                                                    .data
+                                                                                    .overrides,
+                                                                                [String(
+                                                                                    p.id,
+                                                                                )]:
+                                                                                    v,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
                                                             </div>
-                                                            <OverrideToggle
-                                                                value={form.data.overrides[String(p.id)] ?? 'inherit'}
-                                                                onChange={(v) =>
-                                                                    form.setData('overrides', {
-                                                                        ...form.data.overrides,
-                                                                        [String(p.id)]: v,
-                                                                    })
-                                                                }
-                                                            />
-                                                        </div>
-                                                    ))}
+                                                        ),
+                                                    )}
                                                 </div>
                                             </CardContent>
                                         </CollapsibleContent>
@@ -508,19 +659,28 @@ function PermissionOverridesTab({
                             );
                         })}
 
-                        {moduleGroups.length === 0 && filteredPermissions.length === 0 && (
-                            <Card>
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    No permissions match your filter.
-                                </CardContent>
-                            </Card>
-                        )}
+                        {moduleGroups.length === 0 &&
+                            filteredPermissions.length === 0 && (
+                                <Card>
+                                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                                        No permissions match your filter.
+                                    </CardContent>
+                                </Card>
+                            )}
 
                         <div className="flex items-center gap-3 pt-2">
-                            <Button type="submit" disabled={form.processing} className="bg-primary hover:bg-primary">
+                            <Button
+                                type="submit"
+                                disabled={form.processing}
+                                className="bg-primary hover:bg-primary"
+                            >
                                 Save Overrides
                             </Button>
-                            <Button type="button" variant="outline" onClick={() => form.reset()}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => form.reset()}
+                            >
                                 Reset
                             </Button>
                         </div>
@@ -541,13 +701,17 @@ function BoardGovernanceTab({
     users: UserItem[];
 }) {
     const [isOpen, setIsOpen] = useState(false);
-    const [editingMember, setEditingMember] = useState<BoardMember | null>(null);
+    const [editingMember, setEditingMember] = useState<BoardMember | null>(
+        null,
+    );
 
     const form = useForm({
         user_id: '',
         board_role: 'member',
         term_start: new Date().toISOString().split('T')[0],
-        term_end: new Date(new Date().setFullYear(new Date().getFullYear() + 3)).toISOString().split('T')[0],
+        term_end: new Date(new Date().setFullYear(new Date().getFullYear() + 3))
+            .toISOString()
+            .split('T')[0],
         notes: '',
     });
 
@@ -604,7 +768,8 @@ function BoardGovernanceTab({
     const expiringSoon = boardMembers.filter((m) => {
         if (!m.term_end || !m.is_active) return false;
         const end = new Date(m.term_end);
-        const daysLeft = (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+        const daysLeft =
+            (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
         return daysLeft > 0 && daysLeft <= 90;
     });
 
@@ -622,8 +787,12 @@ function BoardGovernanceTab({
                             <Users className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{boardMembers.length}</div>
-                            <div className="text-xs text-muted-foreground">Total Board Members</div>
+                            <div className="text-2xl font-bold">
+                                {boardMembers.length}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Total Board Members
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -633,8 +802,12 @@ function BoardGovernanceTab({
                             <Landmark className="h-5 w-5 text-status-success" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{activeMembers.length}</div>
-                            <div className="text-xs text-muted-foreground">Active Terms</div>
+                            <div className="text-2xl font-bold">
+                                {activeMembers.length}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Active Terms
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -644,8 +817,12 @@ function BoardGovernanceTab({
                             <Calendar className="h-5 w-5 text-status-warning" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{expiringSoon.length}</div>
-                            <div className="text-xs text-muted-foreground">Expiring Soon</div>
+                            <div className="text-2xl font-bold">
+                                {expiringSoon.length}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Expiring Soon
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -655,7 +832,10 @@ function BoardGovernanceTab({
             <div className="flex justify-end">
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
-                        <Button className="bg-primary hover:bg-primary" disabled={availableUsers.length === 0}>
+                        <Button
+                            className="bg-primary hover:bg-primary"
+                            disabled={availableUsers.length === 0}
+                        >
                             <UserPlus className="mr-2 h-4 w-4" />
                             Appoint Member
                         </Button>
@@ -672,38 +852,57 @@ function BoardGovernanceTab({
                                 <Label>User</Label>
                                 <Select
                                     value={form.data.user_id}
-                                    onValueChange={(v) => form.setData('user_id', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('user_id', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select user..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {availableUsers.map((user) => (
-                                            <SelectItem key={user.id} value={String(user.id)}>
+                                            <SelectItem
+                                                key={user.id}
+                                                value={String(user.id)}
+                                            >
                                                 {user.name} ({user.email})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {form.errors.user_id && (
-                                    <p className="mt-1 text-sm text-status-critical">{form.errors.user_id}</p>
+                                    <p className="mt-1 text-sm text-status-critical">
+                                        {form.errors.user_id}
+                                    </p>
                                 )}
                             </div>
                             <div>
                                 <Label>Board Role</Label>
                                 <Select
                                     value={form.data.board_role}
-                                    onValueChange={(v) => form.setData('board_role', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('board_role', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="chair">Chair</SelectItem>
-                                        <SelectItem value="secretary">Secretary</SelectItem>
-                                        <SelectItem value="treasurer">Treasurer</SelectItem>
-                                        <SelectItem value="member">Member</SelectItem>
-                                        <SelectItem value="observer">Observer</SelectItem>
+                                        <SelectItem value="chair">
+                                            Chair
+                                        </SelectItem>
+                                        <SelectItem value="secretary">
+                                            Secretary
+                                        </SelectItem>
+                                        <SelectItem value="treasurer">
+                                            Treasurer
+                                        </SelectItem>
+                                        <SelectItem value="member">
+                                            Member
+                                        </SelectItem>
+                                        <SelectItem value="observer">
+                                            Observer
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -713,7 +912,12 @@ function BoardGovernanceTab({
                                     <Input
                                         type="date"
                                         value={form.data.term_start}
-                                        onChange={(e) => form.setData('term_start', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'term_start',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div>
@@ -721,7 +925,12 @@ function BoardGovernanceTab({
                                     <Input
                                         type="date"
                                         value={form.data.term_end}
-                                        onChange={(e) => form.setData('term_end', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'term_end',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                             </div>
@@ -729,13 +938,19 @@ function BoardGovernanceTab({
                                 <Label>Notes</Label>
                                 <Textarea
                                     value={form.data.notes}
-                                    onChange={(e) => form.setData('notes', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('notes', e.target.value)
+                                    }
                                     placeholder="Optional notes about this appointment..."
                                     rows={3}
                                 />
                             </div>
                             <DialogFooter>
-                                <Button type="submit" disabled={form.processing} className="bg-primary hover:bg-primary">
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                    className="bg-primary hover:bg-primary"
+                                >
                                     Appoint
                                 </Button>
                             </DialogFooter>
@@ -748,7 +963,9 @@ function BoardGovernanceTab({
             {boardMembers.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
                     {boardMembers.map((member) => {
-                        const roleColour = BOARD_ROLE_COLOURS[member.board_role] ?? BOARD_ROLE_COLOURS.member;
+                        const roleColour =
+                            BOARD_ROLE_COLOURS[member.board_role] ??
+                            BOARD_ROLE_COLOURS.member;
                         return (
                             <Card key={member.id}>
                                 <CardContent className="py-4">
@@ -758,10 +975,16 @@ function BoardGovernanceTab({
                                                 {getInitials(member.user.name)}
                                             </div>
                                             <div>
-                                                <div className="font-medium">{member.user.name}</div>
-                                                <div className="text-xs text-muted-foreground">{member.user.email}</div>
+                                                <div className="font-medium">
+                                                    {member.user.name}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {member.user.email}
+                                                </div>
                                                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                                                    <Badge className={`capitalize ${roleColour}`}>
+                                                    <Badge
+                                                        className={`capitalize ${roleColour}`}
+                                                    >
                                                         {member.board_role}
                                                     </Badge>
                                                     {member.is_active ? (
@@ -775,7 +998,13 @@ function BoardGovernanceTab({
                                                     )}
                                                 </div>
                                                 <div className="mt-2 text-xs text-muted-foreground">
-                                                    {formatTermDate(member.term_start)} &rarr; {formatTermDate(member.term_end)}
+                                                    {formatTermDate(
+                                                        member.term_start,
+                                                    )}{' '}
+                                                    &rarr;{' '}
+                                                    {formatTermDate(
+                                                        member.term_end,
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -791,7 +1020,9 @@ function BoardGovernanceTab({
                                                 size="sm"
                                                 variant="ghost"
                                                 className="text-status-critical hover:text-status-critical"
-                                                onClick={() => handleRemove(member.id)}
+                                                onClick={() =>
+                                                    handleRemove(member.id)
+                                                }
                                                 disabled={form.processing}
                                             >
                                                 Remove
@@ -809,7 +1040,9 @@ function BoardGovernanceTab({
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                             <Landmark className="h-6 w-6 text-muted-foreground" />
                         </div>
-                        <p className="text-sm font-medium">No board members appointed</p>
+                        <p className="text-sm font-medium">
+                            No board members appointed
+                        </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                             Get started by appointing your first board member.
                         </p>
@@ -818,12 +1051,16 @@ function BoardGovernanceTab({
             )}
 
             {/* Edit dialog */}
-            <Dialog open={!!editingMember} onOpenChange={(open) => !open && setEditingMember(null)}>
+            <Dialog
+                open={!!editingMember}
+                onOpenChange={(open) => !open && setEditingMember(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Board Member</DialogTitle>
                         <DialogDescription>
-                            Update {editingMember?.user.name}'s board appointment.
+                            Update {editingMember?.user.name}'s board
+                            appointment.
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleEditSubmit} className="space-y-4">
@@ -831,17 +1068,27 @@ function BoardGovernanceTab({
                             <Label>Board Role</Label>
                             <Select
                                 value={editForm.data.board_role}
-                                onValueChange={(v) => editForm.setData('board_role', v)}
+                                onValueChange={(v) =>
+                                    editForm.setData('board_role', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="chair">Chair</SelectItem>
-                                    <SelectItem value="secretary">Secretary</SelectItem>
-                                    <SelectItem value="treasurer">Treasurer</SelectItem>
-                                    <SelectItem value="member">Member</SelectItem>
-                                    <SelectItem value="observer">Observer</SelectItem>
+                                    <SelectItem value="secretary">
+                                        Secretary
+                                    </SelectItem>
+                                    <SelectItem value="treasurer">
+                                        Treasurer
+                                    </SelectItem>
+                                    <SelectItem value="member">
+                                        Member
+                                    </SelectItem>
+                                    <SelectItem value="observer">
+                                        Observer
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -851,7 +1098,12 @@ function BoardGovernanceTab({
                                 <Input
                                     type="date"
                                     value={editForm.data.term_start}
-                                    onChange={(e) => editForm.setData('term_start', e.target.value)}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'term_start',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                             <div>
@@ -859,7 +1111,12 @@ function BoardGovernanceTab({
                                 <Input
                                     type="date"
                                     value={editForm.data.term_end}
-                                    onChange={(e) => editForm.setData('term_end', e.target.value)}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'term_end',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
@@ -867,13 +1124,19 @@ function BoardGovernanceTab({
                             <Label>Notes</Label>
                             <Textarea
                                 value={editForm.data.notes}
-                                onChange={(e) => editForm.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    editForm.setData('notes', e.target.value)
+                                }
                                 placeholder="Optional notes..."
                                 rows={3}
                             />
                         </div>
                         <DialogFooter>
-                            <Button type="submit" disabled={editForm.processing} className="bg-primary hover:bg-primary">
+                            <Button
+                                type="submit"
+                                disabled={editForm.processing}
+                                className="bg-primary hover:bg-primary"
+                            >
                                 Save Changes
                             </Button>
                         </DialogFooter>
