@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -40,8 +41,53 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             return;
         }
 
+        // Site access: TimesheetController::assertCanAccessTimesheet checks
+        // hrEmployeeProfile.primary_site_id (or secondary_site_ids / user.site_id)
+        // against the timesheet's site. Without a matching site assignment the
+        // worker hits 403 on update/submit/resubmit. Grant sw1 access to the
+        // demo client's site so the lifecycle flow is exercisable end-to-end.
+        $this->grantSiteAccess($worker, $client);
+
         $this->seedReturnedTimesheet($worker, $admin, $client, $serviceContext);
         $this->seedPreShiftBriefing($worker, $admin, $client, $serviceContext);
+    }
+
+    private function grantSiteAccess(User $worker, Client $client): void
+    {
+        if (! $client->site_id) {
+            return;
+        }
+
+        $profile = HrEmployeeProfile::query()->where('user_id', $worker->id)->first();
+        if (! $profile) {
+            // SystemUsersSeeder is expected to create one already, but be
+            // defensive in case the seed order changes.
+            $profile = HrEmployeeProfile::create([
+                'user_id' => $worker->id,
+                'primary_site_id' => $client->site_id,
+            ]);
+
+            return;
+        }
+
+        $secondary = is_array($profile->secondary_site_ids) ? $profile->secondary_site_ids : [];
+        $needsPrimary = ! filled($profile->primary_site_id);
+        $alreadyHas = $profile->primary_site_id === $client->site_id
+            || in_array($client->site_id, $secondary, true);
+
+        if ($alreadyHas) {
+            return;
+        }
+
+        if ($needsPrimary) {
+            $profile->update(['primary_site_id' => $client->site_id]);
+
+            return;
+        }
+
+        $profile->update([
+            'secondary_site_ids' => array_values(array_unique([...$secondary, $client->site_id])),
+        ]);
     }
 
     private function seedReturnedTimesheet(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
