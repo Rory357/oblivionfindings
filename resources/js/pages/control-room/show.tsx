@@ -1530,7 +1530,7 @@ export default function ControlRoomAlertShow({
                                             size="sm"
                                             className="w-full"
                                             disabled={processing}
-                                            onClick={() => doAction('assign-me')}
+                                            onClick={() => doAction('assign-to-me')}
                                         >
                                             <UserCheck className="mr-1.5 h-4 w-4" />
                                             Assign to Me

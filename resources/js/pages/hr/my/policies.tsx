@@ -173,7 +173,7 @@ export default function MyPolicies({ policies }: Props) {
                                                 {policy.is_attested ? (
                                                     <Badge
                                                         variant="outline"
-                                                        className="border-status-success/30 bg-status-success text-status-success"
+                                                        className="border-status-success/30 bg-status-success-bg text-status-success-foreground"
                                                     >
                                                         <ShieldCheck className="mr-1 h-3 w-3" />
                                                         Attested
@@ -181,7 +181,7 @@ export default function MyPolicies({ policies }: Props) {
                                                 ) : (
                                                     <Badge
                                                         variant="outline"
-                                                        className="border-status-warning/30 bg-status-warning text-status-warning"
+                                                        className="border-status-warning/30 bg-status-warning-bg text-status-warning-foreground"
                                                     >
                                                         Pending
                                                     </Badge>
