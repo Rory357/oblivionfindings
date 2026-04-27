@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         $this->call(OperationsDemoSeeder::class);
         $this->call(SystemAssetsSeeder::class);
         $this->call(SystemShiftsSeeder::class);
+        $this->call(FrontlineLifecycleDemoSeeder::class);
         $this->call(SystemMedicationsSeeder::class);
         $this->call(MedicationEnterpriseSeeder::class);
         $this->call(SystemIncidentsSeeder::class);
