@@ -12,6 +12,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { UserMenuContent } from '@/components/user-menu-content';
+import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, resolveUrl } from '@/lib/utils';
 import { type NavItem } from '@/types';
@@ -63,6 +64,8 @@ import {
     MessageSquare,
     MessageSquareText,
     Package,
+    PanelLeftClose,
+    PanelLeftOpen,
     PersonStanding,
     PieChart,
     Pill,
@@ -92,6 +95,29 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppLogoIcon from './app-logo-icon';
 const dashboard = () => '/dashboard';
+
+const SIDEBAR_ICON_CLASS = 'size-5 shrink-0';
+const SIDEBAR_ITEM_BASE =
+    'relative flex h-10 w-full items-center rounded-xl text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring';
+const SIDEBAR_ITEM_ACTIVE =
+    'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm';
+const SIDEBAR_ITEM_INACTIVE =
+    'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground';
+
+function SidebarItemIcon({
+    icon: Icon,
+    className,
+}: {
+    icon: LucideIcon;
+    className?: string;
+}) {
+    return (
+        <Icon
+            aria-hidden="true"
+            className={cn(SIDEBAR_ICON_CLASS, className)}
+        />
+    );
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -2421,11 +2447,13 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 function SubPanel({
     groups,
     currentUrl,
+    isSidebarCollapsed,
     onClose,
     title = '',
 }: {
     groups: SubPanelGroup[];
     currentUrl: string;
+    isSidebarCollapsed: boolean;
     onClose: () => void;
     title?: string;
 }) {
@@ -2457,7 +2485,10 @@ function SubPanel({
     return (
         <div
             ref={panelRef}
-            className="fixed top-0 bottom-0 left-14 z-50 w-60 overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg"
+            className={cn(
+                'fixed top-0 bottom-0 z-50 w-64 overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg transition-[left] duration-200 ease-in-out',
+                isSidebarCollapsed ? 'left-16' : 'left-64',
+            )}
         >
             {/* Panel header */}
             <div className="flex items-center justify-between border-b border-sidebar-border/50 px-4 py-3">
@@ -2492,17 +2523,18 @@ function SubPanel({
                                 <Link
                                     key={resolveUrl(item.href)}
                                     href={item.href}
+                                    aria-current={active ? 'page' : undefined}
                                     prefetch
                                     preserveScroll
                                     className={cn(
-                                        'flex items-center gap-2.5 px-4 py-1.5 text-sm transition-colors',
+                                        'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                         active
                                             ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
                                             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                     )}
                                 >
                                     {item.icon && (
-                                        <item.icon className="h-4 w-4 shrink-0" />
+                                        <SidebarItemIcon icon={item.icon} />
                                     )}
                                     <span className="truncate">
                                         {item.title}
@@ -2522,7 +2554,13 @@ function SubPanel({
 
 // ── Main AppSidebar component ──────────────────────────────────────────────
 
-export function AppSidebar() {
+export function AppSidebar({
+    collapsed: collapsedProp,
+    onCollapsedChange,
+}: {
+    collapsed?: boolean;
+    onCollapsedChange?: (collapsed: boolean) => void;
+}) {
     const page = usePage<PageProps & Record<string, any>>();
     const { auth, branding, name: appName, labels } = page.props;
     const role = auth.user?.role ?? null;
@@ -2534,6 +2572,9 @@ export function AppSidebar() {
     const displayName: string =
         (branding as any)?.name ?? appName ?? 'Oblivion Findings';
     const logoUrl: string | null = (branding as any)?.logoUrl ?? null;
+    const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
+        useAppSidebarState((page.props as any)?.sidebarOpen ?? true);
+    const isCollapsed = collapsedProp ?? fallbackCollapsed;
 
     const [openPanelId, setOpenPanelId] = useState<string | null>(null);
 
@@ -2572,6 +2613,16 @@ export function AppSidebar() {
         setOpenPanelId(null);
     }, []);
 
+    const toggleCollapsed = useCallback(() => {
+        const nextCollapsed = !isCollapsed;
+
+        if (onCollapsedChange) {
+            onCollapsedChange(nextCollapsed);
+        } else {
+            setFallbackExpanded(!nextCollapsed);
+        }
+    }, [isCollapsed, onCollapsedChange, setFallbackExpanded]);
+
     // Close sub-panel on navigation
     useEffect(() => {
         setOpenPanelId(null);
@@ -2580,34 +2631,92 @@ export function AppSidebar() {
     return (
         <TooltipProvider delayDuration={0}>
             <div className="relative hidden md:flex">
-                {/* Icon sidebar - 56px (w-14), fixed position */}
-                <nav className="fixed top-0 left-0 z-40 flex h-svh w-14 flex-col items-center overflow-x-hidden overflow-y-hidden border-r border-sidebar-border bg-sidebar py-3">
-                    {/* Top: Logo */}
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Link
-                                href={dashboard()}
-                                prefetch
-                                className="mb-4 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"
-                            >
-                                {logoUrl ? (
-                                    <img
-                                        src={logoUrl}
-                                        alt={displayName}
-                                        className="h-full w-full object-cover"
-                                    />
-                                ) : (
-                                    <AppLogoIcon className="size-5 fill-current text-white dark:text-black" />
-                                )}
-                            </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                            {displayName}
-                        </TooltipContent>
-                    </Tooltip>
+                <nav
+                    id="app-sidebar-nav"
+                    aria-label="Primary navigation"
+                    data-state={isCollapsed ? 'collapsed' : 'expanded'}
+                    className={cn(
+                        'fixed top-0 left-0 z-40 flex h-svh flex-col overflow-x-hidden overflow-y-hidden border-r border-sidebar-border bg-sidebar py-3 transition-[width] duration-200 ease-in-out',
+                        isCollapsed ? 'w-16 items-center' : 'w-64',
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'flex w-full items-center gap-2 px-3 pb-3',
+                            isCollapsed ? 'flex-col' : 'justify-between',
+                        )}
+                    >
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Link
+                                    href={dashboard()}
+                                    aria-label={displayName}
+                                    prefetch
+                                    className={cn(
+                                        'flex min-w-0 items-center rounded-xl text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none',
+                                        isCollapsed
+                                            ? 'h-10 w-10 justify-center'
+                                            : 'h-11 flex-1 gap-3 px-2',
+                                    )}
+                                >
+                                    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+                                        {logoUrl ? (
+                                            <img
+                                                src={logoUrl}
+                                                alt=""
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            <AppLogoIcon className="size-5 fill-current text-white dark:text-black" />
+                                        )}
+                                    </span>
+                                    {!isCollapsed && (
+                                        <span className="min-w-0 truncate text-sm font-semibold text-sidebar-foreground">
+                                            {displayName}
+                                        </span>
+                                    )}
+                                </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" hidden={!isCollapsed}>
+                                {displayName}
+                            </TooltipContent>
+                        </Tooltip>
 
-                    {/* Middle: Nav icons */}
-                    <div className="scrollbar-none flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-controls="app-sidebar-nav"
+                            aria-expanded={!isCollapsed}
+                            aria-label={
+                                isCollapsed
+                                    ? 'Expand sidebar'
+                                    : 'Collapse sidebar'
+                            }
+                            title={
+                                isCollapsed
+                                    ? 'Expand sidebar'
+                                    : 'Collapse sidebar'
+                            }
+                            onClick={toggleCollapsed}
+                            className="size-9 shrink-0 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        >
+                            {isCollapsed ? (
+                                <PanelLeftOpen className={SIDEBAR_ICON_CLASS} />
+                            ) : (
+                                <PanelLeftClose
+                                    className={SIDEBAR_ICON_CLASS}
+                                />
+                            )}
+                        </Button>
+                    </div>
+
+                    <div
+                        className={cn(
+                            'scrollbar-none flex w-full flex-1 flex-col gap-1 overflow-y-auto px-2',
+                            isCollapsed ? 'items-center' : 'items-stretch',
+                        )}
+                    >
                         {iconNavItems.map((item) => {
                             const panelGroups = item.subPanel
                                 ? ((subPanelMap as any)[item.id] as
@@ -2619,15 +2728,26 @@ export function AppSidebar() {
                                 item,
                                 panelGroups,
                             );
+                            const itemClassName = cn(
+                                SIDEBAR_ITEM_BASE,
+                                isCollapsed
+                                    ? 'justify-center px-0'
+                                    : 'justify-start gap-3 px-3',
+                                active
+                                    ? SIDEBAR_ITEM_ACTIVE
+                                    : SIDEBAR_ITEM_INACTIVE,
+                            );
 
                             if (item.subPanel) {
                                 const isPanelOpen = openPanelId === item.id;
+
                                 return (
                                     <div
                                         key={item.id}
                                         className={cn(
+                                            'w-full',
                                             item.dividerAfter &&
-                                                'mb-1 flex w-full justify-center border-b border-sidebar-border/30 pb-1',
+                                                'mb-1 border-b border-sidebar-border/30 pb-1',
                                         )}
                                     >
                                         <Tooltip>
@@ -2635,22 +2755,40 @@ export function AppSidebar() {
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
-                                                    size="icon"
                                                     data-sub-panel-trigger
+                                                    aria-label={`${item.label} menu`}
+                                                    aria-current={
+                                                        active
+                                                            ? 'page'
+                                                            : undefined
+                                                    }
+                                                    aria-expanded={isPanelOpen}
                                                     onClick={() =>
                                                         toggleSubPanel(item.id)
                                                     }
                                                     className={cn(
-                                                        'h-10 w-10 rounded-xl transition-colors',
-                                                        active || isPanelOpen
-                                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                                            : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                                        itemClassName,
+                                                        isPanelOpen &&
+                                                            SIDEBAR_ITEM_ACTIVE,
                                                     )}
                                                 >
-                                                    <item.icon className="h-6 w-6" />
+                                                    <SidebarItemIcon
+                                                        icon={item.icon}
+                                                    />
+                                                    {!isCollapsed && (
+                                                        <>
+                                                            <span className="min-w-0 flex-1 truncate text-left">
+                                                                {item.label}
+                                                            </span>
+                                                            <ChevronRight className="size-4 shrink-0 opacity-70" />
+                                                        </>
+                                                    )}
                                                 </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent side="right">
+                                            <TooltipContent
+                                                side="right"
+                                                hidden={!isCollapsed}
+                                            >
                                                 {item.label}
                                             </TooltipContent>
                                         </Tooltip>
@@ -2662,26 +2800,40 @@ export function AppSidebar() {
                                 <div
                                     key={item.id}
                                     className={cn(
+                                        'w-full',
                                         item.dividerAfter &&
-                                            'mb-1 flex w-full justify-center border-b border-sidebar-border/30 pb-1',
+                                            'mb-1 border-b border-sidebar-border/30 pb-1',
                                     )}
                                 >
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Link
                                                 href={item.href!}
+                                                aria-current={
+                                                    active ? 'page' : undefined
+                                                }
+                                                aria-label={item.label}
                                                 prefetch
-                                                className={cn(
-                                                    'relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
-                                                    active
-                                                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                                        : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                                )}
+                                                className={itemClassName}
                                             >
-                                                <item.icon className="h-6 w-6" />
+                                                <SidebarItemIcon
+                                                    icon={item.icon}
+                                                />
+                                                {!isCollapsed && (
+                                                    <span className="min-w-0 flex-1 truncate">
+                                                        {item.label}
+                                                    </span>
+                                                )}
                                                 {item.badge != null &&
                                                     item.badge > 0 && (
-                                                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-status-critical px-1 text-[9px] font-bold text-white">
+                                                        <span
+                                                            className={cn(
+                                                                'flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white',
+                                                                isCollapsed
+                                                                    ? 'absolute top-0 right-1'
+                                                                    : 'ml-auto',
+                                                            )}
+                                                        >
                                                             {item.badge > 9
                                                                 ? '9+'
                                                                 : item.badge}
@@ -2689,7 +2841,10 @@ export function AppSidebar() {
                                                     )}
                                             </Link>
                                         </TooltipTrigger>
-                                        <TooltipContent side="right">
+                                        <TooltipContent
+                                            side="right"
+                                            hidden={!isCollapsed}
+                                        >
                                             {item.label}
                                         </TooltipContent>
                                     </Tooltip>
@@ -2698,37 +2853,66 @@ export function AppSidebar() {
                         })}
                     </div>
 
-                    {/* Bottom: Settings + User avatar */}
-                    <div className="mt-auto flex w-full flex-col items-center gap-1 border-t border-sidebar-border/30 px-2 pt-2">
-                        {/* Settings */}
+                    <div
+                        className={cn(
+                            'mt-auto flex w-full flex-col gap-1 border-t border-sidebar-border/30 px-2 pt-2',
+                            isCollapsed ? 'items-center' : 'items-stretch',
+                        )}
+                    >
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Link
                                     href="/settings"
+                                    aria-current={
+                                        currentUrl.startsWith('/settings')
+                                            ? 'page'
+                                            : undefined
+                                    }
+                                    aria-label="Settings"
                                     prefetch
                                     className={cn(
-                                        'flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
+                                        SIDEBAR_ITEM_BASE,
+                                        isCollapsed
+                                            ? 'justify-center px-0'
+                                            : 'justify-start gap-3 px-3',
                                         currentUrl.startsWith('/settings')
-                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                                            : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                            ? SIDEBAR_ITEM_ACTIVE
+                                            : SIDEBAR_ITEM_INACTIVE,
                                     )}
                                 >
-                                    <Settings className="h-5 w-5" />
+                                    <Settings
+                                        aria-hidden="true"
+                                        className={SIDEBAR_ICON_CLASS}
+                                    />
+                                    {!isCollapsed && (
+                                        <span className="min-w-0 flex-1 truncate">
+                                            Settings
+                                        </span>
+                                    )}
                                 </Link>
                             </TooltipTrigger>
-                            <TooltipContent side="right">
+                            <TooltipContent side="right" hidden={!isCollapsed}>
                                 Settings
                             </TooltipContent>
                         </Tooltip>
 
-                        {/* User avatar with dropdown */}
                         {auth.user && (
                             <DropdownMenu>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-                                                <Avatar className="h-8 w-8 overflow-hidden rounded-full">
+                                            <button
+                                                type="button"
+                                                aria-label={`Open user menu for ${auth.user.name}`}
+                                                className={cn(
+                                                    SIDEBAR_ITEM_BASE,
+                                                    isCollapsed
+                                                        ? 'justify-center px-0'
+                                                        : 'justify-start gap-3 px-3',
+                                                    SIDEBAR_ITEM_INACTIVE,
+                                                )}
+                                            >
+                                                <Avatar className="size-8 shrink-0 overflow-hidden rounded-full">
                                                     <AvatarImage
                                                         src={auth.user.avatar}
                                                         alt={auth.user.name}
@@ -2739,16 +2923,29 @@ export function AppSidebar() {
                                                         )}
                                                     </AvatarFallback>
                                                 </Avatar>
+                                                {!isCollapsed && (
+                                                    <span className="min-w-0 flex-1 text-left">
+                                                        <span className="block truncate text-sm font-medium text-sidebar-foreground">
+                                                            {auth.user.name}
+                                                        </span>
+                                                        <span className="block truncate text-xs text-sidebar-foreground/60">
+                                                            {auth.user.email}
+                                                        </span>
+                                                    </span>
+                                                )}
                                             </button>
                                         </DropdownMenuTrigger>
                                     </TooltipTrigger>
-                                    <TooltipContent side="right">
+                                    <TooltipContent
+                                        side="right"
+                                        hidden={!isCollapsed}
+                                    >
                                         {auth.user.name}
                                     </TooltipContent>
                                 </Tooltip>
                                 <DropdownMenuContent
                                     className="min-w-56 rounded-lg"
-                                    align="end"
+                                    align={isCollapsed ? 'center' : 'start'}
                                     side="right"
                                 >
                                     <UserMenuContent user={auth.user as any} />
@@ -2758,11 +2955,11 @@ export function AppSidebar() {
                     </div>
                 </nav>
 
-                {/* Sub-panel (slides out for any section) */}
                 {openPanelId && (subPanelMap as any)[openPanelId] && (
                     <SubPanel
                         groups={(subPanelMap as any)[openPanelId]}
                         currentUrl={currentUrl}
+                        isSidebarCollapsed={isCollapsed}
                         onClose={closeSubPanel}
                         title={
                             iconNavItems.find((i) => i.id === openPanelId)
@@ -2870,6 +3067,11 @@ export function AppSidebarMobile({
                                     <Button
                                         type="button"
                                         variant="ghost"
+                                        aria-expanded={isExpanded}
+                                        aria-current={
+                                            active ? 'page' : undefined
+                                        }
+                                        aria-label={`${item.label} menu`}
                                         onClick={() =>
                                             setExpandedId(
                                                 isExpanded ? null : item.id,
@@ -2882,7 +3084,7 @@ export function AppSidebarMobile({
                                                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                         )}
                                     >
-                                        <item.icon className="h-5 w-5 shrink-0" />
+                                        <SidebarItemIcon icon={item.icon} />
                                         <span>{item.label}</span>
                                         <ChevronRight
                                             className={cn(
@@ -2906,9 +3108,17 @@ export function AppSidebarMobile({
                                                             sub.href,
                                                         )}
                                                         href={sub.href}
+                                                        aria-current={
+                                                            isSubItemActive(
+                                                                currentUrl,
+                                                                sub.href,
+                                                            )
+                                                                ? 'page'
+                                                                : undefined
+                                                        }
                                                         prefetch
                                                         className={cn(
-                                                            'flex items-center gap-2.5 px-4 py-1.5 text-sm transition-colors',
+                                                            'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                                             isSubItemActive(
                                                                 currentUrl,
                                                                 sub.href,
@@ -2918,7 +3128,9 @@ export function AppSidebarMobile({
                                                         )}
                                                     >
                                                         {sub.icon && (
-                                                            <sub.icon className="h-4 w-4 shrink-0" />
+                                                            <SidebarItemIcon
+                                                                icon={sub.icon}
+                                                            />
                                                         )}
                                                         <span>{sub.title}</span>
                                                     </Link>
@@ -2939,6 +3151,7 @@ export function AppSidebarMobile({
                             <div key={item.id}>
                                 <Link
                                     href={item.href!}
+                                    aria-current={active ? 'page' : undefined}
                                     prefetch
                                     className={cn(
                                         'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
@@ -2947,7 +3160,7 @@ export function AppSidebarMobile({
                                             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                                     )}
                                 >
-                                    <item.icon className="h-5 w-5 shrink-0" />
+                                    <SidebarItemIcon icon={item.icon} />
                                     <span>{item.label}</span>
                                 </Link>
                                 {item.dividerAfter && (

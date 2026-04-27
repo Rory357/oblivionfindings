@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     Bell,
     CalendarDays,
@@ -26,7 +26,9 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { cn } from '@/lib/utils';
+import { type SharedData } from '@/types';
 
 type StaffPageShellProps = PropsWithChildren<{
     title: ReactNode;
@@ -141,6 +143,8 @@ export default function StaffPageShell({
     mobileOnly = false,
     className,
 }: StaffPageShellProps) {
+    const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
+    const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const [moreOpen, setMoreOpen] = useState(false);
     const showBuiltInMoreSheet = !onMore;
     const handleMore = onMore ?? (() => setMoreOpen(true));
@@ -158,7 +162,12 @@ export default function StaffPageShell({
 
             {!mobileOnly ? (
                 <div className="hidden lg:block">
-                    <AppSidebar />
+                    <AppSidebar
+                        collapsed={collapsed}
+                        onCollapsedChange={(nextCollapsed) =>
+                            setExpanded(!nextCollapsed)
+                        }
+                    />
                 </div>
             ) : null}
 
@@ -166,7 +175,8 @@ export default function StaffPageShell({
                 id="main-content"
                 className={cn(
                     'relative flex min-h-svh flex-col bg-background',
-                    !mobileOnly && 'lg:ml-14',
+                    !mobileOnly && (collapsed ? 'lg:ml-16' : 'lg:ml-64'),
+                    'transition-[margin-left] duration-200 ease-in-out',
                     className,
                 )}
             >
