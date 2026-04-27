@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
-use App\Models\ClientIncident;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,8 +10,8 @@ use Illuminate\Validation\ValidationException;
 
 class Shift extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'organization_id',
@@ -212,7 +211,34 @@ class Shift extends Model
     public function isEnded(): bool
     {
         $end = $this->actual_ends_at ?? $this->ends_at;
+
         return $end ? now()->greaterThanOrEqualTo($end) : false;
+    }
+
+    public function getIsLateAttribute(): bool
+    {
+        if (! $this->starts_at) {
+            return false;
+        }
+
+        $threshold = $this->starts_at->copy()->addMinutes(5);
+
+        if ($this->actual_starts_at) {
+            return $this->actual_starts_at->greaterThan($threshold);
+        }
+
+        return $this->status === 'scheduled' && now()->greaterThan($threshold);
+    }
+
+    public function getIsMissedAttribute(): bool
+    {
+        if (! $this->ends_at) {
+            return false;
+        }
+
+        return $this->status === 'scheduled'
+            && ! $this->actual_starts_at
+            && now()->greaterThan($this->ends_at);
     }
 
     public function hasApprovedTimesheet(): bool
@@ -227,5 +253,4 @@ class Shift extends Model
 
         return $this->approvedTimesheets()->exists();
     }
-
 }

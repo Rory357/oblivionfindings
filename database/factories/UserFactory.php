@@ -58,4 +58,12 @@ class UserFactory extends Factory
             'two_factor_confirmed_at' => null,
         ]);
     }
+
+    public function frontlineWorker(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+    }
 }

@@ -7,6 +7,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Carbon;
 
 class ShiftFactory extends Factory
 {
@@ -62,5 +63,20 @@ class ShiftFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'user_id' => null,
         ]);
+    }
+
+    public function assignedToday(?User $user = null, ?Carbon $start = null): static
+    {
+        return $this->state(function (array $attributes) use ($user, $start) {
+            $start ??= Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))
+                ->setTime(9, 0);
+
+            return [
+                'user_id' => $user?->id ?? ($attributes['user_id'] ?? User::factory()),
+                'starts_at' => $start->copy()->utc(),
+                'ends_at' => $start->copy()->addHours(4)->utc(),
+                'status' => 'scheduled',
+            ];
+        });
     }
 }

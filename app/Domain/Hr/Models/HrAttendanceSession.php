@@ -12,11 +12,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrAttendanceSession extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',
@@ -26,6 +27,8 @@ class HrAttendanceSession extends Model
         'clock_in_at',
         'clock_out_at',
         'break_minutes',
+        'break_started_at',
+        'break_count',
         'status',
         'source',
         'location',
@@ -38,7 +41,9 @@ class HrAttendanceSession extends Model
     protected $casts = [
         'clock_in_at' => 'datetime',
         'clock_out_at' => 'datetime',
+        'break_started_at' => 'datetime',
         'break_minutes' => 'integer',
+        'break_count' => 'integer',
         'meta' => 'array',
     ];
 
@@ -67,6 +72,11 @@ class HrAttendanceSession extends Model
     public function timesheet(): HasOne
     {
         return $this->hasOne(Timesheet::class, 'attendance_session_id');
+    }
+
+    public function breakEvents(): HasMany
+    {
+        return $this->hasMany(HrAttendanceBreakEvent::class, 'session_id');
     }
 
     public function creator(): BelongsTo

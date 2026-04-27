@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Shift;
@@ -138,6 +139,8 @@ class AttendanceController extends Controller
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'force' => ['nullable', 'boolean'],
+            'override_reason' => ['nullable', 'required_if:force,true', 'string', 'max:1000'],
         ]);
 
         $session = null;
@@ -147,6 +150,17 @@ class AttendanceController extends Controller
 
         try {
             $closed = $this->attendanceService->clockOut($auth, $session, $data);
+        } catch (AttendanceClockOutBlockedException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                    'blockers' => $exception->blockers(),
+                ], 422);
+            }
+
+            return redirect()->back()
+                ->withErrors(['clock_out' => $exception->getMessage()])
+                ->with('clock_out_blockers', $exception->blockers());
         } catch (\LogicException $exception) {
             return redirect()->back()->withErrors(['clock_out' => $exception->getMessage()]);
         }
@@ -156,6 +170,52 @@ class AttendanceController extends Controller
         }
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
+    }
+
+    public function startBreak(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($this->canClock($auth), 403);
+
+        $data = $request->validate([
+            'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
+        ]);
+
+        $session = null;
+        if (! empty($data['session_id'])) {
+            $session = HrAttendanceSession::query()->findOrFail($data['session_id']);
+        }
+
+        try {
+            $this->attendanceService->startBreak($auth, $session, $data);
+        } catch (\LogicException $exception) {
+            return redirect()->back()->withErrors(['break' => $exception->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Break started.');
+    }
+
+    public function endBreak(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($this->canClock($auth), 403);
+
+        $data = $request->validate([
+            'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
+        ]);
+
+        $session = null;
+        if (! empty($data['session_id'])) {
+            $session = HrAttendanceSession::query()->findOrFail($data['session_id']);
+        }
+
+        try {
+            $this->attendanceService->endBreak($auth, $session, $data);
+        } catch (\LogicException $exception) {
+            return redirect()->back()->withErrors(['break' => $exception->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Break ended.');
     }
 
     protected function canClock(?User $auth): bool

@@ -4,6 +4,7 @@ use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\QualityChecklistController;
+use App\Http\Controllers\RosterController;
 use App\Http\Controllers\TodayDashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -112,6 +113,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::get('/my-day', \App\Http\Controllers\MyTasksController::class)
     ->middleware(['auth'])
     ->name('my-day');
+
+Route::get('/my-roster', [RosterController::class, 'index'])
+    ->middleware(['auth'])
+    ->name('my-roster');
+
+Route::get('/my-roster/data', [RosterController::class, 'data'])
+    ->middleware(['auth'])
+    ->name('my-roster.data');
 
 // Legacy alias — any inbound `/my-tasks` link (email, bookmarks) lands on
 // the canonical home. Kept as a simple redirect to avoid a second home surface.

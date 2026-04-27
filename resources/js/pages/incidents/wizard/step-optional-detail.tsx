@@ -1,8 +1,14 @@
+import DictateButton from '@/components/dictate-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import VoiceInputButton from '@/components/voice-input-button';
 
 export type StepThreeData = {
     immediate_action_taken: string;
@@ -46,28 +52,41 @@ const MEDICAL_TREATMENT_TYPES = [
     { value: 'ambulance', label: 'Ambulance' },
 ];
 
-export default function StepOptionalDetail({ data, onChange, showInjuryFields }: Props) {
+export default function StepOptionalDetail({
+    data,
+    onChange,
+    showInjuryFields,
+}: Props) {
     return (
         <div className="space-y-6">
             <div className="space-y-1">
-                <h2 className="text-lg font-semibold">Anything else we should know?</h2>
+                <h2 className="text-lg font-semibold">
+                    Anything else we should know?
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                    All optional — the incident is already saved. Add what you know, skip the rest.
+                    All optional — the incident is already saved. Add what you
+                    know, skip the rest.
                 </p>
             </div>
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">What you did straight away</Label>
-                    <VoiceInputButton
+                    <Label className="text-sm font-medium">
+                        What you did straight away
+                    </Label>
+                    <DictateButton
                         value={data.immediate_action_taken}
-                        onChange={(next) => onChange({ immediate_action_taken: next })}
+                        onChange={(next) =>
+                            onChange({ immediate_action_taken: next })
+                        }
                         fieldLabel="What you did straight away"
                     />
                 </div>
                 <Textarea
                     value={data.immediate_action_taken}
-                    onChange={(e) => onChange({ immediate_action_taken: e.target.value })}
+                    onChange={(e) =>
+                        onChange({ immediate_action_taken: e.target.value })
+                    }
                     placeholder="First aid, moved the client, called a manager…"
                     rows={3}
                     className="text-base"
@@ -76,8 +95,10 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Who else was there</Label>
-                    <VoiceInputButton
+                    <Label className="text-sm font-medium">
+                        Who else was there
+                    </Label>
+                    <DictateButton
                         value={data.witnesses}
                         onChange={(next) => onChange({ witnesses: next })}
                         fieldLabel="Who else was there"
@@ -98,10 +119,16 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Injured person</Label>
+                            <Label className="text-xs font-medium">
+                                Injured person
+                            </Label>
                             <Input
                                 value={data.injured_person_name}
-                                onChange={(e) => onChange({ injured_person_name: e.target.value })}
+                                onChange={(e) =>
+                                    onChange({
+                                        injured_person_name: e.target.value,
+                                    })
+                                }
                                 placeholder="Name"
                             />
                         </div>
@@ -109,15 +136,25 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
                             <Label className="text-xs font-medium">Role</Label>
                             <Select
                                 value={data.injured_person_role || '__none__'}
-                                onValueChange={(v) => onChange({ injured_person_role: v === '__none__' ? '' : v })}
+                                onValueChange={(v) =>
+                                    onChange({
+                                        injured_person_role:
+                                            v === '__none__' ? '' : v,
+                                    })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">Select…</SelectItem>
+                                    <SelectItem value="__none__">
+                                        Select…
+                                    </SelectItem>
                                     {INJURED_PERSON_ROLES.map((r) => (
-                                        <SelectItem key={r.value} value={r.value}>
+                                        <SelectItem
+                                            key={r.value}
+                                            value={r.value}
+                                        >
                                             {r.label}
                                         </SelectItem>
                                     ))}
@@ -128,26 +165,44 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Body part</Label>
+                            <Label className="text-xs font-medium">
+                                Body part
+                            </Label>
                             <Input
                                 value={data.injury_body_part}
-                                onChange={(e) => onChange({ injury_body_part: e.target.value })}
+                                onChange={(e) =>
+                                    onChange({
+                                        injury_body_part: e.target.value,
+                                    })
+                                }
                                 placeholder="e.g. Left wrist"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Type of injury</Label>
+                            <Label className="text-xs font-medium">
+                                Type of injury
+                            </Label>
                             <Select
                                 value={data.injury_nature || '__none__'}
-                                onValueChange={(v) => onChange({ injury_nature: v === '__none__' ? '' : v })}
+                                onValueChange={(v) =>
+                                    onChange({
+                                        injury_nature:
+                                            v === '__none__' ? '' : v,
+                                    })
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">Select…</SelectItem>
+                                    <SelectItem value="__none__">
+                                        Select…
+                                    </SelectItem>
                                     {INJURY_NATURES.map((n) => (
-                                        <SelectItem key={n.value} value={n.value}>
+                                        <SelectItem
+                                            key={n.value}
+                                            value={n.value}
+                                        >
                                             {n.label}
                                         </SelectItem>
                                     ))}
@@ -157,16 +212,25 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">Medical treatment</Label>
+                        <Label className="text-xs font-medium">
+                            Medical treatment
+                        </Label>
                         <Select
                             value={data.medical_treatment_type || '__none__'}
-                            onValueChange={(v) => onChange({ medical_treatment_type: v === '__none__' ? '' : v })}
+                            onValueChange={(v) =>
+                                onChange({
+                                    medical_treatment_type:
+                                        v === '__none__' ? '' : v,
+                                })
+                            }
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select…" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="__none__">Select…</SelectItem>
+                                <SelectItem value="__none__">
+                                    Select…
+                                </SelectItem>
                                 {MEDICAL_TREATMENT_TYPES.map((m) => (
                                     <SelectItem key={m.value} value={m.value}>
                                         {m.label}

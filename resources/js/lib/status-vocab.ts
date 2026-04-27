@@ -21,6 +21,7 @@ import {
     CalendarClock,
     CheckCircle2,
     CircleDashed,
+    Clock,
     FileEdit,
     PauseCircle,
     PlayCircle,
@@ -48,7 +49,16 @@ export type StaffStatusTone =
 export type StaffStatusKind = 'shift' | 'timesheet' | 'med' | 'incident';
 
 /** Simplified worker-facing states, per kind. */
-export type ShiftState = 'upcoming' | 'in_progress' | 'done';
+export type ShiftState =
+    | 'upcoming'
+    | 'starting-soon'
+    | 'active'
+    | 'on-break'
+    | 'ending-soon'
+    | 'late'
+    | 'completed'
+    | 'missed'
+    | 'returned-timesheet';
 export type TimesheetState = 'not_sent' | 'sent' | 'needs_changes';
 export type MedState = 'due' | 'given' | 'missed';
 export type IncidentState = 'draft' | 'submitted' | 'action_needed';
@@ -94,15 +104,45 @@ export const staffStatusVocab: {
             icon: CalendarClock,
             tone: 'info',
         },
-        in_progress: {
-            label: 'In progress',
+        'starting-soon': {
+            label: 'Starting soon',
+            icon: Clock,
+            tone: 'warning',
+        },
+        active: {
+            label: 'Active',
             icon: PlayCircle,
             tone: 'progress',
         },
-        done: {
-            label: 'Done',
+        'on-break': {
+            label: 'On break',
+            icon: PauseCircle,
+            tone: 'warning',
+        },
+        'ending-soon': {
+            label: 'Ending soon',
+            icon: Clock,
+            tone: 'warning',
+        },
+        late: {
+            label: 'Late',
+            icon: AlertTriangle,
+            tone: 'danger',
+        },
+        completed: {
+            label: 'Completed',
             icon: CheckCircle2,
             tone: 'success',
+        },
+        missed: {
+            label: 'Missed',
+            icon: XCircle,
+            tone: 'danger',
+        },
+        'returned-timesheet': {
+            label: 'Timesheet returned',
+            icon: FileEdit,
+            tone: 'warning',
         },
     },
     timesheet: {
@@ -171,27 +211,54 @@ export const staffStatusVocab: {
  */
 
 function normalize(value: string | null | undefined): string {
-    return (value ?? '').toString().trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
 }
 
 /** Map a backend shift status into a worker-facing shift state. */
-export function mapShiftStatus(backend: string | null | undefined): ShiftState | null {
+export function mapShiftStatus(
+    backend: string | null | undefined,
+): ShiftState | null {
     switch (normalize(backend)) {
         case 'draft':
         case 'scheduled':
         case 'upcoming':
         case 'pending':
             return 'upcoming';
+        case 'starting_soon':
+        case 'starts_soon':
+        case 'soon':
+            return 'starting-soon';
         case 'in_progress':
         case 'active':
         case 'clocked_in':
         case 'started':
-            return 'in_progress';
+            return 'active';
+        case 'on_break':
+        case 'break':
+            return 'on-break';
+        case 'ending_soon':
+        case 'ends_soon':
+        case 'wrapping_up':
+            return 'ending-soon';
+        case 'late':
+        case 'started_late':
+            return 'late';
         case 'completed':
         case 'done':
         case 'clocked_out':
         case 'finished':
-            return 'done';
+            return 'completed';
+        case 'missed':
+        case 'no_show':
+            return 'missed';
+        case 'returned_timesheet':
+        case 'timesheet_returned':
+        case 'returned':
+            return 'returned-timesheet';
         default:
             return null;
     }
@@ -221,7 +288,9 @@ export function mapTimesheetStatus(
 }
 
 /** Map a backend med/eMAR status into a worker-facing med state. */
-export function mapMedStatus(backend: string | null | undefined): MedState | null {
+export function mapMedStatus(
+    backend: string | null | undefined,
+): MedState | null {
     switch (normalize(backend)) {
         case 'due':
         case 'scheduled':

@@ -3,7 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
 
 export default defineConfig({
-    testDir: './tests/visual',
+    testDir: './tests',
+    testMatch: /.*\.spec\.ts/,
     timeout: 30_000,
     expect: {
         timeout: 10_000,

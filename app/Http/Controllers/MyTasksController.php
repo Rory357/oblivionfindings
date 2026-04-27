@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
+use App\Http\Resources\MyShiftResource;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
@@ -16,10 +17,11 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\ShiftHandoverService;
+use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
-use App\Support\EmarUrl;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -91,6 +93,14 @@ class MyTasksController extends Controller
         //     banner on /my-day for the worker assigned to today's round.
         $activeRound = $this->getActiveRound($user, $workerNow);
 
+        // 13. Shift lifecycle hero payloads.
+        $nextShiftBriefing = $clock['open_session']
+            ? null
+            : $this->getNextShiftBriefing($user, $workerNow);
+        $previousShift = $clock['open_session'] || $nextShiftBriefing
+            ? null
+            : $this->getPreviousShift($user, $workerNow);
+
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
             'shifts' => $shifts->values()->all(),
@@ -104,6 +114,9 @@ class MyTasksController extends Controller
             'manager_data' => $managerData,
             'clock' => $clock,
             'active_round' => $activeRound,
+            'next_shift_briefing' => $nextShiftBriefing,
+            'previous_shift' => $previousShift,
+            'labels' => Lang::get('my-day'),
         ]);
     }
 
@@ -128,7 +141,12 @@ class MyTasksController extends Controller
 
         try {
             $openSession = HrAttendanceSession::query()
-                ->with(['shift.client:id,first_name,last_name'])
+                ->with([
+                    'shift.client:id,first_name,last_name,profile_photo_path',
+                    'shift.serviceContext:id,name',
+                    'shift.tasks',
+                    'breakEvents',
+                ])
                 ->where('user_id', $user->id)
                 ->open()
                 ->latest('clock_in_at')
@@ -150,7 +168,7 @@ class MyTasksController extends Controller
             'status' => $shift->status,
             'location' => $shift->location,
             'client_name' => $shift->client
-                ? trim($shift->client->first_name . ' ' . $shift->client->last_name)
+                ? trim($shift->client->first_name.' '.$shift->client->last_name)
                 : null,
         ];
 
@@ -159,6 +177,14 @@ class MyTasksController extends Controller
             $activeShiftCard['incoming_handover'] = $this->findIncomingHandover($user, $activeShift);
         }
 
+        $openShift = $openSession?->shift;
+        $openShiftTasks = $openShift?->tasks ?? collect();
+        $openShiftTaskTotal = $openShiftTasks->count();
+        $openShiftTaskDone = $openShiftTasks->where('is_completed', true)->count();
+        $endOfShiftBlockers = $openSession
+            ? app(AttendanceService::class)->getEndOfShiftBlockers($openSession)
+            : [];
+
         return [
             'can_clock' => $canClock,
             'open_session' => $openSession ? [
@@ -166,14 +192,42 @@ class MyTasksController extends Controller
                 'clock_in_at' => optional($openSession->clock_in_at)->toIso8601String(),
                 'shift_id' => $openSession->shift_id,
                 'client_name' => $openSession->shift?->client
-                    ? trim($openSession->shift->client->first_name . ' ' . $openSession->shift->client->last_name)
+                    ? trim($openSession->shift->client->first_name.' '.$openSession->shift->client->last_name)
                     : null,
+                'client_photo_url' => $openSession->shift?->client?->profile_photo_url,
                 'shift_starts_at' => optional($openSession->shift?->starts_at)->toIso8601String(),
                 'shift_ends_at' => optional($openSession->shift?->ends_at)->toIso8601String(),
                 'location' => $openSession->shift?->location ?? $openSession->location,
+                'service_type' => $openShift?->serviceContext?->name,
+                'break_started_at' => optional($openSession->break_started_at)->toIso8601String(),
+                'break_minutes' => (int) $openSession->break_minutes,
+                'break_count' => (int) $openSession->break_count,
+                'is_on_break' => (bool) $openSession->break_started_at,
+                'tasks' => $openShiftTasks->map(fn ($task) => [
+                    'id' => $task->id,
+                    'label' => $task->label,
+                    'is_completed' => (bool) $task->is_completed,
+                    'completed_at' => $task->completed_at?->toIso8601String(),
+                ])->values()->all(),
+                'task_progress' => $openShiftTaskTotal > 0
+                    ? round(($openShiftTaskDone / $openShiftTaskTotal) * 100)
+                    : 100,
+                'quick_action_urls' => [
+                    'incident' => $openSession->shift_id
+                        ? '/incidents/create?shift_id='.$openSession->shift_id
+                        : '/incidents',
+                    'emar' => $openShift?->client_id
+                        ? EmarUrl::mar($openShift->client_id, $now->toDateString())
+                        : '/meds/today',
+                    'escalate' => $openSession->shift_id
+                        ? '/control-room?shift_id='.$openSession->shift_id
+                        : '/control-room',
+                ],
                 'handover_submitted' => $openSession->shift_id
                     ? $this->hasSubmittedHandoverForShift((int) $openSession->shift_id)
                     : false,
+                'end_of_shift_blockers' => $endOfShiftBlockers,
+                'end_of_shift_ready' => $endOfShiftBlockers === [],
             ] : null,
             'active_shift' => $activeShiftCard,
             'eligible_shifts' => $eligibleShifts->map($shiftToCard)->values()->all(),
@@ -198,7 +252,7 @@ class MyTasksController extends Controller
                     $q->where('incoming_shift_id', $activeShift->id)
                         ->orWhere(function ($nested) use ($activeShift, $user) {
                             $nested->whereNull('incoming_shift_id')
-                                ->where(function ($inner) use ($activeShift, $user) {
+                                ->where(function ($inner) use ($user) {
                                     $inner->where('incoming_staff_id', $user->id)
                                         ->orWhereNull('incoming_staff_id');
                                 })
@@ -230,7 +284,7 @@ class MyTasksController extends Controller
                 'outgoing_staff_name' => $handover->outgoingStaff?->name,
                 'outgoing_shift_ends_at' => optional($handover->outgoingShift?->ends_at)->toIso8601String(),
                 'client_name' => $handover->client
-                    ? trim($handover->client->first_name . ' ' . $handover->client->last_name)
+                    ? trim($handover->client->first_name.' '.$handover->client->last_name)
                     : null,
             ];
         } catch (\Throwable) {
@@ -267,37 +321,7 @@ class MyTasksController extends Controller
                 ->orderBy('starts_at')
                 ->get()
                 ->map(function (Shift $shift) use ($workerNow) {
-                    $totalTasks = $shift->tasks->count();
-                    $completedTasks = $shift->tasks->where('is_completed', true)->count();
-
-                    return [
-                        'id' => $shift->id,
-                        'starts_at' => $shift->starts_at->toIso8601String(),
-                        'ends_at' => $shift->ends_at?->toIso8601String(),
-                        'actual_starts_at' => $shift->actual_starts_at?->toIso8601String(),
-                        'actual_ends_at' => $shift->actual_ends_at?->toIso8601String(),
-                        'status' => $shift->status,
-                        'location' => $shift->location,
-                        'client' => $shift->client ? [
-                            'id' => $shift->client->id,
-                            'name' => trim($shift->client->first_name . ' ' . $shift->client->last_name),
-                            'photo_url' => $shift->client->profile_photo_url ?? null,
-                        ] : null,
-                        'service_type' => $shift->serviceContext?->name,
-                        'tasks' => $shift->tasks->map(fn ($task) => [
-                            'id' => $task->id,
-                            'label' => $task->label,
-                            'is_completed' => (bool) $task->is_completed,
-                            'completed_at' => $task->completed_at?->toIso8601String(),
-                        ])->all(),
-                        'task_progress' => $totalTasks > 0
-                            ? round(($completedTasks / $totalTasks) * 100)
-                            : 100,
-                        'is_today' => $shift->starts_at
-                            ->copy()
-                            ->timezone($workerNow->getTimezone())
-                            ->isSameDay($workerNow),
-                    ];
+                    return MyShiftResource::fromShift($shift, $workerNow);
                 });
         } catch (\Throwable) {
             return collect();
@@ -345,7 +369,7 @@ class MyTasksController extends Controller
                     }
 
                     $clientName = $med->client
-                        ? trim($med->client->first_name . ' ' . $med->client->last_name)
+                        ? trim($med->client->first_name.' '.$med->client->last_name)
                         : 'Unknown';
 
                     $result[] = [
@@ -368,6 +392,138 @@ class MyTasksController extends Controller
             });
 
             return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function getNextShiftBriefing(User $user, Carbon $workerNow): ?array
+    {
+        try {
+            $shift = Shift::query()
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['scheduled', 'draft'])
+                ->where('starts_at', '<=', $workerNow->copy()->addHours(12)->utc())
+                ->where('ends_at', '>=', $workerNow->copy()->utc())
+                ->with([
+                    'client:id,first_name,last_name,profile_photo_path',
+                    'serviceContext:id,name',
+                    'tasks',
+                ])
+                ->orderBy('starts_at')
+                ->first();
+
+            if (! $shift) {
+                return null;
+            }
+
+            $briefing = MyShiftResource::fromShift($shift, $workerNow);
+            $startsAt = $shift->starts_at?->copy()->timezone($workerNow->getTimezone());
+            $briefing['minutes_until_start'] = $startsAt
+                ? (int) floor($workerNow->diffInMinutes($startsAt, false))
+                : null;
+            $briefing['incoming_handover'] = $this->findIncomingHandover($user, $shift);
+            $briefing['medications_due_during_shift'] = $this->getShiftMedicationsDue($shift, $workerNow);
+            $briefing['what_to_know'] = $shift->notes;
+
+            return $briefing;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function getPreviousShift(User $user, Carbon $workerNow): ?array
+    {
+        try {
+            $shift = Shift::query()
+                ->where('user_id', $user->id)
+                ->where(function ($query) use ($workerNow) {
+                    $query->where('actual_ends_at', '>=', $workerNow->copy()->subHours(12)->utc())
+                        ->orWhere(function ($fallback) use ($workerNow) {
+                            $fallback->whereNull('actual_ends_at')
+                                ->where('ends_at', '>=', $workerNow->copy()->subHours(12)->utc());
+                        });
+                })
+                ->where(function ($query) use ($workerNow) {
+                    $query->whereIn('status', ['completed', 'clocked_out', 'finished'])
+                        ->orWhere('actual_ends_at', '<=', $workerNow->copy()->utc());
+                })
+                ->with([
+                    'client:id,first_name,last_name,profile_photo_path',
+                    'serviceContext:id,name',
+                    'tasks',
+                    'timesheets' => fn ($query) => $query->latest('updated_at'),
+                    'outgoingHandovers:id,outgoing_shift_id,status,submitted_at',
+                ])
+                ->orderByDesc('actual_ends_at')
+                ->orderByDesc('ends_at')
+                ->first();
+
+            if (! $shift) {
+                return null;
+            }
+
+            $summary = MyShiftResource::fromShift($shift, $workerNow);
+            $summary['handover_sent'] = $shift->outgoingHandovers->contains(
+                fn (ShiftHandover $handover) => in_array($handover->status, [
+                    ShiftHandoverService::STATUS_SUBMITTED,
+                    ShiftHandoverService::STATUS_ACKNOWLEDGED,
+                ], true),
+            );
+
+            return $summary;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function getShiftMedicationsDue(Shift $shift, Carbon $workerNow): array
+    {
+        if (! $shift->client_id || ! $shift->starts_at || ! $shift->ends_at) {
+            return [];
+        }
+
+        try {
+            $start = $shift->starts_at->copy()->timezone($workerNow->getTimezone());
+            $end = $shift->ends_at->copy()->timezone($workerNow->getTimezone());
+
+            return ClientMedication::query()
+                ->where('client_id', $shift->client_id)
+                ->active()
+                ->where('is_prn', false)
+                ->whereNotNull('dose_times')
+                ->get()
+                ->flatMap(function (ClientMedication $medication) use ($start, $end) {
+                    $items = [];
+                    $doseTimes = is_array($medication->dose_times)
+                        ? $medication->dose_times
+                        : [];
+                    $day = $start->copy()->startOfDay();
+                    $lastDay = $end->copy()->startOfDay();
+
+                    while ($day->lessThanOrEqualTo($lastDay)) {
+                        foreach ($doseTimes as $doseTime) {
+                            $scheduled = $day->copy()->setTimeFromTimeString($doseTime);
+
+                            if ($scheduled->betweenIncluded($start, $end)) {
+                                $items[] = [
+                                    'medication_name' => $medication->name,
+                                    'dose' => $medication->dosage,
+                                    'scheduled_for' => $scheduled->toIso8601String(),
+                                    'emar_url' => EmarUrl::mar($medication->client_id, $scheduled->toDateString()),
+                                ];
+                            }
+                        }
+
+                        $day->addDay();
+                    }
+
+                    return $items;
+                })
+                ->sortBy('scheduled_for')
+                ->values()
+                ->take(6)
+                ->all();
         } catch (\Throwable) {
             return [];
         }
@@ -442,16 +598,25 @@ class MyTasksController extends Controller
                 ->get()
                 ->map(function (Timesheet $ts) {
                     $clientName = $ts->client
-                        ? trim($ts->client->first_name . ' ' . $ts->client->last_name)
+                        ? trim($ts->client->first_name.' '.$ts->client->last_name)
                         : null;
 
                     return [
                         'id' => $ts->id,
                         'work_date' => Carbon::parse($ts->work_date)->format('D, j M Y'),
+                        'work_date_iso' => Carbon::parse($ts->work_date)->toDateString(),
                         'client_name' => $clientName,
+                        'client_id' => $ts->client_id,
                         'hours' => $ts->total_hours,
                         'status' => $ts->status,
                         'return_notes' => $ts->returned_notes,
+                        'starts_at' => $ts->starts_at?->toIso8601String(),
+                        'ends_at' => $ts->ends_at?->toIso8601String(),
+                        'break_minutes' => (int) ($ts->break_minutes ?? 0),
+                        'mileage_km' => $ts->mileage_km !== null ? (float) $ts->mileage_km : null,
+                        'notes' => $ts->notes,
+                        'can_edit_inline' => in_array($ts->status, ['draft', 'returned'], true)
+                            && ! $ts->is_protected_from_changes,
                     ];
                 })
                 ->all();
@@ -471,7 +636,7 @@ class MyTasksController extends Controller
                 ->get()
                 ->map(function (ClientIncident $incident) {
                     $clientName = $incident->client
-                        ? trim($incident->client->first_name . ' ' . $incident->client->last_name)
+                        ? trim($incident->client->first_name.' '.$incident->client->last_name)
                         : null;
 
                     return [
@@ -481,7 +646,7 @@ class MyTasksController extends Controller
                         'severity' => $incident->severity,
                         'status' => $incident->status,
                         'occurred_at' => $incident->occurred_at?->toIso8601String(),
-                        'url' => '/incidents/' . $incident->id,
+                        'url' => '/incidents/'.$incident->id,
                         'requires_followup' => (bool) $incident->requires_followup,
                     ];
                 })
@@ -610,7 +775,7 @@ class MyTasksController extends Controller
                 ->get()
                 ->map(function (ControlRoomAlert $alert) {
                     $clientName = $alert->client
-                        ? trim($alert->client->first_name . ' ' . $alert->client->last_name)
+                        ? trim($alert->client->first_name.' '.$alert->client->last_name)
                         : null;
 
                     $slaStatus = null;
@@ -631,12 +796,12 @@ class MyTasksController extends Controller
                     $canSnooze = ! $alert->isTerminal() && $severity !== 'critical';
 
                     return [
-                        'id' => 'alert-' . $alert->id,
+                        'id' => 'alert-'.$alert->id,
                         'type' => 'alert',
                         'title' => $alert->alert_type,
                         'priority' => $alert->severity ?? 'medium',
                         'status' => $alert->status,
-                        'source_url' => '/control-room/alerts/' . $alert->id,
+                        'source_url' => '/control-room/alerts/'.$alert->id,
                         'due_at' => $alert->sla?->response_deadline?->toIso8601String(),
                         'created_at' => $alert->triggered_at?->toIso8601String() ?? $alert->created_at->toIso8601String(),
                         'meta' => [
@@ -666,16 +831,16 @@ class MyTasksController extends Controller
                 ->map(function (IncidentFollowup $followup) {
                     $incident = $followup->incident;
                     $clientName = $incident?->client
-                        ? trim($incident->client->first_name . ' ' . $incident->client->last_name)
+                        ? trim($incident->client->first_name.' '.$incident->client->last_name)
                         : null;
 
                     return [
-                        'id' => 'followup-' . $followup->id,
+                        'id' => 'followup-'.$followup->id,
                         'type' => 'followup',
-                        'title' => 'Incident follow-up: ' . ($incident?->title ?? 'Unknown incident'),
+                        'title' => 'Incident follow-up: '.($incident?->title ?? 'Unknown incident'),
                         'priority' => $incident?->severity ?? 'medium',
                         'status' => 'pending',
-                        'source_url' => '/incidents/' . ($followup->client_incident_id),
+                        'source_url' => '/incidents/'.($followup->client_incident_id),
                         'due_at' => $followup->due_at?->toIso8601String(),
                         'created_at' => $followup->created_at->toIso8601String(),
                         'meta' => [
@@ -697,13 +862,13 @@ class MyTasksController extends Controller
                 ->get()
                 ->map(function (OperatorNote $note) {
                     $sourceUrl = $note->alert_id
-                        ? '/control-room/alerts/' . $note->alert_id
+                        ? '/control-room/alerts/'.$note->alert_id
                         : '/control-room/shifts';
 
                     return [
-                        'id' => 'note-' . $note->id,
+                        'id' => 'note-'.$note->id,
                         'type' => 'note_followup',
-                        'title' => 'Follow-up: ' . Str::limit($note->content, 60),
+                        'title' => 'Follow-up: '.Str::limit($note->content, 60),
                         'priority' => 'medium',
                         'status' => 'pending',
                         'source_url' => $sourceUrl,

@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'my_day' => 'My Day',
+    'my_roster' => 'My roster',
+    'today' => 'Today',
+    'this_week' => 'This week',
+    'next_shift' => 'Next shift',
+    'active_shift' => 'Active shift',
+    'pre_shift_briefing' => 'Before you start',
+    'previous_shift' => 'Previous shift',
+    'end_shift' => 'End shift',
+    'end_shift_anyway' => 'End shift anyway',
+    'handover' => 'Handover',
+    'tasks' => 'Tasks',
+    'medications' => 'Medications',
+    'incidents' => 'Incidents',
+    'breaks' => 'Breaks',
+    'timesheets' => 'My timesheets',
+    'update_resubmit' => 'Update & resubmit',
+    'pull_to_refresh' => 'Pull to refresh',
+    'release_to_refresh' => 'Release to refresh',
+    'refreshing' => 'Refreshing',
+    'person_supported' => 'person we support',
+    'support_worker' => 'support worker',
+];

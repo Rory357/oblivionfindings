@@ -1,6 +1,6 @@
+import DictateButton from '@/components/dictate-button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import VoiceInputButton from '@/components/voice-input-button';
 
 export type StepTwoData = {
     description: string;
@@ -17,13 +17,17 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
         <div className="space-y-6">
             <div className="space-y-1">
                 <h2 className="text-lg font-semibold">What happened</h2>
-                <p className="text-sm text-muted-foreground">In your own words is fine. You can add more detail later.</p>
+                <p className="text-sm text-muted-foreground">
+                    In your own words is fine. You can add more detail later.
+                </p>
             </div>
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Describe what happened</Label>
-                    <VoiceInputButton
+                    <Label className="text-sm font-medium">
+                        Describe what happened
+                    </Label>
+                    <DictateButton
                         value={data.description}
                         onChange={(next) => onChange({ description: next })}
                         fieldLabel="Describe what happened"
@@ -37,9 +41,15 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
                     className="text-base"
                     autoFocus
                 />
-                {errors?.description && <p className="text-xs text-status-critical">{errors.description}</p>}
+                {errors?.description && (
+                    <p className="text-xs text-status-critical">
+                        {errors.description}
+                    </p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                    Tap <span className="font-medium">Save and continue</span> and we&rsquo;ll save the incident so you don&rsquo;t lose it.
+                    Tap <span className="font-medium">Save and continue</span>{' '}
+                    and we&rsquo;ll save the incident so you don&rsquo;t lose
+                    it.
                 </p>
             </div>
         </div>

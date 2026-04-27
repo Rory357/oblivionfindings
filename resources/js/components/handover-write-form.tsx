@@ -1,5 +1,5 @@
+import DictateButton from '@/components/dictate-button';
 import { Button } from '@/components/ui/button';
-import VoiceInputButton from '@/components/voice-input-button';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -177,7 +177,7 @@ export default function HandoverWriteForm({
                             (optional)
                         </span>
                     </label>
-                    <VoiceInputButton
+                    <DictateButton
                         value={value.handover_notes}
                         onChange={(next) => set('handover_notes', next)}
                         fieldLabel="Handover notes"

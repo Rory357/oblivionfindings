@@ -11,13 +11,14 @@ import {
 } from 'lucide-react';
 import { useState, type PropsWithChildren, type ReactNode } from 'react';
 
+import { AppSidebar } from '@/components/app-sidebar';
 import FlashToaster from '@/components/flash-toaster';
+import PullToRefresh from '@/components/pull-to-refresh';
 import {
     StaffBottomNav,
     type StaffBottomNavItem,
 } from '@/components/staff-bottom-nav';
 import { StaffHeader } from '@/components/staff-header';
-import { AppSidebar } from '@/components/app-sidebar';
 import {
     Sheet,
     SheetContent,
@@ -69,6 +70,12 @@ const MORE_LINKS: MoreLink[] = [
         description: 'Home, shifts, meds, and action items',
         href: '/my-day',
         icon: Home,
+    },
+    {
+        label: 'My roster',
+        description: 'Today, upcoming, and recent shifts',
+        href: '/my-roster',
+        icon: CalendarDays,
     },
     {
         label: 'Meds today',
@@ -142,7 +149,7 @@ export default function StaffPageShell({
         <div className="min-h-svh w-full overflow-x-hidden">
             <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-primary focus:px-4 focus:py-2 focus:rounded-md focus:text-primary-foreground"
+                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
             >
                 Skip to main content
             </a>
@@ -176,7 +183,7 @@ export default function StaffPageShell({
                         'staff-shell-content flex-1 px-4 pt-4 md:px-6 md:pt-6',
                     )}
                 >
-                    {children}
+                    <PullToRefresh>{children}</PullToRefresh>
                 </div>
             </main>
 

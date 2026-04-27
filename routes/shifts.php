@@ -140,6 +140,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])
         ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.clockOut');
+    Route::post('/attendance/break/start', [AttendanceController::class, 'startBreak'])
+        ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
+        ->name('attendance.break.start');
+    Route::post('/attendance/break/end', [AttendanceController::class, 'endBreak'])
+        ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
+        ->name('attendance.break.end');
 
     // PR 11 — Handover prompts on clock in/out.
     Route::post('/attendance/handover', [AttendanceController::class, 'submitHandover'])

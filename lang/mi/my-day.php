@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'my_day' => 'Taku rā',
+    'my_roster' => 'Taku rārangi mahi',
+    'today' => 'Āianei',
+    'this_week' => 'Tēnei wiki',
+    'next_shift' => 'Te huringa e whai ake',
+    'active_shift' => 'Huringa hohe',
+    'pre_shift_briefing' => 'I mua i te tīmatanga',
+    'previous_shift' => 'Huringa o mua',
+    'end_shift' => 'Whakamutu huringa',
+    'end_shift_anyway' => 'Whakamutu tonu',
+    'handover' => 'Tuku kōrero',
+    'tasks' => 'Ngā mahi',
+    'medications' => 'Ngā rongoā',
+    'incidents' => 'Ngā aituā',
+    'breaks' => 'Ngā whakatā',
+    'timesheets' => 'Aku pepa wā',
+    'update_resubmit' => 'Whakahou, tuku anō',
+    'pull_to_refresh' => 'Kumea kia whakahou',
+    'release_to_refresh' => 'Tukua kia whakahou',
+    'refreshing' => 'E whakahou ana',
+    'person_supported' => 'tangata whaikaha',
+    'support_worker' => 'kaimahi tautoko',
+];

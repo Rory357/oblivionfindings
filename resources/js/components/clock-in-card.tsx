@@ -54,6 +54,7 @@ type OpenSession = {
     shift_starts_at: string | null;
     shift_ends_at: string | null;
     location: string | null;
+    break_minutes?: number;
     handover_submitted?: boolean;
 };
 
@@ -330,8 +331,20 @@ export default function ClockInCard({
                                 variant="destructive"
                                 className="h-12 w-full min-w-40 text-base sm:w-auto"
                                 onClick={() => {
-                                    setBreakPreset(0);
-                                    setCustomBreak('');
+                                    const recordedBreak =
+                                        openSession.break_minutes ?? 0;
+                                    if (
+                                        BREAK_CHIPS.some(
+                                            (chip) =>
+                                                chip.value === recordedBreak,
+                                        )
+                                    ) {
+                                        setBreakPreset(recordedBreak);
+                                        setCustomBreak('');
+                                    } else {
+                                        setBreakPreset('custom');
+                                        setCustomBreak(String(recordedBreak));
+                                    }
                                     // Look for a saved draft for this shift; if present, offer resume.
                                     const existing = handoverDraftKey
                                         ? loadHandoverDraft()

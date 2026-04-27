@@ -1,7 +1,11 @@
 import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
+import { useState } from 'react';
 
 import StaffStatus from '@/components/staff-status';
+import TimesheetEditSheet, {
+    type InlineTimesheet,
+} from '@/components/timesheet-edit-sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +45,8 @@ export type TimesheetReturnBannerProps = {
     className?: string;
     /** Optional size override for the status pill. Defaults to `sm`. */
     size?: 'sm' | 'md';
+    /** Optional inline-edit payload for My Day. Falls back to edit link when omitted. */
+    timesheet?: InlineTimesheet;
 };
 
 export function TimesheetReturnBanner({
@@ -50,7 +56,9 @@ export function TimesheetReturnBanner({
     hideAction = false,
     className,
     size = 'sm',
+    timesheet,
 }: TimesheetReturnBannerProps) {
+    const [editOpen, setEditOpen] = useState(false);
     const href = editHref ?? `/timesheets/${timesheetId}/edit`;
     const trimmedNote = returnNote?.trim() ?? '';
 
@@ -76,7 +84,7 @@ export function TimesheetReturnBanner({
                     </span>
                 </div>
                 {trimmedNote ? (
-                    <p className="whitespace-pre-wrap text-sm leading-snug text-status-warning dark:text-status-warning">
+                    <p className="text-sm leading-snug whitespace-pre-wrap text-status-warning dark:text-status-warning">
                         {trimmedNote}
                     </p>
                 ) : (
@@ -89,16 +97,41 @@ export function TimesheetReturnBanner({
 
             {!hideAction ? (
                 <div className="shrink-0">
-                    <Button
-                        asChild
-                        size="sm"
-                        className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:bg-status-warning dark:hover:bg-status-warning"
-                    >
-                        <Link href={href}>
-                            Fix and resend
-                            <ArrowRight className="ml-1.5 h-4 w-4" />
-                        </Link>
-                    </Button>
+                    {timesheet ? (
+                        <>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:bg-status-warning dark:hover:bg-status-warning"
+                                onClick={() => setEditOpen(true)}
+                                disabled={!timesheet.can_edit_inline}
+                                title={
+                                    timesheet.can_edit_inline
+                                        ? undefined
+                                        : 'This timesheet is locked or no longer editable.'
+                                }
+                            >
+                                Update & resubmit
+                                <ArrowRight className="ml-1.5 h-4 w-4" />
+                            </Button>
+                            <TimesheetEditSheet
+                                timesheet={timesheet}
+                                open={editOpen}
+                                onOpenChange={setEditOpen}
+                            />
+                        </>
+                    ) : (
+                        <Button
+                            asChild
+                            size="sm"
+                            className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:bg-status-warning dark:hover:bg-status-warning"
+                        >
+                            <Link href={href}>
+                                Fix and resend
+                                <ArrowRight className="ml-1.5 h-4 w-4" />
+                            </Link>
+                        </Button>
+                    )}
                 </div>
             ) : null}
         </div>

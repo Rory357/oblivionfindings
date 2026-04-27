@@ -50,6 +50,16 @@ test('staff can clock in and clock out to create draft timesheet from attendance
     expect($openSession)->not->toBeNull();
     expect($openSession?->shift_id)->toBe($shift->id);
 
+    $this->actingAs($this->staff)
+        ->post('/attendance/handover', [
+            'shift_id' => $shift->id,
+            'meds_completed' => true,
+            'shift_rating' => 'calm',
+            'handover_notes' => 'Shift was calm.',
+            'follow_up_needed' => false,
+        ])
+        ->assertSessionHas('success');
+
     // Advance time so the session has meaningful duration for break validation
     $this->travel(2)->hours();
 
@@ -120,6 +130,16 @@ test('clock out reuses an existing draft timesheet for the same shift and staff 
         ->where('status', 'open')
         ->latest('id')
         ->first();
+
+    $this->actingAs($this->staff)
+        ->post('/attendance/handover', [
+            'shift_id' => $shift->id,
+            'meds_completed' => true,
+            'shift_rating' => 'calm',
+            'handover_notes' => 'Shift was calm.',
+            'follow_up_needed' => false,
+        ])
+        ->assertSessionHas('success');
 
     // Advance time so the session has meaningful duration for break validation
     $this->travel(2)->hours();
