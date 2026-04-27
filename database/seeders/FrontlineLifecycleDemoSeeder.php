@@ -98,6 +98,12 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         $starts = $workDate->copy()->setTime(7, 0);
         $ends = $workDate->copy()->setTime(15, 0);
 
+        // Align actual times exactly to planned and pre-declare the shift's
+        // expected break so reconciliation passes:
+        //   planned_minutes  = (ends - starts) - expected_break_minutes
+        //   attendance       = (clock_out - clock_in) - break_minutes
+        // Both end up at 450 (8h shift with a 30 min break), and the
+        // timesheet itself uses break_minutes=30 too, so all three match.
         $shift = Shift::firstOrCreate(
             [
                 'user_id' => $worker->id,
@@ -107,10 +113,11 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             [
                 'service_context_id' => $serviceContext->id,
                 'ends_at' => $ends,
-                'actual_starts_at' => $starts->copy()->addMinutes(2),
-                'actual_ends_at' => $ends->copy()->subMinutes(3),
+                'actual_starts_at' => $starts,
+                'actual_ends_at' => $ends,
                 'started_by' => $worker->id,
                 'completed_by' => $worker->id,
+                'expected_break_minutes' => 30,
                 'location' => $client->city ?: 'Auckland',
                 'status' => 'completed',
                 'created_by' => $admin->id,

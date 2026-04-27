@@ -55,6 +55,10 @@ export default function TimesheetEditSheet({
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
+    // Sync once when the sheet opens (or switches to a different timesheet).
+    // Don't depend on the full `timesheet` reference — Inertia re-renders the
+    // page on a 422 with the same row, which would reset the user's typed
+    // values and force them to re-enter everything before retrying.
     useEffect(() => {
         if (!open) return;
         setStartsAt(toLocalInput(timesheet.starts_at));
@@ -66,7 +70,8 @@ export default function TimesheetEditSheet({
                 : String(timesheet.mileage_km),
         );
         setNotes(timesheet.notes ?? '');
-    }, [open, timesheet]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, timesheet.id]);
 
     const errorMessages = useMemo(() => {
         const messages: string[] = [];
