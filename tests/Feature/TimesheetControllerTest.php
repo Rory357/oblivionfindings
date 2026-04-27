@@ -256,6 +256,108 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
+    public function test_owner_can_save_and_resubmit_a_returned_timesheet_atomically(): void
+    {
+        $timesheet = $this->makeDraftTimesheet($this->staff, [
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Please add the mileage.',
+            'break_minutes' => 30,
+            'mileage_km' => null,
+            'notes' => 'Original note',
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 45,
+                'mileage_km' => 12.5,
+                'notes' => 'Updated with mileage.',
+            ])
+            ->assertSessionHas('success');
+
+        $fresh = $timesheet->fresh();
+        $this->assertSame('submitted', $fresh->status);
+        $this->assertSame($this->staff->id, $fresh->submitted_by);
+        $this->assertNotNull($fresh->submitted_at);
+        $this->assertNull($fresh->returned_at);
+        $this->assertNull($fresh->returned_by);
+        $this->assertNull($fresh->returned_notes);
+        $this->assertSame(45, $fresh->break_minutes);
+        $this->assertEqualsWithDelta(12.5, (float) $fresh->mileage_km, 0.001);
+        $this->assertSame('Updated with mileage.', $fresh->notes);
+    }
+
+    public function test_resubmit_endpoint_rejects_invalid_payload_without_changing_status(): void
+    {
+        $timesheet = $this->makeDraftTimesheet($this->staff, [
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Please add the mileage.',
+            'notes' => 'Original note',
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                // ends_at must be after starts_at — flip them to trigger validation failure
+                'starts_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 0,
+            ])
+            ->assertSessionHasErrors('ends_at');
+
+        $fresh = $timesheet->fresh();
+        $this->assertSame('returned', $fresh->status);
+        $this->assertSame('Original note', $fresh->notes);
+        $this->assertNotNull($fresh->returned_at);
+    }
+
+    public function test_resubmit_endpoint_blocks_already_submitted_timesheet(): void
+    {
+        $timesheet = $this->makeSubmittedTimesheet($this->staff);
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 0,
+            ])
+            ->assertSessionHas('error', 'Only draft or returned timesheets can be resubmitted.');
+
+        $this->assertSame('submitted', $timesheet->fresh()->status);
+    }
+
+    public function test_resubmit_endpoint_requires_ownership(): void
+    {
+        $timesheet = $this->makeDraftTimesheet($this->otherStaff, [
+            'status' => 'returned',
+            'returned_at' => now()->subHour(),
+            'returned_by' => $this->admin->id,
+            'returned_notes' => 'Please add the mileage.',
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 0,
+            ])
+            ->assertForbidden();
+
+        $this->assertSame('returned', $timesheet->fresh()->status);
+    }
+
     public function test_finance_can_approve_a_valid_submitted_timesheet(): void
     {
         $timesheet = $this->makeSubmittedTimesheet($this->staff);

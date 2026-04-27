@@ -1,5 +1,5 @@
-import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { router, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 import DictateButton from '@/components/dictate-button';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,9 @@ export default function TimesheetEditSheet({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const page = usePage<{
+        flash?: { error?: string | null };
+    }>();
     const [startsAt, setStartsAt] = useState('');
     const [endsAt, setEndsAt] = useState('');
     const [breakMinutes, setBreakMinutes] = useState(0);
@@ -65,12 +68,29 @@ export default function TimesheetEditSheet({
         setNotes(timesheet.notes ?? '');
     }, [open, timesheet]);
 
+    const errorMessages = useMemo(() => {
+        const messages: string[] = [];
+        const errors = (page.props as { errors?: Record<string, unknown> }).errors;
+        if (errors) {
+            for (const value of Object.values(errors)) {
+                if (typeof value === 'string' && value !== '') {
+                    messages.push(value);
+                }
+            }
+        }
+        const flashError = page.props.flash?.error;
+        if (typeof flashError === 'string' && flashError !== '') {
+            messages.unshift(flashError);
+        }
+        return messages;
+    }, [page.props]);
+
     const saveAndSubmit = () => {
         if (!timesheet.can_edit_inline || !timesheet.client_id) return;
         setSubmitting(true);
 
-        router.put(
-            `/timesheets/${timesheet.id}`,
+        router.post(
+            `/timesheets/${timesheet.id}/resubmit`,
             {
                 client_id: timesheet.client_id,
                 work_date: timesheet.work_date_iso,
@@ -82,18 +102,8 @@ export default function TimesheetEditSheet({
             },
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    router.post(
-                        `/timesheets/${timesheet.id}/submit`,
-                        {},
-                        {
-                            preserveScroll: true,
-                            onSuccess: () => onOpenChange(false),
-                            onFinish: () => setSubmitting(false),
-                        },
-                    );
-                },
-                onError: () => setSubmitting(false),
+                onSuccess: () => onOpenChange(false),
+                onFinish: () => setSubmitting(false),
             },
         );
     };
@@ -128,6 +138,22 @@ export default function TimesheetEditSheet({
                         <div className="rounded-lg border p-3 text-sm text-muted-foreground">
                             This timesheet is locked for payroll or no longer
                             editable.
+                        </div>
+                    ) : null}
+
+                    {errorMessages.length > 0 ? (
+                        <div
+                            role="alert"
+                            className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
+                        >
+                            <div className="font-medium">
+                                Couldn&apos;t resubmit
+                            </div>
+                            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                                {errorMessages.map((message) => (
+                                    <li key={message}>{message}</li>
+                                ))}
+                            </ul>
                         </div>
                     ) : null}
 

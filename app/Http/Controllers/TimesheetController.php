@@ -605,6 +605,129 @@ class TimesheetController extends Controller
         return redirect()->back()->with('success', 'Timesheet submitted.');
     }
 
+    /**
+     * Atomic save-and-resubmit for the inline /my-day edit sheet.
+     *
+     * Why: the original UI did a chained PUT /timesheets/{id} → POST submit
+     * from the browser. If the submit failed after the PUT succeeded, the
+     * timesheet was mutated but stuck in `returned`, leaving the worker with
+     * no clear retry path. This endpoint runs both inside one DB transaction
+     * so the row either fully transitions to `submitted` or stays untouched.
+     */
+    public function resubmit(Request $request, Timesheet $timesheet)
+    {
+        $auth = $request->user();
+        abort_unless(
+            $auth && $auth->canDo('timesheets.update') && $auth->canDo('timesheets.submit'),
+            403,
+        );
+
+        if (! $auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        $this->assertCanAccessTimesheet($auth, $timesheet);
+
+        if (! in_array($timesheet->status, ['draft', 'returned'], true)) {
+            return back()->with('error', 'Only draft or returned timesheets can be resubmitted.');
+        }
+
+        if ($this->isLockedByPayroll($timesheet)) {
+            return back()->with('error', 'This timesheet is locked by a payroll run and cannot be resubmitted.');
+        }
+
+        if ($timesheet->is_protected_from_changes) {
+            return back()->with('error', 'Approved or payroll-linked timesheets require a controlled correction workflow.');
+        }
+
+        abort_if(
+            $timesheet->linkedShiftIsCancelled(),
+            422,
+            'Timesheets linked to cancelled shifts cannot be resubmitted.',
+        );
+
+        $data = $request->validate([
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'work_date' => ['required', 'date'],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
+            'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
+            'sleepover' => ['nullable', 'boolean'],
+            'on_call' => ['nullable', 'boolean'],
+            'allowance_notes' => ['nullable', 'string'],
+            'public_holiday' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string'],
+            'is_residential_billable' => ['nullable', 'boolean'],
+        ]);
+
+        app(TimesheetReconciliationService::class)->assertWorkflowAllowed($timesheet, 'submitted');
+
+        $linkedShift = $timesheet->shift_id ? Shift::find($timesheet->shift_id) : null;
+        if ($linkedShift) {
+            $data['client_id'] = $linkedShift->client_id;
+        }
+
+        $snapshot = $this->draftSnapshot(
+            $data['client_id'],
+            $linkedShift,
+            $timesheet->staff ?? $auth,
+            $data['notes'] ?? $timesheet->notes,
+        );
+
+        DB::transaction(function () use ($timesheet, $data, $linkedShift, $snapshot, $auth) {
+            $timesheet->fill([
+                'client_id' => $data['client_id'],
+                'work_date' => $data['work_date'],
+                'starts_at' => $data['starts_at'],
+                'ends_at' => $data['ends_at'],
+                'break_minutes' => (int) ($data['break_minutes'] ?? 0),
+                'mileage_km' => $data['mileage_km'] ?? null,
+                'sleepover' => $linkedShift ? (bool) $linkedShift->is_sleepover : (bool) ($data['sleepover'] ?? false),
+                'on_call' => $linkedShift ? (bool) $linkedShift->is_on_call : (bool) ($data['on_call'] ?? false),
+                'allowance_notes' => $data['allowance_notes'] ?? null,
+                'public_holiday' => (bool) ($data['public_holiday'] ?? false),
+                'notes' => $data['notes'] ?? null,
+                'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
+                'shift_site_id' => $snapshot['site_id'] ?? $timesheet->shift_site_id,
+                'shift_service_context_id' => $snapshot['service_context_id'] ?? $timesheet->shift_service_context_id,
+                'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
+                'shift_location_snapshot' => $snapshot['location'] ?? $timesheet->shift_location_snapshot,
+                'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $timesheet->service_context_name_snapshot,
+                'client_name_snapshot' => $snapshot['client_name'] ?? $timesheet->client_name_snapshot,
+                'staff_name_snapshot' => $snapshot['staff_name'] ?? $timesheet->staff_name_snapshot,
+                'shift_type_snapshot' => $snapshot['shift_type'] ?? $timesheet->shift_type_snapshot ?? 'standard',
+                'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $timesheet->coverage_roles_snapshot ?? [],
+            ]);
+
+            $timesheet->status = 'submitted';
+            $timesheet->submitted_at = now();
+            $timesheet->submitted_by = $auth->id;
+            $timesheet->approved_by = null;
+            $timesheet->approved_at = null;
+            $timesheet->decision_notes = null;
+            $timesheet->returned_at = null;
+            $timesheet->returned_by = null;
+            $timesheet->returned_notes = null;
+
+            $timesheet->save();
+
+            app(TimesheetReconciliationService::class)->reconcile($timesheet);
+        });
+
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.submitted',
+            'title' => 'Timesheet updated and resubmitted',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+            'include_entity_user' => false,
+        ]);
+
+        return redirect()->back()->with('success', 'Timesheet updated and resubmitted.');
+    }
+
     public function approve(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();

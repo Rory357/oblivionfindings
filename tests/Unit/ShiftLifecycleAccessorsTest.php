@@ -3,6 +3,8 @@
 use App\Models\Shift;
 use Illuminate\Support\Carbon;
 
+uses(Tests\TestCase::class);
+
 afterEach(function () {
     Carbon::setTestNow();
 });

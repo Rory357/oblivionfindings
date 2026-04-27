@@ -48,7 +48,7 @@ it('keeps historical site context after a client moves locations', function () {
     $timesheet->setRelation('client', $client);
     $timesheet->setRelation('staff', $staff);
 
-    $service = new ShiftOperationalSnapshotService();
+    $service = new ShiftOperationalSnapshotService;
     $snapshot = $service->snapshotForTimesheet($timesheet);
 
     $timesheet->forceFill($snapshot);
@@ -98,7 +98,7 @@ it('keeps the original worker snapshot after a shift is reassigned later', funct
     $timesheet->setRelation('client', $client);
     $timesheet->setRelation('staff', $originalWorker);
 
-    $service = new ShiftOperationalSnapshotService();
+    $service = new ShiftOperationalSnapshotService;
     $timesheet->forceFill($service->snapshotForTimesheet($timesheet));
 
     $shift->user_id = 9;

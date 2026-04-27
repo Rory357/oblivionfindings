@@ -629,6 +629,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/timesheets/{timesheet}/submit', [TimesheetController::class, 'submit'])
         ->middleware('permission:timesheets.submit|timesheets.manageAny')
         ->name('operations.timesheets.submit');
+    // Atomic save-and-resubmit (used by the inline edit sheet on /my-day so a
+    // returned timesheet's update + submit cannot land in a half-finished
+    // state if the second call fails).
+    Route::post('/timesheets/{timesheet}/resubmit', [TimesheetController::class, 'resubmit'])
+        ->middleware('permission:timesheets.update|timesheets.manageAny')
+        ->name('operations.timesheets.resubmit');
     Route::post('/timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])
         ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('operations.timesheets.approve');

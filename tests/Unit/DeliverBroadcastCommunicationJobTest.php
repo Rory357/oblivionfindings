@@ -11,7 +11,8 @@ uses(Tests\TestCase::class);
 
 function createSmsCommunication(array $overrides = []): Communication
 {
-    $communication = new class extends Communication {
+    $communication = new class extends Communication
+    {
         public function save(array $options = []): bool
         {
             $this->syncOriginal();
@@ -46,7 +47,8 @@ function sendPushForTest(Communication $communication): void
 }
 
 test('broadcast sms delivery calls the configured provider and marks the row delivered', function () {
-    $provider = new class implements SmsProvider {
+    $provider = new class implements SmsProvider
+    {
         public array $messages = [];
 
         public function send(string $to, string $message): SmsSendResult
@@ -72,7 +74,8 @@ test('broadcast sms delivery calls the configured provider and marks the row del
 });
 
 test('broadcast sms delivery records provider failures', function () {
-    $this->app->instance(SmsProvider::class, new class implements SmsProvider {
+    $this->app->instance(SmsProvider::class, new class implements SmsProvider
+    {
         public function send(string $to, string $message): SmsSendResult
         {
             return SmsSendResult::failed('Invalid recipient number.');
@@ -88,7 +91,8 @@ test('broadcast sms delivery records provider failures', function () {
 });
 
 test('broadcast push delivery calls the configured provider and marks the row delivered', function () {
-    $provider = new class implements PushProvider {
+    $provider = new class implements PushProvider
+    {
         public array $messages = [];
 
         public function send(array $tokens, string $message, ?string $title = null, array $data = []): PushSendResult
@@ -118,7 +122,8 @@ test('broadcast push delivery calls the configured provider and marks the row de
 });
 
 test('broadcast push delivery records provider failures', function () {
-    $this->app->instance(PushProvider::class, new class implements PushProvider {
+    $this->app->instance(PushProvider::class, new class implements PushProvider
+    {
         public function send(array $tokens, string $message, ?string $title = null, array $data = []): PushSendResult
         {
             return PushSendResult::failed('No push token on record for the recipient.');
