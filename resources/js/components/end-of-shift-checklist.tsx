@@ -6,7 +6,7 @@ import {
     ListChecks,
     Pill,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import DictateButton from '@/components/dictate-button';
 import HandoverWriteForm, {
@@ -64,6 +64,9 @@ function blockerIcon(key: string) {
 
 function ChecklistBody({
     session,
+    blockers,
+    tasks,
+    onTasksChange,
     notes,
     setNotes,
     breakMinutes,
@@ -74,6 +77,9 @@ function ChecklistBody({
     setHandoverValue,
 }: {
     session: EndOfShiftChecklistSession;
+    blockers: EndOfShiftBlocker[];
+    tasks: ShiftTaskListItem[];
+    onTasksChange: (next: ShiftTaskListItem[]) => void;
     notes: string;
     setNotes: (next: string) => void;
     breakMinutes: number;
@@ -83,16 +89,16 @@ function ChecklistBody({
     handoverValue: HandoverWriteValue;
     setHandoverValue: (next: HandoverWriteValue) => void;
 }) {
-    const blockers = session.end_of_shift_blockers ?? [];
     const otherBlockers = blockers.filter(
         (blocker) => blocker.key !== 'handover_missing',
     );
     const hasHandoverBlocker = blockers.some(
         (blocker) => blocker.key === 'handover_missing',
     );
-    const hasTaskBlocker = blockers.some(
-        (blocker) => blocker.key === 'tasks_pending',
-    );
+    const incompleteTaskCount = tasks.filter(
+        (task) => !task.is_completed,
+    ).length;
+    const showTaskList = (tasks?.length ?? 0) > 0;
 
     return (
         <div className="space-y-5">
@@ -147,10 +153,27 @@ function ChecklistBody({
                 </div>
             )}
 
-            {hasTaskBlocker && (session.tasks?.length ?? 0) > 0 ? (
+            {showTaskList ? (
                 <section id="shift-tasks" className="space-y-2">
-                    <h3 className="text-sm font-semibold">Shift tasks</h3>
-                    <ShiftTaskList tasks={session.tasks ?? []} maxVisible={6} />
+                    <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold">Shift tasks</h3>
+                        <span
+                            className={
+                                incompleteTaskCount === 0
+                                    ? 'text-xs font-medium text-status-success'
+                                    : 'text-xs font-medium text-muted-foreground'
+                            }
+                        >
+                            {incompleteTaskCount === 0
+                                ? 'All complete'
+                                : `${incompleteTaskCount} of ${tasks.length} still to do`}
+                        </span>
+                    </div>
+                    <ShiftTaskList
+                        tasks={tasks}
+                        onTasksChange={onTasksChange}
+                        maxVisible={6}
+                    />
                 </section>
             ) : null}
 
@@ -273,8 +296,33 @@ export default function EndOfShiftChecklist({
     const [handoverValue, setHandoverValue] = useState<HandoverWriteValue>(
         emptyHandoverWriteValue,
     );
+    const [tasks, setTasks] = useState<ShiftTaskListItem[]>(
+        session.tasks ?? [],
+    );
 
-    const blockers = session.end_of_shift_blockers ?? [];
+    // Resync local tasks if the session payload changes (e.g. live refresh).
+    useEffect(() => {
+        setTasks(session.tasks ?? []);
+    }, [session.tasks]);
+
+    // Drop the tasks_pending blocker once the worker has ticked off every
+    // task in the embedded list — no more "End shift anyway" + override
+    // reason just because the original payload still says X tasks pending.
+    const blockers = useMemo(() => {
+        const incompleteCount = tasks.filter(
+            (task) => !task.is_completed,
+        ).length;
+        return (session.end_of_shift_blockers ?? [])
+            .map((blocker) =>
+                blocker.key === 'tasks_pending'
+                    ? { ...blocker, count: incompleteCount }
+                    : blocker,
+            )
+            .filter(
+                (blocker) =>
+                    blocker.key !== 'tasks_pending' || incompleteCount > 0,
+            );
+    }, [session.end_of_shift_blockers, tasks]);
     const otherBlockers = useMemo(
         () => blockers.filter((blocker) => blocker.key !== 'handover_missing'),
         [blockers],
@@ -333,6 +381,9 @@ export default function EndOfShiftChecklist({
     const body = (
         <ChecklistBody
             session={session}
+            blockers={blockers}
+            tasks={tasks}
+            onTasksChange={setTasks}
             notes={notes}
             setNotes={setNotes}
             breakMinutes={breakMinutes}

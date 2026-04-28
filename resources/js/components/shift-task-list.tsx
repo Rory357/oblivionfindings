@@ -14,9 +14,11 @@ export interface ShiftTaskListItem {
 export default function ShiftTaskList({
     tasks,
     maxVisible = 4,
+    onTasksChange,
 }: {
     tasks: ShiftTaskListItem[];
     maxVisible?: number;
+    onTasksChange?: (next: ShiftTaskListItem[]) => void;
 }) {
     const [items, setItems] = useState(tasks);
     const [showAll, setShowAll] = useState(false);
@@ -40,26 +42,27 @@ export default function ShiftTaskList({
         const previous = items;
         const nextState = !task.is_completed;
         setPendingIds((prev) => ({ ...prev, [task.id]: true }));
-        setItems((current) =>
-            current.map((item) =>
-                item.id === task.id
-                    ? {
-                          ...item,
-                          is_completed: nextState,
-                          completed_at: nextState
-                              ? new Date().toISOString()
-                              : null,
-                      }
-                    : item,
-            ),
+        const optimistic = items.map((item) =>
+            item.id === task.id
+                ? {
+                      ...item,
+                      is_completed: nextState,
+                      completed_at: nextState ? new Date().toISOString() : null,
+                  }
+                : item,
         );
+        setItems(optimistic);
+        onTasksChange?.(optimistic);
 
         router.post(
             `/my-tasks/shift-task/${task.id}/complete`,
             {},
             {
                 preserveScroll: true,
-                onError: () => setItems(previous),
+                onError: () => {
+                    setItems(previous);
+                    onTasksChange?.(previous);
+                },
                 onFinish: () =>
                     setPendingIds((prev) => {
                         const next = { ...prev };
