@@ -4,6 +4,8 @@ import { CheckCircle2, Clock, FileText, ListTodo } from 'lucide-react';
 import StaffStatus from '@/components/staff-status';
 import { Button } from '@/components/ui/button';
 import { formatRelative, formatTime } from '@/lib/datetime';
+import { show as showShift } from '@/routes/operations/shifts';
+import { edit as editTimesheet } from '@/routes/operations/timesheets';
 
 import type { RosterShift } from './roster/types';
 
@@ -75,8 +77,8 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
                         <Link
                             href={
                                 shift.timesheet
-                                    ? `/timesheets/${shift.timesheet.id}/edit`
-                                    : `/operations/shifts/${shift.id}`
+                                    ? editTimesheet.url(shift.timesheet.id)
+                                    : showShift.url(shift.id)
                             }
                         >
                             Review timesheet

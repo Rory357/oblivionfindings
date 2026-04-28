@@ -1,11 +1,19 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tabs } from '@/components/ui/tabs';
 
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
+import { index as shiftsIndex } from '@/routes/operations/shifts';
+import { index as timesheetsIndex } from '@/routes/operations/timesheets';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
@@ -20,29 +28,29 @@ import { ShiftTimeline, type ShiftLite } from '@/components/dashboard/timeline';
 import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
 
 import {
-    BarChart,
     Bar,
-    XAxis,
-    YAxis,
+    BarChart,
     CartesianGrid,
+    Line,
+    LineChart,
     Tooltip as RechartsTooltip,
     ResponsiveContainer,
-    LineChart,
-    Line,
+    XAxis,
+    YAxis,
 } from 'recharts';
 
 import {
-    Users,
-    ClipboardList,
-    Clock,
-    ShieldAlert,
+    Activity,
+    Briefcase,
     CalendarDays,
     CheckCircle2,
-    ListTodo,
-    Briefcase,
+    ClipboardList,
+    Clock,
     FileWarning,
-    Activity,
+    ListTodo,
     Pill,
+    ShieldAlert,
+    Users,
 } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
@@ -204,8 +212,14 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 const DEPT_COLORS = [
-    '#8b5cf6', '#a78bfa', '#7c3aed', '#c084fc',
-    '#6d28d9', '#ddd6fe', '#5b21b6', '#ede9fe',
+    '#8b5cf6',
+    '#a78bfa',
+    '#7c3aed',
+    '#c084fc',
+    '#6d28d9',
+    '#ddd6fe',
+    '#5b21b6',
+    '#ede9fe',
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -227,11 +241,13 @@ function ManagerDashboard({ props }: { props: Props }) {
     const incidents = props.incidentKpis;
 
     // Build bar chart data from shift series (use 7-day by default)
-    const barData = (shiftSeries.length ? shiftSeries : shiftSeries30).map((d) => ({
-        name: formatShortDate(d.date),
-        shifts: d.count,
-        hours: Math.round((d.hours ?? 0) * 10) / 10,
-    }));
+    const barData = (shiftSeries.length ? shiftSeries : shiftSeries30).map(
+        (d) => ({
+            name: formatShortDate(d.date),
+            shifts: d.count,
+            hours: Math.round((d.hours ?? 0) * 10) / 10,
+        }),
+    );
 
     // Build severity donut data
     const severityDonut = incidentBySeverity30.map((d) => ({
@@ -242,7 +258,11 @@ function ManagerDashboard({ props }: { props: Props }) {
 
     const severityTotal = severityDonut.reduce((s, d) => s + d.value, 0);
 
-    const filters = props.filters ?? { range: 'week', status: 'all', client_id: null };
+    const filters = props.filters ?? {
+        range: 'week',
+        status: 'all',
+        client_id: null,
+    };
 
     function updateFilters(next: Partial<typeof filters>) {
         router.get(
@@ -250,7 +270,10 @@ function ManagerDashboard({ props }: { props: Props }) {
             {
                 range: next.range ?? filters.range,
                 status: next.status ?? filters.status,
-                client_id: Object.prototype.hasOwnProperty.call(next, 'client_id')
+                client_id: Object.prototype.hasOwnProperty.call(
+                    next,
+                    'client_id',
+                )
                     ? (next as any).client_id
                     : filters.client_id,
             },
@@ -269,7 +292,7 @@ function ManagerDashboard({ props }: { props: Props }) {
             <div>
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold">Overview</h2>
-                    <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
+                    <div className="mt-2 h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-transparent"></div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <KpiCard
@@ -277,19 +300,19 @@ function ManagerDashboard({ props }: { props: Props }) {
                         value={summary?.staffWorkingTodayCount ?? 0}
                         icon={Users}
                         sparklineData={summary?.staffSparkline}
-                        href="/shifts"
+                        href={shiftsIndex.url()}
                     />
                     <KpiCard
                         label="Pending Timesheets"
                         value={summary?.timesheetsPendingCount ?? 0}
                         icon={ClipboardList}
-                        href="/timesheets"
+                        href={timesheetsIndex.url()}
                     />
                     <KpiCard
                         label="Shifts Today"
                         value={summary?.shiftsTodayCount ?? 0}
                         icon={Clock}
-                        href="/shifts"
+                        href={shiftsIndex.url()}
                     />
                     <KpiCard
                         label="Incidents (30d)"
@@ -313,7 +336,9 @@ function ManagerDashboard({ props }: { props: Props }) {
             {props.hrWidgets && (
                 <div>
                     <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Human Resources</h3>
+                        <h3 className="text-sm font-semibold text-muted-foreground">
+                            Human Resources
+                        </h3>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <KpiCard
@@ -347,7 +372,7 @@ function ManagerDashboard({ props }: { props: Props }) {
             {/* eMAR widget */}
             {props.emarWidgets && (
                 <Link href="/emar" className="block">
-                    <Card className="transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5">
+                    <Card className="transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
@@ -357,24 +382,55 @@ function ManagerDashboard({ props }: { props: Props }) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                            <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
                                 <div>
-                                    <p className="text-2xl font-bold text-status-success">{props.emarWidgets.adminRate}%</p>
-                                    <p className="text-[10px] text-muted-foreground">Admin Rate</p>
+                                    <p className="text-2xl font-bold text-status-success">
+                                        {props.emarWidgets.adminRate}%
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Admin Rate
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className="text-2xl font-bold">{props.emarWidgets.pending}</p>
-                                    <p className="text-[10px] text-muted-foreground">Pending</p>
+                                    <p className="text-2xl font-bold">
+                                        {props.emarWidgets.pending}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Pending
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className={`text-2xl font-bold ${props.emarWidgets.activeAlerts > 0 ? 'text-status-warning' : ''}`}>{props.emarWidgets.activeAlerts}</p>
-                                    <p className="text-[10px] text-muted-foreground">Alerts</p>
+                                    <p
+                                        className={`text-2xl font-bold ${props.emarWidgets.activeAlerts > 0 ? 'text-status-warning' : ''}`}
+                                    >
+                                        {props.emarWidgets.activeAlerts}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Alerts
+                                    </p>
                                 </div>
                             </div>
-                            {(props.emarWidgets.overdueReviews > 0 || props.emarWidgets.lowStock > 0) && (
+                            {(props.emarWidgets.overdueReviews > 0 ||
+                                props.emarWidgets.lowStock > 0) && (
                                 <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {props.emarWidgets.overdueReviews > 0 && <Badge variant="destructive" className="text-[10px]">{props.emarWidgets.overdueReviews} overdue reviews</Badge>}
-                                    {props.emarWidgets.lowStock > 0 && <Badge variant="outline" className="text-[10px]">{props.emarWidgets.lowStock} low stock</Badge>}
+                                    {props.emarWidgets.overdueReviews > 0 && (
+                                        <Badge
+                                            variant="destructive"
+                                            className="text-[10px]"
+                                        >
+                                            {props.emarWidgets.overdueReviews}{' '}
+                                            overdue reviews
+                                        </Badge>
+                                    )}
+                                    {props.emarWidgets.lowStock > 0 && (
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px]"
+                                        >
+                                            {props.emarWidgets.lowStock} low
+                                            stock
+                                        </Badge>
+                                    )}
                                 </div>
                             )}
                         </CardContent>
@@ -385,19 +441,26 @@ function ManagerDashboard({ props }: { props: Props }) {
             {/* Row 2: Charts */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Analytics</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                        Analytics
+                    </h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-5">
                     {/* Weekly shifts bar chart */}
-                    <Card className="lg:col-span-3 border-primary/10 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm hover:shadow-md transition-shadow">
+                    <Card className="border-primary/10 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm transition-shadow hover:shadow-md lg:col-span-3">
                         <CardHeader>
-                            <CardTitle className="text-sm">Weekly Shifts</CardTitle>
+                            <CardTitle className="text-sm">
+                                Weekly Shifts
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {barData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={260}>
                                     <BarChart data={barData}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <CartesianGrid
+                                            strokeDasharray="3 3"
+                                            className="stroke-muted"
+                                        />
                                         <XAxis
                                             dataKey="name"
                                             tick={{ fontSize: 11 }}
@@ -409,7 +472,8 @@ function ManagerDashboard({ props }: { props: Props }) {
                                         />
                                         <RechartsTooltip
                                             contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
+                                                backgroundColor:
+                                                    'hsl(var(--card))',
                                                 border: '1px solid hsl(var(--border))',
                                                 borderRadius: '0.75rem',
                                                 fontSize: 12,
@@ -431,9 +495,11 @@ function ManagerDashboard({ props }: { props: Props }) {
                     </Card>
 
                     {/* Incident severity donut */}
-                    <Card className="lg:col-span-2 border-amber/10 bg-gradient-to-br from-card via-card to-amber/5 shadow-sm hover:shadow-md transition-shadow">
+                    <Card className="border-amber/10 to-amber/5 bg-gradient-to-br from-card via-card shadow-sm transition-shadow hover:shadow-md lg:col-span-2">
                         <CardHeader>
-                            <CardTitle className="text-sm">Incident Severity (30d)</CardTitle>
+                            <CardTitle className="text-sm">
+                                Incident Severity (30d)
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="flex items-center justify-center">
                             {severityTotal > 0 ? (
@@ -457,42 +523,64 @@ function ManagerDashboard({ props }: { props: Props }) {
             {/* Row 3: Upcoming shifts + My Day */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Schedule & Tasks</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                        Schedule & Tasks
+                    </h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
-                    <div className="lg:col-span-2 space-y-4">
+                    <div className="space-y-4 lg:col-span-2">
                         {/* Filters */}
                         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-4 backdrop-blur-sm">
                             <div>
-                                <div className="text-xs text-muted-foreground">Range</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Range
+                                </div>
                                 <Select
                                     value={filters.range ?? 'week'}
-                                    onValueChange={(v) => updateFilters({ range: v as any })}
+                                    onValueChange={(v) =>
+                                        updateFilters({ range: v as any })
+                                    }
                                 >
                                     <SelectTrigger className="mt-1 w-[160px]">
                                         <SelectValue placeholder="Range" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="today">Today</SelectItem>
-                                        <SelectItem value="week">Next 7 days</SelectItem>
+                                        <SelectItem value="today">
+                                            Today
+                                        </SelectItem>
+                                        <SelectItem value="week">
+                                            Next 7 days
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
-                                <div className="text-xs text-muted-foreground">Status</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Status
+                                </div>
                                 <Select
                                     value={filters.status ?? 'all'}
-                                    onValueChange={(v) => updateFilters({ status: v })}
+                                    onValueChange={(v) =>
+                                        updateFilters({ status: v })
+                                    }
                                 >
                                     <SelectTrigger className="mt-1 w-[180px]">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                                        <SelectItem value="in_progress">In progress</SelectItem>
-                                        <SelectItem value="completed">Completed</SelectItem>
-                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        <SelectItem value="scheduled">
+                                            Scheduled
+                                        </SelectItem>
+                                        <SelectItem value="in_progress">
+                                            In progress
+                                        </SelectItem>
+                                        <SelectItem value="completed">
+                                            Completed
+                                        </SelectItem>
+                                        <SelectItem value="cancelled">
+                                            Cancelled
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -511,7 +599,7 @@ function ManagerDashboard({ props }: { props: Props }) {
                         />
                     </div>
 
-                    <div className="lg:col-span-1 space-y-4">
+                    <div className="space-y-4 lg:col-span-1">
                         <MyDayList
                             title="My Day"
                             items={props.myDayItems ?? []}
@@ -540,7 +628,9 @@ function ManagerDashboard({ props }: { props: Props }) {
                                 timesheetByStatus={timesheetByStatus}
                                 timesheetSeries30={timesheetSeries30 as any}
                                 incidentSeries30={incidentSeries30 as any}
-                                incidentBySeverity30={incidentBySeverity30 as any}
+                                incidentBySeverity30={
+                                    incidentBySeverity30 as any
+                                }
                             />
                         ),
                     },
@@ -571,18 +661,24 @@ function StaffDashboard({ props }: { props: Props }) {
             <div>
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold">Today's Summary</h2>
-                    <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
+                    <div className="mt-2 h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-transparent"></div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <KpiCard
                         label="My Shifts Today"
-                        value={kpis?.myShiftsToday ?? props.todayShifts?.length ?? 0}
+                        value={
+                            kpis?.myShiftsToday ??
+                            props.todayShifts?.length ??
+                            0
+                        }
                         icon={Clock}
-                        href="/shifts"
+                        href="/my-day"
                     />
                     <KpiCard
                         label="Pending Tasks"
-                        value={kpis?.pendingTasks ?? props.myDayItems?.length ?? 0}
+                        value={
+                            kpis?.pendingTasks ?? props.myDayItems?.length ?? 0
+                        }
                         icon={ListTodo}
                         href="/my-day"
                     />
@@ -592,7 +688,9 @@ function StaffDashboard({ props }: { props: Props }) {
             {/* Row 2: Schedule + canonical home prompt */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Schedule</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                        Schedule
+                    </h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
@@ -607,11 +705,14 @@ function StaffDashboard({ props }: { props: Props }) {
                     <div className="lg:col-span-1">
                         <Card className="border-primary/10 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm">
                             <CardHeader>
-                                <CardTitle className="text-sm">Go to My Day</CardTitle>
+                                <CardTitle className="text-sm">
+                                    Go to My Day
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 <p className="text-sm text-muted-foreground">
-                                    Your shifts, meds, and action items live on My Day.
+                                    Your shifts, meds, and action items live on
+                                    My Day.
                                 </p>
                                 <Button asChild size="sm" className="w-full">
                                     <Link href="/my-day">Open My Day</Link>
@@ -625,7 +726,9 @@ function StaffDashboard({ props }: { props: Props }) {
             {/* Row 3: Tasks list */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Tasks</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                        Tasks
+                    </h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
@@ -675,7 +778,7 @@ function HrAdminDashboard({ props }: { props: Props }) {
             <div>
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold">HR Metrics</h2>
-                    <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
+                    <div className="mt-2 h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-transparent"></div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <KpiCard
@@ -699,7 +802,11 @@ function HrAdminDashboard({ props }: { props: Props }) {
                     />
                     <KpiCard
                         label="Compliance Score"
-                        value={hr?.complianceScore != null ? `${hr.complianceScore}%` : '--'}
+                        value={
+                            hr?.complianceScore != null
+                                ? `${hr.complianceScore}%`
+                                : '--'
+                        }
                         icon={CheckCircle2}
                         trend={
                             hr?.complianceScore != null
@@ -723,19 +830,26 @@ function HrAdminDashboard({ props }: { props: Props }) {
             {/* Row 2: Charts */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Workforce Analytics</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                        Workforce Analytics
+                    </h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-5">
                     {/* Headcount trend line chart */}
-                    <Card className="lg:col-span-3 border-blue/10 bg-gradient-to-br from-card via-card to-blue/5 shadow-sm hover:shadow-md transition-shadow">
+                    <Card className="border-blue/10 to-blue/5 bg-gradient-to-br from-card via-card shadow-sm transition-shadow hover:shadow-md lg:col-span-3">
                         <CardHeader>
-                            <CardTitle className="text-sm">Headcount Trend (12 months)</CardTitle>
+                            <CardTitle className="text-sm">
+                                Headcount Trend (12 months)
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {headcountSeries.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={260}>
                                     <LineChart data={headcountSeries}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <CartesianGrid
+                                            strokeDasharray="3 3"
+                                            className="stroke-muted"
+                                        />
                                         <XAxis
                                             dataKey="name"
                                             tick={{ fontSize: 11 }}
@@ -747,7 +861,8 @@ function HrAdminDashboard({ props }: { props: Props }) {
                                         />
                                         <RechartsTooltip
                                             contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
+                                                backgroundColor:
+                                                    'hsl(var(--card))',
                                                 border: '1px solid hsl(var(--border))',
                                                 borderRadius: '0.75rem',
                                                 fontSize: 12,
@@ -758,7 +873,10 @@ function HrAdminDashboard({ props }: { props: Props }) {
                                             dataKey="headcount"
                                             stroke="var(--primary)"
                                             strokeWidth={2}
-                                            dot={{ r: 3, fill: 'var(--primary)' }}
+                                            dot={{
+                                                r: 3,
+                                                fill: 'var(--primary)',
+                                            }}
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>
@@ -771,9 +889,11 @@ function HrAdminDashboard({ props }: { props: Props }) {
                     </Card>
 
                     {/* Department breakdown donut */}
-                    <Card className="lg:col-span-2 border-purple/10 bg-gradient-to-br from-card via-card to-purple/5 shadow-sm hover:shadow-md transition-shadow">
+                    <Card className="border-purple/10 to-purple/5 bg-gradient-to-br from-card via-card shadow-sm transition-shadow hover:shadow-md lg:col-span-2">
                         <CardHeader>
-                            <CardTitle className="text-sm">Department Breakdown</CardTitle>
+                            <CardTitle className="text-sm">
+                                Department Breakdown
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="flex items-center justify-center">
                             {deptTotal > 0 ? (
@@ -797,13 +917,17 @@ function HrAdminDashboard({ props }: { props: Props }) {
             {/* Row 3: Recent activity + Expiring compliance */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Activity & Alerts</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                        Activity & Alerts
+                    </h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-2">
                     {/* Recent activity feed */}
-                    <Card className="border-cyan/10 bg-gradient-to-br from-card via-card to-cyan/5 shadow-sm">
+                    <Card className="border-cyan/10 to-cyan/5 bg-gradient-to-br from-card via-card shadow-sm">
                         <CardHeader>
-                            <CardTitle className="text-sm">Recent Activity</CardTitle>
+                            <CardTitle className="text-sm">
+                                Recent Activity
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {hr?.recentFeedPosts?.length ? (
@@ -817,9 +941,13 @@ function HrAdminDashboard({ props }: { props: Props }) {
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium">
-                                                        {post.user?.name ?? 'System'}
+                                                        {post.user?.name ??
+                                                            'System'}
                                                     </span>
-                                                    <Badge variant="secondary" className="text-[10px]">
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="text-[10px]"
+                                                    >
                                                         {post.post_type}
                                                     </Badge>
                                                 </div>
@@ -827,7 +955,9 @@ function HrAdminDashboard({ props }: { props: Props }) {
                                                     {post.content}
                                                 </div>
                                                 <div className="mt-1 text-xs text-muted-foreground">
-                                                    {formatShortDate(post.created_at)}
+                                                    {formatShortDate(
+                                                        post.created_at,
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -842,10 +972,17 @@ function HrAdminDashboard({ props }: { props: Props }) {
                     </Card>
 
                     {/* Expiring compliance */}
-                    <Card className="border-red/10 bg-gradient-to-br from-card via-card to-red/5 shadow-sm">
+                    <Card className="border-red/10 to-red/5 bg-gradient-to-br from-card via-card shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="text-sm">Expiring Compliance</CardTitle>
-                            <Button asChild size="sm" variant="outline" className="transition-all hover:border-red/30 hover:bg-red/5">
+                            <CardTitle className="text-sm">
+                                Expiring Compliance
+                            </CardTitle>
+                            <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="hover:border-red/30 hover:bg-red/5 transition-all"
+                            >
                                 <Link href="/hr/compliance">View all</Link>
                             </Button>
                         </CardHeader>
@@ -855,7 +992,7 @@ function HrAdminDashboard({ props }: { props: Props }) {
                                     {hr.expiringCompliance.map((item, i) => (
                                         <div
                                             key={`${item.user_id}-${i}`}
-                                            className="flex items-center justify-between gap-3 rounded-lg border border-red/10 bg-red/5 p-3 transition-colors hover:bg-red/10"
+                                            className="border-red/10 bg-red/5 hover:bg-red/10 flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors"
                                         >
                                             <div className="min-w-0">
                                                 <div className="text-sm font-medium">
@@ -865,8 +1002,14 @@ function HrAdminDashboard({ props }: { props: Props }) {
                                                     {item.requirement_name}
                                                 </div>
                                             </div>
-                                            <Badge variant="destructive" className="shrink-0 text-[10px]">
-                                                Expires {formatShortDate(item.expires_at)}
+                                            <Badge
+                                                variant="destructive"
+                                                className="shrink-0 text-[10px]"
+                                            >
+                                                Expires{' '}
+                                                {formatShortDate(
+                                                    item.expires_at,
+                                                )}
                                             </Badge>
                                         </div>
                                     ))}
@@ -902,7 +1045,8 @@ function ClientDashboard({ props }: { props: Props }) {
         <div className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-xl border p-4 lg:col-span-1">
                 <div className="text-sm font-semibold">
-                    {clientLabelSingular}: {props.client?.first_name} {props.client?.last_name}
+                    {clientLabelSingular}: {props.client?.first_name}{' '}
+                    {props.client?.last_name}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
                     Status: {props.client?.status ?? '--'}
@@ -915,10 +1059,15 @@ function ClientDashboard({ props }: { props: Props }) {
                     <div className="mt-2 space-y-2">
                         {props.assignedStaff?.length ? (
                             props.assignedStaff.map((s) => (
-                                <div key={s.id} className="rounded-md border p-2 text-sm">
+                                <div
+                                    key={s.id}
+                                    className="rounded-md border p-2 text-sm"
+                                >
                                     <div className="font-medium">{s.name}</div>
                                     {s.email && (
-                                        <div className="text-xs text-muted-foreground">{s.email}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {s.email}
+                                        </div>
                                     )}
                                 </div>
                             ))

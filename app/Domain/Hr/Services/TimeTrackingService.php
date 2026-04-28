@@ -136,44 +136,9 @@ class TimeTrackingService
      */
     public function submitTimesheet(HrTimesheet $timesheet, User $user): HrTimesheet
     {
-        if ($timesheet->status !== 'draft') {
-            throw new \LogicException("Cannot submit a '{$timesheet->status}' timesheet.");
-        }
-
-        $timesheet = DB::transaction(function () use ($timesheet, $user) {
-            // Calculate total hours from entries in the period
-            $totalHours = HrTimeEntry::forTenant($timesheet->tenant_id)
-                ->forUser($timesheet->user_id)
-                ->forDateRange(
-                    $timesheet->period_start->toDateString(),
-                    $timesheet->period_end->toDateString()
-                )
-                ->whereNotNull('clock_out')
-                ->sum('total_hours');
-
-            $timesheet->update([
-                'status' => 'submitted',
-                'total_hours' => $totalHours,
-                'submitted_at' => now(),
-            ]);
-
-            // Mark related entries as submitted
-            HrTimeEntry::forTenant($timesheet->tenant_id)
-                ->forUser($timesheet->user_id)
-                ->forDateRange(
-                    $timesheet->period_start->toDateString(),
-                    $timesheet->period_end->toDateString()
-                )
-                ->where('status', 'active')
-                ->whereNotNull('clock_out')
-                ->update(['status' => 'submitted']);
-
-            return $timesheet->fresh();
-        });
-
-        app(HrNotificationService::class)->notifyTimesheetSubmitted($timesheet);
-
-        return $timesheet;
+        return app(HrTimesheetApprovalService::class)
+            ->submit($timesheet, $user)
+            ->timesheet;
     }
 
     /**
@@ -181,33 +146,9 @@ class TimeTrackingService
      */
     public function approveTimesheet(HrTimesheet $timesheet, User $approver): HrTimesheet
     {
-        if ($timesheet->status !== 'submitted') {
-            throw new \LogicException("Cannot approve a '{$timesheet->status}' timesheet.");
-        }
-
-        return DB::transaction(function () use ($timesheet, $approver) {
-            $timesheet->update([
-                'status' => 'approved',
-                'approved_by' => $approver->id,
-                'approved_at' => now(),
-            ]);
-
-            // Approve related entries
-            HrTimeEntry::forTenant($timesheet->tenant_id)
-                ->forUser($timesheet->user_id)
-                ->forDateRange(
-                    $timesheet->period_start->toDateString(),
-                    $timesheet->period_end->toDateString()
-                )
-                ->where('status', 'submitted')
-                ->update([
-                    'status' => 'approved',
-                    'approved_by' => $approver->id,
-                    'approved_at' => now(),
-                ]);
-
-            return $timesheet->fresh();
-        });
+        return app(HrTimesheetApprovalService::class)
+            ->approve($timesheet, $approver)
+            ->timesheet;
     }
 
     /**
@@ -215,30 +156,9 @@ class TimeTrackingService
      */
     public function rejectTimesheet(HrTimesheet $timesheet, User $reviewer, string $reason): HrTimesheet
     {
-        if ($timesheet->status !== 'submitted') {
-            throw new \LogicException("Cannot reject a '{$timesheet->status}' timesheet.");
-        }
-
-        return DB::transaction(function () use ($timesheet, $reviewer, $reason) {
-            $timesheet->update([
-                'status' => 'rejected',
-                'approved_by' => $reviewer->id,
-                'approved_at' => now(),
-                'rejection_reason' => $reason,
-            ]);
-
-            // Reset related entries to active
-            HrTimeEntry::forTenant($timesheet->tenant_id)
-                ->forUser($timesheet->user_id)
-                ->forDateRange(
-                    $timesheet->period_start->toDateString(),
-                    $timesheet->period_end->toDateString()
-                )
-                ->where('status', 'submitted')
-                ->update(['status' => 'rejected']);
-
-            return $timesheet->fresh();
-        });
+        return app(HrTimesheetApprovalService::class)
+            ->reject($timesheet, $reviewer, $reason)
+            ->timesheet;
     }
 
     /**
@@ -418,32 +338,9 @@ class TimeTrackingService
 
     public function returnTimesheet(HrTimesheet $timesheet, User $reviewer, string $notes): HrTimesheet
     {
-        if ($timesheet->status !== 'submitted') {
-            throw new \LogicException("Cannot return a '{$timesheet->status}' timesheet.");
-        }
-
-        return DB::transaction(function () use ($timesheet, $reviewer, $notes) {
-            $timesheet->update([
-                'status' => 'draft',
-                'returned_by' => $reviewer->id,
-                'returned_at' => now(),
-                'returned_notes' => $notes,
-                'approved_by' => null,
-                'approved_at' => null,
-            ]);
-
-            // Reset related entries to active
-            HrTimeEntry::forTenant($timesheet->tenant_id)
-                ->forUser($timesheet->user_id)
-                ->forDateRange(
-                    $timesheet->period_start->toDateString(),
-                    $timesheet->period_end->toDateString()
-                )
-                ->where('status', 'submitted')
-                ->update(['status' => 'active']);
-
-            return $timesheet->fresh();
-        });
+        return app(HrTimesheetApprovalService::class)
+            ->returnForChanges($timesheet, $reviewer, $notes)
+            ->timesheet;
     }
 
     /* ------------------------------------------------------------------ */
@@ -452,40 +349,22 @@ class TimeTrackingService
 
     public function bulkApproveTimesheets(array $ids, User $approver, ?string $notes = null): int
     {
-        $count = 0;
-        foreach ($ids as $id) {
-            $ts = HrTimesheet::find($id);
-            if ($ts && $ts->status === 'submitted') {
-                $this->approveTimesheet($ts, $approver);
-                $count++;
-            }
-        }
-        return $count;
+        return app(HrTimesheetApprovalService::class)
+            ->bulkApprove(HrTimesheet::query()->whereIn('id', $ids)->get(), $approver, $notes)
+            ->changedCount();
     }
 
     public function bulkRejectTimesheets(array $ids, User $reviewer, string $reason): int
     {
-        $count = 0;
-        foreach ($ids as $id) {
-            $ts = HrTimesheet::find($id);
-            if ($ts && $ts->status === 'submitted') {
-                $this->rejectTimesheet($ts, $reviewer, $reason);
-                $count++;
-            }
-        }
-        return $count;
+        return app(HrTimesheetApprovalService::class)
+            ->bulkReject(HrTimesheet::query()->whereIn('id', $ids)->get(), $reviewer, $reason)
+            ->changedCount();
     }
 
     public function bulkReturnTimesheets(array $ids, User $reviewer, string $notes): int
     {
-        $count = 0;
-        foreach ($ids as $id) {
-            $ts = HrTimesheet::find($id);
-            if ($ts && $ts->status === 'submitted') {
-                $this->returnTimesheet($ts, $reviewer, $notes);
-                $count++;
-            }
-        }
-        return $count;
+        return app(HrTimesheetApprovalService::class)
+            ->bulkReturn(HrTimesheet::query()->whereIn('id', $ids)->get(), $reviewer, $notes)
+            ->changedCount();
     }
 }

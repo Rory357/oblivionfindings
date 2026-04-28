@@ -9,6 +9,7 @@ import TimesheetEditSheet, {
 import { Button } from '@/components/ui/button';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
+import { edit as editTimesheet } from '@/routes/operations/timesheets';
 
 /**
  * `<TimesheetReturnBanner>` — inline banner for returned / needs-changes
@@ -35,9 +36,8 @@ export type TimesheetReturnBannerProps = {
     /** Manager / reviewer return note, if any. Whitespace is preserved. */
     returnNote?: string | null;
     /**
-     * Override the edit-page URL. Defaults to `/timesheets/{id}/edit`, which
-     * the active `TimesheetController::edit` route handles for both staff and
-     * operations users.
+     * Override the edit-page URL. Defaults to the canonical operations edit
+     * URL. My Day callers should pass `timesheet` for inline editing.
      */
     editHref?: string;
     /** Hide the primary action — useful on the edit page itself. */
@@ -61,7 +61,7 @@ export function TimesheetReturnBanner({
 }: TimesheetReturnBannerProps) {
     const t = useMyDayLabels();
     const [editOpen, setEditOpen] = useState(false);
-    const href = editHref ?? `/timesheets/${timesheetId}/edit`;
+    const href = editHref ?? editTimesheet.url(timesheetId);
     const trimmedNote = returnNote?.trim() ?? '';
 
     return (

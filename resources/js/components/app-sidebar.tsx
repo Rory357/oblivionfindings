@@ -2156,7 +2156,7 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
     if (can?.hr?.time?.view) {
         workforce.items.push({
-            title: 'Time Tracking',
+            title: 'Timekeeping',
             href: '/hr/time',
             icon: Clock,
         });

@@ -10,7 +10,7 @@ test('timesheets index page loads', function () {
         $browser->loginAs($user)
             ->visit('/timesheets')
             ->waitForText('Timesheet', 10)
-            ->assertPathIs('/timesheets');
+            ->assertPathIs('/operations/timesheets');
     });
 });
 
@@ -21,7 +21,7 @@ test('timesheets approvals page loads', function () {
         $browser->loginAs($user)
             ->visit('/timesheets/approvals')
             ->waitForText('Approval', 10)
-            ->assertPathIs('/timesheets/approvals');
+            ->assertPathIs('/operations/timesheets/approvals');
     });
 });
 
@@ -32,6 +32,6 @@ test('timesheets create page loads', function () {
         $browser->loginAs($user)
             ->visit('/timesheets/create')
             ->waitForText('Timesheet', 10)
-            ->assertPathIs('/timesheets/create');
+            ->assertPathIs('/operations/timesheets/create');
     });
 });

@@ -1,0 +1,39 @@
+stateDiagram-v2
+    [*] --> draft: shift created without assigned staff
+    [*] --> scheduled: shift created with assigned staff
+
+    draft --> scheduled: assign or publish
+    scheduled --> in_progress: manual start or attendance clock-in
+    in_progress --> completed: manual complete or attendance clock-out
+
+    draft --> cancelled: cancel occurrence
+    scheduled --> cancelled: cancel occurrence
+    in_progress --> cancelled: exceptional cancellation path
+
+    cancelled --> draft: reopen without assignee
+    cancelled --> scheduled: reopen with assignee
+
+    completed --> [*]
+
+    state "Timesheet workflow" as TimesheetWorkflow {
+        [*] --> timesheet_draft: draft created from shift/session/reconcile
+        timesheet_draft --> submitted: submit or resubmit
+        submitted --> approved: approve
+        submitted --> returned: return for changes
+        submitted --> rejected: reject
+        returned --> submitted: resubmit
+        approved --> [*]: payroll-ready original is locked
+        rejected --> [*]
+    }
+
+    completed --> timesheet_draft: draft timesheet sync
+
+    note right of completed
+        Approved timesheets lock payroll-critical shift fields.
+        Snapshot columns are immutable payroll evidence.
+    end note
+
+    note right of cancelled
+        Cancelled shifts stay excluded from fatigue checks.
+        Approved-timesheet shifts cannot be cancelled.
+    end note

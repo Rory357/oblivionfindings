@@ -93,7 +93,7 @@ class MyHrController extends Controller
             ->where('status', 'published')
             ->count();
 
-        // Time tracking
+        // Timekeeping
         $activeClock = HrTimeEntry::forTenant($tenantId)
             ->forUser($user->id)
             ->active()
@@ -635,7 +635,7 @@ class MyHrController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Time Tracking (Self-Service)                                       */
+    /*  Timekeeping (Self-Service)                                         */
     /* ------------------------------------------------------------------ */
 
     public function time(Request $request)

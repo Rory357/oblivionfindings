@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Models\HrTimesheet;
+use App\Domain\Hr\Services\HrTimesheetApprovalService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\BulkTimesheetActionRequest;
@@ -18,6 +19,7 @@ class TimeTrackingController extends Controller
 {
     public function __construct(
         private readonly TimeTrackingService $timeTrackingService,
+        private readonly HrTimesheetApprovalService $timesheetApprovals,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -55,7 +57,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Index — time tracking dashboard */
+    /*  Index — timekeeping dashboard */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -460,7 +462,7 @@ class TimeTrackingController extends Controller
         abort_unless($user && $user->id === $timesheet->user_id, 403);
 
         try {
-            $this->timeTrackingService->submitTimesheet($timesheet, $user);
+            $this->timesheetApprovals->submit($timesheet, $user);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -476,9 +478,10 @@ class TimeTrackingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        $this->assertCanReviewTimesheet($timesheet, $user);
 
         try {
-            $this->timeTrackingService->approveTimesheet($timesheet, $user);
+            $this->timesheetApprovals->approve($timesheet, $user, $request->input('notes'));
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -500,7 +503,8 @@ class TimeTrackingController extends Controller
         ]);
 
         try {
-            $this->timeTrackingService->rejectTimesheet(
+            $this->assertCanReviewTimesheet($timesheet, $user);
+            $this->timesheetApprovals->reject(
                 $timesheet,
                 $user,
                 $validated['rejection_reason'],
@@ -526,7 +530,8 @@ class TimeTrackingController extends Controller
         ]);
 
         try {
-            $this->timeTrackingService->returnTimesheet($timesheet, $user, $validated['notes']);
+            $this->assertCanReviewTimesheet($timesheet, $user);
+            $this->timesheetApprovals->returnForChanges($timesheet, $user, $validated['notes']);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -543,11 +548,10 @@ class TimeTrackingController extends Controller
         $user = $request->user();
         $validated = $request->validated();
 
-        $count = $this->timeTrackingService->bulkApproveTimesheets(
-            $validated['ids'],
-            $user,
-            $validated['notes'] ?? null,
-        );
+        $timesheets = $this->reviewableTimesheets($validated['ids'], $user);
+        $count = $this->timesheetApprovals
+            ->bulkApprove($timesheets, $user, $validated['notes'] ?? null)
+            ->changedCount();
 
         return redirect()->back()->with('success', "{$count} timesheet(s) approved.");
     }
@@ -559,11 +563,10 @@ class TimeTrackingController extends Controller
 
         abort_unless(! empty($validated['reason']), 422, 'Rejection reason is required.');
 
-        $count = $this->timeTrackingService->bulkRejectTimesheets(
-            $validated['ids'],
-            $user,
-            $validated['reason'],
-        );
+        $timesheets = $this->reviewableTimesheets($validated['ids'], $user);
+        $count = $this->timesheetApprovals
+            ->bulkReject($timesheets, $user, $validated['reason'])
+            ->changedCount();
 
         return redirect()->back()->with('success', "{$count} timesheet(s) rejected.");
     }
@@ -575,12 +578,45 @@ class TimeTrackingController extends Controller
 
         abort_unless(! empty($validated['notes']), 422, 'Return notes are required.');
 
-        $count = $this->timeTrackingService->bulkReturnTimesheets(
-            $validated['ids'],
-            $user,
-            $validated['notes'],
-        );
+        $timesheets = $this->reviewableTimesheets($validated['ids'], $user);
+        $count = $this->timesheetApprovals
+            ->bulkReturn($timesheets, $user, $validated['notes'])
+            ->changedCount();
 
         return redirect()->back()->with('success', "{$count} timesheet(s) returned for changes.");
+    }
+
+    private function assertCanReviewTimesheet(HrTimesheet $timesheet, $user): void
+    {
+        $access = $this->resolveAccess($user);
+
+        abort_unless($access['canApproveAny'], 403);
+
+        $allowed = HrTimesheet::query()
+            ->whereKey($timesheet->id)
+            ->tap(fn ($query) => $this->applyAccessScope($query, $user, $access))
+            ->exists();
+
+        abort_unless($allowed, 403);
+    }
+
+    /**
+     * @param  array<int, int>  $ids
+     * @return \Illuminate\Support\Collection<int, HrTimesheet>
+     */
+    private function reviewableTimesheets(array $ids, $user)
+    {
+        $access = $this->resolveAccess($user);
+
+        abort_unless($access['canApproveAny'], 403);
+
+        $timesheets = HrTimesheet::query()
+            ->whereIn('id', $ids)
+            ->tap(fn ($query) => $this->applyAccessScope($query, $user, $access))
+            ->get();
+
+        abort_if($timesheets->count() !== count(array_unique($ids)), 403, 'You are not authorized to review one or more selected timesheets.');
+
+        return $timesheets;
     }
 }

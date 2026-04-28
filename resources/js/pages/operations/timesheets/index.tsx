@@ -18,6 +18,15 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import {
+    bulkApprove as bulkApproveRoute,
+    bulkReject as bulkRejectRoute,
+    bulkReturn as bulkReturnRoute,
+    create as createTimesheet,
+    edit as editTimesheet,
+    approvals as timesheetApprovals,
+    index as timesheetsIndex,
+} from '@/routes/operations/timesheets';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, CheckCircle2, Clock, FileText, Send } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
@@ -97,6 +106,21 @@ export default function TimesheetsIndex({
     const [bulkAction, setBulkAction] = useState<
         'approve' | 'return' | 'reject' | null
     >(null);
+    const listHref = isApprovalMode
+        ? timesheetApprovals.url()
+        : timesheetsIndex.url();
+    const listUrl = (query?: Record<string, any>) =>
+        isApprovalMode
+            ? timesheetApprovals.url({ query })
+            : timesheetsIndex.url({ query });
+    const filterQuery = (next: Partial<Props['filters']>) => {
+        const query = { ...filters, ...next };
+        if (isApprovalMode) {
+            delete query.mode;
+        }
+
+        return query;
+    };
 
     const toggleAll = () => {
         if (allSelected) {
@@ -112,7 +136,7 @@ export default function TimesheetsIndex({
         if (selectedIds.length === 0) return;
         setBulkError(null);
         router.post(
-            '/timesheets/bulk-approve',
+            bulkApproveRoute.url(),
             { ids: selectedIds, decision_notes: decisionNotes || null },
             {
                 preserveScroll: true,
@@ -136,7 +160,7 @@ export default function TimesheetsIndex({
         }
         setBulkError(null);
         router.post(
-            '/timesheets/bulk-return',
+            bulkReturnRoute.url(),
             { ids: selectedIds, returned_notes: returnedNotes },
             {
                 preserveScroll: true,
@@ -158,7 +182,7 @@ export default function TimesheetsIndex({
         }
         setBulkError(null);
         router.post(
-            '/timesheets/bulk-reject',
+            bulkRejectRoute.url(),
             { ids: selectedIds, decision_notes: decisionNotes },
             {
                 preserveScroll: true,
@@ -183,9 +207,7 @@ export default function TimesheetsIndex({
     }, [timesheets.data]);
 
     return (
-        <AppLayout
-            breadcrumbs={[{ title: timesheetPlural, href: '/timesheets' }]}
-        >
+        <AppLayout breadcrumbs={[{ title: timesheetPlural, href: listHref }]}>
             <Head
                 title={isApprovalMode ? 'Timesheet Approvals' : timesheetPlural}
             />
@@ -205,20 +227,20 @@ export default function TimesheetsIndex({
                         <div className="flex items-center gap-2">
                             {isApprovalMode ? (
                                 <Button asChild>
-                                    <Link href="/operations/timesheets">
+                                    <Link href={timesheetsIndex.url()}>
                                         All timesheets
                                     </Link>
                                 </Button>
                             ) : canApprove ? (
                                 <Button asChild>
-                                    <Link href="/operations/timesheets?mode=approvals">
+                                    <Link href={timesheetApprovals.url()}>
                                         Approval queue
                                     </Link>
                                 </Button>
                             ) : null}
                             {canCreate && !isApprovalMode ? (
                                 <Button asChild>
-                                    <Link href="/operations/timesheets/create">
+                                    <Link href={createTimesheet.url()}>
                                         Create
                                     </Link>
                                 </Button>
@@ -288,11 +310,13 @@ export default function TimesheetsIndex({
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) =>
                                     router.get(
-                                        '/operations/timesheets',
-                                        {
-                                            ...filters,
-                                            status: v === ANY ? undefined : v,
-                                        },
+                                        listUrl(
+                                            filterQuery({
+                                                status:
+                                                    v === ANY ? undefined : v,
+                                            }),
+                                        ),
+                                        {},
                                         { preserveState: true, replace: true },
                                     )
                                 }
@@ -331,11 +355,12 @@ export default function TimesheetsIndex({
                             value={filters.from ?? ''}
                             onChange={(e) =>
                                 router.get(
-                                    '/operations/timesheets',
-                                    {
-                                        ...filters,
-                                        from: e.target.value || undefined,
-                                    },
+                                    listUrl(
+                                        filterQuery({
+                                            from: e.target.value || undefined,
+                                        }),
+                                    ),
+                                    {},
                                     { preserveState: true, replace: true },
                                 )
                             }
@@ -351,11 +376,12 @@ export default function TimesheetsIndex({
                             value={filters.to ?? ''}
                             onChange={(e) =>
                                 router.get(
-                                    '/operations/timesheets',
-                                    {
-                                        ...filters,
-                                        to: e.target.value || undefined,
-                                    },
+                                    listUrl(
+                                        filterQuery({
+                                            to: e.target.value || undefined,
+                                        }),
+                                    ),
+                                    {},
                                     { preserveState: true, replace: true },
                                 )
                             }
@@ -375,12 +401,15 @@ export default function TimesheetsIndex({
                                     }
                                     onValueChange={(v) =>
                                         router.get(
-                                            '/operations/timesheets',
-                                            {
-                                                ...filters,
-                                                client_id:
-                                                    v === ANY ? undefined : v,
-                                            },
+                                            listUrl(
+                                                filterQuery({
+                                                    client_id:
+                                                        v === ANY
+                                                            ? undefined
+                                                            : v,
+                                                }),
+                                            ),
+                                            {},
                                             {
                                                 preserveState: true,
                                                 replace: true,
@@ -418,12 +447,15 @@ export default function TimesheetsIndex({
                                     }
                                     onValueChange={(v) =>
                                         router.get(
-                                            '/operations/timesheets',
-                                            {
-                                                ...filters,
-                                                staff_id:
-                                                    v === ANY ? undefined : v,
-                                            },
+                                            listUrl(
+                                                filterQuery({
+                                                    staff_id:
+                                                        v === ANY
+                                                            ? undefined
+                                                            : v,
+                                                }),
+                                            ),
+                                            {},
                                             {
                                                 preserveState: true,
                                                 replace: true,
@@ -456,8 +488,8 @@ export default function TimesheetsIndex({
                         size="sm"
                         onClick={() =>
                             router.get(
-                                '/operations/timesheets',
-                                isApprovalMode ? { mode: 'approvals' } : {},
+                                listUrl(),
+                                {},
                                 { preserveState: true, replace: true },
                             )
                         }
@@ -647,7 +679,9 @@ export default function TimesheetsIndex({
                                                     returnNote={
                                                         t.returned_notes
                                                     }
-                                                    editHref={`/operations/timesheets/${t.id}/edit`}
+                                                    editHref={editTimesheet.url(
+                                                        t.id,
+                                                    )}
                                                 />
                                             </div>
                                         ) : null}
@@ -670,7 +704,9 @@ export default function TimesheetsIndex({
                                                 variant="outline"
                                             >
                                                 <Link
-                                                    href={`/operations/timesheets/${t.id}/edit`}
+                                                    href={editTimesheet.url(
+                                                        t.id,
+                                                    )}
                                                 >
                                                     View
                                                 </Link>
@@ -889,7 +925,9 @@ export default function TimesheetsIndex({
                                                     <td className="p-3">
                                                         <div className="flex items-center justify-end gap-2">
                                                             <Link
-                                                                href={`/operations/timesheets/${t.id}/edit`}
+                                                                href={editTimesheet.url(
+                                                                    t.id,
+                                                                )}
                                                             >
                                                                 <Button
                                                                     variant="ghost"
@@ -926,7 +964,9 @@ export default function TimesheetsIndex({
                                                                 returnNote={
                                                                     t.returned_notes
                                                                 }
-                                                                editHref={`/operations/timesheets/${t.id}/edit`}
+                                                                editHref={editTimesheet.url(
+                                                                    t.id,
+                                                                )}
                                                             />
                                                         </td>
                                                     </tr>
@@ -954,7 +994,7 @@ export default function TimesheetsIndex({
                         itemName="timesheet"
                         createHref={
                             canCreate && !isApprovalMode
-                                ? '/operations/timesheets/create'
+                                ? createTimesheet.url()
                                 : undefined
                         }
                         createLabel="Create timesheet"

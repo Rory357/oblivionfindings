@@ -518,7 +518,7 @@ class ShiftSeriesController extends Controller
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'shift series', $seriesModel, $client, [
             'title' => 'Recurring shifts created',
             'body' => 'Created ' . ($result['count'] ?? 0) . ' shifts.',
-            'url' => url('/shifts'),
+            'url' => url('/operations/shifts'),
             'target_user_ids' => array_values(array_filter([$data['user_id'] ?? null])),
         ]);
 
@@ -529,7 +529,7 @@ class ShiftSeriesController extends Controller
             ], 201);
         }
 
-        return redirect($data['return_to'] ?? route('shifts.index'))
+        return redirect($data['return_to'] ?? route('operations.shifts.index'))
             ->with('success', 'Recurring shifts created (' . $result['count'] . ').');
     }
 

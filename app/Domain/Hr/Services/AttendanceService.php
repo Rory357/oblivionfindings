@@ -5,19 +5,18 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrAttendanceBreakEvent;
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Shifts\Lifecycle\Data\CompleteShiftData;
+use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
+use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
+use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
-use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\Operations\PayrollRateResolver;
-use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftHandoverService;
-use App\Services\ShiftOperationalSnapshotService;
-use App\Services\ShiftTimelineService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +42,6 @@ class AttendanceService
         $clockInAt = isset($data['clock_in_at']) ? Carbon::parse($data['clock_in_at']) : now();
         $shift = $this->resolveShift($user, $data, $clockInAt);
         $siteId = $data['site_id'] ?? $shift?->site_id ?? $shift?->client?->site_id;
-        $shouldRecordShiftStart = $shift && in_array($shift->status, ['draft', 'scheduled'], true);
 
         $session = DB::transaction(function () use ($user, $data, $clockInAt, $shift, $siteId) {
             $session = HrAttendanceSession::create([
@@ -61,23 +59,16 @@ class AttendanceService
             ]);
 
             if ($shift && in_array($shift->status, ['draft', 'scheduled'], true)) {
-                $shift->update([
-                    'status' => 'in_progress',
-                    'actual_starts_at' => $shift->actual_starts_at ?? $clockInAt,
-                    'started_by' => $shift->started_by ?? $user->id,
-                ]);
+                app(ShiftLifecycleService::class)->start(
+                    $shift,
+                    $user,
+                    $clockInAt,
+                    ShiftLifecycleSource::ClockIn,
+                );
             }
 
             return $session->fresh(['shift.client', 'timesheet']);
         });
-
-        if ($shouldRecordShiftStart && $session->shift) {
-            app(ShiftTimelineService::class)->recordStarted(
-                $session->shift->fresh(),
-                $user,
-                $session->clock_in_at,
-            );
-        }
 
         return $session->fresh(['shift.client', 'timesheet']);
     }
@@ -150,14 +141,19 @@ class AttendanceService
             $this->closeOpenBreakEvent($session, $clockOutAt, $openBreakStartedAt);
 
             if ($session->shift && in_array($session->shift->status, ['in_progress', 'active', 'clocked_in', 'started'], true)) {
-                $session->shift->update([
-                    'status' => 'completed',
-                    'actual_ends_at' => $session->shift->actual_ends_at ?? $clockOutAt,
-                    'completed_by' => $session->shift->completed_by ?? $user->id,
-                ]);
+                app(ShiftLifecycleService::class)->complete(
+                    $session->shift,
+                    $user,
+                    CompleteShiftData::fromClockOutSession(
+                        $session->fresh(['shift']) ?? $session,
+                        $force,
+                        $overrideReason,
+                        $blockers !== [] && $force ? ['forced_clock_out' => true] : [],
+                    ),
+                );
             }
 
-            $this->syncTimesheetFromSession($session->fresh(['shift']), $user->id, $data);
+            app(DraftTimesheetService::class)->fromAttendanceSession($session->fresh(['shift']), $user->id, $data);
 
             if ($blockers !== [] && $force) {
                 AuditLogger::log('attendance.clockOut.forced', $session, [
@@ -170,15 +166,6 @@ class AttendanceService
 
             return $session->fresh(['shift.client', 'timesheet']);
         });
-
-        if ($closedSession->shift) {
-            app(ShiftTimelineService::class)->recordCompleted(
-                $closedSession->shift->fresh(),
-                $user,
-                $closedSession->clock_out_at,
-                $blockers !== [] && $force ? ['forced_clock_out' => true] : [],
-            );
-        }
 
         return $closedSession;
     }
@@ -475,87 +462,4 @@ class AttendanceService
         return $unsigned;
     }
 
-    protected function syncTimesheetFromSession(HrAttendanceSession $session, int $actorId, array $data = []): ?Timesheet
-    {
-        if (! $session->clock_out_at) {
-            return null;
-        }
-
-        $reconciler = app(TimesheetReconciliationService::class);
-
-        $timesheet = Timesheet::query()
-            ->where('attendance_session_id', $session->id)
-            ->first();
-
-        if (! $timesheet && $session->shift_id) {
-            $timesheet = Timesheet::query()
-                ->where('shift_id', $session->shift_id)
-                ->where('user_id', $session->user_id)
-                ->first();
-        }
-
-        $clientId = $session->shift?->client_id ?? ($data['client_id'] ?? null);
-        if (! $clientId) {
-            return null;
-        }
-
-        $snapshot = $session->shift
-            ? app(ShiftOperationalSnapshotService::class)->snapshotForShift($session->shift, User::query()->find($session->user_id))
-            : null;
-
-        $payload = [
-            'user_id' => $session->user_id,
-            'client_id' => $clientId,
-            'shift_id' => $session->shift_id,
-            'shift_site_id' => $snapshot['site_id'] ?? null,
-            'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
-            'work_date' => $session->clock_in_at->toDateString(),
-            'starts_at' => $session->clock_in_at,
-            'ends_at' => $session->clock_out_at,
-            'break_minutes' => (int) ($session->break_minutes ?? 0),
-            'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
-            'shift_location_snapshot' => $snapshot['location'] ?? null,
-            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? null,
-            'client_name_snapshot' => $snapshot['client_name'] ?? null,
-            'staff_name_snapshot' => $snapshot['staff_name'] ?? null,
-            'shift_type_snapshot' => $snapshot['shift_type'] ?? null,
-            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? [],
-            'status' => 'draft',
-            'created_by' => $actorId,
-        ];
-
-        if (! $timesheet) {
-            Timesheet::ensureNoDuplicateShiftUserPair(
-                $session->shift_id ? (int) $session->shift_id : null,
-                (int) $session->user_id,
-            );
-
-            $timesheet = Timesheet::query()->create([
-                ...$payload,
-                'attendance_session_id' => $session->id,
-            ]);
-        } elseif (in_array($timesheet->status, ['draft', 'returned'], true)) {
-            $timesheet->update([
-                ...$payload,
-                'attendance_session_id' => $timesheet->attendance_session_id ?: $session->id,
-            ]);
-            $timesheet = $timesheet->fresh();
-        } else {
-            $reconciler->reconcile($timesheet->fresh(), $session);
-
-            return $timesheet->fresh();
-        }
-
-        $timesheet->loadMissing(['shift.site:id,name', 'shift.client:id,first_name,last_name,site_id', 'shift.serviceContext:id,name', 'user.hrEmployeeProfile']);
-        $rate = app(PayrollRateResolver::class)->resolve($timesheet);
-        $timesheet->forceFill([
-            'pay_type' => $rate['pay_type'],
-            'pay_rate' => $rate['pay_rate'],
-        ])->saveQuietly();
-
-        $timesheet = $timesheet->fresh();
-        $reconciler->reconcile($timesheet, $session);
-
-        return $timesheet->fresh();
-    }
 }

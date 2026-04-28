@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
+import { resubmit as resubmitTimesheet } from '@/routes/operations/timesheets';
 
 export type InlineTimesheet = {
     id: number;
@@ -77,7 +78,8 @@ export default function TimesheetEditSheet({
 
     const errorMessages = useMemo(() => {
         const messages: string[] = [];
-        const errors = (page.props as { errors?: Record<string, unknown> }).errors;
+        const errors = (page.props as { errors?: Record<string, unknown> })
+            .errors;
         if (errors) {
             for (const value of Object.values(errors)) {
                 if (typeof value === 'string' && value !== '') {
@@ -97,7 +99,7 @@ export default function TimesheetEditSheet({
         setSubmitting(true);
 
         router.post(
-            `/timesheets/${timesheet.id}/resubmit`,
+            resubmitTimesheet.url(timesheet.id),
             {
                 client_id: timesheet.client_id,
                 work_date: timesheet.work_date_iso,

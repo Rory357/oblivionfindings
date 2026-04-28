@@ -1,13 +1,19 @@
-import HeadingSmall from '@/components/heading-small';
 import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
-import { EligibilityStatusBadge } from '@/components/eligibility/eligibility-status-badge';
+import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import {
+    edit as editShift,
+    eligibility_preview as eligibilityPreview,
+    index as shiftsIndex,
+    update as updateShift,
+} from '@/routes/operations/shifts';
+import { update as updateShiftTask } from '@/routes/operations/shifts/tasks';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Client = {
     id: number;
@@ -88,23 +94,20 @@ export default function ShiftEdit({
         setTaskBusyId(task.id);
         setTaskError(null);
         try {
-            const res = await fetch(
-                `/operations/shifts/${shift.id}/tasks/${task.id}`,
-                {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': (
-                            document.querySelector(
-                                'meta[name="csrf-token"]',
-                            ) as HTMLMetaElement
-                        )?.content,
-                    },
-                    body: JSON.stringify({ is_completed: checked }),
-                    credentials: 'same-origin',
+            const res = await fetch(updateShiftTask.url([shift.id, task.id]), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': (
+                        document.querySelector(
+                            'meta[name="csrf-token"]',
+                        ) as HTMLMetaElement
+                    )?.content,
                 },
-            );
+                body: JSON.stringify({ is_completed: checked }),
+                credentials: 'same-origin',
+            });
             if (!res.ok) {
                 const data = await res.json().catch(() => null);
                 throw new Error(data?.message ?? 'Failed to update task');
@@ -150,22 +153,26 @@ export default function ShiftEdit({
             setEligLoading(true);
 
             try {
-                const params = new URLSearchParams({
+                const query: Record<string, string | string[]> = {
                     user_id: String(userId),
                     starts_at: startsAt,
                     ends_at: endsAt,
                     shift_id: String(shift.id),
-                });
+                };
 
-                if (shift.site_id) params.set('site_id', String(shift.site_id));
-                if (form.data.shift_type) params.set('shift_type', form.data.shift_type);
+                if (shift.site_id) query.site_id = String(shift.site_id);
+                if (form.data.shift_type)
+                    query.shift_type = form.data.shift_type;
                 if (form.data.coverage_roles?.length) {
-                    form.data.coverage_roles.forEach((r: string) => params.append('coverage_roles[]', r));
+                    query.coverage_roles = form.data.coverage_roles;
                 }
 
-                const res = await fetch(`/operations/shifts/eligibility-preview?${params}`, {
+                const res = await fetch(eligibilityPreview.url({ query }), {
                     signal: controller.signal,
-                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
                     credentials: 'same-origin',
                 });
                 if (!res.ok) throw new Error('preview failed');
@@ -177,7 +184,15 @@ export default function ShiftEdit({
                 if (!controller.signal.aborted) setEligLoading(false);
             }
         }, 500);
-    }, [form.data.user_id, form.data.starts_at, form.data.ends_at, form.data.shift_type, form.data.coverage_roles, shift.id, shift.site_id]);
+    }, [
+        form.data.user_id,
+        form.data.starts_at,
+        form.data.ends_at,
+        form.data.shift_type,
+        form.data.coverage_roles,
+        shift.id,
+        shift.site_id,
+    ]);
 
     useEffect(() => {
         fetchEligibility();
@@ -193,9 +208,9 @@ export default function ShiftEdit({
             breadcrumbs={[
                 {
                     title: labels?.['shift.plural'] ?? 'Shifts',
-                    href: '/shifts',
+                    href: shiftsIndex.url(),
                 },
-                { title: `Edit`, href: `/operations/shifts/${shift.id}/edit` },
+                { title: `Edit`, href: editShift.url(shift.id) },
             ]}
         >
             <Head title={`Edit ${shiftLabel}`} />
@@ -233,7 +248,7 @@ export default function ShiftEdit({
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
-                        form.put(`/operations/shifts/${shift.id}`);
+                        form.put(updateShift.url(shift.id));
                     }}
                     className="space-y-4"
                 >

@@ -1,9 +1,10 @@
-import AppLayout from '@/layouts/app-layout';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
+import { show as showShift } from '@/routes/operations/shifts';
 import { Head, Link, router } from '@inertiajs/react';
 
 type Props = {
@@ -21,23 +22,29 @@ export default function RespiteBookingShow({ booking }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Booking', href: `/respite/bookings/${booking.id}` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Booking', href: `/respite/bookings/${booking.id}` },
+            ]}
+        >
             <Head title="Respite Booking" />
 
             <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">
-                            {booking.client?.first_name} {booking.client?.last_name}
+                            {booking.client?.first_name}{' '}
+                            {booking.client?.last_name}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant="outline">{booking.status}</Badge>
                         </div>
                     </div>
-                    <Link href="/respite" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                    <Link
+                        href="/respite"
+                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                    >
                         Back to list
                     </Link>
                 </div>
@@ -45,17 +52,28 @@ export default function RespiteBookingShow({ booking }: Props) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Booking Details</CardTitle>
+                        <CardTitle className="text-base">
+                            Booking Details
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground space-y-2">
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
                         <div>Start: {formatDateTime(booking.start_at)}</div>
                         <div>End: {formatDateTime(booking.end_at)}</div>
-                        <div>Hours: {hoursBetween(booking.start_at, booking.end_at)}</div>
-                        <div>Coordinator: {booking.coordinator?.name || 'Unassigned'}</div>
+                        <div>
+                            Hours:{' '}
+                            {hoursBetween(booking.start_at, booking.end_at)}
+                        </div>
+                        <div>
+                            Coordinator:{' '}
+                            {booking.coordinator?.name || 'Unassigned'}
+                        </div>
                         <div>
                             Shift:{' '}
                             {booking.shift ? (
-                                <Link href={`/shifts/${booking.shift.id}`} className="text-primary hover:text-primary">
+                                <Link
+                                    href={showShift.url(booking.shift.id)}
+                                    className="text-primary hover:text-primary"
+                                >
                                     View shift
                                 </Link>
                             ) : (
@@ -71,7 +89,14 @@ export default function RespiteBookingShow({ booking }: Props) {
                             <CardTitle className="text-base">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
-                            <Button size="sm" onClick={() => router.post(`/respite/bookings/${booking.id}/confirm`)}>
+                            <Button
+                                size="sm"
+                                onClick={() =>
+                                    router.post(
+                                        `/respite/bookings/${booking.id}/confirm`,
+                                    )
+                                }
+                            >
                                 Confirm Booking
                             </Button>
                         </CardContent>

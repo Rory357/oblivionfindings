@@ -184,7 +184,7 @@ interface Props {
 
 const breadcrumbs = [
     { title: 'HR', href: '/hr' },
-    { title: 'Time Tracking', href: '/hr/time' },
+    { title: 'Timekeeping', href: '/hr/time' },
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
@@ -206,6 +206,11 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         className:
             'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Rejected',
+    },
+    returned: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Returned',
     },
     draft: {
         className:
@@ -489,13 +494,27 @@ export default function TimeIndex({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Time Tracking" />
+            <Head title="Timekeeping" />
             <PageShell>
                 <PageHeader
-                    title="Time Tracking"
-                    description="Track working hours, manage time entries, and review timesheets."
+                    title="Timekeeping"
+                    description="Clocking, time entries, period timesheets, and shift timesheets."
                     actions={
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                                <a href="/operations/timesheets">
+                                    <FileText className="mr-1.5 h-4 w-4" />
+                                    Shift Timesheets
+                                </a>
+                            </Button>
+                            {can.approveAny && (
+                                <Button variant="outline" size="sm" asChild>
+                                    <a href="/operations/timesheets/approvals">
+                                        <ArrowRight className="mr-1.5 h-4 w-4" />
+                                        Shift Approvals
+                                    </a>
+                                </Button>
+                            )}
                             {can.clockOnBehalf && (
                                 <Button
                                     variant="outline"
@@ -568,12 +587,12 @@ export default function TimeIndex({
                         </TabsTrigger>
                         <TabsTrigger value="timesheets">
                             <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />{' '}
-                            Timesheets
+                            Period Timesheets
                         </TabsTrigger>
                         {can.approveAny && (
                             <TabsTrigger value="approvals" className="relative">
                                 <CheckCircle className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                Approvals
+                                Period Approvals
                                 {pendingApprovalCount > 0 && (
                                     <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-status-warning px-1.5 text-[10px] text-white">
                                         {pendingApprovalCount}
@@ -1868,8 +1887,8 @@ export default function TimeIndex({
                     <DialogHeader>
                         <DialogTitle>Return Timesheet for Changes</DialogTitle>
                         <DialogDescription>
-                            The timesheet will be sent back to draft for the
-                            staff member to correct.
+                            The timesheet will be returned for the staff member
+                            to correct and resubmit.
                         </DialogDescription>
                     </DialogHeader>
                     <div>

@@ -1,0 +1,350 @@
+<?php
+
+namespace App\Domain\Shifts\Timesheets;
+
+use App\Domain\Hr\Models\HrPayrollRun;
+use App\Models\Timesheet;
+use App\Models\User;
+use App\Services\Operations\BillingService;
+use App\Services\Operations\TimesheetHrSyncService;
+use App\Services\Operations\TimesheetReconciliationService;
+use App\Services\ShiftOperationalSnapshotService;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class TimesheetApprovalService
+{
+    public function __construct(
+        private readonly TimesheetReconciliationService $reconciliation,
+        private readonly ShiftOperationalSnapshotService $snapshots,
+        private readonly TimesheetHrSyncService $hrSync,
+        private readonly BillingService $billing,
+    ) {}
+
+    public function submit(Timesheet $timesheet, User $actor): TimesheetWorkflowResult
+    {
+        return DB::transaction(function () use ($timesheet, $actor): TimesheetWorkflowResult {
+            $locked = $this->lock($timesheet);
+
+            $this->assertSubmittable($locked, 'submitted');
+            $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
+
+            $locked->forceFill($this->submittedFields($actor))->save();
+
+            return new TimesheetWorkflowResult(
+                $locked->fresh(['shift.client']) ?? $locked,
+                true,
+            );
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $updates
+     */
+    public function resubmit(Timesheet $timesheet, User $actor, array $updates): TimesheetWorkflowResult
+    {
+        return DB::transaction(function () use ($timesheet, $actor, $updates): TimesheetWorkflowResult {
+            $locked = $this->lock($timesheet);
+
+            $this->assertSubmittable($locked, 'resubmitted');
+
+            $locked->fill($updates);
+            $locked->save();
+
+            $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
+
+            $locked->forceFill($this->submittedFields($actor));
+            $locked->save();
+
+            return new TimesheetWorkflowResult(
+                $locked->fresh(['shift.client']) ?? $locked,
+                true,
+            );
+        });
+    }
+
+    public function approve(Timesheet $timesheet, User $actor, ?string $decisionNotes = null): TimesheetWorkflowResult
+    {
+        return DB::transaction(function () use ($timesheet, $actor, $decisionNotes): TimesheetWorkflowResult {
+            $locked = $this->lock($timesheet);
+
+            if ($locked->status === 'approved') {
+                return new TimesheetWorkflowResult(
+                    $locked->fresh(['shift.client']) ?? $locked,
+                    false,
+                );
+            }
+
+            if ($locked->status !== 'submitted') {
+                throw ValidationException::withMessages([
+                    'timesheet' => 'Only submitted timesheets can be approved.',
+                ]);
+            }
+
+            $this->assertApprovalAllowed($locked, $actor);
+
+            $locked->forceFill([
+                'status' => 'approved',
+                'approved_by' => $actor->id,
+                'approved_at' => now(),
+                'decision_notes' => $decisionNotes,
+            ])->save();
+
+            $this->syncApprovedTimesheet($locked);
+
+            return new TimesheetWorkflowResult(
+                $locked->fresh(['shift.client']) ?? $locked,
+                true,
+            );
+        });
+    }
+
+    public function returnForChanges(Timesheet $timesheet, User $actor, string $notes): TimesheetWorkflowResult
+    {
+        return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
+            $locked = $this->lock($timesheet);
+
+            if ($locked->status !== 'submitted') {
+                return new TimesheetWorkflowResult(
+                    $locked->fresh(['shift.client']) ?? $locked,
+                    false,
+                );
+            }
+
+            $this->assertNotPayrollLinked($locked, 'returned after export preparation');
+            $this->reconciliation->assertWorkflowAllowed($locked, 'returned');
+
+            $locked->forceFill([
+                'status' => 'returned',
+                'returned_by' => $actor->id,
+                'returned_at' => now(),
+                'returned_notes' => $notes,
+                'approved_by' => null,
+                'approved_at' => null,
+                'decision_notes' => null,
+            ])->save();
+
+            return new TimesheetWorkflowResult(
+                $locked->fresh(['shift.client']) ?? $locked,
+                true,
+            );
+        });
+    }
+
+    public function reject(Timesheet $timesheet, User $actor, string $notes): TimesheetWorkflowResult
+    {
+        return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
+            $locked = $this->lock($timesheet);
+
+            if ($locked->status !== 'submitted') {
+                return new TimesheetWorkflowResult(
+                    $locked->fresh(['shift.client']) ?? $locked,
+                    false,
+                );
+            }
+
+            $this->assertNotPayrollLinked($locked, 'rejected after export preparation');
+            $this->reconciliation->assertWorkflowAllowed($locked, 'rejected');
+
+            $locked->forceFill([
+                'status' => 'rejected',
+                'approved_by' => $actor->id,
+                'approved_at' => now(),
+                'decision_notes' => $notes,
+            ])->save();
+
+            return new TimesheetWorkflowResult(
+                $locked->fresh(['shift.client']) ?? $locked,
+                true,
+            );
+        });
+    }
+
+    /**
+     * @param  Collection<int, Timesheet>  $timesheets
+     */
+    public function bulkApprove(Collection $timesheets, User $actor, ?string $decisionNotes = null): BulkResult
+    {
+        $timesheets
+            ->filter(fn (Timesheet $timesheet): bool => $timesheet->status !== 'approved')
+            ->each(fn (Timesheet $timesheet) => $this->assertApprovalAllowed($timesheet, $actor));
+
+        return BulkResult::fromResults(
+            $timesheets->map(fn (Timesheet $timesheet) => $this->approve($timesheet, $actor, $decisionNotes))
+        );
+    }
+
+    /**
+     * @param  Collection<int, Timesheet>  $timesheets
+     */
+    public function bulkReturn(Collection $timesheets, User $actor, string $notes): BulkResult
+    {
+        return BulkResult::fromResults(
+            $timesheets->map(fn (Timesheet $timesheet) => $this->returnForChanges($timesheet, $actor, $notes))
+        );
+    }
+
+    /**
+     * @param  Collection<int, Timesheet>  $timesheets
+     */
+    public function bulkReject(Collection $timesheets, User $actor, string $notes): BulkResult
+    {
+        return BulkResult::fromResults(
+            $timesheets->map(fn (Timesheet $timesheet) => $this->reject($timesheet, $actor, $notes))
+        );
+    }
+
+    protected function lock(Timesheet $timesheet): Timesheet
+    {
+        return Timesheet::query()
+            ->lockForUpdate()
+            ->findOrFail($timesheet->id);
+    }
+
+    protected function assertSubmittable(Timesheet $timesheet, string $action): void
+    {
+        if (! in_array($timesheet->status, ['draft', 'returned'], true)) {
+            throw ValidationException::withMessages([
+                'timesheet' => "Only draft or returned timesheets can be {$action}.",
+            ]);
+        }
+
+        $this->assertNotLockedByPayroll($timesheet, $action);
+
+        if ($timesheet->is_protected_from_changes) {
+            throw ValidationException::withMessages([
+                'timesheet' => 'Approved or payroll-linked timesheets require a controlled correction workflow.',
+            ]);
+        }
+
+        if ($timesheet->linkedShiftIsCancelled()) {
+            throw ValidationException::withMessages([
+                'shift_id' => "Timesheets linked to cancelled shifts cannot be {$action}.",
+            ]);
+        }
+    }
+
+    protected function assertApprovalAllowed(Timesheet $timesheet, User $actor): void
+    {
+        if ((int) $timesheet->user_id === (int) $actor->id) {
+            abort(403, 'You cannot approve your own timesheet.');
+        }
+
+        if ($timesheet->linkedShiftIsCancelled()) {
+            abort(422, 'Timesheets linked to cancelled shifts cannot be approved.');
+        }
+
+        $this->reconciliation->assertWorkflowAllowed($timesheet, 'approved');
+    }
+
+    protected function assertNotLockedByPayroll(Timesheet $timesheet, string $action): void
+    {
+        if (! $timesheet->work_date) {
+            return;
+        }
+
+        $user = $timesheet->relationLoaded('user')
+            ? $timesheet->user
+            : User::query()->with('hrEmployeeProfile')->find($timesheet->user_id);
+
+        $user?->loadMissing('hrEmployeeProfile');
+
+        $tenantId = $user?->hrEmployeeProfile?->tenant_id
+            ?? $user?->organization_id
+            ?? $user?->getAttribute('tenant_id');
+
+        if (! $tenantId) {
+            return;
+        }
+
+        $locked = HrPayrollRun::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['locked', 'exported'])
+            ->where('period_start', '<=', $timesheet->work_date)
+            ->where('period_end', '>=', $timesheet->work_date)
+            ->exists();
+
+        if ($locked) {
+            throw ValidationException::withMessages([
+                'timesheet' => "This timesheet is locked by a payroll run and cannot be {$action}.",
+            ]);
+        }
+    }
+
+    protected function assertNotPayrollLinked(Timesheet $timesheet, string $action): void
+    {
+        if (! $timesheet->is_payroll_segment_complete && ! $timesheet->payroll_reference) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'timesheet' => "Payroll-linked timesheets cannot be {$action}.",
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function submittedFields(User $actor): array
+    {
+        return [
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'submitted_by' => $actor->id,
+            'approved_by' => null,
+            'approved_at' => null,
+            'decision_notes' => null,
+            'returned_at' => null,
+            'returned_by' => null,
+            'returned_notes' => null,
+        ];
+    }
+
+    protected function syncApprovedTimesheet(Timesheet $timesheet): void
+    {
+        // Use `load` (not `loadMissing`) for relations that may have been
+        // partially eager-loaded by site access checks before approval.
+        $timesheet->loadMissing([
+            'user.hrEmployeeProfile',
+        ]);
+        $timesheet->load([
+            'shift.site:id,name',
+            'shift.client:id,first_name,last_name,site_id',
+            'shift.serviceContext:id,name',
+            'shift.staff:id,name',
+            'client:id,first_name,last_name',
+            'staff:id,name',
+        ]);
+
+        $snapshot = $this->snapshots->snapshotForTimesheet($timesheet);
+
+        $timesheet->forceFill([
+            'shift_site_id' => $snapshot['shift_site_id'] ?? $timesheet->shift_site_id,
+            'shift_service_context_id' => $snapshot['shift_service_context_id'] ?? $timesheet->shift_service_context_id,
+            'shift_site_name_snapshot' => $snapshot['shift_site_name_snapshot'] ?: $timesheet->shift_site_name_snapshot,
+            'shift_location_snapshot' => $snapshot['shift_location_snapshot'] ?: $timesheet->shift_location_snapshot,
+            'service_context_name_snapshot' => $snapshot['service_context_name_snapshot'] ?: $timesheet->service_context_name_snapshot,
+            'client_name_snapshot' => $snapshot['client_name_snapshot'] ?: $timesheet->client_name_snapshot,
+            'staff_name_snapshot' => $snapshot['staff_name_snapshot'] ?: $timesheet->staff_name_snapshot,
+            'shift_type_snapshot' => $snapshot['shift_type_snapshot'] ?: $timesheet->shift_type_snapshot ?: 'standard',
+            'coverage_roles_snapshot' => $snapshot['coverage_roles_snapshot'] ?? $timesheet->coverage_roles_snapshot ?? [],
+        ])->saveQuietly();
+
+        $freshTimesheet = $timesheet->fresh();
+        $missingSnapshotFields = array_keys(array_filter([
+            'client_name_snapshot' => blank($freshTimesheet?->client_name_snapshot),
+            'staff_name_snapshot' => blank($freshTimesheet?->staff_name_snapshot),
+            'shift_type_snapshot' => blank($freshTimesheet?->shift_type_snapshot),
+        ]));
+
+        if ($missingSnapshotFields !== []) {
+            throw ValidationException::withMessages([
+                'timesheet' => 'This timesheet is missing required snapshot data and cannot be approved safely: '.implode(', ', $missingSnapshotFields).'.',
+            ]);
+        }
+
+        $this->hrSync->syncToHr($freshTimesheet);
+        $this->billing->generateFromTimesheet($freshTimesheet);
+    }
+}

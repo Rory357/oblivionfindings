@@ -1,7 +1,8 @@
+import ObservationRecordSheet from '@/components/clinical/observation-record-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ObservationRecordSheet from '@/components/clinical/observation-record-sheet';
+import { due as dueShiftClinicalObservations } from '@/routes/shifts/clinical/observations';
 import { ClipboardCheck, Stethoscope } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -31,15 +32,16 @@ export default function ShiftObservationsDueCard({
     const [loading, setLoading] = useState(true);
     const [sheetOpen, setSheetOpen] = useState(false);
     const [selectedType, setSelectedType] = useState<string | null>(null);
-    const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
+    const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
+        null,
+    );
 
     const fetchDue = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch(
-                `/shifts/${shiftId}/clinical/observations/due`,
-                { headers: { Accept: 'application/json' } },
-            );
+            const res = await fetch(dueShiftClinicalObservations.url(shiftId), {
+                headers: { Accept: 'application/json' },
+            });
             if (!res.ok) throw new Error('Failed to load');
             const json = await res.json();
             setDueItems(json.items ?? []);
@@ -54,14 +56,11 @@ export default function ShiftObservationsDueCard({
         fetchDue();
     }, [fetchDue]);
 
-    const handleRecord = useCallback(
-        (item: DueItem) => {
-            setSelectedType(item.observation_type);
-            setSelectedScheduleId(item.schedule_id);
-            setSheetOpen(true);
-        },
-        [],
-    );
+    const handleRecord = useCallback((item: DueItem) => {
+        setSelectedType(item.observation_type);
+        setSelectedScheduleId(item.schedule_id);
+        setSheetOpen(true);
+    }, []);
 
     const handleSheetClose = useCallback(
         (open: boolean) => {
@@ -128,7 +127,7 @@ export default function ShiftObservationsDueCard({
                                             </Badge>
                                         )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground line-clamp-1">
+                                    <p className="line-clamp-1 text-xs text-muted-foreground">
                                         {item.protocol_name}
                                         {item.instructions
                                             ? ` \u2014 ${item.instructions}`

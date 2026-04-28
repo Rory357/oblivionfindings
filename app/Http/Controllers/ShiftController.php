@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Shifts\Lifecycle\Data\CompleteShiftData;
+use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
+use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\CustomForm;
@@ -11,7 +13,6 @@ use App\Models\FleetResidentTransport;
 use App\Models\IncidentTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
-use App\Models\ShiftEligibilityOverride;
 use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftTask;
@@ -21,14 +22,11 @@ use App\Models\User;
 use App\Services\CoverageReservationService;
 use App\Services\EnhancedMarService;
 use App\Services\NotificationService;
-use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ServiceContextResolver;
 use App\Services\ShiftAssignmentRecommendationService;
-use App\Services\ShiftCancellationService;
 use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftHandoverService;
-use App\Services\ShiftOperationalSnapshotService;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
@@ -795,7 +793,7 @@ class ShiftController extends Controller
                 app(NotificationService::class)->notifyCrud($request->user(), 'created', 'shift', $shift, $client, [
                     'title' => 'Shift created',
                     'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
-                    'url' => url("/shifts/{$shift->id}"),
+                    'url' => url("/operations/shifts/{$shift->id}"),
                     'target_user_ids' => $targetUserIds,
                 ]);
             } catch (\Throwable $e) {
@@ -807,7 +805,7 @@ class ShiftController extends Controller
             }
         }
 
-        return redirect($data['return_to'] ?? route('shifts.index'))->with('success', 'Shift created.');
+        return redirect($data['return_to'] ?? route('operations.shifts.index'))->with('success', 'Shift created.');
     }
 
     public function edit(Request $request, Shift $shift)
@@ -1117,7 +1115,7 @@ class ShiftController extends Controller
                 app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'shift', $shift, $client, [
                     'title' => 'Shift updated',
                     'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
-                    'url' => url("/shifts/{$shift->id}"),
+                    'url' => url("/operations/shifts/{$shift->id}"),
                     'target_user_ids' => $targetUserIds,
                 ]);
             }
@@ -1128,7 +1126,7 @@ class ShiftController extends Controller
             ]);
         }
 
-        return redirect()->route('shifts.index')->with(
+        return redirect()->route('operations.shifts.index')->with(
             'success',
             $seriesScope === 'future' ? 'Recurring shift series updated.' : 'Shift updated.',
         );
@@ -1144,23 +1142,15 @@ class ShiftController extends Controller
             abort(403);
         }
 
-        if ($shift->status !== 'scheduled') {
-            return back()->withErrors(['status' => 'Only scheduled shifts can be started.']);
-        }
-
-        if (! $shift->user_id) {
-            return back()->withErrors(['status' => 'Only assigned shifts can be started. Assign a staff member before starting the shift.']);
-        }
-
-        $shift->update([
-            'status' => 'in_progress',
-            'actual_starts_at' => $shift->actual_starts_at ?? now(),
-            'started_by' => $shift->started_by ?? $auth->id,
-        ]);
-
-        $startedShift = $shift->fresh();
-        if ($startedShift) {
-            app(ShiftTimelineService::class)->recordStarted($startedShift, $auth, $startedShift->actual_starts_at ?? now());
+        try {
+            app(ShiftLifecycleService::class)->start(
+                $shift,
+                $auth,
+                now(),
+                ShiftLifecycleSource::Manual,
+            );
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
         }
 
         return back()->with('success', 'Shift started.');
@@ -1176,44 +1166,6 @@ class ShiftController extends Controller
             abort(403);
         }
 
-        if ($shift->status === 'completed') {
-            // Even on re-entry, ensure a timesheet exists (idempotent).
-            $existing = Timesheet::where('shift_id', $shift->id)
-                ->where('user_id', $shift->user_id)
-                ->exists();
-
-            if ($existing) {
-                return back()->with('success', 'Shift already completed.');
-            }
-
-            // Timesheet missing for completed shift — attempt recovery.
-            try {
-                $result = $this->syncDraftTimesheetFromShift($shift, $auth->id);
-
-                if ($result['success']) {
-                    return back()->with('success', 'Shift already completed. Missing draft timesheet has been created.');
-                }
-
-                $this->notifyTimesheetCreationFailure($shift, $result['reason'] ?? 'Unknown error');
-
-                return back()->with('warning', 'Shift already completed, but timesheet creation failed and requires follow-up.');
-            } catch (\Throwable $e) {
-                Log::error('Timesheet recovery failed for completed shift', [
-                    'shift_id' => $shift->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $this->notifyTimesheetCreationFailure($shift, $e->getMessage());
-
-                return back()->with('warning', 'Shift already completed, but timesheet creation failed and requires follow-up.');
-            }
-        }
-
-        if ($shift->status !== 'in_progress') {
-            throw ValidationException::withMessages([
-                'status' => 'Only in-progress shifts can be completed. Start the shift first.',
-            ]);
-        }
-
         $data = $request->validate([
             'final_note_subject' => ['nullable', 'string', 'max:255'],
             // Required only if no other shift notes exist.
@@ -1223,204 +1175,29 @@ class ShiftController extends Controller
             'handover_waiver_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $shift->loadMissing([
-            'tasks',
-            'client',
-            'staff:id,name',
-            'site:id,name',
-            'serviceContext:id,name,type',
-            'attendanceSessions:id,user_id,shift_id,clock_in_at,clock_out_at,break_minutes,status',
-        ]);
-        $attendanceSessions = $shift->attendanceSessions
-            ->when($shift->user_id, fn ($collection) => $collection->where('user_id', $shift->user_id))
-            ->values();
-        $openAttendanceSession = $attendanceSessions->first(
-            fn (HrAttendanceSession $session) => $session->status === 'open' || ! $session->clock_out_at
-        );
-        $actualStartAt = $shift->actual_starts_at
-            ?: $attendanceSessions
-                ->whereNotNull('clock_in_at')
-                ->sortBy('clock_in_at')
-                ->first()?->clock_in_at;
-        $incompleteTasks = $shift->tasks->where('is_completed', false)->values();
-        $handoverRequirement = app(ShiftHandoverService::class)->completionRequirement($shift);
-        $handoverWaiverReason = trim((string) ($data['handover_waiver_reason'] ?? ''));
+        $wasCompleted = $shift->status === 'completed';
+        $hadTimesheet = $wasCompleted
+            && Timesheet::where('shift_id', $shift->id)
+                ->where('user_id', $shift->user_id)
+                ->exists();
 
-        if ($openAttendanceSession) {
-            throw ValidationException::withMessages([
-                'status' => 'This shift has an open attendance session. Clock out before completing the shift.',
-            ]);
+        if ($wasCompleted && $hadTimesheet) {
+            return back()->with('success', 'Shift already completed.');
         }
 
-        if (! $actualStartAt) {
-            throw ValidationException::withMessages([
-                'status' => 'This shift has no actual start evidence. Start the shift or record attendance before completing it.',
-            ]);
-        }
-
-        $actualEndAt = $attendanceSessions
-            ->whereNotNull('clock_out_at')
-            ->sortByDesc('clock_out_at')
-            ->first()?->clock_out_at
-            ?? now();
-
-        // Enforce: a shift must have at least one progress/shift note OR a completion summary.
-        $existingNoteCount = \App\Models\ClientNote::query()
-            ->where('shift_id', $shift->id)
-            ->whereIn('type', ['progress_note', 'shift_note'])
-            ->count();
-
-        $finalBody = trim((string) ($data['final_note_body'] ?? ''));
-        if ($finalBody === '' && $existingNoteCount === 0) {
-            throw ValidationException::withMessages([
-                'final_note_body' => 'Add at least one progress note during the shift or provide a shift summary note to complete the shift.',
-            ]);
-        }
-
-        $allowIncomplete = (bool) ($data['allow_incomplete_tasks'] ?? false);
-        if ($incompleteTasks->count() > 0 && ! $allowIncomplete) {
-            throw ValidationException::withMessages([
-                'allow_incomplete_tasks' => 'This shift still has incomplete tasks. Complete all tasks or allow completion with a reason.',
-            ]);
-        }
-        if ($incompleteTasks->count() > 0 && $allowIncomplete && empty(trim((string) ($data['incomplete_tasks_reason'] ?? '')))) {
-            throw ValidationException::withMessages([
-                'incomplete_tasks_reason' => 'Please provide a reason for completing with incomplete tasks.',
-            ]);
-        }
-        if (($handoverRequirement['requires_handover'] ?? false)
-            && ! $handoverRequirement['matched_handover']
-            && $handoverWaiverReason === '') {
-            throw ValidationException::withMessages([
-                'handover_waiver_reason' => $handoverRequirement['reason'],
-            ]);
-        }
-
-        $timesheetResult = ['success' => false, 'reason' => 'Not attempted', 'timesheet' => null];
-
-        DB::transaction(function () use ($auth, $shift, $data, $incompleteTasks, $allowIncomplete, $finalBody, $handoverRequirement, $handoverWaiverReason, $actualStartAt, $actualEndAt, &$timesheetResult) {
-            $now = now();
-            $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
-
-            if ($shift->status === 'completed') {
-                // Already completed — still ensure timesheet exists.
-                $timesheetResult = $this->syncDraftTimesheetFromShift($shift, $auth->id);
-
-                return;
-            }
-
-            if ($shift->status !== 'in_progress') {
-                throw ValidationException::withMessages([
-                    'status' => 'Only in-progress shifts can be completed. Start the shift first.',
-                ]);
-            }
-
-            $shift->update([
-                'status' => 'completed',
-                'actual_starts_at' => $actualStartAt,
-                'actual_ends_at' => $actualEndAt,
-                'started_by' => $shift->started_by ?? $auth->id,
-                'completed_by' => $auth->id,
-                'handover_waiver_reason' => null,
-                'handover_waived_at' => null,
-                'handover_waived_by' => null,
-            ]);
-
-            if (($handoverRequirement['requires_handover'] ?? false)
-                && ! $handoverRequirement['matched_handover']
-                && $handoverWaiverReason !== '') {
-                app(ShiftHandoverService::class)->recordCompletionWaiver(
-                    $shift->fresh() ?? $shift,
-                    $auth,
-                    $handoverWaiverReason,
-                    $handoverRequirement,
-                );
-            }
-
-            // Create a shift summary note (auditable via ClientNote + TimelineEvent)
-            $subject = trim((string) ($data['final_note_subject'] ?? 'Shift summary'));
-            $body = $finalBody !== ''
-                ? $finalBody
-                : 'Shift completed - see shift notes for details.';
-
-            $note = \App\Models\ClientNote::create([
-                'client_id' => $shift->client_id,
-                'shift_id' => $shift->id,
-                'user_id' => $auth->id,
-                'type' => 'shift_note',
-                'subject' => $subject,
-                'body' => $body,
-                'occurred_at' => $now,
-                'visibility' => 'internal',
-                'is_pinned' => false,
-            ]);
-
-            \App\Models\TimelineEvent::query()->updateOrCreate(
-                [
-                    'type' => 'shift_note',
-                    'source_type' => \App\Models\ClientNote::class,
-                    'source_id' => $note->id,
-                ],
-                [
-                    'occurred_at' => $now,
-                    'actor_user_id' => $auth->id,
-                    'client_id' => $shift->client_id,
-                    'shift_id' => $shift->id,
-                    'site_id' => $shift->client?->site_id,
-                    'subject' => $subject,
-                    'body' => $body,
-                    'meta' => array_filter([
-                        'note_id' => $note->id,
-                        'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
-                        'incomplete_tasks_reason' => $allowIncomplete ? (string) ($data['incomplete_tasks_reason'] ?? null) : null,
-                        'incomplete_task_count' => $incompleteTasks->count() ?: null,
-                        'handover_waiver_reason' => $handoverWaiverReason !== '' ? $handoverWaiverReason : null,
-                    ]),
-                    'visibility' => 'internal',
-                    'is_pinned' => false,
-                    'created_by' => $auth->id,
-                ]
-            );
-
-            // Always create draft timesheet on shift completion.
-            try {
-                $timesheetResult = $this->syncDraftTimesheetFromShift($shift->fresh(), $auth->id);
-            } catch (\Throwable $e) {
-                $timesheetResult = [
-                    'success' => false,
-                    'reason' => $e->getMessage(),
-                    'timesheet' => null,
-                ];
-
-                Log::error('Timesheet creation failed on shift completion', [
-                    'shift_id' => $shift->id,
-                    'user_id' => $shift->user_id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        });
-
-        $completedShift = $shift->fresh();
-        if ($completedShift) {
-            app(ShiftTimelineService::class)->recordCompleted(
-                $completedShift,
-                $auth,
-                $completedShift->actual_ends_at ?? now(),
-                [
-                    'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
-                    'incomplete_tasks_reason' => $allowIncomplete ? (string) ($data['incomplete_tasks_reason'] ?? null) : null,
-                    'incomplete_task_count' => $incompleteTasks->count() ?: null,
-                    'handover_required' => ($handoverRequirement['requires_handover'] ?? false) ? true : null,
-                    'handover_id' => $handoverRequirement['matched_handover']?->id,
-                    'handover_waiver_reason' => $handoverWaiverReason !== '' ? $handoverWaiverReason : null,
-                    'timesheet_created' => $timesheetResult['success'],
-                ]
-            );
-        }
+        $lifecycle = app(ShiftLifecycleService::class);
+        $completedShift = $lifecycle->complete($shift, $auth, CompleteShiftData::fromManualRequest($data));
+        $timesheetResult = $lifecycle->lastDraftTimesheetResult();
 
         // Notify manager if timesheet creation failed.
         if (! $timesheetResult['success']) {
-            $this->notifyTimesheetCreationFailure($shift->fresh() ?? $shift, $timesheetResult['reason'] ?? 'Unknown error');
+            $this->notifyTimesheetCreationFailure($completedShift, $timesheetResult['reason'] ?? 'Unknown error');
+        }
+
+        if ($wasCompleted) {
+            return $timesheetResult['success']
+                ? back()->with('success', 'Shift already completed. Missing draft timesheet has been created.')
+                : back()->with('warning', 'Shift already completed, but timesheet creation failed and requires follow-up.');
         }
 
         $flashKey = $timesheetResult['success'] ? 'success' : 'warning';
@@ -1431,17 +1208,17 @@ class ShiftController extends Controller
         return back()->with($flashKey, $flashMessage);
     }
 
-    public function cancelOccurrence(Request $request, Shift $shift, ShiftCancellationService $cancellationService)
+    public function cancelOccurrence(Request $request, Shift $shift)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
         $this->assertCanAccessShift($auth, $shift);
 
-        $result = $cancellationService->cancel($shift, $auth);
-
-        if ($result['already_cancelled']) {
+        if ($shift->status === 'cancelled') {
             return back()->with('success', 'Shift is already cancelled.');
         }
+
+        app(ShiftLifecycleService::class)->cancel($shift, $auth);
 
         return back()->with('success', 'Shift occurrence cancelled.');
     }
@@ -1455,110 +1232,9 @@ class ShiftController extends Controller
             return back()->with('error', 'Only cancelled occurrences can be reopened.');
         }
 
-        $shift->update([
-            'status' => app(ShiftStateGuardService::class)->normalizePlanningStatus(
-                $shift->user_id ? 'scheduled' : 'draft',
-                ! empty($shift->user_id),
-            ),
-            'actual_starts_at' => null,
-            'actual_ends_at' => null,
-        ]);
-
-        TimelineEvent::query()
-            ->where('type', ShiftTimelineService::CANCELLED_EVENT_TYPE)
-            ->where('source_type', Shift::class)
-            ->where('source_id', $shift->id)
-            ->delete();
-
-        $freshShift = $shift->fresh();
-        if ($freshShift) {
-            app(ShiftTimelineService::class)->syncSnapshot($freshShift);
-        }
+        app(ShiftLifecycleService::class)->reopen($shift, $auth);
 
         return back()->with('success', 'Shift occurrence reopened.');
-    }
-
-    /**
-     * Create or update a draft timesheet from a completed shift.
-     *
-     * Idempotent: uses firstOrNew on (shift_id, user_id) so re-running
-     * will not create duplicates. Returns a result array so the caller
-     * can provide accurate user feedback and trigger follow-up actions.
-     *
-     * @return array{success: bool, reason: string|null, timesheet: \App\Models\Timesheet|null}
-     */
-    protected function syncDraftTimesheetFromShift(Shift $shift, int $actorId): array
-    {
-        if (! $shift->user_id || ! $shift->client_id) {
-            return ['success' => false, 'reason' => 'Shift is missing assigned staff or client.', 'timesheet' => null];
-        }
-
-        $shift->loadMissing([
-            'attendanceSessions:id,user_id,shift_id,clock_in_at,clock_out_at,break_minutes,status',
-            'client:id,first_name,last_name,site_id',
-            'client.site:id,name',
-            'site:id,name',
-            'serviceContext:id,name',
-            'staff:id,name',
-        ]);
-
-        $startsAt = $shift->actual_starts_at ?? $shift->starts_at;
-        $endsAt = $shift->actual_ends_at ?? $shift->ends_at;
-
-        if (! $startsAt || ! $endsAt) {
-            return ['success' => false, 'reason' => 'Shift has no start/end times to base timesheet on.', 'timesheet' => null];
-        }
-
-        $matchingAttendanceSessions = $shift->attendanceSessions
-            ->where('user_id', $shift->user_id)
-            ->values();
-        $uniqueAttendanceSession = $matchingAttendanceSessions->count() === 1
-            ? $matchingAttendanceSessions->first()
-            : null;
-
-        $timesheet = Timesheet::query()->firstOrNew([
-            'shift_id' => $shift->id,
-            'user_id' => $shift->user_id,
-        ]);
-
-        if ($timesheet->exists && ! in_array($timesheet->status, ['draft', 'returned'], true)) {
-            // Timesheet already exists in a non-editable state — nothing to do, not an error.
-            return ['success' => true, 'reason' => null, 'timesheet' => $timesheet];
-        }
-
-        $snapshot = app(ShiftOperationalSnapshotService::class)->snapshotForShift($shift, $shift->staff);
-
-        $timesheet->fill([
-            'user_id' => $shift->user_id,
-            'client_id' => $shift->client_id,
-            'shift_site_id' => $snapshot['site_id'] ?? $timesheet->shift_site_id,
-            'shift_service_context_id' => $snapshot['service_context_id'] ?? $timesheet->shift_service_context_id,
-            'attendance_session_id' => $timesheet->attendance_session_id ?: $uniqueAttendanceSession?->id,
-            'work_date' => $startsAt->toDateString(),
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-            'break_minutes' => (int) ($shift->expected_break_minutes ?? $timesheet->break_minutes ?? 0),
-            'sleepover' => (bool) $shift->is_sleepover,
-            'on_call' => (bool) $shift->is_on_call,
-            'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
-            'shift_location_snapshot' => $snapshot['location'] ?? $timesheet->shift_location_snapshot,
-            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $timesheet->service_context_name_snapshot,
-            'client_name_snapshot' => $snapshot['client_name'] ?? $timesheet->client_name_snapshot,
-            'staff_name_snapshot' => $snapshot['staff_name'] ?? $timesheet->staff_name_snapshot,
-            'shift_type_snapshot' => $snapshot['shift_type'] ?? $timesheet->shift_type_snapshot ?? 'standard',
-            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $timesheet->coverage_roles_snapshot ?? [],
-            'status' => 'draft',
-        ]);
-
-        if (! $timesheet->exists) {
-            $timesheet->created_by = $actorId;
-        }
-
-        $timesheet->save();
-
-        app(TimesheetReconciliationService::class)->reconcile($timesheet, $uniqueAttendanceSession);
-
-        return ['success' => true, 'reason' => null, 'timesheet' => $timesheet];
     }
 
     protected function notifyTimesheetCreationFailure(Shift $shift, string $reason): void
@@ -1684,40 +1360,20 @@ class ShiftController extends Controller
         }
 
         $reservation = app(CoverageReservationService::class)->reserveForAssignment($shift, $auth, 'assignment');
-        $originalUserId = $shift->user_id;
         try {
-            DB::transaction(function () use ($shift, $data, $reservation, $overrideData) {
-                $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
-                if (in_array($shift->status, ['completed', 'cancelled'], true)) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'user_id' => 'This shift was changed by another scheduler and can no longer be assigned.',
-                    ]);
-                }
-
-                $shift->update([
-                    'user_id' => $data['user_id'],
-                    'status' => $shift->status === 'draft' ? 'scheduled' : $shift->status,
-                ]);
-
-                if ($overrideData) {
-                    ShiftEligibilityOverride::create([
-                        'shift_id' => $shift->id,
-                        ...$overrideData,
-                    ]);
-                }
-
-                app(CoverageReservationService::class)->fulfill($reservation, $shift);
-            });
+            app(ShiftLifecycleService::class)->assign(
+                $shift,
+                $auth,
+                User::findOrFail($data['user_id']),
+                $overrideData,
+                $reservation,
+            );
         } catch (\Throwable $e) {
             app(CoverageReservationService::class)->release($reservation);
             throw $e;
         }
 
-        if ($originalUserId && (int) $originalUserId !== (int) $data['user_id']) {
-            app(ShiftReplacementService::class)->resolveFromManualAssignment($shift->fresh(), (int) $data['user_id'], $auth);
-        }
-
-        return redirect($data['return_to'] ?? url('/rostering'))->with('success', 'Shift assigned.');
+        return redirect($data['return_to'] ?? url('/operations/rostering'))->with('success', 'Shift assigned.');
     }
 
     public function unassign(Request $request, Shift $shift)
@@ -1734,12 +1390,8 @@ class ShiftController extends Controller
             return back()->with('error', 'In-progress shifts cannot be unassigned. Use the replacement workflow instead.');
         }
 
-        $returnTo = $request->input('return_to') ?: url('/rostering');
-        app(CoverageReservationService::class)->releaseForShift($shift);
-        $shift->update([
-            'user_id' => null,
-            'status' => 'draft',
-        ]);
+        $returnTo = $request->input('return_to') ?: url('/operations/rostering');
+        app(ShiftLifecycleService::class)->unassign($shift, $auth);
 
         return redirect($returnTo)->with('success', 'Shift unassigned.');
     }

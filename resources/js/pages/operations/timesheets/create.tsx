@@ -3,9 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import {
+    create as createTimesheet,
+    store as storeTimesheet,
+    index as timesheetsIndex,
+} from '@/routes/operations/timesheets';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useMemo } from 'react';
 import { Clock } from 'lucide-react';
+import { useMemo } from 'react';
 
 type Client = { id: number; first_name: string; last_name: string };
 type LinkedShift = {
@@ -60,7 +65,8 @@ export default function TimesheetCreate({ clients, shift }: Props) {
         const startMs = new Date(form.data.starts_at).getTime();
         const endMs = new Date(form.data.ends_at).getTime();
         if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return null;
-        const netMinutes = (endMs - startMs) / 60000 - (Number(form.data.break_minutes) || 0);
+        const netMinutes =
+            (endMs - startMs) / 60000 - (Number(form.data.break_minutes) || 0);
         return netMinutes > 0 ? (netMinutes / 60).toFixed(2) : '0.00';
     }, [form.data.starts_at, form.data.ends_at, form.data.break_minutes]);
 
@@ -69,9 +75,9 @@ export default function TimesheetCreate({ clients, shift }: Props) {
             breadcrumbs={[
                 {
                     title: labels?.['timesheet.plural'] ?? 'Timesheets',
-                    href: '/timesheets',
+                    href: timesheetsIndex.url(),
                 },
-                { title: 'Create', href: '/timesheets/create' },
+                { title: 'Create', href: createTimesheet.url() },
             ]}
         >
             <Head title={`Create ${timesheetLabel}`} />
@@ -88,7 +94,7 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
-                        form.post('/timesheets');
+                        form.post(storeTimesheet.url());
                     }}
                     className="space-y-4"
                 >
@@ -154,7 +160,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                     type="datetime-local"
                                     value={form.data.starts_at}
                                     onChange={(e) =>
-                                        form.setData('starts_at', e.target.value)
+                                        form.setData(
+                                            'starts_at',
+                                            e.target.value,
+                                        )
                                     }
                                 />
                             </div>
@@ -174,7 +183,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                         {liveHours !== null ? (
                             <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
-                                Estimated hours: <span className="font-semibold tabular-nums">{liveHours}h</span>
+                                Estimated hours:{' '}
+                                <span className="font-semibold tabular-nums">
+                                    {liveHours}h
+                                </span>
                             </div>
                         ) : null}
 
@@ -185,7 +197,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 type="number"
                                 value={form.data.break_minutes}
                                 onChange={(e) =>
-                                    form.setData('break_minutes', Number(e.target.value))
+                                    form.setData(
+                                        'break_minutes',
+                                        Number(e.target.value),
+                                    )
                                 }
                             />
                         </div>
@@ -198,7 +213,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 value={form.data.client_id}
                                 disabled={!!shift}
                                 onChange={(e) =>
-                                    form.setData('client_id', Number(e.target.value))
+                                    form.setData(
+                                        'client_id',
+                                        Number(e.target.value),
+                                    )
                                 }
                             >
                                 {clients.map((c) => (
@@ -232,7 +250,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                     step="0.1"
                                     value={form.data.mileage_km}
                                     onChange={(e) =>
-                                        form.setData('mileage_km', Number(e.target.value))
+                                        form.setData(
+                                            'mileage_km',
+                                            Number(e.target.value),
+                                        )
                                     }
                                 />
                             </div>
@@ -241,7 +262,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 <Input
                                     value={form.data.allowance_notes}
                                     onChange={(e) =>
-                                        form.setData('allowance_notes', e.target.value)
+                                        form.setData(
+                                            'allowance_notes',
+                                            e.target.value,
+                                        )
                                     }
                                     placeholder="Travel, sleepover or other allowance notes"
                                 />
@@ -256,7 +280,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                     checked={form.data.sleepover}
                                     disabled={!!shift}
                                     onChange={(e) =>
-                                        form.setData('sleepover', e.target.checked)
+                                        form.setData(
+                                            'sleepover',
+                                            e.target.checked,
+                                        )
                                     }
                                 />
                                 Sleepover
@@ -267,7 +294,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                     checked={form.data.on_call}
                                     disabled={!!shift}
                                     onChange={(e) =>
-                                        form.setData('on_call', e.target.checked)
+                                        form.setData(
+                                            'on_call',
+                                            e.target.checked,
+                                        )
                                     }
                                 />
                                 On-call
@@ -277,7 +307,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                     type="checkbox"
                                     checked={form.data.public_holiday}
                                     onChange={(e) =>
-                                        form.setData('public_holiday', e.target.checked)
+                                        form.setData(
+                                            'public_holiday',
+                                            e.target.checked,
+                                        )
                                     }
                                 />
                                 Public holiday
@@ -287,7 +320,10 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                     type="checkbox"
                                     checked={form.data.is_residential_billable}
                                     onChange={(e) =>
-                                        form.setData('is_residential_billable', e.target.checked)
+                                        form.setData(
+                                            'is_residential_billable',
+                                            e.target.checked,
+                                        )
                                     }
                                 />
                                 Residential billable

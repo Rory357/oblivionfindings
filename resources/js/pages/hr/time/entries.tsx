@@ -51,7 +51,7 @@ interface Props {
 
 const breadcrumbs = [
     { title: 'HR', href: '/hr' },
-    { title: 'Time Tracking', href: '/hr/time' },
+    { title: 'Timekeeping', href: '/hr/time' },
     { title: 'Entries', href: '/hr/time/entries' },
 ];
 
@@ -139,9 +139,9 @@ export default function TimeEntries({ entries, filters, can }: Props) {
             <PageShell>
                 <PageHeader
                     title="Time Entries"
-                    description="View and manage all time entries."
+                    description="View and manage clock entries that feed period timesheets."
                     backHref="/hr/time"
-                    backLabel="Back to Time Tracking"
+                    backLabel="Back to Timekeeping"
                 />
 
                 {/* Date Range Filter */}

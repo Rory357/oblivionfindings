@@ -208,9 +208,21 @@ require __DIR__.'/api_medications.php';
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/clients/{any}', '/operations/clients/{any}')->where('any', '.*');
-    Route::redirect('/shifts/{any}', '/operations/shifts/{any}')->where('any', '.*');
-    Route::redirect('/timesheets/{any}', '/operations/timesheets/{any}')->where('any', '.*');
-    Route::redirect('/rostering/{any}', '/operations/rostering/{any}')->where('any', '.*');
+    Route::get('/shifts/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+        ->where('any', '.*')
+        ->defaults('destination_prefix', '/operations/shifts')
+        ->defaults('status', 301);
+    Route::get('/timesheets/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+        ->where('any', '.*')
+        ->defaults('destination_prefix', '/operations/timesheets')
+        ->defaults('status', 301);
+    Route::get('/rostering', \App\Http\Controllers\LegacyRouteRedirectController::class)
+        ->defaults('destination', '/operations/rostering')
+        ->defaults('status', 301);
+    Route::get('/rostering/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+        ->where('any', '.*')
+        ->defaults('destination_prefix', '/operations/rostering')
+        ->defaults('status', 301);
     Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
     Route::redirect('/emergency-access', '/emar/emergency-access');
     Route::redirect('/consents', '/operations/clients');

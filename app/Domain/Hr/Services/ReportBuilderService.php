@@ -41,7 +41,7 @@ class ReportBuilderService
             ],
         ],
         'time' => [
-            'label' => 'Time Tracking',
+            'label' => 'Timekeeping Data',
             'fields' => [
                 'employee_name', 'entry_date', 'clock_in', 'clock_out',
                 'total_hours', 'break_minutes', 'status', 'entry_type',

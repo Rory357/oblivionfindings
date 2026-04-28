@@ -117,14 +117,14 @@ test('attendance generated shift timesheet flows into payroll run with shift and
         ->and($timesheet->reconciliation_status)->toBe('clear');
 
     $this->actingAs($worker)
-        ->post(route('timesheets.submit', $timesheet))
+        ->post(route('operations.timesheets.submit', $timesheet))
         ->assertSessionHas('success');
 
     $timesheet->refresh();
     expect($timesheet->status)->toBe('submitted');
 
     $this->actingAs($finance)
-        ->post(route('timesheets.approve', $timesheet))
+        ->post(route('operations.timesheets.approve', $timesheet))
         ->assertSessionHas('success');
 
     $timesheet->refresh();
@@ -228,17 +228,17 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
     ]);
 
     $this->actingAs($worker)
-        ->post(route('timesheets.submit', $timesheet))
+        ->post(route('operations.timesheets.submit', $timesheet))
         ->assertSessionHas('success');
 
     $this->actingAs($finance)
-        ->post(route('timesheets.return', $timesheet), [
+        ->post(route('operations.timesheets.return', $timesheet), [
             'returned_notes' => 'Confirm public holiday details before export.',
         ])
         ->assertSessionHas('success');
 
     $this->actingAs($worker)
-        ->put(route('timesheets.update', $timesheet), [
+        ->put(route('operations.timesheets.update', $timesheet), [
             'client_id' => $client->id,
             'work_date' => now()->subDay()->toDateString(),
             'starts_at' => now()->subDay()->setTime(9, 0)->format('Y-m-d H:i:s'),
@@ -250,11 +250,11 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
         ->assertSessionHas('success');
 
     $this->actingAs($worker)
-        ->post(route('timesheets.submit', $timesheet))
+        ->post(route('operations.timesheets.submit', $timesheet))
         ->assertSessionHas('success');
 
     $this->actingAs($finance)
-        ->post(route('timesheets.approve', $timesheet))
+        ->post(route('operations.timesheets.approve', $timesheet))
         ->assertSessionHas('success');
 
     $timesheet->refresh();

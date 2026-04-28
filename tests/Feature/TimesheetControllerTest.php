@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -152,7 +153,7 @@ class TimesheetControllerTest extends TestCase
 
         $timesheet = Timesheet::query()->latest('id')->firstOrFail();
 
-        $response->assertRedirect(route('timesheets.edit', $timesheet));
+        $response->assertRedirect(route('operations.timesheets.edit', $timesheet));
         $this->assertDatabaseHas('timesheets', [
             'id' => $timesheet->id,
             'user_id' => $this->staff->id,
@@ -162,6 +163,22 @@ class TimesheetControllerTest extends TestCase
             'created_by' => $this->staff->id,
             'break_minutes' => 30,
         ]);
+    }
+
+    public function test_duplicate_draft_creation_via_canonical_json_route_returns_shift_id_error(): void
+    {
+        $shift = $this->makeScheduledShift($this->staff);
+        $this->makeDraftTimesheet($this->staff, ['shift' => $shift]);
+
+        $this->actingAs($this->staff)
+            ->postJson(route('operations.timesheets.store'), $this->validStorePayload($shift))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.shift_id.0', 'A timesheet already exists for this shift and staff member.');
+
+        $this->assertSame(1, Timesheet::query()
+            ->where('shift_id', $shift->id)
+            ->where('user_id', $this->staff->id)
+            ->count());
     }
 
     public function test_staff_cannot_store_timesheet_for_another_users_shift(): void
@@ -188,7 +205,7 @@ class TimesheetControllerTest extends TestCase
 
         $timesheet = Timesheet::query()->latest('id')->firstOrFail();
 
-        $response->assertRedirect(route('timesheets.edit', $timesheet));
+        $response->assertRedirect(route('operations.timesheets.edit', $timesheet));
         $this->assertDatabaseHas('timesheets', [
             'id' => $timesheet->id,
             'user_id' => $this->staff->id,
@@ -222,6 +239,40 @@ class TimesheetControllerTest extends TestCase
             'notes' => 'Updated note',
             'break_minutes' => 45,
             'is_residential_billable' => true,
+        ]);
+    }
+
+    public function test_payroll_lock_uses_employee_profile_tenant_for_edit_blocking(): void
+    {
+        $timesheet = $this->makeDraftTimesheet($this->staff, [
+            'notes' => 'Locked note',
+        ]);
+
+        HrPayrollRun::query()->create([
+            'tenant_id' => 1,
+            'period_start' => '2026-04-01',
+            'period_end' => '2026-04-30',
+            'status' => 'locked',
+            'locked_at' => now(),
+            'locked_by' => $this->finance->id,
+            'created_by' => $this->finance->id,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 45,
+                'notes' => 'Should stay blocked by payroll',
+            ])
+            ->assertSessionHas('error', 'This timesheet is locked by a payroll run and cannot be edited.');
+
+        $this->assertDatabaseHas('timesheets', [
+            'id' => $timesheet->id,
+            'notes' => 'Locked note',
+            'break_minutes' => 30,
         ]);
     }
 
@@ -339,6 +390,36 @@ class TimesheetControllerTest extends TestCase
             ->assertSessionHas('error', 'Only draft or returned timesheets can be resubmitted.');
 
         $this->assertSame('submitted', $timesheet->fresh()->status);
+    }
+
+    public function test_resubmit_after_manager_approval_preserves_approved_state_and_reports_stale_action(): void
+    {
+        $timesheet = $this->makeSubmittedTimesheet($this->staff, [
+            'notes' => 'Submitted before approval.',
+        ]);
+
+        $timesheet->forceFill([
+            'status' => 'approved',
+            'approved_by' => $this->finance->id,
+            'approved_at' => now(),
+            'decision_notes' => 'Manager approved first.',
+        ])->saveQuietly();
+
+        $this->actingAs($this->staff)
+            ->post(route('operations.timesheets.resubmit', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 15,
+                'notes' => 'Worker stale resubmit after approval.',
+            ])
+            ->assertSessionHas('error', 'Only draft or returned timesheets can be resubmitted.');
+
+        $fresh = $timesheet->fresh();
+        $this->assertSame('approved', $fresh->status);
+        $this->assertSame('Submitted before approval.', $fresh->notes);
+        $this->assertSame($this->finance->id, $fresh->approved_by);
     }
 
     public function test_resubmit_endpoint_requires_ownership(): void

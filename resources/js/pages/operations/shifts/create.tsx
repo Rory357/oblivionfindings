@@ -7,6 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import {
+    create as createShift,
+    eligibility_preview as eligibilityPreview,
+    index as shiftsIndex,
+    store as storeShift,
+} from '@/routes/operations/shifts';
+import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -295,27 +302,27 @@ export default function ShiftCreate({
             setEligLoading(true);
 
             try {
-                const params = new URLSearchParams({
+                const query: Record<string, string | string[]> = {
                     user_id: String(userId),
                     starts_at: startsAt,
                     ends_at: endsAt,
-                });
+                };
 
                 const selectedClient = clients.find(
                     (c) => String(c.id) === String(form.data.client_id),
                 );
                 if (selectedClient?.site_id)
-                    params.set('site_id', String(selectedClient.site_id));
+                    query.site_id = String(selectedClient.site_id);
                 if (form.data.shift_type)
-                    params.set('shift_type', form.data.shift_type);
+                    query.shift_type = form.data.shift_type;
                 if (form.data.coverage_roles?.length) {
-                    form.data.coverage_roles.forEach((r) =>
-                        params.append('coverage_roles[]', r),
-                    );
+                    query.coverage_roles = form.data.coverage_roles;
                 }
 
                 const res = await fetch(
-                    `/operations/shifts/eligibility-preview?${params}`,
+                    eligibilityPreview.url({
+                        query,
+                    }),
                     {
                         signal: controller.signal,
                         headers: {
@@ -358,9 +365,9 @@ export default function ShiftCreate({
             breadcrumbs={[
                 {
                     title: labels?.['shift.plural'] ?? 'Shifts',
-                    href: '/shifts',
+                    href: shiftsIndex.url(),
                 },
-                { title: 'Create', href: '/shifts/create' },
+                { title: 'Create', href: createShift.url() },
             ]}
         >
             <Head title={`Create ${shiftLabel}`} />
@@ -368,7 +375,7 @@ export default function ShiftCreate({
                 <div className="max-w-2xl">
                     <PageHeader
                         title={`Create ${shiftLabel}`}
-                        backHref="/shifts"
+                        backHref={shiftsIndex.url()}
                         description="Create an appointment / rostered shift. Add tasks and (optionally) repeat weekly."
                     />
                 </div>
@@ -377,7 +384,7 @@ export default function ShiftCreate({
                     onSubmit={(e) => {
                         e.preventDefault();
                         if (!form.data.repeat_weekly) {
-                            form.post('/shifts');
+                            form.post(storeShift.url());
                             return;
                         }
 
@@ -388,7 +395,7 @@ export default function ShiftCreate({
                         const startsTime = starts?.slice(11, 16);
                         const endsTime = ends?.slice(11, 16);
 
-                        router.post('/operations/shifts/series', {
+                        router.post(storeShiftSeries.url(), {
                             client_id: form.data.client_id,
                             service_context_id: form.data.service_context_id,
                             user_id: form.data.user_id,

@@ -10,7 +10,7 @@ test('shifts index page loads', function () {
         $browser->loginAs($user)
             ->visit('/shifts')
             ->waitForText('Shift', 10)
-            ->assertPathIs('/shifts');
+            ->assertPathIs('/operations/shifts');
     });
 });
 
@@ -21,7 +21,7 @@ test('shifts create page loads', function () {
         $browser->loginAs($user)
             ->visit('/shifts/create')
             ->waitForText('Shift', 10)
-            ->assertPathIs('/shifts/create');
+            ->assertPathIs('/operations/shifts/create');
     });
 });
 
@@ -32,6 +32,6 @@ test('rostering page loads', function () {
         $browser->loginAs($user)
             ->visit('/rostering')
             ->waitForText('Roster', 10)
-            ->assertPathIs('/rostering');
+            ->assertPathIs('/operations/rostering');
     });
 });

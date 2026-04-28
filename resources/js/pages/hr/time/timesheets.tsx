@@ -71,8 +71,8 @@ interface Props {
 
 const breadcrumbs = [
     { title: 'HR', href: '/hr' },
-    { title: 'Time Tracking', href: '/hr/time' },
-    { title: 'Timesheets', href: '/hr/time/timesheets' },
+    { title: 'Timekeeping', href: '/hr/time' },
+    { title: 'Period Timesheets', href: '/hr/time/timesheets' },
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
@@ -90,6 +90,10 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         className:
             'border-status-success/30 text-status-success bg-status-success',
         label: 'Approved',
+    },
+    returned: {
+        className: 'border-status-info/30 text-status-info bg-status-info',
+        label: 'Returned',
     },
     rejected: {
         className:
@@ -200,14 +204,14 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Timesheets" />
+            <Head title="Period Timesheets" />
 
             <PageShell>
                 <PageHeader
-                    title="Timesheets"
-                    description="Review and manage weekly timesheets."
+                    title="Period Timesheets"
+                    description="Review and manage HR period timesheets."
                     backHref="/hr/time"
-                    backLabel="Back to Time Tracking"
+                    backLabel="Back to Timekeeping"
                 />
 
                 {/* Filters */}
@@ -226,6 +230,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                             <SelectItem value="draft">Draft</SelectItem>
                             <SelectItem value="submitted">Submitted</SelectItem>
                             <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="returned">Returned</SelectItem>
                             <SelectItem value="rejected">Rejected</SelectItem>
                         </SelectContent>
                     </Select>
@@ -247,7 +252,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                 {/* Timesheets Table */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>All Timesheets</CardTitle>
+                        <CardTitle>All Period Timesheets</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {timesheets.data.length === 0 ? (

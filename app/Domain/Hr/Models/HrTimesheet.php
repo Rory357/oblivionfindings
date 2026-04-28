@@ -20,8 +20,10 @@ class HrTimesheet extends Model
         'status',
         'total_hours',
         'submitted_at',
+        'submitted_by',
         'approved_by',
         'approved_at',
+        'decision_notes',
         'rejection_reason',
         'returned_by',
         'returned_at',
@@ -34,6 +36,7 @@ class HrTimesheet extends Model
         'period_end' => 'date',
         'total_hours' => 'decimal:2',
         'submitted_at' => 'datetime',
+        'submitted_by' => 'integer',
         'approved_at' => 'datetime',
         'returned_at' => 'datetime',
     ];
@@ -50,6 +53,11 @@ class HrTimesheet extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
     }
 
     public function returnedBy(): BelongsTo
@@ -83,6 +91,11 @@ class HrTimesheet extends Model
     public function scopePending($query)
     {
         return $query->where('status', 'submitted');
+    }
+
+    public function scopeReturned($query)
+    {
+        return $query->where('status', 'returned');
     }
 
     public function scopeForPeriod($query, string $start, string $end)

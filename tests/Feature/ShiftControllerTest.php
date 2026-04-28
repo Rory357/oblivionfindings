@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -18,6 +19,7 @@ class ShiftControllerTest extends TestCase
     protected User $admin;
     protected User $staff;
     protected Client $client;
+    protected Site $site;
     protected ServiceContext $serviceContext;
 
     protected function setUp(): void
@@ -53,9 +55,26 @@ class ShiftControllerTest extends TestCase
             'is_active' => true,
         ]);
 
+        $this->site = Site::factory()->create(['name' => 'Kowhai House']);
+
         // Create client
         $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
+        ]);
+
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $this->staff->id,
+            'employee_number' => 'EMP-SHIFT-'.$this->staff->id,
+            'work_email' => $this->staff->email,
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
         ]);
     }
 
@@ -71,7 +90,7 @@ class ShiftControllerTest extends TestCase
 
     public function test_index_displays_for_authorized_user(): void
     {
-        $response = $this->actingAs($this->admin)->get('/shifts');
+        $response = $this->actingAs($this->admin)->get('/operations/shifts');
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->component('operations/shifts/index')
@@ -86,7 +105,7 @@ class ShiftControllerTest extends TestCase
     {
         $today = now()->format('Y-m-d');
         
-        $response = $this->actingAs($this->admin)->get("/shifts?from={$today}&to={$today}");
+        $response = $this->actingAs($this->admin)->get("/operations/shifts?from={$today}&to={$today}");
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->where('filters.from', $today)
@@ -99,7 +118,7 @@ class ShiftControllerTest extends TestCase
         // This tests that search doesn't cause SQL injection
         $maliciousInput = "test' OR '1'='1";
         
-        $response = $this->actingAs($this->admin)->get("/shifts?q=" . urlencode($maliciousInput));
+        $response = $this->actingAs($this->admin)->get("/operations/shifts?q=" . urlencode($maliciousInput));
         $response->assertOk();
         // If SQL injection worked, we'd get all shifts. With parameterized query, we get none.
     }
@@ -113,7 +132,7 @@ class ShiftControllerTest extends TestCase
         $site = Site::factory()->create(['name' => 'Kauri House']);
         $this->client->update(['site_id' => $site->id]);
 
-        $response = $this->actingAs($this->admin)->get('/shifts/create');
+        $response = $this->actingAs($this->admin)->get('/operations/shifts/create');
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -137,7 +156,7 @@ class ShiftControllerTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->post('/shifts', $shiftData);
+            ->post(route('operations.shifts.store'), $shiftData);
 
         $response->assertRedirect('/operations/shifts');
         $response->assertSessionHas('success');
@@ -159,7 +178,7 @@ class ShiftControllerTest extends TestCase
             'ends_at' => now()->addDay()->addHours(4)->format('Y-m-d H:i:s'),
         ];
 
-        $this->actingAs($this->admin)->post('/shifts', $shiftData);
+        $this->actingAs($this->admin)->post(route('operations.shifts.store'), $shiftData);
 
         $this->assertDatabaseHas('shifts', [
             'client_id' => $this->client->id,
@@ -177,7 +196,7 @@ class ShiftControllerTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->post('/shifts', $shiftData);
+            ->post(route('operations.shifts.store'), $shiftData);
 
         $response->assertSessionHasErrors(['ends_at']);
     }
@@ -192,7 +211,7 @@ class ShiftControllerTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->post('/shifts', $shiftData);
+            ->post(route('operations.shifts.store'), $shiftData);
 
         $response->assertSessionHasErrors(['starts_at']);
     }
@@ -212,7 +231,7 @@ class ShiftControllerTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->post('/shifts', $shiftData);
+            ->post(route('operations.shifts.store'), $shiftData);
 
         $response->assertSessionHasErrors(['tasks']);
     }
@@ -227,7 +246,7 @@ class ShiftControllerTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->post('/shifts', $shiftData);
+            ->post(route('operations.shifts.store'), $shiftData);
 
         $response->assertSessionHasErrors(['notes']);
     }
@@ -252,9 +271,9 @@ class ShiftControllerTest extends TestCase
         ];
 
         $response = $this->actingAs($this->admin)
-            ->post('/shifts', $shiftData);
+            ->post(route('operations.shifts.store'), $shiftData);
 
-        $response->assertSessionHasErrors(['starts_at']);
+        $response->assertSessionHasErrors(['user_id']);
     }
 
     public function test_store_creates_tasks_when_provided(): void
@@ -270,7 +289,7 @@ class ShiftControllerTest extends TestCase
             ],
         ];
 
-        $this->actingAs($this->admin)->post('/shifts', $shiftData);
+        $this->actingAs($this->admin)->post(route('operations.shifts.store'), $shiftData);
 
         $shift = Shift::latest()->first();
         $this->assertCount(3, $shift->tasks);
@@ -290,7 +309,7 @@ class ShiftControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->put("/shifts/{$shift->id}", [
+            ->put(route('operations.shifts.update', $shift), [
                 'client_id' => $this->client->id,
                 'starts_at' => $shift->starts_at->format('Y-m-d H:i:s'),
                 'ends_at' => $shift->ends_at->format('Y-m-d H:i:s'),
@@ -307,13 +326,12 @@ class ShiftControllerTest extends TestCase
 
     public function test_update_prevents_modifying_completed_shift(): void
     {
-        $shift = Shift::factory()->create([
+        $shift = Shift::factory()->completed()->create([
             'client_id' => $this->client->id,
-            'status' => 'completed',
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->put("/shifts/{$shift->id}", [
+            ->put(route('operations.shifts.update', $shift), [
                 'client_id' => $this->client->id,
                 'starts_at' => $shift->starts_at->format('Y-m-d H:i:s'),
                 'ends_at' => $shift->ends_at->format('Y-m-d H:i:s'),
@@ -334,7 +352,7 @@ class ShiftControllerTest extends TestCase
         $existingTask = $shift->tasks()->create(['label' => 'Old Task', 'sort_order' => 0]);
 
         $response = $this->actingAs($this->admin)
-            ->put("/shifts/{$shift->id}", [
+            ->put(route('operations.shifts.update', $shift), [
                 'client_id' => $this->client->id,
                 'starts_at' => $shift->starts_at->format('Y-m-d H:i:s'),
                 'ends_at' => $shift->ends_at->format('Y-m-d H:i:s'),
@@ -360,10 +378,12 @@ class ShiftControllerTest extends TestCase
             'client_id' => $this->client->id,
             'user_id' => $this->staff->id,
             'status' => 'scheduled',
+            'starts_at' => now()->subMinutes(10),
+            'ends_at' => now()->addHours(3),
         ]);
 
         $response = $this->actingAs($this->staff)
-            ->patch("/shifts/{$shift->id}/start");
+            ->patch(route('operations.shifts.start', $shift));
 
         $response->assertSessionHas('success');
         $this->assertDatabaseHas('shifts', [
@@ -378,11 +398,13 @@ class ShiftControllerTest extends TestCase
             'client_id' => $this->client->id,
             'user_id' => $this->staff->id,
             'status' => 'in_progress',
+            'actual_starts_at' => now()->subHours(2),
+            'started_by' => $this->staff->id,
         ]);
 
         // Try to complete without any notes
         $response = $this->actingAs($this->staff)
-            ->patch("/shifts/{$shift->id}/complete", [
+            ->patch(route('operations.shifts.complete', $shift), [
             ]);
 
         $response->assertSessionHasErrors(['final_note_body']);
@@ -394,10 +416,12 @@ class ShiftControllerTest extends TestCase
             'client_id' => $this->client->id,
             'user_id' => $this->staff->id,
             'status' => 'in_progress',
+            'actual_starts_at' => now()->subHours(2),
+            'started_by' => $this->staff->id,
         ]);
 
         $response = $this->actingAs($this->staff)
-            ->patch("/shifts/{$shift->id}/complete", [
+            ->patch(route('operations.shifts.complete', $shift), [
                 'final_note_subject' => 'Shift Summary',
                 'final_note_body' => 'Completed all tasks successfully',
             ]);
@@ -436,13 +460,9 @@ class ShiftControllerTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $response = $this->actingAs($this->staff)->get('/shifts');
-        $response->assertOk();
-        
-        // Staff should only see their own shift
-        $response->assertInertia(fn ($page) => $page
-            ->where('shifts.data', fn ($shifts) => count($shifts) === 1)
-        );
+        $this->actingAs($this->staff)
+            ->get('/operations/shifts')
+            ->assertRedirect(route('my-day'));
     }
 
     // ==========================================
@@ -460,7 +480,7 @@ class ShiftControllerTest extends TestCase
             'ends_at' => now()->addDay()->addHours(4)->format('Y-m-d H:i:s'),
         ];
 
-        $this->actingAs($this->admin)->post('/shifts', $shiftData);
+        $this->actingAs($this->admin)->post(route('operations.shifts.store'), $shiftData);
 
         $this->assertDatabaseHas('shifts', [
             'service_context_id' => $otherContext->id,
@@ -476,7 +496,7 @@ class ShiftControllerTest extends TestCase
             'ends_at' => now()->addDay()->addHours(4)->format('Y-m-d H:i:s'),
         ];
 
-        $this->actingAs($this->admin)->post('/shifts', $shiftData);
+        $this->actingAs($this->admin)->post(route('operations.shifts.store'), $shiftData);
 
         $shift = Shift::latest()->first();
         $this->assertEquals($this->serviceContext->id, $shift->service_context_id);

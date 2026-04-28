@@ -17,6 +17,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { store as storeShiftClinicalObservation } from '@/routes/shifts/clinical/observations';
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -123,7 +124,7 @@ export default function ObservationRecordSheet({
         }
 
         const url = shiftId
-            ? `/shifts/${shiftId}/clinical/observations`
+            ? storeShiftClinicalObservation.url(shiftId)
             : `/clients/${clientId}/clinical/observations`;
 
         router.post(

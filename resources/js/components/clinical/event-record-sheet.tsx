@@ -18,6 +18,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { store as storeShiftClinicalEvent } from '@/routes/shifts/clinical/events';
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -55,11 +56,13 @@ interface Props {
 function toDateTimeLocalValue(date: Date): string {
     const pad = (value: number) => String(value).padStart(2, '0');
 
-    return [
-        date.getFullYear(),
-        pad(date.getMonth() + 1),
-        pad(date.getDate()),
-    ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return (
+        [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate()),
+        ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+    );
 }
 
 export default function EventRecordSheet({
@@ -71,7 +74,9 @@ export default function EventRecordSheet({
 }: Props) {
     const [eventType, setEventType] = useState<EventType>('other');
     const [severity, setSeverity] = useState<Severity>('medium');
-    const [occurredAt, setOccurredAt] = useState(toDateTimeLocalValue(new Date()));
+    const [occurredAt, setOccurredAt] = useState(
+        toDateTimeLocalValue(new Date()),
+    );
     const [description, setDescription] = useState('');
     const [immediateActionTaken, setImmediateActionTaken] = useState('');
     const [outcome, setOutcome] = useState('');
@@ -100,7 +105,7 @@ export default function EventRecordSheet({
 
     const handleSubmit = useCallback(() => {
         const url = shiftId
-            ? `/shifts/${shiftId}/clinical/events`
+            ? storeShiftClinicalEvent.url(shiftId)
             : `/clients/${clientId}/clinical/events`;
 
         setSubmitting(true);
@@ -116,7 +121,10 @@ export default function EventRecordSheet({
                 immediate_action_taken: immediateActionTaken || undefined,
                 outcome: outcome || undefined,
                 requires_followup: requiresFollowup,
-                followup_notes: requiresFollowup && followupNotes ? followupNotes : undefined,
+                followup_notes:
+                    requiresFollowup && followupNotes
+                        ? followupNotes
+                        : undefined,
             },
             {
                 preserveScroll: true,
@@ -153,7 +161,8 @@ export default function EventRecordSheet({
                 <SheetHeader>
                     <SheetTitle>Record Clinical Event</SheetTitle>
                     <SheetDescription>
-                        Record a clinical event for this {shiftId ? 'shift' : 'client'}.
+                        Record a clinical event for this{' '}
+                        {shiftId ? 'shift' : 'client'}.
                     </SheetDescription>
                 </SheetHeader>
 
@@ -161,13 +170,21 @@ export default function EventRecordSheet({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label>Event Type</Label>
-                            <Select value={eventType} onValueChange={(value) => setEventType(value as EventType)}>
+                            <Select
+                                value={eventType}
+                                onValueChange={(value) =>
+                                    setEventType(value as EventType)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {EVENT_TYPES.map((type) => (
-                                        <SelectItem key={type.value} value={type.value}>
+                                        <SelectItem
+                                            key={type.value}
+                                            value={type.value}
+                                        >
                                             {type.label}
                                         </SelectItem>
                                     ))}
@@ -177,13 +194,21 @@ export default function EventRecordSheet({
 
                         <div className="space-y-2">
                             <Label>Severity</Label>
-                            <Select value={severity} onValueChange={(value) => setSeverity(value as Severity)}>
+                            <Select
+                                value={severity}
+                                onValueChange={(value) =>
+                                    setSeverity(value as Severity)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {SEVERITIES.map((item) => (
-                                        <SelectItem key={item.value} value={item.value}>
+                                        <SelectItem
+                                            key={item.value}
+                                            value={item.value}
+                                        >
                                             {item.label}
                                         </SelectItem>
                                     ))}
@@ -197,7 +222,9 @@ export default function EventRecordSheet({
                         <Input
                             type="datetime-local"
                             value={occurredAt}
-                            onChange={(event) => setOccurredAt(event.target.value)}
+                            onChange={(event) =>
+                                setOccurredAt(event.target.value)
+                            }
                         />
                     </div>
 
@@ -207,7 +234,9 @@ export default function EventRecordSheet({
                             placeholder="Describe what happened."
                             rows={4}
                             value={description}
-                            onChange={(event) => setDescription(event.target.value)}
+                            onChange={(event) =>
+                                setDescription(event.target.value)
+                            }
                         />
                     </div>
 
@@ -217,7 +246,9 @@ export default function EventRecordSheet({
                             placeholder="Document immediate actions taken."
                             rows={3}
                             value={immediateActionTaken}
-                            onChange={(event) => setImmediateActionTaken(event.target.value)}
+                            onChange={(event) =>
+                                setImmediateActionTaken(event.target.value)
+                            }
                         />
                     </div>
 
@@ -245,11 +276,14 @@ export default function EventRecordSheet({
                                 }}
                             />
                             <div className="space-y-1">
-                                <Label htmlFor={`requires-followup-${shiftId ?? clientId ?? 'event'}`}>
+                                <Label
+                                    htmlFor={`requires-followup-${shiftId ?? clientId ?? 'event'}`}
+                                >
                                     Requires follow-up
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Flag this if a coordinator or clinical lead should review what happens next.
+                                    Flag this if a coordinator or clinical lead
+                                    should review what happens next.
                                 </p>
                             </div>
                         </div>
@@ -261,7 +295,9 @@ export default function EventRecordSheet({
                                     placeholder="Add any follow-up or review notes."
                                     rows={3}
                                     value={followupNotes}
-                                    onChange={(event) => setFollowupNotes(event.target.value)}
+                                    onChange={(event) =>
+                                        setFollowupNotes(event.target.value)
+                                    }
                                 />
                             </div>
                         ) : null}
@@ -270,7 +306,10 @@ export default function EventRecordSheet({
                     {Object.keys(errors).length > 0 ? (
                         <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3">
                             {Object.entries(errors).map(([field, message]) => (
-                                <p key={field} className="text-xs text-status-critical">
+                                <p
+                                    key={field}
+                                    className="text-xs text-status-critical"
+                                >
                                     {message}
                                 </p>
                             ))}
@@ -286,10 +325,7 @@ export default function EventRecordSheet({
                     >
                         Cancel
                     </Button>
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                    >
+                    <Button onClick={handleSubmit} disabled={submitting}>
                         {submitting ? 'Saving...' : 'Record Event'}
                     </Button>
                 </SheetFooter>
