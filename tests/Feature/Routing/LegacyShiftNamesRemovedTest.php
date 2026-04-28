@@ -27,23 +27,47 @@ class LegacyShiftNamesRemovedTest extends TestCase
         );
     }
 
-    #[DataProvider('removedLegacyWriteRoutes')]
-    public function test_legacy_write_urls_are_not_mounted(string $method, string $uri): void
+    #[DataProvider('legacyWriteRoutes')]
+    public function test_legacy_write_urls_are_redirect_only(string $method, string $uri, string $canonical): void
     {
         $matches = collect(Route::getRoutes())->filter(function ($route) use ($method, $uri) {
             return $route->uri() === $uri
                 && in_array($method, $route->methods(), true);
         });
 
-        $this->assertTrue(
-            $matches->isEmpty(),
-            "Legacy write URL [{$method} {$uri}] should not be mounted after Phase 7 cleanup."
+        $this->assertCount(
+            1,
+            $matches,
+            "Expected exactly one redirect mount for [{$method} {$uri}], found {$matches->count()}."
+        );
+
+        $route = $matches->first();
+
+        $this->assertSame(
+            LegacyRouteRedirectController::class,
+            ltrim($route->getActionName(), '\\'),
+            "Legacy write URL [{$method} {$uri}] must be a redirect via LegacyRouteRedirectController, not a controller mount."
+        );
+        $this->assertNull(
+            $route->getName(),
+            "Legacy write URL [{$method} {$uri}] must remain unnamed (legacy names stay removed)."
+        );
+        $this->assertSame(
+            308,
+            (int) ($route->defaults['status'] ?? 0),
+            "Legacy write URL [{$method} {$uri}] must redirect with HTTP 308 to preserve method+body."
+        );
+        $this->assertSame(
+            $canonical,
+            $route->defaults['canonical'] ?? null,
+            "Legacy write URL [{$method} {$uri}] must redirect to canonical [{$canonical}]."
         );
     }
 
-    public function test_legacy_shift_file_only_keeps_get_redirects_and_attendance_routes(): void
+    public function test_legacy_shift_file_only_keeps_redirects_and_attendance_routes(): void
     {
         $legacyRedirectUris = [
+            // GET-only deep-link redirects
             'shifts',
             'shifts/create',
             'shifts/{shift}',
@@ -53,21 +77,30 @@ class LegacyShiftNamesRemovedTest extends TestCase
             'timesheets/create',
             'timesheets/{timesheet}',
             'timesheets/{timesheet}/edit',
+            // POST/PATCH/PUT 308 redirects
+            'shifts/series',
+            'shifts/{shift}/assign',
+            'shifts/{shift}/unassign',
+            'shifts/{shift}/start',
+            'shifts/{shift}/complete',
+            'shifts/{shift}/cancel',
+            'shifts/{shift}/reopen',
+            'shifts/{shift}/replacement-request',
+            'shifts/{shift}/replacement-request/cancel',
+            'shifts/{shift}/tasks/{task}',
+            'timesheets/{timesheet}/submit',
+            'timesheets/{timesheet}/resubmit',
+            'timesheets/{timesheet}/approve',
+            'timesheets/{timesheet}/reject',
+            'timesheets/{timesheet}/return',
+            'timesheets/bulk-approve',
+            'timesheets/bulk-return',
+            'timesheets/bulk-reject',
         ];
 
-        $routes = collect(Route::getRoutes())->filter(function ($route) {
+        $routes = collect(Route::getRoutes())->filter(function ($route) use ($legacyRedirectUris) {
             return str_starts_with($route->uri(), 'attendance')
-                || in_array($route->uri(), [
-                    'shifts',
-                    'shifts/create',
-                    'shifts/{shift}',
-                    'shifts/{shift}/edit',
-                    'timesheets',
-                    'timesheets/approvals',
-                    'timesheets/create',
-                    'timesheets/{timesheet}',
-                    'timesheets/{timesheet}/edit',
-                ], true);
+                || in_array($route->uri(), $legacyRedirectUris, true);
         });
 
         $unexpectedLegacyMounts = $routes->reject(function ($route) use ($legacyRedirectUris) {
@@ -78,15 +111,14 @@ class LegacyShiftNamesRemovedTest extends TestCase
             }
 
             return in_array($uri, $legacyRedirectUris, true)
-                && $route->methods() === ['GET', 'HEAD']
                 && ltrim($route->getActionName(), '\\') === LegacyRouteRedirectController::class
                 && $route->getName() === null;
         });
 
         $this->assertTrue(
             $unexpectedLegacyMounts->isEmpty(),
-            'Legacy /shifts or /timesheets routes should only exist as unnamed GET redirects: '
-            .$unexpectedLegacyMounts->map(fn ($route) => implode('|', $route->methods()).' '.$route->uri().' ['.($route->getName() ?? 'unnamed').']')->join(', ')
+            'Legacy /shifts or /timesheets routes must only exist as unnamed LegacyRouteRedirectController mounts: '
+            .$unexpectedLegacyMounts->map(fn ($route) => implode('|', $route->methods()).' '.$route->uri().' ['.($route->getName() ?? 'unnamed').' → '.$route->getActionName().']')->join(', ')
         );
     }
 
@@ -164,31 +196,31 @@ class LegacyShiftNamesRemovedTest extends TestCase
         ];
     }
 
-    public static function removedLegacyWriteRoutes(): array
+    public static function legacyWriteRoutes(): array
     {
         return [
-            ['POST', 'shifts'],
-            ['POST', 'shifts/series'],
-            ['PUT', 'shifts/{shift}'],
-            ['POST', 'shifts/{shift}/assign'],
-            ['POST', 'shifts/{shift}/unassign'],
-            ['PATCH', 'shifts/{shift}/start'],
-            ['PATCH', 'shifts/{shift}/complete'],
-            ['PATCH', 'shifts/{shift}/cancel'],
-            ['PATCH', 'shifts/{shift}/reopen'],
-            ['POST', 'shifts/{shift}/replacement-request'],
-            ['PATCH', 'shifts/{shift}/replacement-request/cancel'],
-            ['PATCH', 'shifts/{shift}/tasks/{task}'],
-            ['POST', 'timesheets'],
-            ['PUT', 'timesheets/{timesheet}'],
-            ['POST', 'timesheets/{timesheet}/submit'],
-            ['POST', 'timesheets/{timesheet}/resubmit'],
-            ['POST', 'timesheets/{timesheet}/approve'],
-            ['POST', 'timesheets/{timesheet}/reject'],
-            ['POST', 'timesheets/{timesheet}/return'],
-            ['POST', 'timesheets/bulk-approve'],
-            ['POST', 'timesheets/bulk-return'],
-            ['POST', 'timesheets/bulk-reject'],
+            ['POST', 'shifts', 'operations.shifts.store'],
+            ['POST', 'shifts/series', 'operations.shifts.series.store'],
+            ['PUT', 'shifts/{shift}', 'operations.shifts.update'],
+            ['POST', 'shifts/{shift}/assign', 'operations.shifts.assign'],
+            ['POST', 'shifts/{shift}/unassign', 'operations.shifts.unassign'],
+            ['PATCH', 'shifts/{shift}/start', 'operations.shifts.start'],
+            ['PATCH', 'shifts/{shift}/complete', 'operations.shifts.complete'],
+            ['PATCH', 'shifts/{shift}/cancel', 'operations.shifts.cancel'],
+            ['PATCH', 'shifts/{shift}/reopen', 'operations.shifts.reopen'],
+            ['POST', 'shifts/{shift}/replacement-request', 'operations.shifts.replacement.request'],
+            ['PATCH', 'shifts/{shift}/replacement-request/cancel', 'operations.shifts.replacement.cancel'],
+            ['PATCH', 'shifts/{shift}/tasks/{task}', 'operations.shifts.tasks.update'],
+            ['POST', 'timesheets', 'operations.timesheets.store'],
+            ['PUT', 'timesheets/{timesheet}', 'operations.timesheets.update'],
+            ['POST', 'timesheets/{timesheet}/submit', 'operations.timesheets.submit'],
+            ['POST', 'timesheets/{timesheet}/resubmit', 'operations.timesheets.resubmit'],
+            ['POST', 'timesheets/{timesheet}/approve', 'operations.timesheets.approve'],
+            ['POST', 'timesheets/{timesheet}/reject', 'operations.timesheets.reject'],
+            ['POST', 'timesheets/{timesheet}/return', 'operations.timesheets.return'],
+            ['POST', 'timesheets/bulk-approve', 'operations.timesheets.bulkApprove'],
+            ['POST', 'timesheets/bulk-return', 'operations.timesheets.bulkReturn'],
+            ['POST', 'timesheets/bulk-reject', 'operations.timesheets.bulkReject'],
         ];
     }
 }

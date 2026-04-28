@@ -15,7 +15,15 @@ class LegacyRouteRedirectController extends Controller
 
         if (is_string($canonical) && $canonical !== '') {
             $parameters = $route?->parameters() ?? [];
-            unset($parameters['canonical']);
+            // Strip controller-side defaults so they don't leak into route() as
+            // query string parameters. `route()` treats any extra keys as
+            // ?key=value, which would corrupt the redirect URL.
+            unset(
+                $parameters['canonical'],
+                $parameters['status'],
+                $parameters['destination'],
+                $parameters['destination_prefix'],
+            );
 
             $url = route($canonical, $parameters);
         } elseif (is_string($defaults['destination'] ?? null) && $defaults['destination'] !== '') {
