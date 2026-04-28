@@ -398,9 +398,16 @@ export default function NotificationEscalations({
     const [sortMode, setSortMode] = useState<SortMode>('default');
     const [timingOpen, setTimingOpen] = useState<Record<string, boolean>>({});
     const [targetsOpen, setTargetsOpen] = useState<Record<string, boolean>>({});
-    const [initialRulesJson] = useState(() => JSON.stringify(rules));
+    // Track the saved baseline as state so the dirty check stays consistent
+    // with React's render lifecycle (a ref would trip
+    // `react-hooks/refs` because it'd be read during render). The
+    // `onSuccess` handler below resets the baseline to the freshly saved
+    // value so the form returns to a clean state after a successful save.
+    const [savedRulesJson, setSavedRulesJson] = useState(() =>
+        JSON.stringify(rules),
+    );
 
-    const isDirty = JSON.stringify(form.data.rules) !== initialRulesJson;
+    const isDirty = JSON.stringify(form.data.rules) !== savedRulesJson;
 
     const setRule = useCallback(
         (key: string, patch: Partial<Rule>) => {
@@ -550,8 +557,8 @@ export default function NotificationEscalations({
                         e.preventDefault();
                         form.put('/settings/notifications/escalations', {
                             onSuccess: () => {
-                                initialRulesRef.current = JSON.stringify(
-                                    form.data.rules,
+                                setSavedRulesJson(
+                                    JSON.stringify(form.data.rules),
                                 );
                                 setSaveSuccess(true);
                                 setTimeout(() => setSaveSuccess(false), 3000);

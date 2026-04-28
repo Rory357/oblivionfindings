@@ -121,9 +121,14 @@ class TimesheetControllerTest extends TestCase
 
     public function test_non_approvers_cannot_access_the_approval_queue(): void
     {
+        // Frontline support_worker is bounced away from approval-only pages
+        // by the `role_scope:my-day` middleware (added when /my-day became
+        // the canonical staff home), so a 302 redirect to /my-day replaces
+        // the older 403. Either way the worker never reaches the approvals
+        // queue — the assertion just had to follow the new convention.
         $this->actingAs($this->staff)
             ->get(route('operations.timesheets.approvals'))
-            ->assertForbidden();
+            ->assertRedirect('/my-day');
     }
 
     public function test_create_page_renders_for_timesheet_creators(): void

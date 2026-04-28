@@ -93,10 +93,17 @@ test('attendance generated shift timesheet flows into payroll run with shift and
 
     $this->travel(3)->hours();
 
+    // The end-of-shift checklist (F-1/F-3) blocks clock-out when a
+    // handover hasn't been written, so this payroll-pipeline test forces
+    // the clock-out with a recorded reason. The behaviour is identical to
+    // the operator dashboard's "End shift anyway" flow — see
+    // `AttendanceClockOutBlockerTest` for direct coverage of the blocker.
     $this->actingAs($worker)
         ->post('/attendance/clock-out', [
             'session_id' => $openSession->id,
             'break_minutes' => 15,
+            'force' => true,
+            'override_reason' => 'Payroll integration test — handover covered separately.',
         ])
         ->assertSessionHas('success');
 

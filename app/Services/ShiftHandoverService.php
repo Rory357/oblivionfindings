@@ -163,8 +163,13 @@ class ShiftHandoverService
                 'outgoingStaff:id,name',
             ]);
 
+            // resolveExpectedIncomingShift returns a plain array (see its
+            // docblock above), so use array access — the previous `->get()`
+            // call threw "Call to a member function get() on array" whenever a
+            // worker submitted a handover for a shift without an existing
+            // incoming match.
             $matchedIncoming = $handover->incomingShift
-                ?: $this->resolveExpectedIncomingShift($handover->outgoingShift)->get('matched_shift');
+                ?: $this->resolveExpectedIncomingShift($handover->outgoingShift)['matched_shift'];
 
             $handover->forceFill([
                 'incoming_shift_id' => $handover->incoming_shift_id ?: $matchedIncoming?->id,

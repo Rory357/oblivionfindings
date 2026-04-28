@@ -893,14 +893,22 @@ class TimesheetController extends Controller
 
     protected function syncApprovedTimesheet(Timesheet $timesheet): void
     {
+        // Use `load` (not `loadMissing`) for the relations the snapshot
+        // depends on. An earlier `assertCanAccessTimesheet` call eager-loads
+        // `shift.client:id,site_id` on the same timesheet — `loadMissing`
+        // would treat that partial projection as already-loaded and
+        // `client_name_snapshot` would silently come out blank because
+        // first_name / last_name were never SELECTed.
         $timesheet->loadMissing([
+            'user.hrEmployeeProfile',
+        ]);
+        $timesheet->load([
             'shift.site:id,name',
             'shift.client:id,first_name,last_name,site_id',
             'shift.serviceContext:id,name',
             'shift.staff:id,name',
             'client:id,first_name,last_name',
             'staff:id,name',
-            'user.hrEmployeeProfile',
         ]);
 
         $snapshot = app(ShiftOperationalSnapshotService::class)->snapshotForTimesheet($timesheet);

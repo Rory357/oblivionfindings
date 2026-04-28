@@ -18,7 +18,8 @@ class ShiftOperationalSnapshotService
             return $this->emptySnapshot($staff);
         }
 
-        $shift->loadMissing([
+        // `load` (not `loadMissing`) — see snapshotForTimesheet for why.
+        $shift->load([
             'site:id,name',
             'client:id,first_name,last_name,site_id',
             'client.site:id,name',
@@ -79,7 +80,11 @@ class ShiftOperationalSnapshotService
      */
     public function snapshotForTimesheet(Timesheet $timesheet): array
     {
-        $timesheet->loadMissing([
+        // `load` (not `loadMissing`) so a prior partial-column eager load
+        // elsewhere — e.g. `UserSiteAccessService::timesheetSiteId` only
+        // loads `shift.client:id,site_id` — does not silently mask
+        // first_name / last_name and produce an empty `client_name_snapshot`.
+        $timesheet->load([
             'shift.site:id,name',
             'shift.client:id,first_name,last_name,site_id',
             'shift.client.site:id,name',

@@ -83,3 +83,22 @@ test('forced clock out succeeds with an override reason', function () {
 
     expect($session->fresh()->status)->toBe('closed');
 });
+
+test('handover submit does not crash when no incoming shift exists', function () {
+    // Regression: ShiftHandoverService::save called
+    // resolveExpectedIncomingShift(...)->get('matched_shift') but the resolver
+    // returns a plain array. End-of-shift dialog hit
+    // "Call to a member function get() on array" whenever a worker submitted
+    // a handover for a shift with no follow-on shift to match.
+    $session = openShiftSessionFor($this->staff);
+
+    $this->actingAs($this->staff)
+        ->post('/attendance/handover', [
+            'shift_id' => $session->shift_id,
+            'meds_completed' => true,
+            'shift_rating' => 'calm',
+            'handover_notes' => 'Regression coverage for handover submit fatal.',
+            'follow_up_needed' => false,
+        ])
+        ->assertSessionHas('success');
+});
