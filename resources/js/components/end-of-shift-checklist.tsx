@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
 export type EndOfShiftBlocker = {
     key: string;
@@ -89,6 +90,7 @@ function ChecklistBody({
     handoverValue: HandoverWriteValue;
     setHandoverValue: (next: HandoverWriteValue) => void;
 }) {
+    const t = useMyDayLabels();
     const otherBlockers = blockers.filter(
         (blocker) => blocker.key !== 'handover_missing',
     );
@@ -106,12 +108,9 @@ function ChecklistBody({
                 <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-3 text-sm text-status-success">
                     <div className="flex items-center gap-2 font-medium">
                         <CheckCircle2 className="h-4 w-4" />
-                        Ready to end shift
+                        {t('ready_to_end_shift')}
                     </div>
-                    <p className="mt-1">
-                        Required tasks, handover, incidents, and medication
-                        records are clear.
-                    </p>
+                    <p className="mt-1">{t('ready_subtitle')}</p>
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -141,7 +140,7 @@ function ChecklistBody({
                                                 className="mt-1 h-auto p-0 text-sm"
                                             >
                                                 <Link href={blocker.action_url}>
-                                                    Open related page
+                                                    {t('open_related_page')}
                                                 </Link>
                                             </Button>
                                         ) : null}
@@ -156,7 +155,9 @@ function ChecklistBody({
             {showTaskList ? (
                 <section id="shift-tasks" className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold">Shift tasks</h3>
+                        <h3 className="text-sm font-semibold">
+                            {t('shift_tasks')}
+                        </h3>
                         <span
                             className={
                                 incompleteTaskCount === 0
@@ -165,8 +166,11 @@ function ChecklistBody({
                             }
                         >
                             {incompleteTaskCount === 0
-                                ? 'All complete'
-                                : `${incompleteTaskCount} of ${tasks.length} still to do`}
+                                ? t('all_complete')
+                                : t('still_to_do', {
+                                      open: incompleteTaskCount,
+                                      total: tasks.length,
+                                  })}
                         </span>
                     </div>
                     <ShiftTaskList
@@ -179,7 +183,7 @@ function ChecklistBody({
 
             {hasHandoverBlocker && session.shift_id ? (
                 <section id="handover" className="space-y-2">
-                    <h3 className="text-sm font-semibold">Handover</h3>
+                    <h3 className="text-sm font-semibold">{t('handover')}</h3>
                     <HandoverWriteForm
                         value={handoverValue}
                         onChange={setHandoverValue}
@@ -193,7 +197,7 @@ function ChecklistBody({
                         htmlFor="end-shift-break-minutes"
                         className="text-sm font-medium"
                     >
-                        Break minutes
+                        {t('break_minutes')}
                     </label>
                     <Input
                         id="end-shift-break-minutes"
@@ -223,7 +227,7 @@ function ChecklistBody({
                             htmlFor="override-reason"
                             className="text-sm font-medium"
                         >
-                            Reason to end anyway
+                            {t('reason_to_end_anyway')}
                         </label>
                         <Input
                             id="override-reason"
@@ -231,7 +235,7 @@ function ChecklistBody({
                             onChange={(event) =>
                                 setOverrideReason(event.target.value)
                             }
-                            placeholder="Brief reason"
+                            placeholder={t('brief_reason')}
                         />
                     </div>
                 ) : null}
@@ -243,12 +247,12 @@ function ChecklistBody({
                         htmlFor="end-shift-notes"
                         className="text-sm font-medium"
                     >
-                        Optional notes
+                        {t('optional_notes')}
                     </label>
                     <DictateButton
                         value={notes}
                         onChange={setNotes}
-                        fieldLabel="Optional end of shift notes"
+                        fieldLabel={t('optional_notes')}
                     />
                 </div>
                 <Textarea
@@ -256,7 +260,7 @@ function ChecklistBody({
                     rows={3}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
-                    placeholder="Anything payroll or your manager should know."
+                    placeholder={t('optional_notes_placeholder')}
                     className="text-base"
                 />
             </section>
@@ -265,12 +269,9 @@ function ChecklistBody({
                 <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
                     <div className="flex items-center gap-2 font-medium">
                         <AlertTriangle className="h-4 w-4" />
-                        Override will be audit logged
+                        {t('override_audit_title')}
                     </div>
-                    <p className="mt-1">
-                        You can end the shift now if needed, but the reason and
-                        outstanding items will be recorded.
-                    </p>
+                    <p className="mt-1">{t('override_audit_subtitle')}</p>
                 </div>
             ) : null}
         </div>
@@ -286,6 +287,7 @@ export default function EndOfShiftChecklist({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useMyDayLabels();
     const isMobile = useIsMobile();
     const [submitting, setSubmitting] = useState(false);
     const [notes, setNotes] = useState('');
@@ -394,18 +396,20 @@ export default function EndOfShiftChecklist({
             setHandoverValue={setHandoverValue}
         />
     );
-    const title = `End shift${session.client_name ? ` for ${session.client_name}` : ''}`;
+    const title = session.client_name
+        ? t('end_shift_for', { name: session.client_name })
+        : t('end_shift');
     const description =
         blockers.length === 0
-            ? 'Confirm break minutes and wrap the shift.'
-            : 'Clear the required items, or provide a reason to end anyway.';
+            ? t('confirm_break_minutes')
+            : t('clear_required_or_reason');
     const label = submitting
-        ? 'Ending...'
+        ? t('ending')
         : force
-          ? 'End shift anyway'
+          ? t('end_shift_anyway')
           : hasHandoverBlocker
-            ? 'Save handover and end shift'
-            : 'End shift';
+            ? t('save_handover_and_end')
+            : t('end_shift');
 
     if (isMobile) {
         return (

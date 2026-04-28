@@ -2,6 +2,7 @@ import { Mic, MicOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useDictation } from '@/hooks/use-dictation';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
 
 export type DictateButtonProps = {
@@ -21,6 +22,7 @@ export default function DictateButton({
     disabled,
     locale,
 }: DictateButtonProps) {
+    const t = useMyDayLabels();
     const appendTranscript = (chunk: string) => {
         const current = value ?? '';
         const needsSpace = current.length > 0 && !/\s$/.test(current);
@@ -38,11 +40,12 @@ export default function DictateButton({
 
     const aria = fieldLabel
         ? isListening
-            ? `Stop voice input for ${fieldLabel}`
-            : `Start voice input for ${fieldLabel}`
+            ? `${t('stop_voice_input')} (${fieldLabel})`
+            : t('start_voice_input', { field: fieldLabel })
         : isListening
-          ? 'Stop voice input'
-          : 'Start voice input';
+          ? t('stop_voice_input')
+          : t('start_voice_input', { field: '' }).replace(/\s*$/, '').trim() ||
+            t('dictate');
 
     return (
         <Button
@@ -65,7 +68,7 @@ export default function DictateButton({
             ) : (
                 <Mic aria-hidden className="h-3.5 w-3.5" />
             )}
-            <span>{isListening ? 'Listening...' : 'Dictate'}</span>
+            <span>{isListening ? `${t('listening')}...` : t('dictate')}</span>
         </Button>
     );
 }

@@ -13,6 +13,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
 export type InlineTimesheet = {
     id: number;
@@ -45,6 +46,7 @@ export default function TimesheetEditSheet({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useMyDayLabels();
     const page = usePage<{
         flash?: { error?: string | null };
     }>();
@@ -123,16 +125,18 @@ export default function TimesheetEditSheet({
                 className="max-h-[92vh] overflow-y-auto rounded-t-2xl"
             >
                 <SheetHeader className="pr-12">
-                    <SheetTitle>Update and resubmit</SheetTitle>
+                    <SheetTitle>{t('update_and_resubmit')}</SheetTitle>
                     <SheetDescription>
-                        Fix the returned timesheet without leaving My Day.
+                        {t('fix_returned_timesheet')}
                     </SheetDescription>
                 </SheetHeader>
 
                 <div className="space-y-4 px-4">
                     {timesheet.return_notes ? (
                         <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
-                            <div className="font-medium">Manager note</div>
+                            <div className="font-medium">
+                                {t('manager_note')}
+                            </div>
                             <p className="mt-1 whitespace-pre-wrap">
                                 {timesheet.return_notes}
                             </p>
@@ -141,8 +145,7 @@ export default function TimesheetEditSheet({
 
                     {!timesheet.can_edit_inline ? (
                         <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-                            This timesheet is locked for payroll or no longer
-                            editable.
+                            {t('locked_for_payroll')}
                         </div>
                     ) : null}
 
@@ -152,7 +155,7 @@ export default function TimesheetEditSheet({
                             className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
                         >
                             <div className="font-medium">
-                                Couldn&apos;t resubmit
+                                {t('couldnt_resubmit')}
                             </div>
                             <ul className="mt-1 list-disc space-y-0.5 pl-5">
                                 {errorMessages.map((message) => (
@@ -168,7 +171,7 @@ export default function TimesheetEditSheet({
                                 htmlFor={`timesheet-${timesheet.id}-starts`}
                                 className="text-sm font-medium"
                             >
-                                Start
+                                {t('start')}
                             </label>
                             <Input
                                 id={`timesheet-${timesheet.id}-starts`}
@@ -185,7 +188,7 @@ export default function TimesheetEditSheet({
                                 htmlFor={`timesheet-${timesheet.id}-ends`}
                                 className="text-sm font-medium"
                             >
-                                Finish
+                                {t('finish')}
                             </label>
                             <Input
                                 id={`timesheet-${timesheet.id}-ends`}
@@ -205,7 +208,7 @@ export default function TimesheetEditSheet({
                                 htmlFor={`timesheet-${timesheet.id}-break`}
                                 className="text-sm font-medium"
                             >
-                                Break minutes
+                                {t('break_minutes')}
                             </label>
                             <Input
                                 id={`timesheet-${timesheet.id}-break`}
@@ -231,7 +234,7 @@ export default function TimesheetEditSheet({
                                 htmlFor={`timesheet-${timesheet.id}-mileage`}
                                 className="text-sm font-medium"
                             >
-                                Mileage km
+                                {t('mileage_km')}
                             </label>
                             <Input
                                 id={`timesheet-${timesheet.id}-mileage`}
@@ -254,12 +257,12 @@ export default function TimesheetEditSheet({
                                 htmlFor={`timesheet-${timesheet.id}-notes`}
                                 className="text-sm font-medium"
                             >
-                                Notes
+                                {t('notes')}
                             </label>
                             <DictateButton
                                 value={notes}
                                 onChange={setNotes}
-                                fieldLabel="Timesheet notes"
+                                fieldLabel={t('timesheet_notes_label')}
                                 disabled={disabled}
                             />
                         </div>
@@ -280,7 +283,9 @@ export default function TimesheetEditSheet({
                         onClick={saveAndSubmit}
                         disabled={disabled || !startsAt || !endsAt}
                     >
-                        {submitting ? 'Sending...' : 'Save and resubmit'}
+                        {submitting
+                            ? t('sending')
+                            : t('update_and_resubmit_action')}
                     </Button>
                 </SheetFooter>
             </SheetContent>

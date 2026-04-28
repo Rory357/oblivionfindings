@@ -63,7 +63,7 @@ class RosterController extends Controller
                 'upcoming_days' => 14,
                 'recent_days' => 7,
             ],
-            'labels' => Lang::get('my-day'),
+            'my_day_labels' => Lang::get('my-day'),
         ];
     }
 

@@ -116,7 +116,10 @@ class MyTasksController extends Controller
             'active_round' => $activeRound,
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
-            'labels' => Lang::get('my-day'),
+            // Namespaced as `my_day_labels` so it does not collide with the
+            // `labels` prop shared globally by HandleInertiaRequests for
+            // terminology overrides (client.singular, etc.).
+            'my_day_labels' => Lang::get('my-day'),
         ]);
     }
 

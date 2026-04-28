@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import VoiceInputButton from '@/components/voice-input-button';
+import DictateButton from '@/components/dictate-button';
 import RespiteSubnav from '@/components/respite-subnav';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
@@ -143,7 +143,7 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Notes *</Label>
-                                    <VoiceInputButton
+                                    <DictateButton
                                         value={data.notes}
                                         onChange={(next) => setData('notes', next)}
                                         fieldLabel="Handover notes"

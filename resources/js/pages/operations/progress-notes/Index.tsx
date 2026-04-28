@@ -16,7 +16,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import VoiceInputButton from '@/components/voice-input-button';
+import DictateButton from '@/components/dictate-button';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
 import AppLayout from '@/layouts/app-layout';
 import { submitOffline } from '@/lib/offline-queue';
@@ -476,7 +476,7 @@ export default function ProgressNotesIndex({
                             </div>
                             <div className="mt-3 flex items-center justify-between">
                                 <Label className="text-xs">Note</Label>
-                                <VoiceInputButton
+                                <DictateButton
                                     value={noteData.content}
                                     onChange={(next) =>
                                         setNoteData({

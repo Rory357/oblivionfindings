@@ -23,7 +23,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import VoiceInputButton from '@/components/voice-input-button';
+import DictateButton from '@/components/dictate-button';
 import { submitOffline } from '@/lib/offline-queue';
 
 /* -------------------------------------------------------------------------- */
@@ -711,7 +711,7 @@ function RecordStep({
                                 (optional)
                             </span>
                         </label>
-                        <VoiceInputButton
+                        <DictateButton
                             value={notes}
                             onChange={onNotesChange}
                             fieldLabel="PRN note"

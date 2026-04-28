@@ -12,6 +12,7 @@ import ShiftDetailSheet from '@/components/roster/shift-detail-sheet';
 import TodayTimeline from '@/components/roster/today-timeline';
 import type { RosterShift } from '@/components/roster/types';
 import UpcomingList from '@/components/roster/upcoming-list';
+import WeekGridOverview from '@/components/roster/week-grid-overview';
 import { Button } from '@/components/ui/button';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import { formatDate } from '@/lib/datetime';
@@ -140,6 +141,14 @@ export default function MyRoster({
                         </div>
                     </div>
                 ) : null}
+
+                <WeekGridOverview
+                    todayShifts={today_shifts}
+                    upcomingShifts={upcoming_shifts}
+                    recentShifts={recent_shifts}
+                    onSelect={openShift}
+                    today={window.today}
+                />
 
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="space-y-6">

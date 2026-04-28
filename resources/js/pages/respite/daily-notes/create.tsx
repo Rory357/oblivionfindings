@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import VoiceInputButton from '@/components/voice-input-button';
+import DictateButton from '@/components/dictate-button';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
@@ -257,7 +257,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Activities</Label>
-                                    <VoiceInputButton
+                                    <DictateButton
                                         value={data.activities}
                                         onChange={(next) => setData('activities', next)}
                                         fieldLabel="Activities"
@@ -273,7 +273,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Observations</Label>
-                                    <VoiceInputButton
+                                    <DictateButton
                                         value={data.observations}
                                         onChange={(next) => setData('observations', next)}
                                         fieldLabel="Observations"
@@ -289,7 +289,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Concerns</Label>
-                                    <VoiceInputButton
+                                    <DictateButton
                                         value={data.concerns}
                                         onChange={(next) => setData('concerns', next)}
                                         fieldLabel="Concerns"
@@ -305,7 +305,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Goals Progress</Label>
-                                    <VoiceInputButton
+                                    <DictateButton
                                         value={data.goals_progress}
                                         onChange={(next) => setData('goals_progress', next)}
                                         fieldLabel="Goals progress"

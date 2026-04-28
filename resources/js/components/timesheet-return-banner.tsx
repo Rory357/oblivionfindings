@@ -7,6 +7,7 @@ import TimesheetEditSheet, {
     type InlineTimesheet,
 } from '@/components/timesheet-edit-sheet';
 import { Button } from '@/components/ui/button';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
 
 /**
@@ -58,6 +59,7 @@ export function TimesheetReturnBanner({
     size = 'sm',
     timesheet,
 }: TimesheetReturnBannerProps) {
+    const t = useMyDayLabels();
     const [editOpen, setEditOpen] = useState(false);
     const href = editHref ?? `/timesheets/${timesheetId}/edit`;
     const trimmedNote = returnNote?.trim() ?? '';
@@ -80,7 +82,7 @@ export function TimesheetReturnBanner({
                         size={size}
                     />
                     <span className="text-sm font-semibold">
-                        Your timesheet needs a quick fix
+                        {t('timesheet_quick_fix')}
                     </span>
                 </div>
                 {trimmedNote ? (
@@ -89,8 +91,7 @@ export function TimesheetReturnBanner({
                     </p>
                 ) : (
                     <p className="text-sm leading-snug text-status-warning dark:text-status-warning">
-                        Your manager asked for a change. Open it, make the fix,
-                        then resend for approval.
+                        {t('timesheet_review_again')}
                     </p>
                 )}
             </div>
@@ -111,7 +112,7 @@ export function TimesheetReturnBanner({
                                         : 'This timesheet is locked or no longer editable.'
                                 }
                             >
-                                Update & resubmit
+                                {t('update_and_resubmit')}
                                 <ArrowRight className="ml-1.5 h-4 w-4" />
                             </Button>
                             <TimesheetEditSheet
