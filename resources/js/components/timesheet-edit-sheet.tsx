@@ -127,7 +127,7 @@ export default function TimesheetEditSheet({
                 className="max-h-[92vh] overflow-y-auto rounded-t-2xl"
             >
                 <SheetHeader className="pr-12">
-                    <SheetTitle>{t('update_and_resubmit')}</SheetTitle>
+                    <SheetTitle>{t('update_and_resubmit_title')}</SheetTitle>
                     <SheetDescription>
                         {t('fix_returned_timesheet')}
                     </SheetDescription>

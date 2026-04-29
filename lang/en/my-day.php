@@ -61,6 +61,7 @@ return [
 
     // Update + resubmit (returned timesheet)
     'update_and_resubmit' => 'Update & resubmit',
+    'update_and_resubmit_title' => 'Update and resubmit',
     'update_and_resubmit_action' => 'Save and resubmit',
     'fix_returned_timesheet' => 'Fix the returned timesheet without leaving My Day.',
     'manager_note' => 'Manager note',

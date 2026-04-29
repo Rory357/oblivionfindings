@@ -14,12 +14,14 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\ShiftTask;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ShiftHandoverService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AttendanceService
 {
@@ -92,43 +94,67 @@ class AttendanceService
             throw new \LogicException('You can only clock out your own attendance session.');
         }
 
-        $blockers = $this->getEndOfShiftBlockers($session);
         $force = (bool) ($data['force'] ?? false);
         $overrideReason = trim((string) ($data['override_reason'] ?? ''));
 
-        if ($blockers !== [] && ! $force) {
-            throw new AttendanceClockOutBlockedException($blockers);
-        }
-
-        if ($blockers !== [] && $force && $overrideReason === '') {
-            throw new \LogicException('An override reason is required to end a shift with outstanding checklist items.');
-        }
-
         $clockOutAt = isset($data['clock_out_at']) ? Carbon::parse($data['clock_out_at']) : now();
-        if ($clockOutAt->lessThanOrEqualTo($session->clock_in_at)) {
-            throw new \LogicException('Clock-out time must be after clock-in time.');
-        }
 
-        $openBreakStartedAt = $session->break_started_at?->copy();
-        $openBreakMinutes = $openBreakStartedAt
-            ? max(0, (int) $openBreakStartedAt->diffInMinutes($clockOutAt))
-            : 0;
-        $breakMinutes = max(
-            (int) ($data['break_minutes'] ?? $session->break_minutes ?? 0),
-            (int) ($session->break_minutes ?? 0) + $openBreakMinutes,
-        );
-        if ($breakMinutes > 0) {
-            $elapsedMinutes = (int) $session->clock_in_at->diffInMinutes($clockOutAt);
-            if ($breakMinutes >= $elapsedMinutes) {
-                throw new \LogicException(sprintf(
-                    'Break duration (%d min) must be less than the session duration (%d min).',
-                    $breakMinutes,
-                    $elapsedMinutes,
-                ));
+        $closedSession = DB::transaction(function () use ($session, $user, $clockOutAt, $data, $force, $overrideReason) {
+            $session = HrAttendanceSession::query()
+                ->with(['shift'])
+                ->lockForUpdate()
+                ->findOrFail($session->id);
+
+            if ((int) $session->user_id !== (int) $user->id) {
+                throw new \LogicException('You can only clock out your own attendance session.');
             }
-        }
 
-        $closedSession = DB::transaction(function () use ($session, $user, $clockOutAt, $data, $breakMinutes, $blockers, $force, $overrideReason, $openBreakStartedAt) {
+            if ($session->status !== 'open' || $session->clock_out_at) {
+                throw new \LogicException('This attendance session has already been closed.');
+            }
+
+            if ($clockOutAt->lessThanOrEqualTo($session->clock_in_at)) {
+                throw new \LogicException('Clock-out time must be after clock-in time.');
+            }
+
+            $openBreakStartedAt = $session->break_started_at?->copy();
+            $openBreakMinutes = $openBreakStartedAt
+                ? max(0, (int) $openBreakStartedAt->diffInMinutes($clockOutAt))
+                : 0;
+            $breakMinutes = max(
+                (int) ($data['break_minutes'] ?? $session->break_minutes ?? 0),
+                (int) ($session->break_minutes ?? 0) + $openBreakMinutes,
+            );
+
+            if ($breakMinutes > 0) {
+                $elapsedMinutes = (int) $session->clock_in_at->diffInMinutes($clockOutAt);
+                if ($breakMinutes >= $elapsedMinutes) {
+                    throw new \LogicException(sprintf(
+                        'Break duration (%d min) must be less than the session duration (%d min).',
+                        $breakMinutes,
+                        $elapsedMinutes,
+                    ));
+                }
+            }
+
+            $this->applyTaskUpdates($session, $user, $data['task_updates'] ?? []);
+            $this->saveHandoverFromClockOut($session, $user, $data['handover'] ?? null);
+
+            $session = $session->fresh([
+                'shift.tasks',
+                'shift.outgoingHandovers',
+            ]) ?? $session;
+
+            $blockers = $this->getEndOfShiftBlockers($session);
+
+            if ($blockers !== [] && ! $force) {
+                throw new AttendanceClockOutBlockedException($blockers);
+            }
+
+            if ($blockers !== [] && $force && $overrideReason === '') {
+                throw new \LogicException('An override reason is required to end a shift with outstanding checklist items.');
+            }
+
             $session->update([
                 'clock_out_at' => $clockOutAt,
                 'break_minutes' => $breakMinutes,
@@ -398,6 +424,122 @@ class AttendanceService
             ]);
     }
 
+    /**
+     * @param  array<int, array{id?: int, is_completed?: bool}>|mixed  $updates
+     */
+    protected function applyTaskUpdates(HrAttendanceSession $session, User $user, mixed $updates): void
+    {
+        if (! is_array($updates) || $updates === []) {
+            return;
+        }
+
+        if (! $session->shift_id) {
+            throw ValidationException::withMessages([
+                'task_updates' => 'Task updates require a linked shift.',
+            ]);
+        }
+
+        $normalized = collect($updates)
+            ->map(fn (mixed $update) => is_array($update) ? [
+                'id' => (int) ($update['id'] ?? 0),
+                'is_completed' => (bool) ($update['is_completed'] ?? false),
+            ] : null)
+            ->filter(fn (?array $update) => $update !== null && $update['id'] > 0)
+            ->values();
+
+        if ($normalized->isEmpty()) {
+            return;
+        }
+
+        $ids = $normalized->pluck('id')->unique()->values();
+
+        if ($ids->count() !== $normalized->count()) {
+            throw ValidationException::withMessages([
+                'task_updates' => 'Task updates included the same task more than once.',
+            ]);
+        }
+
+        $tasks = ShiftTask::query()
+            ->where('shift_id', $session->shift_id)
+            ->whereIn('id', $ids->all())
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        if ($tasks->count() !== $ids->count()) {
+            throw ValidationException::withMessages([
+                'task_updates' => 'One or more shift tasks could no longer be found. Refresh and try again.',
+            ]);
+        }
+
+        foreach ($normalized as $update) {
+            /** @var ShiftTask $task */
+            $task = $tasks->get($update['id']);
+            $completed = (bool) $update['is_completed'];
+
+            $task->forceFill([
+                'is_completed' => $completed,
+                'completed_at' => $completed ? ($task->completed_at ?? now()) : null,
+                'completed_by' => $completed ? ($task->completed_by ?? $user->id) : null,
+            ])->save();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>|mixed  $handover
+     */
+    protected function saveHandoverFromClockOut(HrAttendanceSession $session, User $user, mixed $handover): void
+    {
+        if (! is_array($handover) || $handover === [] || ! $session->shift_id) {
+            return;
+        }
+
+        $shift = $session->shift ?: Shift::query()->find($session->shift_id);
+        if (! $shift) {
+            return;
+        }
+
+        $alreadySubmitted = ShiftHandover::query()
+            ->where('outgoing_shift_id', $shift->id)
+            ->whereIn('status', [
+                ShiftHandoverService::STATUS_SUBMITTED,
+                ShiftHandoverService::STATUS_ACKNOWLEDGED,
+            ])
+            ->exists();
+
+        if ($alreadySubmitted) {
+            return;
+        }
+
+        $notes = trim((string) ($handover['handover_notes'] ?? ''));
+        $medsCompleted = (bool) ($handover['meds_completed'] ?? true);
+        $followUpNeeded = (bool) ($handover['follow_up_needed'] ?? false);
+
+        if ($notes === '') {
+            $notes = $medsCompleted
+                ? 'No specific items to flag for the next shift.'
+                : 'Medications were not fully completed - please review on arrival.';
+        }
+
+        app(ShiftHandoverService::class)->save($shift, $user, [
+            'handover_notes' => $notes,
+            'client_mood' => $handover['shift_rating'] ?? null,
+            'medications_due' => $medsCompleted
+                ? null
+                : [[
+                    'label' => 'Review outstanding medications from previous shift',
+                    'severity' => 'high',
+                ]],
+            'follow_up_items' => $followUpNeeded
+                ? [[
+                    'label' => 'Follow-up flagged by outgoing worker',
+                    'priority' => 'medium',
+                ]]
+                : null,
+            'submit' => true,
+        ]);
+    }
+
     protected function countUnsignedMedicationDoses(Shift $shift): int
     {
         if (! $shift->client_id || ! $shift->starts_at || ! $shift->ends_at) {
@@ -462,5 +604,4 @@ class AttendanceService
 
         return $unsigned;
     }
-
 }

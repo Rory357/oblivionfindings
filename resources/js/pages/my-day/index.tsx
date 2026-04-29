@@ -23,6 +23,8 @@ import ActiveShiftCard, {
 } from '@/components/active-shift-card';
 import AlertRow, { type AlertRowItem } from '@/components/alert-row';
 import ClockInCard from '@/components/clock-in-card';
+import ClockOutBlockerAlert from '@/components/clock-out-blocker-alert';
+import type { EndOfShiftBlocker } from '@/components/end-of-shift-checklist';
 import HandoverReadCard, {
     type HandoverReadPayload,
 } from '@/components/handover-read-card';
@@ -240,6 +242,9 @@ interface Props {
     next_shift_briefing?: PreShiftBriefing | null;
     previous_shift?: PreviousShift | null;
     labels?: Record<string, string>;
+    flash?: {
+        clock_out_blockers?: EndOfShiftBlocker[] | null;
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +335,7 @@ export default function MyDay({
     next_shift_briefing,
     previous_shift,
     labels,
+    flash,
 }: Props) {
     const [openItemFilter, setOpenItemFilter] = useState<OpenItemFilter>('all');
 
@@ -349,6 +355,7 @@ export default function MyDay({
         Record<number, true>
     >({});
     const t = (key: string, fallback: string) => labels?.[key] ?? fallback;
+    const flashedClockOutBlockers = flash?.clock_out_blockers ?? [];
 
     const handleTimesheetSubmit = (tsId: number) => {
         if (pendingTimesheetIds[tsId]) return;
@@ -577,6 +584,8 @@ export default function MyDay({
             <Head title={t('my_day', 'My Day')} />
 
             <div className="mx-auto w-full max-w-5xl space-y-5">
+                <ClockOutBlockerAlert blockers={flashedClockOutBlockers} />
+
                 {/* ── Shift lifecycle hero slot ─────────────────────────── */}
                 {clock?.open_session ? (
                     <ActiveShiftCard session={clock.open_session} />

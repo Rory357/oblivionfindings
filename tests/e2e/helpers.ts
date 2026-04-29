@@ -1,11 +1,20 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type TestInfo } from '@playwright/test';
 
-export async function loginAs(page: Page, email: string, password = 'password') {
+export async function loginAs(
+    page: Page,
+    email: string,
+    password = 'password',
+) {
     await page.goto('/login');
+    await page.waitForLoadState('networkidle');
     await page.locator('#email').fill(email);
     await page.locator('#password').fill(password);
-    await page.getByTestId('login-button').click();
-    await expect(page).not.toHaveURL(/\/login$/);
+    const loginButton = page.getByTestId('login-button');
+    await expect(loginButton).toBeEnabled();
+    await Promise.all([
+        page.waitForURL((url) => !url.pathname.endsWith('/login')),
+        loginButton.click(),
+    ]);
 }
 
 export async function loginAsStaff(page: Page) {
@@ -22,6 +31,46 @@ export async function loginAsStaff(page: Page) {
  */
 export async function loginAsFrontlineDemoWorker(page: Page) {
     await loginAs(page, 'sw1@demo.test', 'password');
+}
+
+export async function loginAsClockOutCleanWorker(
+    page: Page,
+    testInfo: TestInfo,
+) {
+    await loginAs(
+        page,
+        testInfo.project.name.includes('mobile')
+            ? 'sw6@demo.test'
+            : 'sw2@demo.test',
+        'password',
+    );
+}
+
+export async function loginAsClockInCandidateWorker(
+    page: Page,
+    testInfo: TestInfo,
+) {
+    await loginAs(
+        page,
+        testInfo.project.name.includes('mobile')
+            ? 'sw8@demo.test'
+            : 'sw3@demo.test',
+        'password',
+    );
+}
+
+export async function loginAsChecklistWorker(page: Page, testInfo: TestInfo) {
+    await loginAs(
+        page,
+        testInfo.project.name.includes('mobile')
+            ? 'sw7@demo.test'
+            : 'sw4@demo.test',
+        'password',
+    );
+}
+
+export async function loginAsIncidentBlockerWorker(page: Page) {
+    await loginAs(page, 'sw5@demo.test', 'password');
 }
 
 export async function gotoMyDay(page: Page) {

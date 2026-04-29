@@ -180,6 +180,9 @@ export default function GlobalQueryBar() {
             {/* Mobile trigger */}
             <DialogTrigger asChild>
                 <Button
+                    type="button"
+                    aria-label="Ask about a client"
+                    title="Ask about a client"
                     variant="ghost"
                     size="icon"
                     className="group h-9 w-9 cursor-pointer lg:hidden"

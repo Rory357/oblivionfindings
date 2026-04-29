@@ -174,6 +174,7 @@ export default function ActiveShiftCard({
                         </div>
                     </div>
 
+                    {/* eslint-disable no-restricted-syntax -- Compact status tiles need custom sizing inside the active-shift surface. */}
                     <div className="rounded-lg border bg-background/80 px-4 py-3 lg:min-w-44">
                         <div className="text-2xl font-semibold tabular-nums">
                             {elapsed}
@@ -217,6 +218,7 @@ export default function ActiveShiftCard({
                                 : 'Needed'}
                         </div>
                     </div>
+                    {/* eslint-enable no-restricted-syntax */}
                 </div>
 
                 <div>
@@ -244,6 +246,7 @@ export default function ActiveShiftCard({
                     <Button
                         type="button"
                         variant="destructive"
+                        data-test="clock-out-button"
                         onClick={() => setEndOpen(true)}
                     >
                         <FileText className="mr-2 h-4 w-4" />

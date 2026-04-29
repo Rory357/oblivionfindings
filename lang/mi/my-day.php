@@ -61,6 +61,7 @@ return [
 
     // Update + resubmit (returned timesheet)
     'update_and_resubmit' => 'Whakahou & tuku anō',
+    'update_and_resubmit_title' => 'Whakahou, tuku anō',
     'update_and_resubmit_action' => 'Tiaki, tuku anō',
     'fix_returned_timesheet' => 'Whakatikahia te pepa wā kua whakahokia mai, kāore he wehe atu i Taku Rā.',
     'manager_note' => 'Tuhipoka mai i te kaiwhakahaere',

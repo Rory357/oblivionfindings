@@ -54,8 +54,7 @@ class ShiftLifecycleService
         protected ShiftReplacementService $replacementService,
         protected ShiftStateGuardService $stateGuardService,
         protected DraftTimesheetService $draftTimesheets,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{success: bool, reason: string|null, timesheet: Timesheet|null}
@@ -196,7 +195,7 @@ class ShiftLifecycleService
                     $locked->forceFill(['completed_by' => $actor->id])->save();
                 }
 
-                if ($data->syncDraftTimesheet) {
+                if ($this->shouldSyncDraftTimesheet($data)) {
                     $timesheetResult = $this->draftTimesheets->fromShift($locked->fresh() ?? $locked, $actor->id);
                 }
 
@@ -278,7 +277,7 @@ class ShiftLifecycleService
                     $locked->forceFill(['completed_by' => $actor->id])->save();
                 }
 
-                if ($data->syncDraftTimesheet) {
+                if ($this->shouldSyncDraftTimesheet($data)) {
                     $timesheetResult = $this->draftTimesheets->fromShift($locked->fresh() ?? $locked, $actor->id);
                 }
 
@@ -332,7 +331,7 @@ class ShiftLifecycleService
                 );
             }
 
-            if ($data->syncDraftTimesheet) {
+            if ($this->shouldSyncDraftTimesheet($data)) {
                 try {
                     $timesheetResult = $this->draftTimesheets->fromShift($locked->fresh() ?? $locked, $actor->id);
                 } catch (\Throwable $e) {
@@ -501,6 +500,12 @@ class ShiftLifecycleService
         return ShiftLifecycleSource::Manual;
     }
 
+    private function shouldSyncDraftTimesheet(CompleteShiftData $data): bool
+    {
+        return $data->syncDraftTimesheet
+            && $data->source !== ShiftLifecycleSource::ClockOut;
+    }
+
     private function assertTransitionAllowed(string $from, string $to): void
     {
         if (in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
@@ -563,5 +568,4 @@ class ShiftLifecycleService
             ]
         );
     }
-
 }

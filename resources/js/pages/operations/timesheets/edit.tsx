@@ -488,6 +488,7 @@ export default function TimesheetEdit({
                             <Button
                                 type="button"
                                 variant="outline"
+                                data-test="timesheet-submit"
                                 onClick={() =>
                                     router.post(
                                         submitTimesheet.url(timesheet.id),
@@ -522,6 +523,7 @@ export default function TimesheetEdit({
                                     required for reject)
                                 </Label>
                                 <Textarea
+                                    data-test="timesheet-decision-notes"
                                     rows={3}
                                     value={decision.data.decision_notes}
                                     onChange={(e) =>
@@ -538,6 +540,7 @@ export default function TimesheetEdit({
                                     Return notes (required to return)
                                 </Label>
                                 <Textarea
+                                    data-test="timesheet-return-notes"
                                     rows={3}
                                     value={decision.data.returned_notes}
                                     onChange={(e) =>
@@ -551,6 +554,7 @@ export default function TimesheetEdit({
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <Button
+                                    data-test="timesheet-approve"
                                     onClick={() =>
                                         decision.post(
                                             approveTimesheet.url(timesheet.id),
@@ -563,6 +567,7 @@ export default function TimesheetEdit({
                                 </Button>
                                 <Button
                                     variant="outline"
+                                    data-test="timesheet-return"
                                     onClick={() =>
                                         decision.post(
                                             returnTimesheet.url(timesheet.id),
@@ -575,6 +580,7 @@ export default function TimesheetEdit({
                                 </Button>
                                 <Button
                                     variant="destructive"
+                                    data-test="timesheet-reject"
                                     onClick={() =>
                                         decision.post(
                                             rejectTimesheet.url(timesheet.id),

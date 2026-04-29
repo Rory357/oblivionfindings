@@ -29,6 +29,9 @@ for (const target of authenticatedPages) {
     test(`${target.name} visual baseline`, async ({ page }) => {
         await page.goto(target.path);
         await page.waitForLoadState('networkidle');
+        const main = page.locator('#main-content');
+        await expect(main).toBeVisible();
+        await expect(main).toContainText(/[A-Za-z0-9]/);
         await expect(page).toHaveScreenshot(`${target.name}.png`, {
             fullPage: true,
         });

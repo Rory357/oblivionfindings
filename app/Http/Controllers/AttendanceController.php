@@ -8,6 +8,7 @@ use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\ShiftHandoverService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,7 +23,7 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAssigned') || $auth->canDo('timesheets.viewAny')), 403);
+        abort_unless($auth && $this->canViewAttendance($auth), 403);
 
         $canManageAny = $auth->canDo('timesheets.manageAny');
         $targetUserId = $canManageAny ? (int) ($request->integer('user_id') ?: $auth->id) : $auth->id;
@@ -120,6 +121,20 @@ class AttendanceController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        if (! empty($data['shift_id'])) {
+            $shift = Shift::query()->findOrFail((int) $data['shift_id']);
+
+            if ((int) $shift->user_id !== (int) $auth->id) {
+                AuditLogger::log('attendance.clockIn.unauthorized', $shift, [
+                    'shift_id' => $shift->id,
+                    'shift_user_id' => $shift->user_id,
+                    'attempted_by_user_id' => $auth->id,
+                ], $request);
+
+                abort(403);
+            }
+        }
+
         try {
             $this->attendanceService->clockIn($auth, $data);
         } catch (\LogicException $exception) {
@@ -141,11 +156,30 @@ class AttendanceController extends Controller
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'force' => ['nullable', 'boolean'],
             'override_reason' => ['nullable', 'required_if:force,true', 'string', 'max:1000'],
+            'handover' => ['nullable', 'array'],
+            'handover.meds_completed' => ['required_with:handover', 'boolean'],
+            'handover.shift_rating' => ['nullable', 'string', 'in:calm,mixed,challenging'],
+            'handover.handover_notes' => ['nullable', 'string', 'max:2000'],
+            'handover.follow_up_needed' => ['required_with:handover', 'boolean'],
+            'task_updates' => ['nullable', 'array'],
+            'task_updates.*.id' => ['required', 'integer', 'distinct', 'exists:shift_tasks,id'],
+            'task_updates.*.is_completed' => ['required', 'boolean'],
         ]);
 
         $session = null;
         if (! empty($data['session_id'])) {
             $session = HrAttendanceSession::query()->findOrFail($data['session_id']);
+
+            if ((int) $session->user_id !== (int) $auth->id) {
+                AuditLogger::log('attendance.clockOut.unauthorized', $session, [
+                    'attendance_session_id' => $session->id,
+                    'session_user_id' => $session->user_id,
+                    'shift_id' => $session->shift_id,
+                    'attempted_by_user_id' => $auth->id,
+                ], $request);
+
+                abort(403);
+            }
         }
 
         try {
@@ -158,7 +192,7 @@ class AttendanceController extends Controller
                 ], 422);
             }
 
-            return redirect()->back()
+            return redirect()->to(route('my-day').'#clock')
                 ->withErrors(['clock_out' => $exception->getMessage()])
                 ->with('clock_out_blockers', $exception->blockers());
         } catch (\LogicException $exception) {
@@ -225,6 +259,15 @@ class AttendanceController extends Controller
             || $auth->canDo('shifts.viewAssigned')
             || $auth->canDo('shifts.update')
             || $auth->canDo('shifts.manageAny')
+        );
+    }
+
+    protected function canViewAttendance(?User $auth): bool
+    {
+        return (bool) $auth && (
+            $auth->canDo('timesheets.viewAssigned')
+            || $auth->canDo('timesheets.viewAny')
+            || $this->canClock($auth)
         );
     }
 

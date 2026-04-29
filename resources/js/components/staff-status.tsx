@@ -20,15 +20,15 @@ const toneClasses: Record<StaffStatusTone, string> = {
     neutral:
         'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground',
     info:
-        'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info',
+        'border-status-info/30 bg-status-info-bg text-status-info-foreground dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info-foreground',
     progress:
-        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
+        'border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground',
     success:
-        'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/40 dark:bg-status-success-bg dark:text-status-success',
+        'border-status-success/30 bg-status-success-bg text-status-success-foreground dark:border-status-success/40 dark:bg-status-success-bg dark:text-status-success-foreground',
     warning:
-        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
+        'border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground',
     danger:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
+        'border-status-critical/30 bg-status-critical-bg text-status-critical-foreground dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical-foreground',
 };
 
 const staffStatusVariants = cva(

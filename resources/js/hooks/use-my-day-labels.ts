@@ -46,6 +46,7 @@ export type MyDayLabelKey =
     | 'override_audit_title'
     | 'override_audit_subtitle'
     | 'update_and_resubmit'
+    | 'update_and_resubmit_title'
     | 'update_and_resubmit_action'
     | 'fix_returned_timesheet'
     | 'manager_note'
@@ -107,6 +108,7 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     override_audit_subtitle:
         'You can end the shift now if needed, but the reason and outstanding items will be recorded.',
     update_and_resubmit: 'Update & resubmit',
+    update_and_resubmit_title: 'Update and resubmit',
     update_and_resubmit_action: 'Save and resubmit',
     fix_returned_timesheet:
         'Fix the returned timesheet without leaving My Day.',

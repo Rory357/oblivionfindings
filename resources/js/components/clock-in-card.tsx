@@ -1,26 +1,12 @@
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { Clock, LogIn, LogOut, MapPin, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import DraftResumePrompt from '@/components/draft-resume-prompt';
-import DraftSavedIndicator from '@/components/draft-saved-indicator';
-import HandoverWriteForm, {
-    emptyHandoverWriteValue,
-    type HandoverWriteValue,
-} from '@/components/handover-write-form';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import EndOfShiftChecklist, {
+    type EndOfShiftBlocker,
+} from '@/components/end-of-shift-checklist';
+import type { ShiftTaskListItem } from '@/components/shift-task-list';
 import { Button } from '@/components/ui/button';
-import { useFormAutosave } from '@/hooks/use-form-autosave';
-import { useUndoableAction } from '@/hooks/use-undoable-action';
 import { formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
@@ -41,9 +27,9 @@ import { cn } from '@/lib/utils';
  *   2. Not clocked in + shift     → "Start shift" with one dominant CTA.
  *   3. Currently clocked in       → "Shift in progress" + guarded clock-out.
  *
- * Clock-out opens a confirmation dialog with quick-select break chips so the
- * action cannot be triggered accidentally and break minutes don't rely on a
- * raw number field.
+ * Clock-out opens the shared end-of-shift checklist. The legacy bespoke
+ * confirmation dialog was retired so every worker sees the same blockers,
+ * handover capture, and atomic clock-out request.
  */
 
 type OpenSession = {
@@ -56,6 +42,8 @@ type OpenSession = {
     location: string | null;
     break_minutes?: number;
     handover_submitted?: boolean;
+    tasks?: ShiftTaskListItem[];
+    end_of_shift_blockers?: EndOfShiftBlocker[];
 };
 
 type ActiveShift = {
@@ -74,14 +62,6 @@ export type ClockInCardProps = {
     eligibleShifts?: ActiveShift[];
     eligibleShiftCount: number;
 };
-
-const BREAK_CHIPS: ReadonlyArray<{ value: number; label: string }> = [
-    { value: 0, label: '0' },
-    { value: 15, label: '15' },
-    { value: 30, label: '30' },
-    { value: 45, label: '45' },
-    { value: 60, label: '60' },
-];
 
 function formatElapsed(sinceIso: string, now: number): string {
     const start = new Date(sinceIso).getTime();
@@ -102,45 +82,10 @@ export default function ClockInCard({
     eligibleShifts,
     eligibleShiftCount,
 }: ClockInCardProps) {
-    const page = usePage().props as { auth?: { user?: { id?: number } } };
-    const userId = page.auth?.user?.id ?? 0;
-
     const [submitting, setSubmitting] = useState(false);
-    const [confirmOpen, setConfirmOpen] = useState(false);
-    const { run: runUndoable } = useUndoableAction();
-    const [breakPreset, setBreakPreset] = useState<number | 'custom'>(0);
-    const [customBreak, setCustomBreak] = useState('');
+    const [endOpen, setEndOpen] = useState(false);
     const [now, setNow] = useState<number>(() => Date.now());
     const [pickedShiftId, setPickedShiftId] = useState<number | null>(null);
-    const [handoverValue, setHandoverValue] = useState<HandoverWriteValue>(
-        emptyHandoverWriteValue,
-    );
-    const [resumeAvailable, setResumeAvailable] = useState<{
-        savedAt: number;
-    } | null>(null);
-
-    // Per-shift draft key so two parallel shifts never collide on the same device.
-    const handoverDraftKey = openSession?.shift_id
-        ? `oblivion:clockout-handover:v1:u${userId}:s${openSession.shift_id}`
-        : null;
-
-    const handoverEligibleForSave =
-        !!openSession?.shift_id &&
-        !openSession?.handover_submitted &&
-        confirmOpen;
-
-    const {
-        savedAt: handoverSavedAt,
-        load: loadHandoverDraft,
-        clear: clearHandoverDraft,
-    } = useFormAutosave<Record<string, unknown>>(
-        handoverValue as unknown as Record<string, unknown>,
-        {},
-        {
-            key: handoverDraftKey ?? 'oblivion:clockout-handover:v1:disabled',
-            enabled: !!handoverDraftKey && handoverEligibleForSave,
-        },
-    );
 
     // Tick every second while clocked in so the elapsed counter updates live.
     useEffect(() => {
@@ -153,15 +98,6 @@ export default function ClockInCard({
         if (!openSession?.clock_in_at) return null;
         return formatElapsed(openSession.clock_in_at, now);
     }, [openSession?.clock_in_at, now]);
-
-    const breakMinutes = useMemo(() => {
-        if (breakPreset === 'custom') {
-            const n = Number(customBreak);
-            if (!Number.isFinite(n) || n < 0) return 0;
-            return Math.min(240, Math.floor(n));
-        }
-        return breakPreset;
-    }, [breakPreset, customBreak]);
 
     const ambiguous =
         !openSession && !activeShift && (eligibleShifts?.length ?? 0) > 1;
@@ -182,85 +118,6 @@ export default function ClockInCard({
                 onFinish: () => setSubmitting(false),
             },
         );
-    };
-
-    const handoverEligible =
-        !!openSession?.shift_id && !openSession?.handover_submitted;
-
-    const performClockOut = () => {
-        if (!openSession) return;
-        router.post(
-            '/attendance/clock-out',
-            {
-                session_id: openSession.id,
-                break_minutes: breakMinutes,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    clearHandoverDraft();
-                },
-                onFinish: () => {
-                    setSubmitting(false);
-                    setConfirmOpen(false);
-                },
-            },
-        );
-    };
-
-    // PR 21 — after the worker confirms in the dialog, we hold the real
-    // POST for a short undo window. Nothing is written to the backend
-    // during that window, so Undo genuinely prevents the clock-out rather
-    // than faking a reversal after the fact. The confirm dialog closes
-    // immediately so the worker sees the undo toast clearly on the home.
-    const commitClockOutNow = () => {
-        if (!openSession) return;
-
-        const finishClockOut = () => performClockOut();
-
-        if (handoverEligible && openSession.shift_id) {
-            router.post(
-                '/attendance/handover',
-                {
-                    shift_id: openSession.shift_id,
-                    meds_completed: handoverValue.meds_completed,
-                    shift_rating: handoverValue.shift_rating,
-                    handover_notes: handoverValue.handover_notes,
-                    follow_up_needed: handoverValue.follow_up_needed,
-                },
-                {
-                    preserveScroll: true,
-                    onSuccess: () => {
-                        clearHandoverDraft();
-                        finishClockOut();
-                    },
-                    onError: () => {
-                        setSubmitting(false);
-                    },
-                },
-            );
-            return;
-        }
-
-        finishClockOut();
-    };
-
-    const handleClockOutConfirm = () => {
-        if (!openSession) return;
-        setSubmitting(true);
-        setConfirmOpen(false);
-
-        runUndoable({
-            message: 'Clocking out…',
-            durationMs: 5000,
-            onCommit: commitClockOutNow,
-            onUndo: () => {
-                // Shift stays open; re-enable the Clock out button so the
-                // worker can try again. The handover draft is untouched.
-                setSubmitting(false);
-            },
-            undoneMessage: 'Clock-out cancelled — still on shift.',
-        });
     };
 
     /* ---------------------------------- */
@@ -329,202 +186,25 @@ export default function ClockInCard({
                             <Button
                                 size="lg"
                                 variant="destructive"
+                                data-test="clock-out-button"
                                 className="h-12 w-full min-w-40 text-base sm:w-auto"
-                                onClick={() => {
-                                    const recordedBreak =
-                                        openSession.break_minutes ?? 0;
-                                    if (
-                                        BREAK_CHIPS.some(
-                                            (chip) =>
-                                                chip.value === recordedBreak,
-                                        )
-                                    ) {
-                                        setBreakPreset(recordedBreak);
-                                        setCustomBreak('');
-                                    } else {
-                                        setBreakPreset('custom');
-                                        setCustomBreak(String(recordedBreak));
-                                    }
-                                    // Look for a saved draft for this shift; if present, offer resume.
-                                    const existing = handoverDraftKey
-                                        ? loadHandoverDraft()
-                                        : null;
-                                    const draftData = existing?.data as
-                                        | HandoverWriteValue
-                                        | undefined;
-                                    const hasDraft =
-                                        !!draftData &&
-                                        (!!draftData.handover_notes?.trim() ||
-                                            draftData.shift_rating !== null ||
-                                            draftData.follow_up_needed ===
-                                                true ||
-                                            draftData.meds_completed === false);
-                                    if (hasDraft && draftData) {
-                                        setHandoverValue(draftData);
-                                        setResumeAvailable({
-                                            savedAt: existing!.savedAt,
-                                        });
-                                    } else {
-                                        setHandoverValue(
-                                            emptyHandoverWriteValue,
-                                        );
-                                        setResumeAvailable(null);
-                                    }
-                                    setConfirmOpen(true);
-                                }}
+                                onClick={() => setEndOpen(true)}
                                 disabled={submitting}
                             >
                                 <LogOut className="mr-2 h-5 w-5" />
-                                Clock out
+                                End shift
                             </Button>
                         </div>
                     </div>
                 </section>
 
-                <AlertDialog
-                    open={confirmOpen}
-                    onOpenChange={(o) => {
-                        if (!submitting) setConfirmOpen(o);
+                <EndOfShiftChecklist
+                    session={openSession}
+                    open={endOpen}
+                    onOpenChange={(open) => {
+                        if (!submitting) setEndOpen(open);
                     }}
-                >
-                    <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>End this shift?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                {clientLabel}
-                                {elapsed ? ` · ${elapsed} worked` : ''}. Add any
-                                unpaid break you took during the shift.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-
-                        <div className="space-y-4 py-2">
-                            <div className="text-sm font-medium">
-                                Break (minutes)
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {BREAK_CHIPS.map((chip) => {
-                                    const active = breakPreset === chip.value;
-                                    return (
-                                        <Button
-                                            key={chip.value}
-                                            type="button"
-                                            variant={
-                                                active ? 'default' : 'outline'
-                                            }
-                                            onClick={() =>
-                                                setBreakPreset(chip.value)
-                                            }
-                                            className={cn(
-                                                'min-h-11 min-w-14 rounded-full px-4 text-sm font-medium transition-colors',
-                                                active
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'border-border bg-background hover:bg-muted',
-                                            )}
-                                            aria-pressed={active}
-                                        >
-                                            {chip.label}
-                                        </Button>
-                                    );
-                                })}
-                                <Button
-                                    type="button"
-                                    variant={
-                                        breakPreset === 'custom'
-                                            ? 'default'
-                                            : 'outline'
-                                    }
-                                    onClick={() => setBreakPreset('custom')}
-                                    className={cn(
-                                        'min-h-11 rounded-full px-4 text-sm font-medium transition-colors',
-                                        breakPreset === 'custom'
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'border-border bg-background hover:bg-muted',
-                                    )}
-                                    aria-pressed={breakPreset === 'custom'}
-                                >
-                                    Custom
-                                </Button>
-                            </div>
-                            {breakPreset === 'custom' && (
-                                <div>
-                                    <label className="text-xs text-muted-foreground">
-                                        Enter break minutes (0–240)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        min={0}
-                                        max={240}
-                                        value={customBreak}
-                                        onChange={(e) =>
-                                            setCustomBreak(e.target.value)
-                                        }
-                                        className="mt-1 h-11 w-32 rounded-md border border-input bg-background px-3 text-base shadow-sm focus:ring-2 focus:ring-ring focus:outline-none"
-                                        autoFocus
-                                    />
-                                </div>
-                            )}
-
-                            {openSession.shift_id ? (
-                                <div className="space-y-3 border-t pt-4">
-                                    {resumeAvailable &&
-                                        !openSession.handover_submitted && (
-                                            <DraftResumePrompt
-                                                savedAt={
-                                                    resumeAvailable.savedAt
-                                                }
-                                                onResume={() =>
-                                                    setResumeAvailable(null)
-                                                }
-                                                onDiscard={() => {
-                                                    clearHandoverDraft();
-                                                    setHandoverValue(
-                                                        emptyHandoverWriteValue,
-                                                    );
-                                                    setResumeAvailable(null);
-                                                }}
-                                                title="Resume your unfinished handover?"
-                                                description="We kept your handover answers from earlier on this device."
-                                            />
-                                        )}
-                                    <HandoverWriteForm
-                                        value={handoverValue}
-                                        onChange={setHandoverValue}
-                                        disabled={submitting}
-                                        alreadySubmitted={
-                                            !!openSession.handover_submitted
-                                        }
-                                    />
-                                    {!openSession.handover_submitted && (
-                                        <DraftSavedIndicator
-                                            savedAt={handoverSavedAt}
-                                        />
-                                    )}
-                                </div>
-                            ) : null}
-                        </div>
-
-                        <AlertDialogFooter>
-                            <AlertDialogCancel disabled={submitting}>
-                                Keep shift open
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    handleClockOutConfirm();
-                                }}
-                                disabled={submitting}
-                                className="bg-destructive text-white hover:bg-destructive/90"
-                            >
-                                {submitting
-                                    ? 'Ending…'
-                                    : handoverEligible
-                                      ? `Finish and clock out (${breakMinutes}m break)`
-                                      : `Clock out (${breakMinutes}m break)`}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                />
             </>
         );
     }
@@ -633,6 +313,7 @@ export default function ClockInCard({
                             handleClockIn(pickedShiftId ?? undefined)
                         }
                         disabled={submitting || pickedShiftId === null}
+                        data-test="clock-in-button"
                     >
                         <LogIn className="mr-2 h-5 w-5" />
                         {submitting ? 'Clocking in…' : 'Clock in'}
@@ -687,6 +368,7 @@ export default function ClockInCard({
                         className="h-12 w-full min-w-40 text-base sm:w-auto"
                         onClick={() => handleClockIn()}
                         disabled={submitting}
+                        data-test="clock-in-button"
                     >
                         <LogIn className="mr-2 h-5 w-5" />
                         {submitting ? 'Clocking in…' : 'Clock in'}

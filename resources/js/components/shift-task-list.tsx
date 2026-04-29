@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
@@ -15,10 +16,12 @@ export default function ShiftTaskList({
     tasks,
     maxVisible = 4,
     onTasksChange,
+    submitOnToggle = true,
 }: {
     tasks: ShiftTaskListItem[];
     maxVisible?: number;
     onTasksChange?: (next: ShiftTaskListItem[]) => void;
+    submitOnToggle?: boolean;
 }) {
     const [items, setItems] = useState(tasks);
     const [showAll, setShowAll] = useState(false);
@@ -53,6 +56,15 @@ export default function ShiftTaskList({
         );
         setItems(optimistic);
         onTasksChange?.(optimistic);
+
+        if (!submitOnToggle) {
+            setPendingIds((prev) => {
+                const next = { ...prev };
+                delete next[task.id];
+                return next;
+            });
+            return;
+        }
 
         router.post(
             `/my-tasks/shift-task/${task.id}/complete`,
@@ -101,15 +113,16 @@ export default function ShiftTaskList({
             ))}
 
             {items.length > maxVisible ? (
-                <button
+                <Button
                     type="button"
-                    className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    variant="link"
+                    className="h-auto p-0 text-sm font-medium text-foreground"
                     onClick={() => setShowAll((value) => !value)}
                 >
                     {showAll
                         ? 'Show fewer tasks'
                         : `Show all ${items.length} tasks`}
-                </button>
+                </Button>
             ) : null}
         </div>
     );

@@ -5,7 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, Clock3, Eye, FileClock, RotateCcw, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock3,
+    Eye,
+    FileClock,
+    RotateCcw,
+    XCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type PendingTimesheet = {
@@ -54,6 +61,7 @@ function formatHours(timesheet: PendingTimesheet): string {
 
 export default function TimesheetApprovalsPage({ timesheets }: Props) {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [decisionNotes, setDecisionNotes] = useState('');
 
     const rows = timesheets?.data ?? [];
     const allSelected = rows.length > 0 && selectedIds.length === rows.length;
@@ -66,7 +74,9 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
     }, [selectedIds.length]);
 
     const toggleAll = () => {
-        setSelectedIds(allSelected ? [] : rows.map((timesheet) => timesheet.id));
+        setSelectedIds(
+            allSelected ? [] : rows.map((timesheet) => timesheet.id),
+        );
     };
 
     const toggleOne = (timesheetId: number) => {
@@ -88,10 +98,14 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
             return;
         }
 
-        router.post(endpoint, { ids, ...payload }, {
-            preserveScroll: true,
-            onSuccess: () => setSelectedIds([]),
-        });
+        router.post(
+            endpoint,
+            { ids, ...payload },
+            {
+                preserveScroll: true,
+                onSuccess: () => setSelectedIds([]),
+            },
+        );
     };
 
     return (
@@ -106,8 +120,16 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         size="sm"
+                        data-test="approvals-bulk-approve"
                         onClick={() =>
-                            runBulkAction('/operations/timesheets/bulk-approve')
+                            runBulkAction(
+                                '/operations/timesheets/bulk-approve',
+                                {
+                                    decision_notes:
+                                        decisionNotes.trim() ||
+                                        'Bulk approved from approval queue.',
+                                },
+                            )
                         }
                         disabled={selectedIds.length === 0}
                     >
@@ -117,10 +139,16 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                     <Button
                         size="sm"
                         variant="outline"
+                        data-test="approvals-bulk-return"
                         onClick={() =>
-                            runBulkAction('/operations/timesheets/bulk-return', {
-                                returned_notes: 'Returned from approval queue for follow-up.',
-                            })
+                            runBulkAction(
+                                '/operations/timesheets/bulk-return',
+                                {
+                                    returned_notes:
+                                        decisionNotes.trim() ||
+                                        'Returned from approval queue for follow-up.',
+                                },
+                            )
                         }
                         disabled={selectedIds.length === 0}
                     >
@@ -130,10 +158,16 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                     <Button
                         size="sm"
                         variant="outline"
+                        data-test="approvals-bulk-reject"
                         onClick={() =>
-                            runBulkAction('/operations/timesheets/bulk-reject', {
-                                decision_notes: 'Rejected from approval queue.',
-                            })
+                            runBulkAction(
+                                '/operations/timesheets/bulk-reject',
+                                {
+                                    decision_notes:
+                                        decisionNotes.trim() ||
+                                        'Rejected from approval queue.',
+                                },
+                            )
                         }
                         disabled={selectedIds.length === 0}
                     >
@@ -144,6 +178,13 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                         {selectionLabel}
                     </span>
                 </div>
+                <textarea
+                    data-test="approvals-decision-notes"
+                    value={decisionNotes}
+                    onChange={(event) => setDecisionNotes(event.target.value)}
+                    placeholder="Decision notes"
+                    className="mt-3 min-h-20 w-full max-w-2xl rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
 
                 <div className="mt-4 space-y-2">
                     {rows.length === 0 && (
@@ -154,7 +195,8 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                                     No Submitted Timesheets
                                 </h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">
-                                    New submissions will appear here for approval.
+                                    New submissions will appear here for
+                                    approval.
                                 </p>
                             </CardContent>
                         </Card>
@@ -181,13 +223,19 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                                 {rows.map((timesheet) => (
                                     <div
                                         key={timesheet.id}
+                                        data-test="approvals-row"
                                         className="grid gap-3 border-b px-4 py-4 last:border-b-0 md:grid-cols-[40px,1.3fr,1fr,1fr,0.9fr,120px] md:items-center"
                                     >
                                         <label className="flex items-center md:justify-center">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedIds.includes(timesheet.id)}
-                                                onChange={() => toggleOne(timesheet.id)}
+                                                data-test="approvals-row-checkbox"
+                                                checked={selectedIds.includes(
+                                                    timesheet.id,
+                                                )}
+                                                onChange={() =>
+                                                    toggleOne(timesheet.id)
+                                                }
                                             />
                                         </label>
                                         <div>
@@ -197,12 +245,18 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                                                     : `Timesheet #${timesheet.id}`}
                                             </p>
                                             <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                                <Badge variant="secondary" className="h-4 px-1.5 text-[9px] capitalize">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="h-4 px-1.5 text-[9px] capitalize"
+                                                >
                                                     {timesheet.status}
                                                 </Badge>
                                                 <span className="inline-flex items-center gap-1">
                                                     <Clock3 className="h-3 w-3" />
-                                                    Submitted {formatDate(timesheet.submitted_at)}
+                                                    Submitted{' '}
+                                                    {formatDate(
+                                                        timesheet.submitted_at,
+                                                    )}
                                                 </span>
                                             </div>
                                         </div>
@@ -216,17 +270,33 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                                             {formatHours(timesheet)}
                                         </p>
                                         <div className="flex items-center gap-2">
-                                            <Button asChild size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                                <Link href={`/operations/timesheets/${timesheet.id}/edit`}>
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0"
+                                            >
+                                                <Link
+                                                    href={`/operations/timesheets/${timesheet.id}/edit`}
+                                                >
                                                     <Eye className="h-3.5 w-3.5" />
                                                 </Link>
                                             </Button>
                                             <Button
                                                 size="sm"
                                                 onClick={() =>
-                                                    runBulkAction('/operations/timesheets/bulk-approve', {}, [timesheet.id])
+                                                    runBulkAction(
+                                                        '/operations/timesheets/bulk-approve',
+                                                        {},
+                                                        [timesheet.id],
+                                                    )
                                                 }
-                                                disabled={selectedIds.length > 0 && !selectedIds.includes(timesheet.id)}
+                                                disabled={
+                                                    selectedIds.length > 0 &&
+                                                    !selectedIds.includes(
+                                                        timesheet.id,
+                                                    )
+                                                }
                                             >
                                                 Approve
                                             </Button>

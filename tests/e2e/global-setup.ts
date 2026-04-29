@@ -13,12 +13,10 @@ import { fileURLToPath } from 'node:url';
  *    cannot reach `https://oblivionfindings.test:5173`, so leaving `public/hot`
  *    in place produces blank pages and login-form timeouts.
  *
- * 2. **Re-seed `RosteringProductionDemoSeeder`** so each Playwright run starts
- *    against a clean fixture. The suggestions test assigns shift 9201 to a
- *    candidate as part of its assertions; without a re-seed, the second run
- *    finds shift 9201 already assigned and the suggestion engine reports zero
- *    open shifts. The seeder is idempotent (uses `forceFill` upserts), so
- *    re-running has no other side effects.
+ * 2. **Re-seed deterministic UI fixtures** so each Playwright run starts
+ *    with fresh rostering and frontline attendance states. The seeders are
+ *    idempotent (use upserts / forceFill), so re-running has no other side
+ *    effects.
  *
  * `globalTeardown` restores `public/hot`. The seeded fixture state is left as-is
  * after the run — re-seeding happens at the next setup, not after teardown.
@@ -57,17 +55,49 @@ async function globalSetup(): Promise<void> {
         // Use `shell: true` so Windows .bat shims (Herd ships php.bat) work.
         // execFileSync without shell mode cannot exec .bat files; the result
         // is an opaque "spawn ENOENT" with no useful message.
-        const useShell = phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
-        const output = execFileSync(
+        const useShell =
+            phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
+        const rosteringOutput = execFileSync(
             phpBin,
-            ['artisan', 'db:seed', '--class=RosteringProductionDemoSeeder', '--force'],
-            { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: useShell },
+            [
+                'artisan',
+                'db:seed',
+                '--class=RosteringProductionDemoSeeder',
+                '--force',
+            ],
+            {
+                cwd: root,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: useShell,
+            },
+        );
+        const frontlineOutput = execFileSync(
+            phpBin,
+            [
+                'artisan',
+                'db:seed',
+                '--class=FrontlineLifecycleDemoSeeder',
+                '--force',
+            ],
+            {
+                cwd: root,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: useShell,
+            },
         );
         console.log(
-            '[playwright global-setup] re-seeded RosteringProductionDemoSeeder so suggestion / publish fixtures are deterministic.',
+            '[playwright global-setup] re-seeded RosteringProductionDemoSeeder and FrontlineLifecycleDemoSeeder so UI fixtures are deterministic.',
         );
+        const output = [rosteringOutput, frontlineOutput]
+            .map((value) => value.trim())
+            .filter(Boolean)
+            .join('\n');
         if (output.trim()) {
-            console.log(`[playwright global-setup] seeder output:\n${output.trimEnd()}`);
+            console.log(
+                `[playwright global-setup] seeder output:\n${output.trimEnd()}`,
+            );
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

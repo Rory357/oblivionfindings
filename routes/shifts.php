@@ -91,7 +91,7 @@ Route::middleware(['auth'])->group(function () {
     $legacyWriteRedirect(['POST'], '/timesheets/bulk-reject', 'operations.timesheets.bulkReject');
 
     Route::get('/attendance', [AttendanceController::class, 'index'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.index');
     Route::post('/attendance/clock-in', [AttendanceController::class, 'clockIn'])
         ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')

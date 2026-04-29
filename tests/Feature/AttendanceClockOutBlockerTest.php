@@ -1,10 +1,13 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Services\AttendanceService;
+use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
 use App\Models\User;
 
@@ -101,4 +104,74 @@ test('handover submit does not crash when no incoming shift exists', function ()
             'follow_up_needed' => false,
         ])
         ->assertSessionHas('success');
+});
+
+test('handover is persisted inside the clock out transaction', function () {
+    $session = openShiftSessionFor($this->staff);
+    ShiftTask::query()
+        ->where('shift_id', $session->shift_id)
+        ->update([
+            'is_completed' => true,
+            'completed_at' => now(),
+            'completed_by' => $this->staff->id,
+        ]);
+
+    $this->travel(2)->hours();
+
+    $this->actingAs($this->staff)
+        ->post('/attendance/clock-out', [
+            'session_id' => $session->id,
+            'break_minutes' => 15,
+            'handover' => [
+                'meds_completed' => true,
+                'shift_rating' => 'calm',
+                'handover_notes' => 'Quiet shift. Dinner prepared for the next worker.',
+                'follow_up_needed' => false,
+            ],
+        ])
+        ->assertSessionHas('success');
+
+    expect($session->fresh()->status)->toBe('closed');
+
+    $handover = ShiftHandover::query()
+        ->where('outgoing_shift_id', $session->shift_id)
+        ->first();
+
+    expect($handover)->not->toBeNull()
+        ->and($handover?->status)->toBe('submitted')
+        ->and($handover?->handover_notes)->toBe('Quiet shift. Dinner prepared for the next worker.');
+});
+
+test('handover is rolled back when a later clock out write fails', function () {
+    $session = openShiftSessionFor($this->staff);
+    ShiftTask::query()
+        ->where('shift_id', $session->shift_id)
+        ->update([
+            'is_completed' => true,
+            'completed_at' => now(),
+            'completed_by' => $this->staff->id,
+        ]);
+
+    $this->travel(2)->hours();
+
+    $draftTimesheets = Mockery::mock(DraftTimesheetService::class);
+    $draftTimesheets
+        ->shouldReceive('fromAttendanceSession')
+        ->once()
+        ->andThrow(new RuntimeException('Draft sync failed after handover save.'));
+
+    $this->app->instance(DraftTimesheetService::class, $draftTimesheets);
+
+    expect(fn () => app(AttendanceService::class)->clockOut($this->staff, $session, [
+        'break_minutes' => 15,
+        'handover' => [
+            'meds_completed' => true,
+            'shift_rating' => 'mixed',
+            'handover_notes' => 'This should roll back.',
+            'follow_up_needed' => true,
+        ],
+    ]))->toThrow(RuntimeException::class);
+
+    expect($session->fresh()->status)->toBe('open');
+    expect(ShiftHandover::query()->where('outgoing_shift_id', $session->shift_id)->exists())->toBeFalse();
 });

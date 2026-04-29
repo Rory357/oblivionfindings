@@ -5,11 +5,13 @@ namespace Database\Seeders;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -50,6 +52,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
 
         $this->seedReturnedTimesheet($worker, $admin, $client, $serviceContext);
         $this->seedPreShiftBriefing($worker, $admin, $client, $serviceContext);
+
+        $this->seedPlaywrightAttendanceFixtures($admin, $client, $serviceContext);
     }
 
     private function grantSiteAccess(User $worker, Client $client): void
@@ -189,7 +193,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             'submitted_by' => $worker->id,
             'returned_at' => Carbon::now()->subHours(6),
             'returned_by' => $admin->id,
-            'returned_notes' => "Please double-check the break minutes — payroll rules require at least 30 min for an 8-hour shift, and add the kilometres if you used your own vehicle.",
+            'returned_notes' => 'Please double-check the break minutes — payroll rules require at least 30 min for an 8-hour shift, and add the kilometres if you used your own vehicle.',
         ]);
     }
 
@@ -217,7 +221,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             'ends_at' => $endsAt,
             'location' => $client->city ?: 'Auckland',
             'status' => 'scheduled',
-            'notes' => "Routine support shift. Family will visit between 14:00 and 15:00 — please greet them and update the visit log.",
+            'notes' => 'Routine support shift. Family will visit between 14:00 and 15:00 — please greet them and update the visit log.',
             'created_by' => $admin->id,
         ]);
 
@@ -229,5 +233,364 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'is_completed' => false,
             ]);
         }
+    }
+
+    private function seedPlaywrightAttendanceFixtures(User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        $workers = User::query()
+            ->whereIn('email', [
+                'sw2@demo.test',
+                'sw3@demo.test',
+                'sw4@demo.test',
+                'sw5@demo.test',
+                'sw6@demo.test',
+                'sw7@demo.test',
+                'sw8@demo.test',
+            ])
+            ->get()
+            ->keyBy('email');
+
+        foreach ($workers as $worker) {
+            $this->grantSiteAccess($worker, $client);
+        }
+
+        foreach (['sw2@demo.test', 'sw6@demo.test'] as $email) {
+            if ($workers->has($email)) {
+                $this->seedActiveClockOutClean($workers[$email], $admin, $client, $serviceContext);
+                $this->seedSubmittedApprovalTimesheet($workers[$email], $admin, $client, $serviceContext);
+            }
+        }
+
+        foreach (['sw3@demo.test', 'sw8@demo.test'] as $email) {
+            if ($workers->has($email)) {
+                $this->seedClockInCandidate($workers[$email], $admin, $client, $serviceContext);
+            }
+        }
+
+        if ($workers->has('sw4@demo.test')) {
+            $this->seedActiveChecklistShift($workers['sw4@demo.test'], $admin, $client, $serviceContext);
+        }
+
+        if ($workers->has('sw7@demo.test')) {
+            $this->seedActiveChecklistShift($workers['sw7@demo.test'], $admin, $client, $serviceContext);
+        }
+
+        if ($workers->has('sw5@demo.test')) {
+            $this->seedActiveIncidentBlockerShift($workers['sw5@demo.test'], $admin, $client, $serviceContext);
+        }
+    }
+
+    private function seedActiveClockOutClean(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        $startsAt = Carbon::now()->subHours(2)->startOfMinute();
+        $endsAt = Carbon::now()->addHours(6)->startOfMinute();
+        $shift = $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:active-clean:'.$worker->email,
+            $startsAt,
+            $endsAt,
+            'in_progress',
+            [
+                'actual_starts_at' => $startsAt,
+                'started_by' => $worker->id,
+                'expected_break_minutes' => 0,
+            ],
+        );
+
+        $shift->tasks()->delete();
+
+        HrAttendanceSession::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'user_id' => $worker->id,
+            ],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'site_id' => $shift->site_id,
+                'clock_in_at' => $startsAt,
+                'clock_out_at' => null,
+                'break_minutes' => 0,
+                'status' => 'open',
+                'source' => 'playwright',
+                'created_by' => $worker->id,
+                'closed_by' => null,
+            ],
+        );
+
+        $this->ensureSubmittedPlaywrightHandover($shift, $worker, [
+            'handover_notes' => 'Playwright clean handover already submitted.',
+            'client_mood' => 'calm',
+            'submit' => true,
+        ]);
+    }
+
+    private function seedClockInCandidate(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        HrAttendanceSession::query()
+            ->where('user_id', $worker->id)
+            ->where('status', 'open')
+            ->update([
+                'status' => 'closed',
+                'clock_out_at' => Carbon::now()->subMinutes(10),
+            ]);
+
+        $startsAt = Carbon::now()->subMinutes(20)->startOfMinute();
+        $endsAt = Carbon::now()->addHours(7)->startOfMinute();
+
+        $shift = $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:clock-in-candidate:'.$worker->email,
+            $startsAt,
+            $endsAt,
+            'scheduled',
+        );
+
+        $shift->tasks()->delete();
+    }
+
+    private function seedActiveChecklistShift(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        $startsAt = Carbon::now()->subHours(2)->startOfMinute();
+        $endsAt = Carbon::now()->addHours(6)->startOfMinute();
+        $shift = $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:active-checklist:'.$worker->email,
+            $startsAt,
+            $endsAt,
+            'in_progress',
+            [
+                'actual_starts_at' => $startsAt,
+                'started_by' => $worker->id,
+                'expected_break_minutes' => 0,
+            ],
+        );
+
+        $shift->outgoingHandovers()->delete();
+        $shift->tasks()->delete();
+        ShiftTask::create([
+            'shift_id' => $shift->id,
+            'label' => 'Playwright checklist task',
+            'sort_order' => 1,
+            'is_completed' => false,
+        ]);
+
+        HrAttendanceSession::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'user_id' => $worker->id,
+            ],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'site_id' => $shift->site_id,
+                'clock_in_at' => $startsAt,
+                'clock_out_at' => null,
+                'break_minutes' => 0,
+                'status' => 'open',
+                'source' => 'playwright',
+                'created_by' => $worker->id,
+                'closed_by' => null,
+            ],
+        );
+    }
+
+    private function seedActiveIncidentBlockerShift(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        $startsAt = Carbon::now()->subHours(2)->startOfMinute();
+        $endsAt = Carbon::now()->addHours(6)->startOfMinute();
+        $shift = $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:active-incident-blocker:'.$worker->email,
+            $startsAt,
+            $endsAt,
+            'in_progress',
+            [
+                'actual_starts_at' => $startsAt,
+                'started_by' => $worker->id,
+                'expected_break_minutes' => 0,
+            ],
+        );
+
+        $shift->tasks()->delete();
+
+        HrAttendanceSession::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'user_id' => $worker->id,
+            ],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'site_id' => $shift->site_id,
+                'clock_in_at' => $startsAt,
+                'clock_out_at' => null,
+                'break_minutes' => 0,
+                'status' => 'open',
+                'source' => 'playwright',
+                'created_by' => $worker->id,
+                'closed_by' => null,
+            ],
+        );
+
+        ClientIncident::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'reported_by' => $worker->id,
+                'title' => 'Playwright draft incident',
+            ],
+            [
+                'client_id' => $client->id,
+                'service_context_id' => $serviceContext->id,
+                'type' => 'behaviour',
+                'severity' => 'low',
+                'status' => 'draft',
+                'occurred_at' => Carbon::now()->subHour(),
+                'description' => 'Draft incident left open for blocker feedback coverage.',
+            ],
+        );
+
+        $this->ensureSubmittedPlaywrightHandover($shift, $worker, [
+            'handover_notes' => 'Playwright incident blocker handover already submitted.',
+            'client_mood' => 'mixed',
+            'submit' => true,
+        ]);
+    }
+
+    private function seedSubmittedApprovalTimesheet(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        $workDate = Carbon::now()->subDays($worker->email === 'sw2@demo.test' ? 3 : 4)->startOfDay();
+        $startsAt = $workDate->copy()->setTime(8, 0);
+        $endsAt = $workDate->copy()->setTime(16, 0);
+        $shift = $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:submitted-approval:'.$worker->email,
+            $startsAt,
+            $endsAt,
+            'completed',
+            [
+                'actual_starts_at' => $startsAt,
+                'actual_ends_at' => $endsAt,
+                'started_by' => $worker->id,
+                'completed_by' => $worker->id,
+                'expected_break_minutes' => 30,
+            ],
+        );
+
+        $attendance = HrAttendanceSession::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'user_id' => $worker->id,
+            ],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'site_id' => $shift->site_id,
+                'clock_in_at' => $startsAt,
+                'clock_out_at' => $endsAt,
+                'break_minutes' => 30,
+                'status' => 'closed',
+                'source' => 'playwright',
+                'created_by' => $worker->id,
+                'closed_by' => $worker->id,
+            ],
+        );
+
+        Timesheet::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'user_id' => $worker->id,
+            ],
+            [
+                'attendance_session_id' => $attendance->id,
+                'client_id' => $client->id,
+                'shift_site_id' => $shift->site_id,
+                'shift_service_context_id' => $shift->service_context_id,
+                'work_date' => $workDate->toDateString(),
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'break_minutes' => 30,
+                'notes' => 'Playwright submitted timesheet.',
+                'status' => 'submitted',
+                'submitted_at' => Carbon::now()->subHour(),
+                'submitted_by' => $worker->id,
+                'created_by' => $worker->id,
+                'shift_site_name_snapshot' => $shift->site?->name ?? 'Demo Site',
+                'service_context_name_snapshot' => $serviceContext->name,
+                'client_name_snapshot' => trim($client->first_name.' '.$client->last_name),
+                'staff_name_snapshot' => $worker->name,
+                'shift_type_snapshot' => 'standard',
+                'coverage_roles_snapshot' => [],
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function upsertPlaywrightShift(
+        User $worker,
+        User $admin,
+        Client $client,
+        ServiceContext $serviceContext,
+        string $notes,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        string $status,
+        array $overrides = [],
+    ): Shift {
+        $shift = Shift::query()->where('notes', $notes)->first();
+        $attributes = array_merge([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'service_context_id' => $serviceContext->id,
+            'user_id' => $worker->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'location' => $client->city ?: 'Auckland',
+            'status' => $status,
+            'notes' => $notes,
+            'created_by' => $admin->id,
+        ], $overrides);
+
+        if ($shift) {
+            $shift->forceFill($attributes)->save();
+        } else {
+            $shift = Shift::create($attributes);
+        }
+
+        $shift->forceFill(['published_at' => Carbon::now()])->save();
+
+        return $shift->fresh(['site']) ?? $shift;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function ensureSubmittedPlaywrightHandover(Shift $shift, User $worker, array $payload): void
+    {
+        $exists = $shift->outgoingHandovers()
+            ->whereIn('status', [
+                ShiftHandoverService::STATUS_SUBMITTED,
+                ShiftHandoverService::STATUS_ACKNOWLEDGED,
+            ])
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        app(ShiftHandoverService::class)->save($shift, $worker, $payload);
     }
 }

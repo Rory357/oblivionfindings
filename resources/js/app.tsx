@@ -55,7 +55,7 @@ createInertiaApp({
                                 position="top-right"
                                 style={
                                     {
-                                        '--success-text': 'hsl(140, 100%, 24%)',
+                                        '--success-text': 'hsl(140, 100%, 18%)',
                                     } as CSSProperties
                                 }
                             />
