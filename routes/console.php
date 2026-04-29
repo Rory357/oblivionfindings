@@ -356,6 +356,19 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('06:00');
 
+// Rostering maintenance: expire stale suggestions and archive completed published periods
+app(Schedule::class)
+    ->command('rostering:expire-stale-suggestion-runs')
+    ->timezone('Pacific/Auckland')
+    ->hourly()
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->command('rostering:archive-completed-periods')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('05:30')
+    ->withoutOverlapping();
+
 // Stale alert auto-resolution: clears unactioned operational alerts past TTL
 app(Schedule::class)
     ->command('control-room:auto-resolve-stale-alerts')

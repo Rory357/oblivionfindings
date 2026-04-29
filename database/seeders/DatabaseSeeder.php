@@ -57,5 +57,6 @@ class DatabaseSeeder extends Seeder
         $this->call(DemoSeeder::class);
         $this->call(DebugMedicalData::class);
         $this->call(FamilyPortalDemoSeeder::class);
+        $this->call(RosteringProductionDemoSeeder::class);
     }
 }

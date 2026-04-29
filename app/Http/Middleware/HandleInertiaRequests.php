@@ -135,6 +135,7 @@ class HandleInertiaRequests extends Middleware
             'availableLocales' => $availableLocales,
             'translations' => [
                 'app' => trans('app'),
+                'rostering' => trans('rostering'),
             ],
 
             // NEW: organisation theme tokens and branding assets

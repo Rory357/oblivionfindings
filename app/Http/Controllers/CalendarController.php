@@ -100,7 +100,9 @@ class CalendarController extends Controller
             ->where('ends_at', '>', $data['start']);
 
         if (!$canManageAny) {
-            $query->where('user_id', $auth->id);
+            $query
+                ->where('user_id', $auth->id)
+                ->visibleToFrontline($auth->organization_id);
         } else {
             if (!empty($data['staff_id'])) {
                 $query->where('user_id', $data['staff_id']);

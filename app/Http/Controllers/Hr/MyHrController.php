@@ -696,6 +696,7 @@ class MyHrController extends Controller
 
         // Upcoming shifts for the next 3 days
         $upcomingShifts = Shift::where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->where('starts_at', '>=', now())
             ->where('starts_at', '<=', now()->addDays(3))

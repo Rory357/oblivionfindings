@@ -109,7 +109,9 @@ class ShiftController extends Controller
 
         if (! $auth->canDo('shifts.manageAny')) {
             // Assigned-only access: only their own shifts
-            $query->where('user_id', $auth->id);
+            $query
+                ->where('user_id', $auth->id)
+                ->visibleToFrontline($auth->organization_id);
         }
 
         $shifts = $query->paginate(25)->withQueryString();
@@ -155,6 +157,16 @@ class ShiftController extends Controller
 
         if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
+        }
+
+        if (! $auth->canDo('shifts.manageAny')) {
+            abort_unless(
+                Shift::query()
+                    ->whereKey($shift->id)
+                    ->visibleToFrontline($auth->organization_id)
+                    ->exists(),
+                404,
+            );
         }
 
         $this->assertCanAccessShift($auth, $shift);

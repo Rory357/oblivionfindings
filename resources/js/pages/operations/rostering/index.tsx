@@ -76,6 +76,7 @@ const CHART_COLORS = [
 
 type Staff = { id: number; name: string; email?: string };
 type Client = { id: number; first_name: string; last_name: string };
+type Site = { id: number; name: string; type?: string | null };
 type ShiftLite = {
     id: number;
     client_id: number;
@@ -85,6 +86,9 @@ type ShiftLite = {
     ends_at: string;
     location: string | null;
     status: string;
+    roster_period_id?: number | null;
+    published_at?: string | null;
+    publish_dirty_at?: string | null;
     shift_type?: string | null;
     service_context: string | null;
     client: string | null;
@@ -99,6 +103,30 @@ type ShiftLite = {
     replacement_requested_by?: string | null;
     replacement_current_staff?: string | null;
     open_position_status?: string | null;
+};
+
+type RosterPeriodSummary = {
+    id: number;
+    site_id: number;
+    week_start: string;
+    week_end?: string | null;
+    version: number;
+    status: string;
+    shift_count?: number | null;
+    published_at: string | null;
+    last_validated_at: string | null;
+    validation_summary?: {
+        can_publish?: boolean;
+        blocks?: Array<{ message: string }>;
+        warnings?: Array<{ message: string }>;
+        shift_count?: number;
+    } | null;
+    diff_summary?: {
+        added: number;
+        removed: number;
+        changed: number;
+        total: number;
+    } | null;
 };
 
 type ReplacementQueueItem = {
@@ -185,15 +213,24 @@ type CoverageSiteSummary = {
 
 type Props = {
     canManageAny: boolean;
+    canPublishRoster: boolean;
+    canAutoScheduleRoster: boolean;
+    rosteringFeatures: {
+        publish: boolean;
+        auto_schedule: boolean;
+    };
     weekStart: string; // YYYY-MM-DD
     weekEnd: string; // YYYY-MM-DD (exclusive)
     filters: {
         week: string;
         staff_id: number | null;
         client_id: number | null;
+        site_id: number | null;
     };
     staff: Staff[];
     clients: Client[];
+    sites: Site[];
+    rosterPeriod: RosterPeriodSummary | null;
     stats: {
         total: number;
         open: number;
@@ -920,6 +957,7 @@ export default function RosteringIndex(props: Props) {
                 week: target,
                 staff_id: props.filters.staff_id ?? undefined,
                 client_id: props.filters.client_id ?? undefined,
+                site_id: props.filters.site_id ?? undefined,
             },
             { preserveScroll: true, preserveState: true },
         );
@@ -933,8 +971,50 @@ export default function RosteringIndex(props: Props) {
                 staff_id: next.staff_id ?? props.filters.staff_id ?? undefined,
                 client_id:
                     next.client_id ?? props.filters.client_id ?? undefined,
+                site_id: next.site_id ?? props.filters.site_id ?? undefined,
             },
             { preserveScroll: true, preserveState: true },
+        );
+    };
+
+    const selectedSiteName =
+        props.sites.find((site) => site.id === props.filters.site_id)?.name ??
+        null;
+    const publishBlockCount =
+        props.rosterPeriod?.validation_summary?.blocks?.length ?? 0;
+    const publishWarningCount =
+        props.rosterPeriod?.validation_summary?.warnings?.length ?? 0;
+
+    const isPreviouslyPublished = Boolean(props.rosterPeriod?.published_at);
+    const canRepublish = Boolean(
+        props.rosterPeriod &&
+        isPreviouslyPublished &&
+        props.rosterPeriod.status !== 'published' &&
+        props.rosterPeriod.status !== 'archived',
+    );
+    const diffTotal = props.rosterPeriod?.diff_summary?.total ?? 0;
+
+    const postPeriodAction = (
+        action: 'review' | 'publish' | 'republish' | 'unpublish',
+    ) => {
+        if (!props.rosterPeriod) return;
+
+        router.post(
+            `/operations/rostering/periods/${props.rosterPeriod.id}/${action}`,
+            {},
+            { preserveScroll: true },
+        );
+    };
+
+    const generateSuggestions = () => {
+        router.post(
+            '/operations/rostering/auto-schedule',
+            {
+                week: props.weekStart,
+                site_id: props.filters.site_id,
+                client_id: props.filters.client_id,
+            },
+            { preserveScroll: true },
         );
     };
 
@@ -989,6 +1069,18 @@ export default function RosteringIndex(props: Props) {
                                 Recurring series
                             </Button>
                         </Link>
+                        {props.rosteringFeatures.auto_schedule &&
+                        props.canAutoScheduleRoster ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!props.filters.site_id}
+                                onClick={generateSuggestions}
+                                data-test="rostering-suggest-assignments"
+                            >
+                                Suggest assignments
+                            </Button>
+                        ) : null}
                     </div>
                 </div>
 
@@ -1187,7 +1279,7 @@ export default function RosteringIndex(props: Props) {
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {props.canManageAny ? (
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 <Select
                                     value={
                                         props.filters.staff_id
@@ -1214,6 +1306,37 @@ export default function RosteringIndex(props: Props) {
                                                 value={String(s.id)}
                                             >
                                                 {s.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Select
+                                    value={
+                                        props.filters.site_id
+                                            ? String(props.filters.site_id)
+                                            : 'all'
+                                    }
+                                    onValueChange={(v) =>
+                                        updateFilter({
+                                            site_id:
+                                                v === 'all' ? null : Number(v),
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All sites" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All sites
+                                        </SelectItem>
+                                        {props.sites.map((site) => (
+                                            <SelectItem
+                                                key={site.id}
+                                                value={String(site.id)}
+                                            >
+                                                {site.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1257,6 +1380,111 @@ export default function RosteringIndex(props: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                {props.rosteringFeatures.publish && props.canPublishRoster ? (
+                    <Card data-test="rostering-publish-panel">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center justify-between gap-2 text-sm font-medium">
+                                <span>Publish status</span>
+                                {props.rosterPeriod ? (
+                                    <Badge
+                                        variant={
+                                            props.rosterPeriod.status ===
+                                            'published'
+                                                ? 'default'
+                                                : props.rosterPeriod.status ===
+                                                    'changed_after_publish'
+                                                  ? 'destructive'
+                                                  : 'outline'
+                                        }
+                                    >
+                                        {props.rosterPeriod.status.replaceAll(
+                                            '_',
+                                            ' ',
+                                        )}
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline">No site</Badge>
+                                )}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div className="space-y-1 text-sm">
+                                <div className="font-medium">
+                                    {selectedSiteName ??
+                                        'Choose a site to manage publishing'}
+                                </div>
+                                {props.rosterPeriod ? (
+                                    <div className="text-muted-foreground">
+                                        Version {props.rosterPeriod.version} ·{' '}
+                                        {publishBlockCount} blockers ·{' '}
+                                        {publishWarningCount} warnings
+                                        {diffTotal > 0
+                                            ? ` · ${diffTotal} changes`
+                                            : ''}
+                                    </div>
+                                ) : (
+                                    <div className="text-muted-foreground">
+                                        Publishing is tracked per site and week.
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={
+                                        !props.rosterPeriod ||
+                                        props.rosterPeriod.status === 'archived'
+                                    }
+                                    onClick={() => postPeriodAction('review')}
+                                    data-test="rostering-review-publish"
+                                >
+                                    Review
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    disabled={
+                                        !props.rosterPeriod ||
+                                        publishBlockCount > 0 ||
+                                        props.rosterPeriod.status === 'archived'
+                                    }
+                                    onClick={() =>
+                                        postPeriodAction(
+                                            canRepublish
+                                                ? 'republish'
+                                                : 'publish',
+                                        )
+                                    }
+                                    data-test="rostering-confirm-publish"
+                                >
+                                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                                    {canRepublish ? 'Re-publish' : 'Publish'}
+                                </Button>
+                                {props.rosterPeriod && diffTotal > 0 ? (
+                                    <Link
+                                        href={`/operations/rostering/periods/${props.rosterPeriod.id}/diff`}
+                                    >
+                                        <Button size="sm" variant="outline">
+                                            View diff
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                                {props.rosterPeriod?.status === 'published' ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            postPeriodAction('unpublish')
+                                        }
+                                    >
+                                        Unpublish
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 <Tabs
                     tabs={[

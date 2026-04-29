@@ -65,6 +65,18 @@ class ShiftLifecycleService
         return $this->lastDraftTimesheetResult;
     }
 
+    public function create(array $attributes, User $actor): Shift
+    {
+        return DB::transaction(function () use ($attributes, $actor) {
+            $attributes['created_by'] ??= $actor->id;
+            $attributes['status'] ??= 'draft';
+
+            $shift = Shift::query()->create($attributes);
+
+            return $shift->fresh() ?? $shift;
+        });
+    }
+
     public function start(
         Shift $shift,
         User $actor,

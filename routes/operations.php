@@ -48,6 +48,7 @@ use App\Http\Controllers\Operations\QualificationMatchController;
 use App\Http\Controllers\Operations\QuoteController;
 use App\Http\Controllers\Operations\RecurringChargeController;
 use App\Http\Controllers\Operations\ReportController;
+use App\Http\Controllers\Operations\RosterSuggestionController;
 use App\Http\Controllers\Operations\RosterTemplateController;
 use App\Http\Controllers\Operations\ServiceAgreementController;
 use App\Http\Controllers\Operations\ShiftNoteController;
@@ -574,6 +575,34 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/rostering/auto-schedule', [RosteringController::class, 'autoSchedule'])
         ->middleware('permission:rostering.autoSchedule')
         ->name('operations.rostering.auto_schedule');
+
+    Route::middleware('permission:rostering.publish')->group(function () {
+        Route::get('/rostering/periods/{period}/review', [RosteringController::class, 'viewPublishReview'])
+            ->name('operations.rostering.periods.review.show');
+        Route::get('/rostering/periods/{period}/diff', [RosteringController::class, 'viewDiff'])
+            ->name('operations.rostering.periods.diff');
+        Route::post('/rostering/periods/{period}/review', [RosteringController::class, 'reviewForPublish'])
+            ->name('operations.rostering.periods.review');
+        Route::post('/rostering/periods/{period}/publish', [RosteringController::class, 'confirmPublish'])
+            ->name('operations.rostering.periods.publish');
+        Route::post('/rostering/periods/{period}/republish', [RosteringController::class, 'republish'])
+            ->name('operations.rostering.periods.republish');
+        Route::post('/rostering/periods/{period}/unpublish', [RosteringController::class, 'unpublish'])
+            ->name('operations.rostering.periods.unpublish');
+    });
+
+    Route::middleware('permission:rostering.autoSchedule')->group(function () {
+        Route::get('/rostering/suggestions/{run}', [RosterSuggestionController::class, 'show'])
+            ->name('operations.rostering.suggestions.show');
+        Route::post('/rostering/suggestions/{suggestion}/accept', [RosterSuggestionController::class, 'accept'])
+            ->name('operations.rostering.suggestions.accept');
+        Route::post('/rostering/suggestions/{suggestion}/dismiss', [RosterSuggestionController::class, 'dismiss'])
+            ->name('operations.rostering.suggestions.dismiss');
+        Route::post('/rostering/suggestions/{suggestion}/apply', [RosterSuggestionController::class, 'apply'])
+            ->name('operations.rostering.suggestions.apply');
+        Route::post('/rostering/suggestions/{run}/apply-accepted', [RosterSuggestionController::class, 'applyAccepted'])
+            ->name('operations.rostering.suggestions.apply_accepted');
+    });
 
     // -------------------------------------------------------------------------
     // Availability (NEW)

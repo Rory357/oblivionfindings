@@ -1,0 +1,160 @@
+<?php
+
+use App\Models\Client;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\RosterTemplate;
+use App\Models\RosterTemplateShift;
+use App\Models\Shift;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+
+beforeEach(function () {
+    Cache::flush();
+});
+
+it('creates roster templates with related shifts from the factory helper', function () {
+    $template = RosterTemplate::factory()->withShifts(5)->create();
+
+    expect($template->templateShifts()->count())->toBe(5);
+});
+
+it('applies a template once per actor and week through the lifecycle assignment path', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = rosteringTemplateActor();
+    $assignee = User::factory()->create(['organization_id' => 1]);
+    $template = RosterTemplate::factory()->create([
+        'organization_id' => 1,
+        'created_by' => $actor->id,
+    ]);
+
+    RosterTemplateShift::factory()->create([
+        'organization_id' => 1,
+        'roster_template_id' => $template->id,
+        'client_id' => $client->id,
+        'service_context_id' => null,
+        'user_id' => $assignee->id,
+        'day_of_week' => 0,
+        'start_time' => '09:00',
+        'end_time' => '13:00',
+    ]);
+
+    $payload = [
+        'week_start' => '2026-05-04',
+        'confirm_warnings' => true,
+    ];
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), $payload)
+        ->assertRedirect(route('operations.rostering.index', ['week' => '2026-05-04']));
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), $payload)
+        ->assertRedirect(route('operations.rostering.templates.show', $template));
+
+    expect(Shift::count())->toBe(1);
+    $shift = Shift::first();
+
+    expect($shift->user_id)->toBe($assignee->id);
+    expect($shift->status)->toBe('scheduled');
+    expect($shift->created_by)->toBe($actor->id);
+});
+
+it('blocks conflicting proposed template rows before creating shifts', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = rosteringTemplateActor();
+    $assignee = User::factory()->create(['organization_id' => 1]);
+    $template = RosterTemplate::factory()->create([
+        'organization_id' => 1,
+        'created_by' => $actor->id,
+    ]);
+
+    RosterTemplateShift::factory()->count(2)->create([
+        'organization_id' => 1,
+        'roster_template_id' => $template->id,
+        'client_id' => $client->id,
+        'service_context_id' => null,
+        'user_id' => $assignee->id,
+        'day_of_week' => 0,
+        'start_time' => '09:00',
+        'end_time' => '13:00',
+    ]);
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), [
+            'week_start' => '2026-05-04',
+            'confirm_warnings' => true,
+        ])
+        ->assertSessionHasErrors('preflight_blocks');
+
+    expect(Shift::count())->toBe(0);
+});
+
+it('surfaces preflight warnings before applying unassigned template rows', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = rosteringTemplateActor();
+    $template = RosterTemplate::factory()->create([
+        'organization_id' => 1,
+        'created_by' => $actor->id,
+    ]);
+
+    RosterTemplateShift::factory()->unassigned()->create([
+        'organization_id' => 1,
+        'roster_template_id' => $template->id,
+        'client_id' => $client->id,
+        'service_context_id' => null,
+        'day_of_week' => 0,
+        'start_time' => '09:00',
+        'end_time' => '13:00',
+    ]);
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), [
+            'week_start' => '2026-05-04',
+        ])
+        ->assertSessionHasErrors('preflight_warnings');
+
+    expect(Shift::count())->toBe(0);
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), [
+            'week_start' => '2026-05-04',
+            'confirm_warnings' => true,
+        ])
+        ->assertRedirect(route('operations.rostering.index', ['week' => '2026-05-04']));
+
+    expect(Shift::count())->toBe(1);
+});
+
+function rosteringTemplateActor(): User
+{
+    $actor = User::factory()->create(['organization_id' => 1]);
+    $role = Role::create([
+        'name' => 'rostering-template-test-'.uniqid(),
+        'label' => 'Rostering template test',
+        'level' => 10,
+        'type' => 'custom',
+    ]);
+    $permission = Permission::firstOrCreate(
+        ['key' => 'roster_templates.update'],
+        ['description' => 'Update roster templates', 'group' => 'Rostering', 'module' => 'operations'],
+    );
+
+    $role->permissions()->sync([$permission->id]);
+    $actor->roles()->attach($role);
+
+    return $actor;
+}

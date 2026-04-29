@@ -25,6 +25,12 @@ return [
         'driver_eligibility' => env('FEATURE_HR_DRIVER', false),
     ],
 
+    'rostering' => [
+        'publish' => env('FEATURE_ROSTERING_PUBLISH', false),
+        'auto_schedule' => env('FEATURE_ROSTERING_AUTO_SCHEDULE', false),
+        'auto_schedule_queue_threshold' => env('FEATURE_ROSTERING_AUTO_SCHEDULE_QUEUE_THRESHOLD', 1000),
+    ],
+
     'integrations' => [
         'enabled' => env('FEATURE_INTEGRATIONS', true),
         'unifi' => env('FEATURE_INTEGRATION_UNIFI', true),

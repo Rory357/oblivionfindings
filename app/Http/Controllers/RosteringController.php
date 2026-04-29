@@ -4,9 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Rostering\AutoSchedule\RosterSuggestionService;
+use App\Domain\Rostering\RosteringFeatureFlags;
+use App\Domain\Rostering\RosterPeriodService;
+use App\Domain\Rostering\RosterPublishingService;
+use App\Http\Requests\Operations\Rostering\AutoScheduleRosterRequest;
+use App\Http\Requests\Operations\Rostering\RosteringConflictsRequest;
+use App\Http\Requests\Operations\Rostering\RosteringIndexRequest;
 use App\Models\Client;
+use App\Models\RosterPeriod;
+use App\Models\RosterSuggestionRun;
 use App\Models\Shift;
 use App\Models\ShiftEligibilityOverride;
+use App\Models\Site;
 use App\Models\StaffTimeOff;
 use App\Models\User;
 use App\Services\ShiftCoverageService;
@@ -19,21 +29,21 @@ class RosteringController extends Controller
 {
     public function __construct(
         protected ShiftCoverageService $shiftCoverageService,
+        protected RosterPeriodService $rosterPeriods,
+        protected RosterPublishingService $publishing,
+        protected RosterSuggestionService $suggestions,
+        protected RosteringFeatureFlags $featureFlags,
     ) {
     }
 
-    public function index(Request $request)
+    public function index(RosteringIndexRequest $request)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $canManageAny = $auth->canDo('shifts.manageAny');
 
-        $data = $request->validate([
-            'week' => ['nullable', 'date'],
-            'staff_id' => ['nullable', 'integer', 'exists:users,id'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-        ]);
+        $data = $request->validated();
 
         $week = !empty($data['week'])
             ? Carbon::parse($data['week'])
@@ -45,10 +55,12 @@ class RosteringController extends Controller
 
         $staff = [];
         $clients = [];
+        $sites = [];
 
         if ($canManageAny) {
             $staff = User::staff()->orderBy('name')->get(['id', 'name', 'email']);
             $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+            $sites = Site::query()->orderBy('name')->get(['id', 'name', 'type']);
         }
 
         $query = Shift::query()
@@ -89,6 +101,9 @@ class RosteringController extends Controller
             }
             if (!empty($data['client_id'])) {
                 $query->where('client_id', $data['client_id']);
+            }
+            if (!empty($data['site_id'])) {
+                $query->where('site_id', $data['site_id']);
             }
         }
 
@@ -321,9 +336,12 @@ class RosteringController extends Controller
             ->sortBy('starts_at')
             ->values();
 
-        $selectedSiteId = ! empty($data['client_id'])
-            ? Client::query()->whereKey($data['client_id'])->value('site_id')
-            : null;
+        $selectedSiteId = null;
+        if (! empty($data['site_id'])) {
+            $selectedSiteId = (int) $data['site_id'];
+        } elseif (! empty($data['client_id'])) {
+            $selectedSiteId = Client::query()->whereKey($data['client_id'])->value('site_id');
+        }
 
         $coverageSites = $canManageAny
             ? $this->shiftCoverageService->buildSiteSummaries($weekStart, $weekEnd, $selectedSiteId)
@@ -392,17 +410,52 @@ class RosteringController extends Controller
             $eligibilityAlerts = $this->buildEligibilityAlerts();
         }
 
+        $publishEnabled = $this->featureFlags->publishEnabled($auth->organization_id);
+        $autoScheduleEnabled = $this->featureFlags->autoScheduleEnabled($auth->organization_id);
+        $selectedRosterPeriod = null;
+        $selectedRosterPeriodDiffSummary = null;
+
+        if ($publishEnabled && $canManageAny && $selectedSiteId) {
+            $selectedRosterPeriod = $this->rosterPeriods->activeFor($auth->organization_id, (int) $selectedSiteId, $weekStart)
+                ?? $this->rosterPeriods->findOrCreate($auth->organization_id, (int) $selectedSiteId, $weekStart);
+
+            if ($selectedRosterPeriod->snapshot) {
+                $selectedRosterPeriodDiffSummary = $this->publishing->diff($selectedRosterPeriod)['summary'];
+            }
+        }
+
         return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
+            'canPublishRoster' => $auth->canDo('rostering.publish'),
+            'canAutoScheduleRoster' => $auth->canDo('rostering.autoSchedule'),
+            'rosteringFeatures' => [
+                'publish' => $publishEnabled,
+                'auto_schedule' => $autoScheduleEnabled,
+            ],
             'weekStart' => $weekStart->toDateString(),
             'weekEnd' => $weekEnd->toDateString(),
             'filters' => [
                 'week' => $weekStart->toDateString(),
                 'staff_id' => $data['staff_id'] ?? null,
                 'client_id' => $data['client_id'] ?? null,
+                'site_id' => $selectedSiteId,
             ],
             'staff' => $staff,
             'clients' => $clients,
+            'sites' => $sites,
+            'rosterPeriod' => $selectedRosterPeriod ? [
+                'id' => $selectedRosterPeriod->id,
+                'site_id' => $selectedRosterPeriod->site_id,
+                'week_start' => $selectedRosterPeriod->week_start->toDateString(),
+                'week_end' => optional($selectedRosterPeriod->week_end)->toDateString(),
+                'version' => $selectedRosterPeriod->version,
+                'status' => $selectedRosterPeriod->status,
+                'shift_count' => $selectedRosterPeriod->shift_count,
+                'published_at' => optional($selectedRosterPeriod->published_at)->toIso8601String(),
+                'last_validated_at' => optional($selectedRosterPeriod->last_validated_at)->toIso8601String(),
+                'validation_summary' => $selectedRosterPeriod->validation_summary,
+                'diff_summary' => $selectedRosterPeriodDiffSummary,
+            ] : null,
             'stats' => $stats,
             'shifts' => $shifts->map(function (Shift $shift) {
                 $clientName = $shift->client ? ($shift->client->first_name . ' ' . $shift->client->last_name) : null;
@@ -421,6 +474,9 @@ class RosteringController extends Controller
                     'ends_at' => optional($shift->ends_at)->toIso8601String(),
                     'location' => $shift->location,
                     'status' => $shift->status,
+                    'roster_period_id' => $shift->roster_period_id,
+                    'published_at' => optional($shift->published_at)->toIso8601String(),
+                    'publish_dirty_at' => optional($shift->publish_dirty_at)->toIso8601String(),
                     'shift_type' => $shift->shift_type ?? 'standard',
                     'service_context' => $shift->serviceContext ? $shift->serviceContext->name : null,
                     'client' => $clientName,
@@ -489,14 +545,12 @@ class RosteringController extends Controller
         ]);
     }
 
-    public function conflicts(Request $request)
+    public function conflicts(RosteringConflictsRequest $request)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
-        $data = $request->validate([
-            'week' => ['nullable', 'date'],
-        ]);
+        $data = $request->validated();
 
         $week = !empty($data['week']) ? Carbon::parse($data['week']) : now();
         $weekStart = (clone $week)->startOfWeek(Carbon::MONDAY)->startOfDay();
@@ -675,22 +729,193 @@ class RosteringController extends Controller
         ]);
     }
 
-    public function autoSchedule(Request $request)
+    public function autoSchedule(AutoScheduleRosterRequest $request)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
 
-        $data = $request->validate([
-            'week' => ['nullable', 'date'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-        ]);
+        $data = $request->validated();
+
+        if ($this->featureFlags->autoScheduleEnabled($auth->organization_id)) {
+            $siteId = ! empty($data['site_id'])
+                ? (int) $data['site_id']
+                : (! empty($data['client_id'])
+                    ? (int) Client::query()->whereKey($data['client_id'])->value('site_id')
+                    : null);
+
+            if (! $siteId) {
+                return redirect()
+                    ->route('operations.rostering.index', array_filter([
+                        'week' => $data['week'] ?? null,
+                        'client_id' => $data['client_id'] ?? null,
+                    ]))
+                    ->with('warning', __('rostering.suggestions.choose_site'));
+            }
+
+            $run = $this->suggestions->generateOrQueue($auth, $data['week'] ?? null, $siteId);
+
+            return redirect()
+                ->route('operations.rostering.suggestions.show', $run)
+                ->with(
+                    $run->status === RosterSuggestionRun::STATUS_PENDING ? 'warning' : 'success',
+                    $run->status === RosterSuggestionRun::STATUS_PENDING
+                        ? __('rostering.suggestions.queued')
+                        : __('rostering.suggestions.generated'),
+                );
+        }
 
         return redirect()
             ->route('operations.rostering.index', array_filter([
                 'week' => $data['week'] ?? null,
                 'client_id' => $data['client_id'] ?? null,
+                'site_id' => $data['site_id'] ?? null,
             ]))
-            ->with('warning', 'Auto-scheduling is not configured yet. Please assign open shifts manually.');
+            ->with('warning', __('rostering.suggestions.auto_schedule_disabled'));
+    }
+
+    public function reviewForPublish(Request $request, RosterPeriod $period)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.publish'), 403);
+        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
+        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+
+        $summary = $this->publishing->review($period, $auth);
+
+        return redirect()
+            ->route('operations.rostering.periods.review.show', $period)
+            ->with(
+                $summary['can_publish'] ? 'success' : 'warning',
+                $summary['can_publish']
+                    ? __('rostering.publish.review_ready')
+                    : __('rostering.publish.review_blocked'),
+            );
+    }
+
+    public function viewPublishReview(Request $request, RosterPeriod $period)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.publish'), 403);
+        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
+        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+
+        $period->load(['site:id,name', 'publisher:id,name']);
+        $summary = $period->validation_summary ?? [
+            'can_publish' => false,
+            'blocks' => [],
+            'warnings' => [],
+            'shift_count' => $period->shift_count,
+        ];
+        $shifts = $this->rosterPeriods->shiftsQuery($period)
+            ->with(['client:id,first_name,last_name', 'staff:id,name,email', 'site:id,name', 'serviceContext:id,name'])
+            ->orderBy('starts_at')
+            ->get();
+
+        return inertia('operations/rostering/publish/Review', [
+            'period' => [
+                'id' => $period->id,
+                'site_id' => $period->site_id,
+                'site_name' => $period->site?->name,
+                'week_start' => $period->week_start->toDateString(),
+                'week_end' => optional($period->week_end)->toDateString(),
+                'version' => $period->version,
+                'status' => $period->status,
+                'published_at' => optional($period->published_at)->toIso8601String(),
+                'published_by' => $period->publisher?->name,
+                'last_validated_at' => optional($period->last_validated_at)->toIso8601String(),
+            ],
+            'summary' => $summary,
+            'shifts' => $shifts->map(fn (Shift $shift) => [
+                'id' => $shift->id,
+                'starts_at' => optional($shift->starts_at)->toIso8601String(),
+                'ends_at' => optional($shift->ends_at)->toIso8601String(),
+                'status' => $shift->status,
+                'client' => $shift->client ? trim($shift->client->first_name.' '.$shift->client->last_name) : null,
+                'site' => $shift->site?->name,
+                'staff' => $shift->staff?->name,
+                'service_context' => $shift->serviceContext?->name,
+                'published_at' => optional($shift->published_at)->toIso8601String(),
+                'publish_dirty_at' => optional($shift->publish_dirty_at)->toIso8601String(),
+            ])->values(),
+        ]);
+    }
+
+    public function confirmPublish(Request $request, RosterPeriod $period)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.publish'), 403);
+        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
+        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+
+        $published = $this->publishing->publish($period, $auth);
+
+        return redirect()
+            ->route('operations.rostering.index', [
+                'week' => $published->week_start->toDateString(),
+                'site_id' => $published->site_id,
+            ])
+            ->with('success', __('rostering.publish.published_message'));
+    }
+
+    public function viewDiff(Request $request, RosterPeriod $period)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.publish'), 403);
+        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
+        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+
+        $period->load(['site:id,name', 'publisher:id,name']);
+        $diff = $this->publishing->diff($period);
+
+        return inertia('operations/rostering/publish/Diff', [
+            'period' => [
+                'id' => $period->id,
+                'site_id' => $period->site_id,
+                'site_name' => $period->site?->name,
+                'week_start' => $period->week_start->toDateString(),
+                'week_end' => optional($period->week_end)->toDateString(),
+                'version' => $period->version,
+                'status' => $period->status,
+                'published_at' => optional($period->published_at)->toIso8601String(),
+                'published_by' => $period->publisher?->name,
+            ],
+            'summary' => $diff['summary'],
+            'changes' => $diff['changes'],
+        ]);
+    }
+
+    public function republish(Request $request, RosterPeriod $period)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.publish'), 403);
+        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
+        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+
+        $published = $this->publishing->republish($period, $auth);
+
+        return redirect()
+            ->route('operations.rostering.index', [
+                'week' => $published->week_start->toDateString(),
+                'site_id' => $published->site_id,
+            ])
+            ->with('success', __('rostering.publish.republished_message', ['version' => $published->version]));
+    }
+
+    public function unpublish(Request $request, RosterPeriod $period)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.publish'), 403);
+        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
+        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+
+        $draft = $this->publishing->unpublish($period, $auth);
+
+        return redirect()
+            ->route('operations.rostering.index', [
+                'week' => $draft->week_start->toDateString(),
+                'site_id' => $draft->site_id,
+            ])
+            ->with('warning', __('rostering.publish.unpublished_message'));
     }
 
     /**

@@ -29,7 +29,9 @@ class TodayDashboardController extends Controller
 
         // Staff see only their own shifts unless manageAny
         if (!$user->canDo('shifts.manageAny')) {
-            $shiftQuery->where('user_id', $user->id);
+            $shiftQuery
+                ->where('user_id', $user->id)
+                ->visibleToFrontline($user->organization_id);
         }
 
         $shifts = $shiftQuery->get();

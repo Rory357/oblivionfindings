@@ -1,5 +1,16 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 type TemplateShift = {
     id: number;
@@ -62,11 +74,47 @@ function nextMonday(): string {
 export default function ShowTemplate({ template }: Props) {
     const applyForm = useForm({
         week_start: nextMonday(),
+        confirm_warnings: false,
     });
+    const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+    const applyErrors = applyForm.errors as Record<string, string | undefined>;
+    const preflightWarnings = applyErrors.preflight_warnings;
+    const preflightBlocks = applyErrors.preflight_blocks;
+    const warningLines = useMemo(
+        () =>
+            preflightWarnings
+                ? preflightWarnings.split('\n').filter(Boolean)
+                : [],
+        [preflightWarnings],
+    );
+    const blockLines = useMemo(
+        () =>
+            preflightBlocks ? preflightBlocks.split('\n').filter(Boolean) : [],
+        [preflightBlocks],
+    );
 
     const deleteTemplate = () => {
         router.delete(`/operations/rostering/templates/${template.id}`);
     };
+
+    const postApply = (confirmWarnings = false) => {
+        applyForm.transform((data) => ({
+            ...data,
+            confirm_warnings: confirmWarnings,
+        }));
+        applyForm.post(`/operations/rostering/templates/${template.id}/apply`, {
+            preserveScroll: true,
+            onFinish: () => {
+                applyForm.transform((data) => data);
+            },
+        });
+    };
+
+    useEffect(() => {
+        if (warningLines.length > 0) {
+            setWarningDialogOpen(true);
+        }
+    }, [warningLines.length]);
 
     return (
         <AppLayout
@@ -223,7 +271,7 @@ export default function ShowTemplate({ template }: Props) {
                     </Card>
 
                     <div className="space-y-4">
-                        <Card>
+                        <Card data-test="template-apply-card">
                             <CardHeader>
                                 <CardTitle className="text-base">
                                     Template details
@@ -296,11 +344,30 @@ export default function ShowTemplate({ template }: Props) {
                                     className="space-y-3"
                                     onSubmit={(event) => {
                                         event.preventDefault();
-                                        applyForm.post(
-                                            `/operations/rostering/templates/${template.id}/apply`,
-                                        );
+                                        postApply(false);
                                     }}
                                 >
+                                    {blockLines.length > 0 && (
+                                        <Alert
+                                            variant="destructive"
+                                            data-test="template-apply-blocks"
+                                        >
+                                            <AlertTitle>
+                                                Template cannot be applied
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                <ul className="list-disc space-y-1 pl-4">
+                                                    {blockLines.map(
+                                                        (line, index) => (
+                                                            <li key={index}>
+                                                                {line}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                     <div className="space-y-2">
                                         <Label htmlFor="week-start">
                                             Week start
@@ -325,6 +392,7 @@ export default function ShowTemplate({ template }: Props) {
                                         type="submit"
                                         disabled={applyForm.processing}
                                         className="w-full"
+                                        data-test="template-apply-submit"
                                     >
                                         Apply to roster
                                     </Button>
@@ -333,6 +401,45 @@ export default function ShowTemplate({ template }: Props) {
                         </Card>
                     </div>
                 </div>
+
+                <AlertDialog
+                    open={warningDialogOpen}
+                    onOpenChange={setWarningDialogOpen}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Review template warnings
+                            </AlertDialogTitle>
+                            <AlertDialogDescription asChild>
+                                <div className="space-y-3">
+                                    <p>
+                                        The template can be applied, but these
+                                        items should be reviewed first.
+                                    </p>
+                                    <ul className="max-h-64 list-disc space-y-1 overflow-auto pl-4">
+                                        {warningLines.map((line, index) => (
+                                            <li key={index}>{line}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                disabled={applyForm.processing}
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    setWarningDialogOpen(false);
+                                    postApply(true);
+                                }}
+                            >
+                                Apply anyway
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageShell>
         </AppLayout>
     );

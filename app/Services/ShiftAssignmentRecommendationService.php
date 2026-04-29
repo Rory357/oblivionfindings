@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Shift;
 use App\Models\User;
+use Closure;
+use Illuminate\Support\Collection;
 
 class ShiftAssignmentRecommendationService
 {
@@ -15,8 +17,17 @@ class ShiftAssignmentRecommendationService
 
     /**
      * @param  array<int, string>  $bypassPermissions
+     * @param  Collection<int, User>|null  $candidatePool
+     * @param  (Closure(User, Closure): mixed)|null  $eligibilityResolver
      */
-    public function forShift(Shift $shift, ?User $viewer = null, int $limit = 8, array $bypassPermissions = []): array
+    public function forShift(
+        Shift $shift,
+        ?User $viewer = null,
+        int $limit = 8,
+        array $bypassPermissions = [],
+        ?Collection $candidatePool = null,
+        ?Closure $eligibilityResolver = null,
+    ): array
     {
         $shift->loadMissing(['client:id,first_name,last_name,site_id']);
         $coverage = $this->coverage->coverageStatusForShift($shift);
@@ -28,17 +39,19 @@ class ShiftAssignmentRecommendationService
                 ->sum(fn (array $role) => (int) ($role['missing'] ?? 0) * 12)
             : 0;
 
-        $staffQuery = User::staff()->orderBy('name');
+        if ($candidatePool === null) {
+            $staffQuery = User::staff()->orderBy('name');
 
-        if ($viewer?->organization_id) {
-            $staffQuery->where('organization_id', $viewer->organization_id);
+            if ($viewer?->organization_id) {
+                $staffQuery->where('organization_id', $viewer->organization_id);
+            }
+
+            $this->siteAccess->applyStaffScope($staffQuery, $viewer, $bypassPermissions);
+
+            $candidatePool = $staffQuery->get(['id', 'name', 'email']);
         }
 
-        $this->siteAccess->applyStaffScope($staffQuery, $viewer, $bypassPermissions);
-
-        $candidates = $staffQuery->get(['id', 'name', 'email']);
-
-        $results = $candidates->map(function (User $user) use ($shift, $coveragePriority, $roleGapPriority) {
+        $results = $candidatePool->map(function (User $user) use ($shift, $coveragePriority, $roleGapPriority, $eligibilityResolver) {
             $siteId = $shift->site_id ?: $shift->client?->site_id;
             $weeklyMinutes = Shift::query()
                 ->where('user_id', $user->id)
@@ -56,7 +69,10 @@ class ShiftAssignmentRecommendationService
                     return max(0, $existingShift->ends_at->diffInMinutes($existingShift->starts_at));
                 });
 
-            $eligibility = $this->eligibility->evaluate($shift, $user)->toArray();
+            $eligibilityResult = $eligibilityResolver
+                ? $eligibilityResolver($user, fn () => $this->eligibility->evaluate($shift, $user))
+                : $this->eligibility->evaluate($shift, $user);
+            $eligibility = $eligibilityResult->toArray();
             $roleCoverageBonus = collect($eligibility['matched_roles'] ?? [])
                 ->sum(fn (array $role) => (int) ($role['minimum'] ?? 1) * ($roleGapPriority > 0 ? 12 : 6));
             $siteFamiliarity = $siteId

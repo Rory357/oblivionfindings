@@ -99,6 +99,8 @@ jobs:
           PLAYWRIGHT_PORT: 4173
           QUEUE_CONNECTION: sync
           SESSION_DRIVER: file
+          FEATURE_ROSTERING_PUBLISH: true
+          FEATURE_ROSTERING_AUTO_SCHEDULE: true
           VISUAL_EMAIL: admin@demo.test
           VISUAL_PASSWORD: password
         run: npm run visual:test

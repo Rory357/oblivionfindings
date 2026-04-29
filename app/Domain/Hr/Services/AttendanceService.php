@@ -177,6 +177,7 @@ class AttendanceService
         return Shift::query()
             ->with('client:id,site_id')
             ->where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->where('starts_at', '<=', $clockInAt->copy()->addHours(self::AUTO_MATCH_GRACE_HOURS))
             ->where('ends_at', '>=', $clockInAt->copy()->subHours(self::AUTO_MATCH_GRACE_HOURS))

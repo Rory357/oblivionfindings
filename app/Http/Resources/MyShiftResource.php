@@ -81,7 +81,15 @@ class MyShiftResource extends JsonResource
             return 'returned-timesheet';
         }
 
-        if ($shift->is_missed) {
+        $startsAt = $shift->starts_at?->copy()->timezone($workerNow->getTimezone());
+        $endsAt = $shift->ends_at?->copy()->timezone($workerNow->getTimezone());
+
+        if (
+            $shift->status === 'scheduled'
+            && ! $shift->actual_starts_at
+            && $endsAt
+            && $workerNow->greaterThan($endsAt)
+        ) {
             return 'missed';
         }
 
@@ -89,21 +97,22 @@ class MyShiftResource extends JsonResource
             return 'completed';
         }
 
-        if ($shift->is_late) {
+        if (
+            $shift->status === 'scheduled'
+            && ! $shift->actual_starts_at
+            && $startsAt
+            && $workerNow->greaterThan($startsAt->copy()->addMinutes(5))
+        ) {
             return 'late';
         }
 
         if (in_array($shift->status, ['in_progress', 'active', 'clocked_in', 'started'], true)) {
-            $endsAt = $shift->ends_at?->copy()->timezone($workerNow->getTimezone());
-
             if ($endsAt && $workerNow->betweenIncluded($endsAt->copy()->subMinutes(30), $endsAt)) {
                 return 'ending-soon';
             }
 
             return 'active';
         }
-
-        $startsAt = $shift->starts_at?->copy()->timezone($workerNow->getTimezone());
 
         if ($startsAt && $workerNow->betweenIncluded($startsAt->copy()->subMinutes(30), $startsAt)) {
             return 'starting-soon';

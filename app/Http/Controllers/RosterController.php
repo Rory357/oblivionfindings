@@ -75,6 +75,7 @@ class RosterController extends Controller
     ): array {
         return Shift::query()
             ->where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
             ->whereBetween('starts_at', [$start->copy()->utc(), $end->copy()->utc()])
             ->with([
                 'client:id,first_name,last_name,profile_photo_path',
@@ -93,6 +94,7 @@ class RosterController extends Controller
     {
         return Shift::query()
             ->where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
             ->where(function ($query) use ($recentStart) {
                 $query->where('actual_ends_at', '>=', $recentStart->copy()->utc())
                     ->orWhere(function ($fallback) use ($recentStart) {

@@ -3,8 +3,10 @@
 namespace Database\Factories;
 
 use App\Models\Client;
+use App\Models\RosterPeriod;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
@@ -62,6 +64,30 @@ class ShiftFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'user_id' => null,
+        ]);
+    }
+
+    public function forSite(?Site $site = null): static
+    {
+        return $this->state(fn () => [
+            'site_id' => $site?->id ?? Site::factory(),
+        ]);
+    }
+
+    public function published(?RosterPeriod $period = null): static
+    {
+        return $this->state(fn () => [
+            'roster_period_id' => $period?->id,
+            'published_at' => now(),
+            'publish_dirty_at' => null,
+        ]);
+    }
+
+    public function unpublished(): static
+    {
+        return $this->state(fn () => [
+            'published_at' => null,
+            'publish_dirty_at' => null,
         ]);
     }
 

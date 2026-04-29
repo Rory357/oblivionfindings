@@ -3,7 +3,10 @@
 namespace App\Models;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Rostering\RosteringFeatureFlags;
+use App\Domain\Rostering\RosterPublishingService;
 use App\Models\Concerns\AuditableChanges;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -47,6 +50,8 @@ class Shift extends Model
         'actual_starts_at' => 'datetime',
         'actual_ends_at' => 'datetime',
         'handover_waived_at' => 'datetime',
+        'published_at' => 'datetime',
+        'publish_dirty_at' => 'datetime',
         'is_sleepover' => 'boolean',
         'is_on_call' => 'boolean',
         'expected_break_minutes' => 'integer',
@@ -101,6 +106,18 @@ class Shift extends Model
                 ]);
             }
         });
+
+        static::updating(function (self $shift): void {
+            app(RosterPublishingService::class)->markDirtyFromShiftUpdate($shift);
+        });
+
+        static::created(function (self $shift): void {
+            app(RosterPublishingService::class)->markDirtyFromShiftCreate($shift);
+        });
+
+        static::deleting(function (self $shift): void {
+            app(RosterPublishingService::class)->markDirtyFromShiftDelete($shift);
+        });
     }
 
     public function client()
@@ -111,6 +128,11 @@ class Shift extends Model
     public function site()
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function rosterPeriod()
+    {
+        return $this->belongsTo(RosterPeriod::class);
     }
 
     public function serviceContext()
@@ -161,6 +183,15 @@ class Shift extends Model
     public function approvedTimesheets()
     {
         return $this->timesheets()->where('status', 'approved');
+    }
+
+    public function scopeVisibleToFrontline(Builder $query, ?int $organizationId = null): Builder
+    {
+        if (app(RosteringFeatureFlags::class)->publishEnabled($organizationId)) {
+            $query->whereNotNull('published_at');
+        }
+
+        return $query;
     }
 
     public function formSubmissions()

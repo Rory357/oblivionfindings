@@ -49,7 +49,7 @@ class MyTasksController extends Controller
         $todayFormatted = $workerNow->format('l, j F Y');
 
         // 2. Shifts today + tomorrow
-        $shifts = $this->getShifts($userId, $today, $tomorrowEnd, $workerNow);
+        $shifts = $this->getShifts($user, $today, $tomorrowEnd, $workerNow);
 
         // 3. Medications due
         $clientIds = $shifts->pluck('client.id')->filter()->unique()->values()->all();
@@ -315,10 +315,11 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getShifts(int $userId, Carbon $today, Carbon $tomorrowEnd, Carbon $workerNow): \Illuminate\Support\Collection
+    private function getShifts(User $user, Carbon $today, Carbon $tomorrowEnd, Carbon $workerNow): \Illuminate\Support\Collection
     {
         try {
-            return Shift::where('user_id', $userId)
+            return Shift::where('user_id', $user->id)
+                ->visibleToFrontline($user->organization_id)
                 ->whereBetween('starts_at', [$today, $tomorrowEnd])
                 ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
                 ->orderBy('starts_at')
@@ -405,6 +406,7 @@ class MyTasksController extends Controller
         try {
             $shift = Shift::query()
                 ->where('user_id', $user->id)
+                ->visibleToFrontline($user->organization_id)
                 ->whereIn('status', ['scheduled', 'draft'])
                 ->where('starts_at', '<=', $workerNow->copy()->addHours(12)->utc())
                 ->where('ends_at', '>=', $workerNow->copy()->utc())
@@ -440,6 +442,7 @@ class MyTasksController extends Controller
         try {
             $shift = Shift::query()
                 ->where('user_id', $user->id)
+                ->visibleToFrontline($user->organization_id)
                 ->where(function ($query) use ($workerNow) {
                     $query->where('actual_ends_at', '>=', $workerNow->copy()->subHours(12)->utc())
                         ->orWhere(function ($fallback) use ($workerNow) {

@@ -12,6 +12,8 @@ use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
 use App\Services\Eligibility\Rules\HsTrainingRule;
 use App\Services\Eligibility\Rules\SiteAssignmentRule;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class ShiftStaffEligibilityService
 {
@@ -58,6 +60,43 @@ class ShiftStaffEligibilityService
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
 
         return EligibilityResult::fromChecks($checks);
+    }
+
+    /**
+     * Cheap pre-filter for batch suggestion runs. The full 11-rule evaluation
+     * still happens before a candidate is persisted or applied.
+     *
+     * @return Collection<int, User>
+     */
+    public function candidatesFor(Shift $shift): Collection
+    {
+        $shift->loadMissing('client:id,site_id');
+        $siteId = $shift->site_id ?: $shift->client?->site_id;
+
+        return User::staff()
+            ->when($shift->organization_id, fn ($query) => $query->where('organization_id', $shift->organization_id))
+            ->where(function (Builder $query) use ($siteId): void {
+                $query->whereDoesntHave('hrEmployeeProfile')
+                    ->orWhereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+                        $profileQuery->where('is_active', true);
+
+                        if ($siteId) {
+                            $profileQuery->where(function (Builder $siteQuery) use ($siteId): void {
+                                $siteQuery->where('primary_site_id', $siteId)
+                                    ->orWhereJsonContains('secondary_site_ids', (int) $siteId);
+                            });
+                        }
+                    });
+            })
+            ->whereDoesntHave('hrComplianceStatuses', function (Builder $query): void {
+                $query->whereIn('status', ['expired', 'not_started'])
+                    ->whereHas('requirement', function (Builder $requirementQuery): void {
+                        $requirementQuery->where('hard_stop', true)
+                            ->where('is_active', true);
+                    });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'organization_id']);
     }
 
     // ── Private rule methods (existing logic, reformatted as rule results) ──
