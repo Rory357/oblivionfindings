@@ -43,8 +43,11 @@ test.describe('operations rostering — suggestions flow', () => {
         ).toBeEnabled();
         await page.getByTestId('suggestions-apply-accepted').click();
 
+        // The success toast can render twice (Sonner shows the toast and the
+        // accessible live-region announcer mirrors it). Use `.first()` so the
+        // selector is non-strict.
         await expect(
-            page.getByText(/Applied \d+ accepted suggestions/i),
+            page.getByText(/Applied \d+ accepted suggestions/i).first(),
         ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);

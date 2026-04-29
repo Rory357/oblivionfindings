@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import { expect, test } from '@playwright/test';
 
@@ -9,21 +9,76 @@ import {
 } from './rostering-flags';
 
 type DashboardBaseline = {
-    dashboard_p95_ms: number;
+    dashboard_p95_ms: number | Record<string, number>;
 };
 
+const baselinePath = new URL(
+    './performance/rostering-dashboard-baseline.json',
+    import.meta.url,
+);
 const baseline = JSON.parse(
-    readFileSync(
-        new URL(
-            './performance/rostering-dashboard-baseline.json',
-            import.meta.url,
-        ),
-        'utf8',
-    ),
+    readFileSync(baselinePath, 'utf8'),
 ) as DashboardBaseline;
 const sampleCount = 5;
-const allowedP95Ms = baseline.dashboard_p95_ms * 1.1;
+const baselineEnv = process.env.PLAYWRIGHT_BASELINE_ENV ?? 'default';
+const selectedBaselineMs = selectDashboardBaselineMs(baseline, baselineEnv);
+const allowedP95Ms = selectedBaselineMs * 1.1;
 const testTimeoutMs = Math.ceil(allowedP95Ms * sampleCount + 30_000);
+const shouldUpdateBaseline =
+    process.env.PLAYWRIGHT_UPDATE_ROSTERING_BASELINE === 'true';
+
+/**
+ * `PLAYWRIGHT_BASELINE_ENV` selects the performance budget tier.
+ * Local php -S runs use `php_builtin` via playwright.config.ts; production-like
+ * CI can keep the stricter `default` tier. To recapture the selected tier, run
+ * this spec with `PLAYWRIGHT_UPDATE_ROSTERING_BASELINE=true`.
+ */
+function selectDashboardBaselineMs(
+    data: DashboardBaseline,
+    environment: string,
+): number {
+    if (typeof data.dashboard_p95_ms === 'number') {
+        return data.dashboard_p95_ms;
+    }
+
+    const selected =
+        data.dashboard_p95_ms[environment] ?? data.dashboard_p95_ms.default;
+
+    if (selected === undefined) {
+        throw new Error(
+            `No rostering dashboard baseline found for "${environment}" and no default baseline is configured.`,
+        );
+    }
+
+    return selected;
+}
+
+function writeDashboardBaselineMs(
+    data: DashboardBaseline,
+    environment: string,
+    measured: number,
+) {
+    const rounded = Math.ceil(measured);
+    const dashboardBaseline =
+        typeof data.dashboard_p95_ms === 'number'
+            ? { default: data.dashboard_p95_ms }
+            : data.dashboard_p95_ms;
+
+    writeFileSync(
+        baselinePath,
+        `${JSON.stringify(
+            {
+                ...data,
+                dashboard_p95_ms: {
+                    ...dashboardBaseline,
+                    [environment]: rounded,
+                },
+            },
+            null,
+            4,
+        )}\n`,
+    );
+}
 
 function p95(values: number[]) {
     const sorted = [...values].sort((a, b) => a - b);
@@ -54,6 +109,12 @@ test.describe('operations rostering performance budget', () => {
         }
 
         const measured = p95(durations);
+        if (shouldUpdateBaseline) {
+            writeDashboardBaselineMs(baseline, baselineEnv, measured);
+
+            return;
+        }
+
         expect(measured).toBeLessThanOrEqual(allowedP95Ms);
     });
 });

@@ -1,3 +1,6 @@
 {
-    "dashboard_p95_ms": 12000
+    "dashboard_p95_ms": {
+        "default": 12000,
+        "php_builtin": 20000
+    }
 }

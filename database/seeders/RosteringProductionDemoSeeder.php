@@ -2,7 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Hr\Models\HrComplianceRequirement;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
+use App\Models\HsTrainingRequirement;
 use App\Models\RosterPeriod;
 use App\Models\RosterTemplate;
 use App\Models\RosterTemplateShift;
@@ -125,9 +129,77 @@ class RosteringProductionDemoSeeder extends Seeder
     {
         $weekStart = Carbon::parse('2026-05-11', 'Pacific/Auckland')->startOfDay();
         $this->period($site, $weekStart, $manager);
+        $this->ensureSuggestionCandidateEligible($candidate, $site);
 
-        $this->shift(9201, $site, $client, $weekStart->copy()->setTime(10, 0), null, false);
-        $this->shift(9202, $site, $client, $weekStart->copy()->setTime(15, 0), $candidate, false);
+        $this->shift(9201, $site, $client, $weekStart->copy()->setTime(10, 0), null, false, ['caregiver']);
+        $this->shift(9202, $site, $client, $weekStart->copy()->addDay()->setTime(15, 0), $candidate, false);
+    }
+
+    private function ensureSuggestionCandidateEligible(User $candidate, Site $site): void
+    {
+        $this->ensureSiteProfile($candidate, $site);
+        $this->ensureCompliantStatuses($candidate, $site);
+
+        // The suggestion fixture only needs the legacy users.role value.
+        // Dropping RBAC pivots avoids unrelated live hard-stop checks seeded elsewhere.
+        $candidate->roles()->detach();
+    }
+
+    private function ensureSiteProfile(User $candidate, Site $site): void
+    {
+        HrEmployeeProfile::query()->updateOrCreate(
+            ['user_id' => $candidate->id],
+            [
+                'tenant_id' => 1,
+                'employee_number' => 'ROSTER-E2E-'.$candidate->id,
+                'work_email' => $candidate->email,
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'employment_type' => 'full_time',
+                'contract_type' => 'permanent',
+                'pay_frequency' => 'fortnightly',
+                'start_date' => now()->subYear()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+            ],
+        );
+    }
+
+    private function ensureCompliantStatuses(User $candidate, Site $site): void
+    {
+        $hsRequirementIds = HsTrainingRequirement::query()
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (HsTrainingRequirement $requirement) => $requirement->appliesTo($candidate->role, $site->id, null))
+            ->pluck('hr_compliance_requirement_id')
+            ->filter()
+            ->values();
+
+        $requirements = HrComplianceRequirement::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($candidate, $hsRequirementIds): void {
+                $query->whereHas('matrixEntries', fn ($matrixQuery) => $matrixQuery->where('role', $candidate->role))
+                    ->orWhereIn('id', $hsRequirementIds);
+            })
+            ->get();
+
+        foreach ($requirements as $requirement) {
+            HrStaffComplianceStatus::query()->updateOrCreate(
+                [
+                    'tenant_id' => $requirement->tenant_id,
+                    'user_id' => $candidate->id,
+                    'requirement_id' => $requirement->id,
+                ],
+                [
+                    'status' => 'compliant',
+                    'valid_from' => now()->subYear()->toDateString(),
+                    'expires_at' => now()->addYear()->toDateString(),
+                    'last_checked_at' => now(),
+                    'next_check_at' => now()->addMonth(),
+                ],
+            );
+        }
     }
 
     private function frontlineVisibilityFixture(Site $site, Client $client, User $worker, User $manager): void
@@ -201,6 +273,7 @@ class RosteringProductionDemoSeeder extends Seeder
         Carbon $startsAt,
         ?User $worker,
         bool $published,
+        array $coverageRoles = [],
     ): Shift {
         $shift = Shift::query()->find($id) ?? new Shift(['id' => $id]);
         $shift->forceFill([
@@ -215,6 +288,7 @@ class RosteringProductionDemoSeeder extends Seeder
             'location' => $site->name,
             'notes' => 'Rostering E2E fixture',
             'status' => 'scheduled',
+            'coverage_roles' => $coverageRoles,
             'created_by' => null,
             'published_at' => $published ? $startsAt->copy()->subDay()->utc() : null,
             'publish_dirty_at' => null,

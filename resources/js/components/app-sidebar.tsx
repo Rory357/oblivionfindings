@@ -2928,7 +2928,7 @@ export function AppSidebar({
                                                         <span className="block truncate text-sm font-medium text-sidebar-foreground">
                                                             {auth.user.name}
                                                         </span>
-                                                        <span className="block truncate text-xs text-sidebar-foreground/60">
+                                                        <span className="block truncate text-xs text-sidebar-foreground/80">
                                                             {auth.user.email}
                                                         </span>
                                                     </span>

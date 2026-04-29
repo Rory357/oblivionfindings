@@ -26,7 +26,10 @@ test.describe('frontline roster — published visibility', () => {
 
         await loginAs(page, 'roster-e2e-frontline@demo.test', 'password');
         await gotoMyRoster(page);
-        await expect(page.getByText(/Rostering Frontline/i)).toBeHidden();
+        const publishedShift = page.getByRole('button', {
+            name: /Rostering Frontline - Rostering E2E Frontline House/i,
+        });
+        await expect(publishedShift).toBeHidden();
 
         await page.context().clearCookies();
         await loginAsStaff(page);
@@ -39,7 +42,7 @@ test.describe('frontline roster — published visibility', () => {
         await page.context().clearCookies();
         await loginAs(page, 'roster-e2e-frontline@demo.test', 'password');
         await gotoMyRoster(page);
-        await expect(page.getByText(/Rostering Frontline/i)).toBeVisible();
+        await expect(publishedShift).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });

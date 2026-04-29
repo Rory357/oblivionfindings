@@ -2,7 +2,7 @@ import '../css/app.css';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createElement, StrictMode } from 'react';
+import { createElement, StrictMode, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import FlashToaster from './components/flash-toaster';
@@ -50,7 +50,15 @@ createInertiaApp({
                             <OfflineStatusBanner />
                             {renderInertiaPage(Component, pageProps, key)}
                             <FlashToaster />
-                            <Toaster richColors position="top-right" />
+                            <Toaster
+                                richColors
+                                position="top-right"
+                                style={
+                                    {
+                                        '--success-text': 'hsl(140, 100%, 24%)',
+                                    } as CSSProperties
+                                }
+                            />
                         </>
                     )}
                 </App>

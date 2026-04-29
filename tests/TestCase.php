@@ -212,25 +212,125 @@ abstract class TestCase extends BaseTestCase
             return false;
         }
 
+        // Preferred path: shell out to the `mysql` client binary. Fast and
+        // handles delimiters, comments, and binary data robustly.
         $mysqlBinary = $this->resolveMysqlBinary();
-        if ($mysqlBinary === null) {
+        if ($mysqlBinary !== null) {
+            $process = new Process([
+                $mysqlBinary,
+                sprintf('--host=%s', $host),
+                sprintf('--port=%s', $port),
+                sprintf('--user=%s', $username),
+                sprintf('--password=%s', $password),
+                $database,
+            ]);
+
+            $process->setInput(file_get_contents($schemaPath));
+            $process->setTimeout(300);
+            $process->run();
+
+            if ($process->isSuccessful()) {
+                return true;
+            }
+        }
+
+        // Fallback path: pure-PHP PDO loader. Slightly slower but works on
+        // machines that don't ship the `mysql.exe` client (e.g. Herd on
+        // Windows). The dump produced by `php artisan rostering:dump-schema-portable`
+        // is intentionally compatible: only `--` line comments, `/*! ... */`
+        // version-conditional pragmas, and `;`-terminated statements.
+        return $this->loadSchemaDumpViaPdo($schemaPath, $host, $port, $username, $password, $database);
+    }
+
+    /**
+     * Stream-execute a `*-schema.sql` dump via PDO. Splits on `;` at end of
+     * line (after stripping `--` comments and blank lines). Skips DELIMITER
+     * directives because the portable dumper does not emit them.
+     */
+    protected function loadSchemaDumpViaPdo(
+        string $schemaPath,
+        string $host,
+        string $port,
+        string $username,
+        string $password,
+        string $database,
+    ): bool {
+        try {
+            $pdo = new PDO(
+                sprintf('mysql:host=%s;port=%s;dbname=%s', $host, $port, $database),
+                $username,
+                $password,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+            );
+        } catch (\Throwable) {
             return false;
         }
 
-        $process = new Process([
-            $mysqlBinary,
-            sprintf('--host=%s', $host),
-            sprintf('--port=%s', $port),
-            sprintf('--user=%s', $username),
-            sprintf('--password=%s', $password),
-            $database,
-        ]);
+        $handle = fopen($schemaPath, 'r');
+        if ($handle === false) {
+            return false;
+        }
 
-        $process->setInput(file_get_contents($schemaPath));
-        $process->setTimeout(300);
-        $process->run();
+        $buffer = '';
+        $insideMultiLineComment = false;
 
-        return $process->isSuccessful();
+        try {
+            while (($line = fgets($handle)) !== false) {
+                $trimmed = ltrim($line);
+
+                // Skip blank lines and `--` comments before any statement starts.
+                if ($buffer === '' && ($trimmed === '' || $trimmed === "\n" || str_starts_with($trimmed, '--'))) {
+                    continue;
+                }
+
+                // Skip /*!...*/ that span multiple lines (rare in our dumps).
+                if ($insideMultiLineComment) {
+                    if (str_contains($line, '*/')) {
+                        $insideMultiLineComment = false;
+                    }
+
+                    continue;
+                }
+
+                if ($buffer === '' && str_starts_with($trimmed, '/*') && ! str_contains($line, '*/')) {
+                    $insideMultiLineComment = true;
+
+                    continue;
+                }
+
+                $buffer .= $line;
+
+                // A statement ends with `;` at the end of a line (ignoring trailing whitespace).
+                if (preg_match('/;\s*$/', rtrim($line))) {
+                    $statement = trim($buffer);
+                    $buffer = '';
+
+                    if ($statement === '' || $statement === ';') {
+                        continue;
+                    }
+
+                    try {
+                        $pdo->exec($statement);
+                    } catch (\PDOException) {
+                        return false;
+                    }
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        // Flush a trailing statement without a final newline.
+        $remaining = trim($buffer);
+        if ($remaining !== '' && $remaining !== ';') {
+            try {
+                $pdo->exec($remaining);
+            } catch (\PDOException) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function resolveMysqlBinary(): ?string

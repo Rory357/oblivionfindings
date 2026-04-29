@@ -1293,7 +1293,7 @@ export default function RosteringIndex(props: Props) {
                                         })
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label="Filter staff">
                                         <SelectValue placeholder="All staff" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1324,7 +1324,7 @@ export default function RosteringIndex(props: Props) {
                                         })
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label="Filter sites">
                                         <SelectValue placeholder="All sites" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1355,7 +1355,9 @@ export default function RosteringIndex(props: Props) {
                                         })
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger
+                                        aria-label={`Filter ${clientPlural.toLowerCase()}`}
+                                    >
                                         <SelectValue
                                             placeholder={`All ${clientPlural.toLowerCase()}`}
                                         />
@@ -1631,7 +1633,10 @@ export default function RosteringIndex(props: Props) {
                                                                                                 )
                                                                                             }
                                                                                         >
-                                                                                            <SelectTrigger className="w-[220px]">
+                                                                                            <SelectTrigger
+                                                                                                aria-label={`Assign staff for ${sh.client ?? 'open shift'}`}
+                                                                                                className="w-[220px]"
+                                                                                            >
                                                                                                 <SelectValue placeholder="Assign staff" />
                                                                                             </SelectTrigger>
                                                                                             <SelectContent>

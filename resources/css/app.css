@@ -139,7 +139,7 @@
     --chart-5: var(--color-purple-300);
     --radius: 0.75rem;
     --sidebar: oklch(0.97 0.005 277);
-    --sidebar-foreground: oklch(0.40 0.020 277);
+    --sidebar-foreground: oklch(0.32 0.020 277);
     --sidebar-primary: var(--color-purple-500);
     --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: oklch(0.93 0.015 277);
@@ -151,7 +151,7 @@
     --status-success: oklch(60% 0.15 150);
     --status-success-bg: oklch(94% 0.05 150);
     --status-success-foreground: oklch(28% 0.10 150);
-    --status-warning: oklch(66% 0.15 85);
+    --status-warning: oklch(52% 0.13 85);
     --status-warning-bg: oklch(95% 0.06 85);
     --status-warning-foreground: oklch(35% 0.12 85);
     --status-critical: oklch(55% 0.22 25);
