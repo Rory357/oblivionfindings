@@ -656,6 +656,7 @@ export default function MyDay({
                                 );
 
                                 return (
+                                    // eslint-disable-next-line no-restricted-syntax -- Shift card composes a primary Link + secondary Care Button, not a plain Card panel.
                                     <div
                                         key={shift.id}
                                         data-test="my-day-shift-card"
@@ -1152,6 +1153,7 @@ export default function MyDay({
                                         );
 
                                         return (
+                                            // eslint-disable-next-line no-restricted-syntax -- Shift card composes a primary Link + secondary Care Button, not a plain Card panel.
                                             <div
                                                 key={shift.id}
                                                 data-test="my-day-shift-card"
