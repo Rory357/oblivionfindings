@@ -1,3 +1,6 @@
+import ClientSafetyRibbon, {
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
 import ShiftClinicalEventCard from '@/components/clinical/shift-clinical-event-card';
 import ShiftObservationsDueCard from '@/components/clinical/shift-observations-due-card';
 import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
@@ -46,6 +49,7 @@ import {
     FileText,
     Handshake,
     MapPin,
+    Shield,
     User,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -323,6 +327,10 @@ type Props = {
             window_label: string;
         }>;
     } | null;
+    client_safety: ClientSafety | null;
+    links: {
+        client_care: string | null;
+    };
     can: {
         add_note: boolean;
         create_incident: boolean;
@@ -432,6 +440,8 @@ export default function ShiftShow({
     replacementRequest,
     assignmentCandidates = [],
     coverage = null,
+    client_safety,
+    links,
     can,
 }: Props) {
     const { auth } = usePage().props as any;
@@ -730,11 +740,24 @@ export default function ShiftShow({
                         { label: 'Notes', value: notes.length },
                     ]}
                     actions={
-                        <ShiftStatusBadge
-                            status={shift.status}
-                            showIcon
-                            className="border-white/30 bg-white/10 text-white"
-                        />
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            {links.client_care ? (
+                                <Button asChild size="sm" variant="secondary">
+                                    <Link
+                                        href={links.client_care}
+                                        className="gap-1.5"
+                                    >
+                                        <Shield className="h-4 w-4" />
+                                        Open client care view
+                                    </Link>
+                                </Button>
+                            ) : null}
+                            <ShiftStatusBadge
+                                status={shift.status}
+                                showIcon
+                                className="border-white/30 bg-white/10 text-white"
+                            />
+                        </div>
                     }
                 >
                     <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/70">
@@ -808,6 +831,8 @@ export default function ShiftShow({
                         ) : null}
                     </div>
                 </FleetHero>
+
+                <ClientSafetyRibbon safety={client_safety} />
 
                 {/* Workflow guidance */}
                 {shift.status === 'in_progress' ? (

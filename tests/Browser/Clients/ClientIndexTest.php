@@ -8,7 +8,7 @@ test('authenticated user can view clients index page', function () {
 
     $this->browse(function (Browser $browser) use ($user) {
         $browser->loginAs($user)
-            ->visit('/clients')
+            ->visit('/operations/clients')
             ->pause(1000)
             ->assertPathBeginsWith('/operations/clients')
             ->assertSee('Client');
@@ -20,7 +20,7 @@ test('clients page has create button or link', function () {
 
     $this->browse(function (Browser $browser) use ($user) {
         $browser->loginAs($user)
-            ->visit('/clients')
+            ->visit('/operations/clients')
             ->pause(1000)
             ->assertPathBeginsWith('/operations/clients')
             ->assertSee('Client');
@@ -30,7 +30,7 @@ test('clients page has create button or link', function () {
 test('guest is redirected from clients page', function () {
     $this->browse(function (Browser $browser) {
         $browser->logout()
-            ->visit('/clients')
+            ->visit('/operations/clients')
             ->pause(500)
             ->assertPathBeginsWith('/login');
     });

@@ -10,10 +10,10 @@ test('authenticated user can view a client profile', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id)
-            ->waitForLocation('/clients/' . $client->id)
+            ->visit('/operations/clients/' . $client->id)
+            ->waitForLocation('/operations/clients/' . $client->id)
             ->pause(500)
-            ->assertPathBeginsWith('/clients/')
+            ->assertPathBeginsWith('/operations/clients/')
             ->assertSee('Client');
     });
 });
@@ -24,8 +24,8 @@ test('client profile shows client information', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id)
-            ->waitForLocation('/clients/' . $client->id)
+            ->visit('/operations/clients/' . $client->id)
+            ->waitForLocation('/operations/clients/' . $client->id)
             ->pause(500)
             ->assertSee($client->first_name ?? $client->name ?? 'Client');
     });

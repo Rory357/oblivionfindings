@@ -409,6 +409,7 @@ class EnhancedMarService
             return [
                 'success' => false,
                 'error' => $safetyCheck['block_reason'],
+                'error_field' => 'client_medication_id',
                 'safety_check' => $safetyCheck,
             ];
         }
@@ -430,6 +431,7 @@ class EnhancedMarService
                 return [
                     'success' => false,
                     'error' => 'Outside time window: ' . $windowCheck['message'] . '. Please provide a reason.',
+                    'error_field' => 'reason',
                     'time_window' => $windowCheck,
                 ];
             }

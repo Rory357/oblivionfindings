@@ -59,38 +59,13 @@ class ShiftSiteIsolationTest extends TestCase
         ]);
     }
 
-    public function test_user_sees_only_shifts_from_accessible_sites(): void
+    public function test_frontline_shift_index_redirects_to_my_day(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
 
-        $visibleShift = Shift::factory()->create([
-            'client_id' => $this->clientA->id,
-            'site_id' => $this->siteA->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => $user->id,
-            'starts_at' => now()->copy()->setTime(9, 0),
-            'ends_at' => now()->copy()->setTime(13, 0),
-            'status' => 'scheduled',
-        ]);
-
-        Shift::factory()->create([
-            'client_id' => $this->clientB->id,
-            'site_id' => $this->siteB->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => $user->id,
-            'starts_at' => now()->copy()->setTime(14, 0),
-            'ends_at' => now()->copy()->setTime(18, 0),
-            'status' => 'scheduled',
-        ]);
-
-        $response = $this->actingAs($user)
-            ->get('/operations/shifts?from=2026-04-06&to=2026-04-06');
-
-        $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('operations/shifts/index')
-            ->has('shifts.data', 1)
-            ->where('shifts.data.0.id', $visibleShift->id)
-        );
+        $this->actingAs($user)
+            ->get('/operations/shifts?from=2026-04-06&to=2026-04-06')
+            ->assertRedirect(route('my-day'));
     }
 
     public function test_user_cannot_access_shift_from_another_site(): void
@@ -194,7 +169,7 @@ class ShiftSiteIsolationTest extends TestCase
         ]);
 
         $this->actingAs($approver)
-            ->post("/timesheets/{$timesheet->id}/approve")
+            ->post(route('operations.timesheets.approve', $timesheet))
             ->assertForbidden();
     }
 

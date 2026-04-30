@@ -99,6 +99,7 @@ type Props = {
         record_prn: boolean;
         view_medical: boolean;
         view_risks: boolean;
+        view_followups: boolean;
     };
     links: {
         full_profile: string;
@@ -202,7 +203,10 @@ export default function ClientCare({
         >
             <Head title={`${displayName} \u00b7 Care`} />
 
-            <div className="mx-auto w-full max-w-3xl space-y-4">
+            <div
+                className="mx-auto w-full max-w-3xl space-y-4"
+                data-test="client-care-page"
+            >
                 {/* ── Identity card ─────────────────────────────────────── */}
                 {/* eslint-disable-next-line no-restricted-syntax -- Compact client identity strip has custom avatar/status layout. */}
                 <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
@@ -232,7 +236,7 @@ export default function ClientCare({
                             {hasActiveShift ? (
                                 <>
                                     <span aria-hidden>·</span>
-                                    <span className="inline-flex items-center gap-1 text-status-success dark:text-status-success">
+                                    <span className="inline-flex items-center gap-1 text-status-success-foreground dark:text-status-success-foreground">
                                         <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                         On shift
                                     </span>
@@ -249,6 +253,7 @@ export default function ClientCare({
                 <Button
                     type="button"
                     variant="outline"
+                    data-test="client-care-prn-button"
                     onClick={() => setPrnOpen(true)}
                     disabled={prnDisabled}
                     aria-label={`Give as-needed med to ${fullName}`}
@@ -478,18 +483,20 @@ export default function ClientCare({
                 {/* Intentionally lightweight and empty by default. A later PR
                     will populate this from an effect-check follow-up queue
                     without restructuring the page. */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <ListTodo className="h-4 w-4" />
-                            Follow-up needed
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground">
-                        Nothing pending. As-needed med effect checks and witness
-                        follow-ups will appear here.
-                    </CardContent>
-                </Card>
+                {can.view_followups && (
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <ListTodo className="h-4 w-4" />
+                                Follow-up needed
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0 text-sm text-muted-foreground">
+                            Nothing pending. As-needed med effect checks and
+                            witness follow-ups will appear here.
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* ── Deep links into admin surfaces ────────────────────── */}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

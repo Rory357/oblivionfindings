@@ -656,27 +656,51 @@ export default function MyDay({
                                 );
 
                                 return (
-                                    <Link
+                                    <div
                                         key={shift.id}
-                                        href={`/my-roster#shift-${shift.id}`}
-                                        className="frontline-focus min-w-52 rounded-lg border bg-card p-3"
+                                        data-test="my-day-shift-card"
+                                        className="min-w-52 rounded-lg border bg-card p-3"
                                     >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-sm font-medium">
-                                                {formatTime(shift.starts_at)}
-                                            </span>
-                                            {state ? (
-                                                <StaffStatus
-                                                    kind="shift"
-                                                    state={state}
-                                                    size="sm"
-                                                />
-                                            ) : null}
-                                        </div>
-                                        <div className="mt-1 truncate text-sm text-muted-foreground">
-                                            {shift.client.name}
-                                        </div>
-                                    </Link>
+                                        <Link
+                                            href={`/my-roster#shift-${shift.id}`}
+                                            data-test="my-day-shift-primary-link"
+                                            className="frontline-focus block rounded-md"
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-sm font-medium">
+                                                    {formatTime(
+                                                        shift.starts_at,
+                                                    )}
+                                                </span>
+                                                {state ? (
+                                                    <StaffStatus
+                                                        kind="shift"
+                                                        state={state}
+                                                        size="sm"
+                                                    />
+                                                ) : null}
+                                            </div>
+                                            <div className="mt-1 truncate text-sm text-muted-foreground">
+                                                {shift.client.name}
+                                            </div>
+                                        </Link>
+                                        {shift.client?.id ? (
+                                            <Button
+                                                asChild
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-3 h-9 w-full justify-center gap-1.5"
+                                            >
+                                                <Link
+                                                    href={`/operations/clients/${shift.client.id}/care`}
+                                                    data-test="my-day-shift-care-action"
+                                                >
+                                                    <Shield className="h-4 w-4" />
+                                                    Care
+                                                </Link>
+                                            </Button>
+                                        ) : null}
+                                    </div>
                                 );
                             })}
                         </div>
@@ -1128,29 +1152,51 @@ export default function MyDay({
                                         );
 
                                         return (
-                                            <Link
+                                            <div
                                                 key={shift.id}
-                                                href={`/my-roster#shift-${shift.id}`}
-                                                className="frontline-focus block rounded-lg border bg-card p-3"
+                                                data-test="my-day-shift-card"
+                                                className="rounded-lg border bg-card p-3"
                                             >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-sm font-medium">
-                                                        {formatTime(
-                                                            shift.starts_at,
-                                                        )}
-                                                    </span>
-                                                    {state ? (
-                                                        <StaffStatus
-                                                            kind="shift"
-                                                            state={state}
-                                                            size="sm"
-                                                        />
-                                                    ) : null}
-                                                </div>
-                                                <div className="mt-1 truncate text-sm text-muted-foreground">
-                                                    {shift.client.name}
-                                                </div>
-                                            </Link>
+                                                <Link
+                                                    href={`/my-roster#shift-${shift.id}`}
+                                                    data-test="my-day-shift-primary-link"
+                                                    className="frontline-focus block rounded-md"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-medium">
+                                                            {formatTime(
+                                                                shift.starts_at,
+                                                            )}
+                                                        </span>
+                                                        {state ? (
+                                                            <StaffStatus
+                                                                kind="shift"
+                                                                state={state}
+                                                                size="sm"
+                                                            />
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="mt-1 truncate text-sm text-muted-foreground">
+                                                        {shift.client.name}
+                                                    </div>
+                                                </Link>
+                                                {shift.client?.id ? (
+                                                    <Button
+                                                        asChild
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="mt-3 h-9 w-full justify-center gap-1.5"
+                                                    >
+                                                        <Link
+                                                            href={`/operations/clients/${shift.client.id}/care`}
+                                                            data-test="my-day-shift-care-action"
+                                                        >
+                                                            <Shield className="h-4 w-4" />
+                                                            Care
+                                                        </Link>
+                                                    </Button>
+                                                ) : null}
+                                            </div>
                                         );
                                     })}
                                 </div>

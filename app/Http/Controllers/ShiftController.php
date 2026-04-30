@@ -32,6 +32,7 @@ use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
 use App\Services\UserSiteAccessService;
+use App\Support\ClientSafetyPayload;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -172,7 +173,9 @@ class ShiftController extends Controller
         $this->assertCanAccessShift($auth, $shift);
 
         $shift->load([
-            'client:id,first_name,last_name,site_id',
+            'client:id,first_name,last_name,site_id,risk_level,safeguarding_flag',
+            'client.medicalProfile',
+            'client.risks',
             'staff:id,name,email',
             'site:id,name,type',
             'tasks',
@@ -375,6 +378,10 @@ class ShiftController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
             ])->values(),
+            'client_safety' => $shift->client ? ClientSafetyPayload::forClient($shift->client) : null,
+            'links' => [
+                'client_care' => $shift->client ? route('operations.clients.care', $shift->client) : null,
+            ],
             'transports' => $transports->map(fn (FleetResidentTransport $transport) => [
                 'id' => $transport->id,
                 'status' => $transport->status,

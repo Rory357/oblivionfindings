@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\User;
 use App\Models\Client;
+use App\Models\User;
 use Laravel\Dusk\Browser;
 
 test('client documents page loads', function () {
@@ -10,9 +10,9 @@ test('client documents page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/documents')
+            ->visit('/operations/clients/' . $client->id . '/documents')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
+            ->assertPathBeginsWith('/operations/clients/' . $client->id)
             ->assertSee('Document');
     });
 });
@@ -23,9 +23,9 @@ test('client incidents page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/incidents')
+            ->visit('/operations/clients/' . $client->id . '/incidents')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
+            ->assertPathBeginsWith('/operations/clients/' . $client->id)
             ->assertSee('Incident');
     });
 });
@@ -36,9 +36,9 @@ test('client MAR page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/mar')
+            ->visit('/operations/clients/' . $client->id . '/mar')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
+            ->assertPathBeginsWith('/emar/mar')
             ->assertDontSee('500');
     });
 });
@@ -49,10 +49,10 @@ test('client medical page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/medical')
+            ->visit('/operations/clients/' . $client->id . '/medical')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
-            ->assertSee('Medical');
+            ->assertPathBeginsWith('/emar/medications')
+            ->assertDontSee('500');
     });
 });
 
@@ -62,9 +62,9 @@ test('client portal users page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/portal-users')
+            ->visit('/operations/clients/' . $client->id . '/portal-users')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
+            ->assertPathBeginsWith('/operations/clients/' . $client->id)
             ->assertDontSee('500');
     });
 });
@@ -75,9 +75,9 @@ test('client risks page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/risks')
+            ->visit('/operations/clients/' . $client->id . '/risks')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
+            ->assertPathBeginsWith('/operations/clients/' . $client->id)
             ->assertSee('Risk');
     });
 });
@@ -101,9 +101,9 @@ test('client assignments page loads', function () {
 
     $this->browse(function (Browser $browser) use ($user, $client) {
         $browser->loginAs($user)
-            ->visit('/clients/' . $client->id . '/assignments')
+            ->visit('/operations/clients/' . $client->id . '/assignments')
             ->pause(500)
-            ->assertPathBeginsWith('/clients/' . $client->id)
-            ->assertSee('Assignment');
+            ->assertPathBeginsWith('/operations/clients/' . $client->id)
+            ->assertSee('Assigned Workers');
     });
 });

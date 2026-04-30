@@ -30,6 +30,10 @@ use Inertia\Response;
  */
 class ClientCareController extends Controller
 {
+    private const ACTIVE_SHIFT_GRACE_MINUTES = 240;
+
+    private const ACTIVE_SHIFT_FALLBACK_HOURS = 16;
+
     public function __construct(
         protected EnhancedMarService $marService,
     ) {
@@ -115,6 +119,7 @@ class ClientCareController extends Controller
                     || $user?->canDo('clients.update')),
                 'view_medical' => $user?->can('viewMedications', $client) ?? false,
                 'view_risks' => true,
+                'view_followups' => (bool) ($user?->canDo('clients.update')),
             ],
             'links' => [
                 'full_profile' => route('operations.clients.show', $client),
@@ -143,6 +148,8 @@ class ClientCareController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
+        // Keep this clients.update fallback aligned with WorkerMedsController:
+        // managers who maintain client records can record PRNs from care context.
         abort_unless(
             $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
             403,
@@ -205,8 +212,10 @@ class ClientCareController extends Controller
         );
 
         if (! ($result['success'] ?? false)) {
+            $errorField = $this->prnErrorField($result['error_field'] ?? null);
+
             return back()->withErrors([
-                'reason' => $result['error'] ?? 'Could not record this PRN dose.',
+                $errorField => $result['error'] ?? 'Could not record this PRN dose.',
             ]);
         }
 
@@ -276,16 +285,71 @@ class ClientCareController extends Controller
         }
 
         try {
-            return Shift::query()
+            $graceMinutes = max(0, (int) config(
+                'operations.client_care.active_shift_grace_minutes',
+                self::ACTIVE_SHIFT_GRACE_MINUTES,
+            ));
+            $fallbackHours = max(1, (int) config(
+                'operations.client_care.active_shift_fallback_hours',
+                self::ACTIVE_SHIFT_FALLBACK_HOURS,
+            ));
+            $now = now();
+
+            $openShifts = Shift::query()
                 ->where('user_id', $userId)
                 ->where('client_id', $clientId)
                 ->whereNotNull('actual_starts_at')
                 ->whereNull('actual_ends_at')
                 ->latest('actual_starts_at')
-                ->first();
+                ->limit(10)
+                ->get();
         } catch (\Throwable) {
             return null;
         }
+
+        return $openShifts->first(fn (Shift $shift) => $this->shiftIsInsideActiveCareWindow(
+            $shift,
+            $now,
+            $graceMinutes,
+            $fallbackHours,
+        ));
+    }
+
+    private function shiftIsInsideActiveCareWindow(
+        Shift $shift,
+        Carbon $now,
+        int $graceMinutes,
+        int $fallbackHours,
+    ): bool {
+        $actualStart = $shift->actual_starts_at;
+        if (! $actualStart) {
+            return false;
+        }
+
+        $windowStart = ($shift->starts_at ?? $actualStart)->copy()->subMinutes($graceMinutes);
+        $scheduledWindowEnd = $shift->ends_at?->copy()->addMinutes($graceMinutes);
+        $fallbackWindowEnd = $actualStart->copy()->addHours($fallbackHours)->addMinutes($graceMinutes);
+
+        $insideScheduledWindow = $scheduledWindowEnd
+            ? $now->betweenIncluded($windowStart, $scheduledWindowEnd)
+            : false;
+        $insideBoundedOpenWindow = $now->betweenIncluded(
+            $actualStart->copy()->subMinutes($graceMinutes),
+            $fallbackWindowEnd,
+        );
+
+        return $actualStart->lte($now->copy()->addMinutes($graceMinutes))
+            && ($insideScheduledWindow || $insideBoundedOpenWindow);
+    }
+
+    private function prnErrorField(mixed $field): string
+    {
+        return in_array($field, [
+            'client_medication_id',
+            'reason',
+            'dose_given',
+            'notes',
+        ], true) ? $field : 'client_medication_id';
     }
 
     private function severityRank(?string $severity): int

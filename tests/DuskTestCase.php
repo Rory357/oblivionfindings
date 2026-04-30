@@ -29,7 +29,14 @@ abstract class DuskTestCase extends BaseTestCase
         parent::setUp();
 
         if (! static::$seeded) {
-            $this->artisan('migrate:fresh', ['--seed' => true, '--seeder' => 'DuskDatabaseSeeder']);
+            if (! filter_var(env('DUSK_SKIP_DB_RESET', false), FILTER_VALIDATE_BOOLEAN)) {
+                $this->artisan('migrate:fresh', [
+                    '--schema-path' => database_path('schema/__skip-dusk-schema-load.sql'),
+                    '--seed' => true,
+                    '--seeder' => 'DuskDatabaseSeeder',
+                ]);
+            }
+
             static::$seeded = true;
         }
     }

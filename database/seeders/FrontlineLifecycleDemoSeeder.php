@@ -10,6 +10,7 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\ClientRisk;
 use App\Models\MedicationRound;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -506,6 +507,19 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         ClientControlledDrugEntry::query()
             ->whereIn('client_medication_id', $medications->pluck('id')->all())
             ->delete();
+
+        ClientRisk::updateOrCreate(
+            [
+                'client_id' => $client->id,
+                'label' => 'PW Meds active mobility risk',
+            ],
+            [
+                'severity' => 'high',
+                'controls' => 'Use two-person support for transfers.',
+                'review_date' => now()->addMonth()->toDateString(),
+                'active' => true,
+            ],
+        );
 
         $controlledPrn = $medications->firstWhere('name', 'PW Meds Controlled PRN');
         if ($controlledPrn) {
