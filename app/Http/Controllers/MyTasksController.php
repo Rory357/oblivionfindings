@@ -13,6 +13,7 @@ use App\Models\IncidentFollowup;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\ShiftOpenPosition;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
@@ -67,6 +68,8 @@ class MyTasksController extends Controller
         // 7. Leave
         $leave = $this->getLeave($userId, $workerNow);
 
+        $pendingClaimsCount = $this->getPendingClaimsCount($user);
+
         // 8. Stats
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
         $stats = [
@@ -110,6 +113,7 @@ class MyTasksController extends Controller
             'tasks' => $tasks,
             'stats' => $stats,
             'leave' => $leave,
+            'pending_claims_count' => $pendingClaimsCount,
             'is_manager' => $isManager,
             'manager_data' => $managerData,
             'clock' => $clock,
@@ -887,6 +891,19 @@ class MyTasksController extends Controller
                 ->all();
         } catch (\Throwable) {
             return [];
+        }
+    }
+
+    private function getPendingClaimsCount(User $user): int
+    {
+        try {
+            return ShiftOpenPosition::query()
+                ->when($user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+                ->where('claimed_by', $user->id)
+                ->where('status', 'claimed')
+                ->count();
+        } catch (\Throwable) {
+            return 0;
         }
     }
 

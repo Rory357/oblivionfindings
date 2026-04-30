@@ -7,10 +7,11 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
-use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Notifications\AppEventNotification;
 use App\Services\ShiftReplacementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -70,6 +71,8 @@ class ShiftReplacementServiceTest extends TestCase
 
     public function test_claim_and_approve_replacement_flow_updates_request_and_cancels_other_positions(): void
     {
+        Notification::fake();
+
         $replacement = $this->service->request($this->shift, $this->currentStaff, [
             'reason' => 'Unavailable for shift',
             'publish_to_job_board' => true,
@@ -93,6 +96,9 @@ class ShiftReplacementServiceTest extends TestCase
         $replacement->refresh();
         $this->assertSame(ShiftReplacementService::CLAIMED, $replacement->status);
         $this->assertSame($this->replacementStaff->id, $replacement->replacement_user_id);
+        Notification::assertSentTo($this->currentStaff, AppEventNotification::class, function (AppEventNotification $notification) {
+            return $notification->payload['title'] === 'Shift replacement claim submitted';
+        });
 
         $this->service->approveFromOpenPosition($primaryPosition->fresh(['replacementRequest', 'claimer']), $this->manager);
 
@@ -106,6 +112,8 @@ class ShiftReplacementServiceTest extends TestCase
 
     public function test_cancel_replacement_updates_active_request_and_open_position(): void
     {
+        Notification::fake();
+
         $replacement = $this->service->request($this->shift, $this->currentStaff, [
             'reason' => 'Unavailable for shift',
             'publish_to_job_board' => true,
@@ -115,6 +123,9 @@ class ShiftReplacementServiceTest extends TestCase
 
         $this->assertSame(ShiftReplacementService::CANCELLED, $cancelled->status);
         $this->assertSame('cancelled', $cancelled->openPosition?->status);
+        Notification::assertSentTo($this->currentStaff, AppEventNotification::class, function (AppEventNotification $notification) {
+            return $notification->payload['title'] === 'Shift replacement cancelled';
+        });
     }
 
     public function test_manual_assignment_resolves_replacement_and_fills_open_position(): void

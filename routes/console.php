@@ -18,19 +18,19 @@ use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Jobs\AutoEscalateControlRoomQueues;
-use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\ChecklistDueJob;
 use App\Jobs\DetectFleetOfflineDevices;
+use App\Jobs\EnforceDataRetentionJob;
+use App\Jobs\EscalateUnresolvedEligibilityJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
-use App\Jobs\SendEventReminderJob;
-use App\Jobs\EscalateUnresolvedEligibilityJob;
 use App\Jobs\RecalculateFutureShiftEligibility;
 use App\Jobs\ReconcileTimesheetsJob;
+use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
@@ -355,6 +355,12 @@ app(Schedule::class)
     ->command('shifts:detect-orphans')
     ->timezone('Pacific/Auckland')
     ->dailyAt('06:00');
+
+app(Schedule::class)
+    ->command('shifts:expire-positions')
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
 
 // Rostering maintenance: expire stale suggestions and archive completed published periods
 app(Schedule::class)

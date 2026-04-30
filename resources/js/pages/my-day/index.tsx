@@ -222,6 +222,7 @@ interface Props {
         cr_alerts: number;
         notifications_unread: number;
     };
+    pending_claims_count: number;
     leave: {
         balances: Array<{
             type: string;
@@ -327,6 +328,7 @@ export default function MyDay({
     incidents,
     tasks,
     stats,
+    pending_claims_count,
     leave,
     is_manager,
     manager_data,
@@ -679,6 +681,24 @@ export default function MyDay({
                             })}
                         </div>
                     </section>
+                )}
+
+                {pending_claims_count > 0 && (
+                    <Link
+                        href="/operations/job-board?scope=mine"
+                        data-test="pending-claims-link"
+                        className="frontline-focus flex items-center justify-between gap-3 rounded-lg border bg-card p-3 text-sm hover:bg-accent lg:hidden"
+                    >
+                        <div className="min-w-0">
+                            <div className="font-semibold">
+                                Pending claims ({pending_claims_count})
+                            </div>
+                            <div className="mt-0.5 truncate text-muted-foreground">
+                                Awaiting manager approval
+                            </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
                 )}
 
                 {/* ── Trimmed KPI strip (3 items only) ───────────────────── */}
@@ -1135,6 +1155,24 @@ export default function MyDay({
                                     })}
                                 </div>
                             </section>
+                        )}
+
+                        {pending_claims_count > 0 && (
+                            <Link
+                                href="/operations/job-board?scope=mine"
+                                data-test="pending-claims-link"
+                                className="frontline-focus flex items-center justify-between gap-3 rounded-lg border bg-card p-3 text-sm hover:bg-accent"
+                            >
+                                <div className="min-w-0">
+                                    <div className="font-semibold">
+                                        Pending claims ({pending_claims_count})
+                                    </div>
+                                    <div className="mt-0.5 truncate text-muted-foreground">
+                                        Awaiting manager approval
+                                    </div>
+                                </div>
+                                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </Link>
                         )}
 
                         <Link

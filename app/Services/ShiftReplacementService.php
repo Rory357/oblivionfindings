@@ -13,8 +13,11 @@ use Illuminate\Validation\ValidationException;
 class ShiftReplacementService
 {
     public const REQUESTED = 'requested';
+
     public const CLAIMED = 'claimed';
+
     public const APPROVED = 'approved';
+
     public const CANCELLED = 'cancelled';
 
     public function request(Shift $shift, User $actor, array $data): ShiftReplacementRequest
@@ -40,11 +43,14 @@ class ShiftReplacementService
         }
 
         return DB::transaction(function () use ($shift, $actor, $data) {
+            $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+            $lockedShift->loadMissing(['client:id,first_name,last_name,site_id', 'staff:id,name']);
+
             $replacement = ShiftReplacementRequest::create([
                 'organization_id' => $actor->organization_id,
-                'shift_id' => $shift->id,
+                'shift_id' => $lockedShift->id,
                 'requested_by' => $actor->id,
-                'current_staff_id' => $shift->user_id,
+                'current_staff_id' => $lockedShift->user_id,
                 'status' => self::REQUESTED,
                 'reason' => (string) $data['reason'],
                 'notes' => $data['notes'] ?? null,
@@ -54,7 +60,7 @@ class ShiftReplacementService
 
             if (! empty($data['publish_to_job_board'])) {
                 $existingPosition = ShiftOpenPosition::query()
-                    ->where('shift_id', $shift->id)
+                    ->where('shift_id', $lockedShift->id)
                     ->whereIn('status', ['open', 'claimed'])
                     ->first();
 
@@ -66,12 +72,12 @@ class ShiftReplacementService
 
                 $position = ShiftOpenPosition::create([
                     'organization_id' => $actor->organization_id,
-                    'shift_id' => $shift->id,
+                    'shift_id' => $lockedShift->id,
                     'replacement_request_id' => $replacement->id,
                     'status' => 'open',
                     'required_skills' => array_values($data['required_skills'] ?? []),
-                    'coverage_roles' => $shift->coverage_roles ?? [],
-                    'notes' => $this->buildOpenPositionNotes($shift, (string) $data['reason'], $data['notes'] ?? null),
+                    'coverage_roles' => $lockedShift->coverage_roles ?? [],
+                    'notes' => $this->buildOpenPositionNotes($lockedShift, (string) $data['reason'], $data['notes'] ?? null),
                     'expires_at' => $data['expires_at'] ?? null,
                 ]);
 
@@ -83,18 +89,18 @@ class ShiftReplacementService
                 'shift_replacement_requested',
                 $actor,
                 'Replacement requested',
-                $this->buildRequestedBody($shift, (string) $data['reason'])
+                $this->buildRequestedBody($lockedShift, (string) $data['reason'])
             );
 
-            $client = $shift->client;
+            $client = $lockedShift->client;
             app(NotificationService::class)->notifyCrud($actor, 'requested', 'shift replacement', $replacement, $client, [
                 'title' => 'Shift replacement requested',
-                'body' => $this->buildRequestedBody($shift, (string) $data['reason']),
-                'url' => url("/operations/shifts/{$shift->id}"),
+                'body' => $this->buildRequestedBody($lockedShift, (string) $data['reason']),
+                'url' => url("/operations/shifts/{$lockedShift->id}"),
                 'include_managers' => true,
                 'include_assigned_workers' => false,
                 'include_entity_user' => false,
-                'target_user_ids' => array_values(array_filter([$shift->user_id])),
+                'target_user_ids' => array_values(array_filter([$lockedShift->user_id])),
             ]);
 
             return $replacement->fresh([
@@ -136,6 +142,22 @@ class ShiftReplacementService
                 'Replacement request cancelled',
                 'The replacement workflow for this shift was cancelled.'
             );
+
+            $freshReplacement = $replacement->fresh(['shift.client', 'requester', 'currentStaff', 'replacementStaff']);
+            $client = $freshReplacement->shift?->client;
+            app(NotificationService::class)->notifyCrud($actor, 'cancelled', 'shift replacement', $freshReplacement, $client, [
+                'title' => 'Shift replacement cancelled',
+                'body' => 'The replacement workflow for this shift was cancelled.',
+                'url' => url("/operations/shifts/{$freshReplacement->shift_id}"),
+                'include_managers' => false,
+                'include_assigned_workers' => false,
+                'include_entity_user' => false,
+                'target_user_ids' => array_values(array_filter([
+                    $freshReplacement->requested_by,
+                    $freshReplacement->current_staff_id,
+                    $freshReplacement->replacement_user_id,
+                ])),
+            ]);
 
             return $replacement->fresh([
                 'requester:id,name',
@@ -181,6 +203,23 @@ class ShiftReplacementService
                 ? $claimer->name.' has claimed this replacement request and is awaiting approval.'
                 : 'A replacement claim was submitted and is awaiting approval.'
         );
+
+        $freshReplacement = $replacement->fresh(['shift.client', 'requester', 'currentStaff', 'replacementStaff']);
+        $client = $freshReplacement->shift?->client;
+        app(NotificationService::class)->notifyCrud($claimer, 'claimed', 'shift replacement', $freshReplacement, $client, [
+            'title' => 'Shift replacement claim submitted',
+            'body' => $claimer?->name
+                ? $claimer->name.' has claimed this replacement request and is awaiting approval.'
+                : 'A replacement claim was submitted and is awaiting approval.',
+            'url' => url("/operations/shifts/{$freshReplacement->shift_id}"),
+            'include_managers' => true,
+            'include_assigned_workers' => false,
+            'include_entity_user' => false,
+            'target_user_ids' => array_values(array_filter([
+                $freshReplacement->requested_by,
+                $freshReplacement->current_staff_id,
+            ])),
+        ]);
     }
 
     public function approveFromOpenPosition(ShiftOpenPosition $position, User $actor): void

@@ -57,40 +57,27 @@ async function globalSetup(): Promise<void> {
         // is an opaque "spawn ENOENT" with no useful message.
         const useShell =
             phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
-        const rosteringOutput = execFileSync(
-            phpBin,
-            [
-                'artisan',
-                'db:seed',
-                '--class=RosteringProductionDemoSeeder',
-                '--force',
-            ],
-            {
-                cwd: root,
-                encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'pipe'],
-                shell: useShell,
-            },
-        );
-        const frontlineOutput = execFileSync(
-            phpBin,
-            [
-                'artisan',
-                'db:seed',
-                '--class=FrontlineLifecycleDemoSeeder',
-                '--force',
-            ],
-            {
-                cwd: root,
-                encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'pipe'],
-                shell: useShell,
-            },
+        const seederClasses = [
+            'RosteringProductionDemoSeeder',
+            'FrontlineLifecycleDemoSeeder',
+            'JobBoardReadinessDemoSeeder',
+        ];
+        const seederOutputs = seederClasses.map((seederClass) =>
+            execFileSync(
+                phpBin,
+                ['artisan', 'db:seed', `--class=${seederClass}`, '--force'],
+                {
+                    cwd: root,
+                    encoding: 'utf8',
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    shell: useShell,
+                },
+            ),
         );
         console.log(
-            '[playwright global-setup] re-seeded RosteringProductionDemoSeeder and FrontlineLifecycleDemoSeeder so UI fixtures are deterministic.',
+            `[playwright global-setup] re-seeded ${seederClasses.join(', ')} so UI fixtures are deterministic.`,
         );
-        const output = [rosteringOutput, frontlineOutput]
+        const output = seederOutputs
             .map((value) => value.trim())
             .filter(Boolean)
             .join('\n');

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Announcement;
 use App\Models\AppSetting;
+use App\Models\ShiftOpenPosition;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -43,6 +44,9 @@ class HandleInertiaRequests extends Middleware
 
         if ($user) {
             $can = $this->getUserPermissions($user);
+            if (isset($can['job_board'])) {
+                $can['job_board']['open_count'] = $this->jobBoardOpenCount($user);
+            }
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
@@ -868,5 +872,25 @@ class HandleInertiaRequests extends Middleware
                 'update' => $user->canDo('roster_templates.update'),
             ],
         ];
+    }
+
+    protected function jobBoardOpenCount($user): int
+    {
+        if (! Schema::hasTable('shift_open_positions')) {
+            return 0;
+        }
+
+        try {
+            return ShiftOpenPosition::query()
+                ->when($user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+                ->where('status', 'open')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->count();
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 }

@@ -815,6 +815,7 @@ function buildOperationsSubPanelGroups({
             title: 'Job Board',
             href: '/operations/job-board',
             icon: ClipboardList,
+            badge: can?.job_board?.open_count,
         });
     if (can?.rostering?.viewAny)
         scheduling.push({
@@ -2539,8 +2540,21 @@ function SubPanel({
                                     <span className="truncate">
                                         {item.title}
                                     </span>
+                                    {item.badge != null && item.badge > 0 && (
+                                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                            {item.badge > 9 ? '9+' : item.badge}
+                                        </span>
+                                    )}
                                     {active && (
-                                        <ChevronRight className="ml-auto h-3 w-3 text-sidebar-foreground/40" />
+                                        <ChevronRight
+                                            className={cn(
+                                                'h-3 w-3 text-sidebar-foreground/40',
+                                                item.badge != null &&
+                                                    item.badge > 0
+                                                    ? 'ml-0'
+                                                    : 'ml-auto',
+                                            )}
+                                        />
                                     )}
                                 </Link>
                             );
@@ -3133,6 +3147,15 @@ export function AppSidebarMobile({
                                                             />
                                                         )}
                                                         <span>{sub.title}</span>
+                                                        {sub.badge != null &&
+                                                            sub.badge > 0 && (
+                                                                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                                                    {sub.badge >
+                                                                    9
+                                                                        ? '9+'
+                                                                        : sub.badge}
+                                                                </span>
+                                                            )}
                                                     </Link>
                                                 ))}
                                             </div>
