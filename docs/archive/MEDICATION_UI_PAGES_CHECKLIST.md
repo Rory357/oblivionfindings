@@ -1,5 +1,10 @@
 # Medication Management UI Pages - Checklist
 
+> Archived: this checklist references pre-consolidation medication pages that
+> now redirect to canonical eMAR routes. Use
+> [docs/emar-meds-readiness-plan.md](../emar-meds-readiness-plan.md) for the
+> current readiness status.
+
 ## ✅ Pages Built and Accessible
 
 ### Main Navigation Pages

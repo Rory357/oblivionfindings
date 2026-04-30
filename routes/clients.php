@@ -160,7 +160,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Medication administration (support workers + managers)
     Route::post('/clients/{client}/medical/medications/{medication}/administrations', [ClientMedicalController::class, 'storeAdministration'])
-        ->middleware('permission:medications.administer.record|clients.update')
+        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
         ->name('clients.medical.medications.administrations.store');
 
     // Medication administration corrections

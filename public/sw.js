@@ -1,15 +1,30 @@
-const CACHE_NAME = 'of-app-shell-v2';
+const CACHE_NAME = 'of-app-shell-v3';
 const OFFLINE_URLS = [
     '/emar',
     '/emar/mar',
     '/emar/medications',
     '/emar/stock',
+    '/meds/today',
     '/fleet-assets/mobile/dashboard',
     '/fleet-assets/daily-check',
 ];
 
 function isCacheableNavigation(request) {
     return request.mode === 'navigate';
+}
+
+function navigationFallbackFor(request) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/meds/today') {
+        return '/meds/today';
+    }
+
+    if (url.pathname.startsWith('/emar/rounds/') && url.pathname.endsWith('/guided')) {
+        return '/meds/today';
+    }
+
+    return '/emar';
 }
 
 function isCacheableMedicationGet(request) {
@@ -90,7 +105,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (isCacheableNavigation(event.request)) {
-        event.respondWith(networkFirst(event.request, '/emar'));
+        event.respondWith(networkFirst(event.request, navigationFallbackFor(event.request)));
         return;
     }
 

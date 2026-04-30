@@ -10,7 +10,7 @@ use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Testing\AssertableInertia as Assert;
+use App\Support\EmarUrl;
 use Tests\TestCase;
 
 class ClientMedicalControllerTest extends TestCase
@@ -50,32 +50,11 @@ class ClientMedicalControllerTest extends TestCase
         $this->createEmployeeProfile($this->viewer);
     }
 
-    public function test_client_medical_page_renders_with_permission_override_witnesses(): void
+    public function test_client_medical_page_redirects_to_canonical_emar_medications_page(): void
     {
-        $allowedWitness = $this->makeRoleUser('support_worker');
-        $this->createEmployeeProfile($allowedWitness);
-        $this->grantPermissions($allowedWitness, ['medications.controlled.witness']);
-
-        $deniedWitness = $this->makeRoleUser('support_worker');
-        $this->createEmployeeProfile($deniedWitness);
-        $this->grantPermissionOverride($deniedWitness, 'medications.controlled.witness', false);
-
-        $response = $this->actingAs($this->viewer)
+        $this->actingAs($this->viewer)
             ->get(route('clients.medical.show', $this->client))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('operations/clients/medical')
-                ->where('client.id', $this->client->id)
-                ->has('witnesses')
-            );
-
-        $witnessIds = collect($response->viewData('page')['props']['witnesses'] ?? [])
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        $this->assertContains($allowedWitness->id, $witnessIds);
-        $this->assertNotContains($deniedWitness->id, $witnessIds);
+            ->assertRedirect(EmarUrl::medications($this->client));
     }
 
     protected function makeRoleUser(string $roleName): User

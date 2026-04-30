@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
+use App\Models\TimelineEvent;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use Carbon\Carbon;
@@ -22,6 +25,8 @@ use Inertia\Inertia;
  */
 class GuidedRoundController extends Controller
 {
+    use HandlesMedicationSync;
+
     public function __construct(
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
@@ -86,12 +91,37 @@ class GuidedRoundController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
             'scheduled_for' => ['required', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
         ]);
+
+        if ($cached = $this->getCachedMedicationSyncResponse('round_admin', $data)) {
+            if ($request->expectsJson()) {
+                return response()->json($cached);
+            }
+
+            return back()->with('status', 'Dose already recorded for this round.');
+        }
 
         // Worker vocabulary: "held" → backend "withheld".
         $backendStatus = $data['status'] === 'held' ? 'withheld' : $data['status'];
 
         if ($backendStatus !== 'given' && empty($data['reason'])) {
+            if ($request->expectsJson()) {
+                return response()->json(
+                    $this->withMedicationSync(
+                        ['success' => false, 'error' => 'Please tell us why this dose was not given.'],
+                        $data,
+                        'rejected',
+                        false,
+                        'Please tell us why this dose was not given.',
+                    ),
+                    422,
+                );
+            }
+
             return back()->withErrors([
                 'reason' => 'Please tell us why this dose was not given.',
             ]);
@@ -99,7 +129,7 @@ class GuidedRoundController extends Controller
 
         $scheduled = Carbon::parse($data['scheduled_for']);
 
-        return DB::transaction(function () use ($round, $medication, $data, $backendStatus, $scheduled, $user) {
+        return DB::transaction(function () use ($request, $round, $medication, $data, $backendStatus, $scheduled, $user) {
             // Guard against double administration for the same dose in the
             // same round (covers a worker tapping twice, or resuming after a
             // partial network error).
@@ -112,6 +142,36 @@ class GuidedRoundController extends Controller
                 ->first();
 
             if ($existing) {
+                if (($data['queued_offline'] ?? false) && $request->expectsJson()) {
+                    return response()->json(
+                        $this->buildMedicationConflictPayload(
+                            $data,
+                            'Medication state changed before this offline round item could sync. Supervisor review is required.',
+                        ),
+                        409,
+                    );
+                }
+
+                if ($request->expectsJson()) {
+                    return response()->json(
+                        $this->withMedicationSync(
+                            [
+                                'success' => true,
+                                'administration' => [
+                                    'id' => $existing->id,
+                                    'status' => $existing->status,
+                                    'administered_at' => $existing->administered_at?->toIso8601String(),
+                                    'round_id' => $round->id,
+                                ],
+                            ],
+                            $data,
+                            'duplicate',
+                            true,
+                            'Dose already recorded for this round.',
+                        ),
+                    );
+                }
+
                 return back()->with('status', 'Dose already recorded for this round.');
             }
 
@@ -136,6 +196,19 @@ class GuidedRoundController extends Controller
             );
 
             if (! ($result['success'] ?? false)) {
+                if ($request->expectsJson()) {
+                    return response()->json(
+                        $this->withMedicationSync(
+                            $result,
+                            $data,
+                            'rejected',
+                            false,
+                            $result['error'] ?? 'Could not record this dose.',
+                        ),
+                        422,
+                    );
+                }
+
                 return back()->withErrors([
                     'status' => $result['error'] ?? 'Could not record this dose.',
                 ]);
@@ -147,7 +220,53 @@ class GuidedRoundController extends Controller
             $admin->medication_round_id = $round->id;
             $admin->save();
 
+            $statusLabel = ucfirst(str_replace('_', ' ', $backendStatus));
+            TimelineEvent::create([
+                'source_type' => ClientMedicationAdministration::class,
+                'source_id' => $admin->id,
+                'occurred_at' => $admin->administered_at ?? now(),
+                'type' => 'medication_'.$backendStatus,
+                'actor_user_id' => $user->id,
+                'client_id' => $medication->client_id,
+                'shift_id' => null,
+                'site_id' => $medication->client?->site_id,
+                'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
+                'body' => null,
+                'meta' => array_filter([
+                    'medication_name' => $medication->name,
+                    'dosage' => $medication->dosage,
+                    'status' => $backendStatus,
+                    'reason' => $data['reason'] ?? null,
+                    'witnessed_by' => $data['witnessed_by'] ?? null,
+                    'medication_round_id' => $round->id,
+                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                    'origin_device_id' => $data['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                ]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $user->id,
+            ]);
+
             $round->updateCounts();
+
+            $payload = $this->withMedicationSync([
+                'success' => true,
+                'administration' => [
+                    'id' => $admin->id,
+                    'status' => $admin->status,
+                    'administered_at' => $admin->administered_at?->toIso8601String(),
+                    'round_id' => $round->id,
+                ],
+                'safety_check' => $result['safety_check'] ?? null,
+            ], $data, $this->medicationProcessedStatus($data));
+
+            $this->rememberMedicationSyncResponse('round_admin', $data, $payload);
+
+            if ($request->expectsJson()) {
+                return response()->json($payload);
+            }
 
             return back();
         });

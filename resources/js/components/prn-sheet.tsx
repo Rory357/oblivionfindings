@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+import DictateButton from '@/components/dictate-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -23,7 +24,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import DictateButton from '@/components/dictate-button';
+import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { submitOffline } from '@/lib/offline-queue';
 
 /* -------------------------------------------------------------------------- */
@@ -132,6 +133,18 @@ export default function PrnSheet({
     const [search, setSearch] = useState('');
     const [reasonChoice, setReasonChoice] = useState<string | null>(null);
     const [reasonText, setReasonText] = useState('');
+    const offlineQueue = useOfflineQueueState();
+    const { online } = offlineQueue;
+    const queuedPrnMedicationIds = useMemo(() => {
+        return new Set(
+            offlineQueue.pendingSubmissions
+                .filter((submission) => submission.action === 'prn')
+                .map((submission) =>
+                    Number(submission.payload.client_medication_id),
+                )
+                .filter((id) => Number.isFinite(id)),
+        );
+    }, [offlineQueue.pendingSubmissions]);
 
     const form = useForm<{
         client_medication_id: number | null;
@@ -314,6 +327,7 @@ export default function PrnSheet({
                     <PickStep
                         medications={medications}
                         groupedByClient={groupedByClient}
+                        queuedMedicationIds={queuedPrnMedicationIds}
                         search={search}
                         onSearchChange={setSearch}
                         onPick={pickMed}
@@ -344,6 +358,7 @@ export default function PrnSheet({
                             preselectedClient &&
                             preselectedClient.hasActiveShift === false
                         }
+                        offline={!online}
                     />
                 )}
             </SheetContent>
@@ -358,6 +373,7 @@ export default function PrnSheet({
 function PickStep({
     medications,
     groupedByClient,
+    queuedMedicationIds,
     search,
     onSearchChange,
     onPick,
@@ -365,6 +381,7 @@ function PickStep({
 }: {
     medications: PrnMedication[];
     groupedByClient: [string, PrnMedication[]][];
+    queuedMedicationIds: Set<number>;
     search: string;
     onSearchChange: (s: string) => void;
     onPick: (m: PrnMedication) => void;
@@ -440,6 +457,16 @@ function PickStep({
                                                                 className="shrink-0 border-primary text-[10px] tracking-wide text-primary uppercase dark:border-primary/30 dark:text-primary/70"
                                                             >
                                                                 CD
+                                                            </Badge>
+                                                        )}
+                                                        {queuedMedicationIds.has(
+                                                            med.id,
+                                                        ) && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="shrink-0 border-status-info/30 bg-status-info-bg text-[10px] tracking-wide text-status-info uppercase dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info"
+                                                            >
+                                                                Queued
                                                             </Badge>
                                                         )}
                                                     </div>
@@ -522,6 +549,7 @@ function RecordStep({
     canSubmit,
     error,
     nullShiftNotice,
+    offline,
 }: {
     med: PrnMedication;
     reasonChips: string[];
@@ -538,6 +566,7 @@ function RecordStep({
     canSubmit: boolean;
     error?: string;
     nullShiftNotice?: boolean;
+    offline: boolean;
 }) {
     const freeTextShown =
         reasonChips.length === 0 || reasonChoice === '__other__';
@@ -736,12 +765,18 @@ function RecordStep({
 
             {/* Sticky action bar */}
             <div className="border-t bg-background px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+                {offline && (
+                    <p className="mb-2 rounded-md border border-status-info/30 bg-status-info-bg px-3 py-2 text-center text-xs text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
+                        Will send when you&rsquo;re back online.
+                    </p>
+                )}
                 <Button
                     type="button"
                     size="lg"
                     className="h-12 w-full text-base font-semibold"
                     onClick={onSubmit}
                     disabled={!canSubmit}
+                    data-test="meds-prn-submit"
                 >
                     {submitting ? (
                         'Saving\u2026'

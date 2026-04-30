@@ -14,11 +14,11 @@ import {
 import { useMemo, useState } from 'react';
 
 import PrnSheet, { type PrnMedication } from '@/components/prn-sheet';
+import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import { formatTime } from '@/lib/datetime';
 
@@ -119,22 +119,28 @@ function SummaryPill({
         tone === 'danger'
             ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60 dark:bg-status-critical'
             : tone === 'warn'
-                ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60 dark:bg-status-warning'
-                : 'border-border bg-card';
+              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60 dark:bg-status-warning'
+              : 'border-border bg-card';
     const iconTone =
         tone === 'danger'
             ? 'text-status-critical dark:text-status-critical'
             : tone === 'warn'
-                ? 'text-status-warning dark:text-status-warning'
-                : 'text-muted-foreground';
+              ? 'text-status-warning dark:text-status-warning'
+              : 'text-muted-foreground';
     return (
-        <div className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${ring}`}>
+        <div
+            className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${ring}`}
+        >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background/60">
                 <Icon className={`h-4 w-4 ${iconTone}`} />
             </div>
             <div className="min-w-0">
-                <div className="text-lg font-semibold leading-none">{value}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+                <div className="text-lg leading-none font-semibold">
+                    {value}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                    {label}
+                </div>
             </div>
         </div>
     );
@@ -149,13 +155,28 @@ function MedRow({ med }: { med: MedDue }) {
     // "due" and "upcoming" are normal states, not errors, so we stay calm.
     const pill =
         med.status === 'overdue'
-            ? { label: 'Overdue', className: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical' }
+            ? {
+                  label: 'Overdue',
+                  className:
+                      'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
+              }
             : med.status === 'due'
-                ? { label: 'Due', className: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning' }
-                : { label: 'Later', className: 'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground' };
+              ? {
+                    label: 'Due',
+                    className:
+                        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
+                }
+              : {
+                    label: 'Later',
+                    className:
+                        'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground',
+                };
 
     return (
-        <li className="flex items-center justify-between gap-3 py-2.5">
+        <li
+            className="flex items-center justify-between gap-3 py-2.5"
+            data-test="meds-due-row"
+        >
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                     <Link
@@ -167,7 +188,7 @@ function MedRow({ med }: { med: MedDue }) {
                     {med.is_controlled && (
                         <Badge
                             variant="outline"
-                            className="shrink-0 border-primary text-[10px] uppercase tracking-wide text-primary dark:border-primary/30 dark:text-primary/70"
+                            className="shrink-0 border-primary text-[10px] tracking-wide text-primary uppercase dark:border-primary/30 dark:text-primary/70"
                         >
                             CD
                         </Badge>
@@ -187,7 +208,9 @@ function MedRow({ med }: { med: MedDue }) {
                         </>
                     )}
                     <span aria-hidden>·</span>
-                    <span className="shrink-0">{formatTime(med.scheduled_for)}</span>
+                    <span className="shrink-0">
+                        {formatTime(med.scheduled_for)}
+                    </span>
                 </div>
             </div>
             <span
@@ -218,7 +241,12 @@ export default function MedsToday({
         () => [
             { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
             { key: 'meds', label: 'Meds', icon: Pill, href: '/meds/today' },
-            { key: 'clock', label: 'Clock', icon: Clock, href: '/my-day#clock' },
+            {
+                key: 'clock',
+                label: 'Clock',
+                icon: Clock,
+                href: '/my-day#clock',
+            },
             {
                 key: 'report',
                 label: 'Report',
@@ -255,8 +283,8 @@ export default function MedsToday({
                             stats.meds_overdue > 0
                                 ? 'danger'
                                 : stats.due_now > 0
-                                    ? 'warn'
-                                    : 'default'
+                                  ? 'warn'
+                                  : 'default'
                         }
                     />
                     <SummaryPill
@@ -280,19 +308,22 @@ export default function MedsToday({
                     type="button"
                     onClick={() => setPrnOpen(true)}
                     disabled={prn_medications.length === 0}
+                    data-test="meds-prn-button"
                     aria-label={
                         prn_medications.length === 0
                             ? 'Give as-needed med — none set up'
                             : `Give as-needed med (${prn_medications.length} available)`
                     }
                     variant="outline"
-                    className="frontline-focus group h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
+                    className="frontline-focus group h-auto w-full justify-start gap-3 rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left whitespace-normal transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold leading-tight">Give as-needed med</p>
+                        <p className="text-sm leading-tight font-semibold">
+                            Give as-needed med
+                        </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {prn_medications.length === 0
                                 ? 'No as-needed meds set up for your clients today'
@@ -314,13 +345,14 @@ export default function MedsToday({
                                 <Pill className="h-5 w-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold leading-tight">
+                                <p className="text-sm leading-tight font-semibold">
                                     {active_round.status === 'in_progress'
                                         ? `Resume ${active_round.name}`
                                         : `Start ${active_round.name}`}
                                 </p>
                                 <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {active_round.completed} of {active_round.total} done
+                                    {active_round.completed} of{' '}
+                                    {active_round.total} done
                                     {active_round.scheduled_time
                                         ? ` · ${formatClock(active_round.scheduled_time)}`
                                         : ''}
@@ -343,7 +375,10 @@ export default function MedsToday({
                                 <Zap className="h-4 w-4" />
                                 Due now
                                 {stats.meds_overdue > 0 && (
-                                    <Badge variant="destructive" className="ml-1">
+                                    <Badge
+                                        variant="destructive"
+                                        className="ml-1"
+                                    >
                                         {stats.meds_overdue} overdue
                                     </Badge>
                                 )}
@@ -392,7 +427,7 @@ export default function MedsToday({
                                                         {isActive && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="shrink-0 border-status-success/30 text-[10px] uppercase tracking-wide text-status-success dark:border-status-success/30 dark:text-status-success"
+                                                                className="shrink-0 border-status-success/30 text-[10px] tracking-wide text-status-success uppercase dark:border-status-success/30 dark:text-status-success"
                                                             >
                                                                 In progress
                                                             </Badge>
@@ -400,20 +435,33 @@ export default function MedsToday({
                                                     </div>
                                                     <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                                                         <Clock className="h-3 w-3" />
-                                                        <span>{formatClock(round.scheduled_time)}</span>
-                                                        <span aria-hidden>·</span>
                                                         <span>
-                                                            {round.completed} of {round.total} done
+                                                            {formatClock(
+                                                                round.scheduled_time,
+                                                            )}
+                                                        </span>
+                                                        <span aria-hidden>
+                                                            ·
+                                                        </span>
+                                                        <span>
+                                                            {round.completed} of{' '}
+                                                            {round.total} done
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <Button
                                                     size="sm"
-                                                    variant={isActive ? 'default' : 'outline'}
+                                                    variant={
+                                                        isActive
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
                                                     asChild
                                                 >
                                                     <span>
-                                                        {isActive ? 'Resume round' : 'Start round'}
+                                                        {isActive
+                                                            ? 'Resume round'
+                                                            : 'Start round'}
                                                         <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                                                     </span>
                                                 </Button>
@@ -453,13 +501,20 @@ export default function MedsToday({
                     <Card>
                         <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
                             <CheckCircle2 className="h-8 w-8 text-status-success" />
-                            <p className="text-sm font-medium">Nothing due right now</p>
+                            <p className="text-sm font-medium">
+                                Nothing due right now
+                            </p>
                             <p className="max-w-sm text-xs text-muted-foreground">
                                 {has_shift_context
                                     ? 'No doses due in the next few hours for the clients on your shift.'
                                     : 'You don\u2019t have a shift today. Once you clock in, meds due for that client will show here.'}
                             </p>
-                            <Button variant="outline" size="sm" asChild className="mt-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="mt-2"
+                            >
                                 <Link href="/my-day">
                                     <Home className="mr-2 h-4 w-4" />
                                     Back to My Day
@@ -475,11 +530,13 @@ export default function MedsToday({
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical dark:text-status-critical" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-critical dark:text-status-critical">
-                                {stats.meds_overdue} dose{stats.meds_overdue === 1 ? '' : 's'} past due
+                                {stats.meds_overdue} dose
+                                {stats.meds_overdue === 1 ? '' : 's'} past due
                             </p>
                             <p className="mt-0.5 text-xs text-status-critical dark:text-status-critical">
-                                Give now if safe, or tell your supervisor. Don&rsquo;t skip a dose
-                                without writing down why.
+                                Give now if safe, or tell your supervisor.
+                                Don&rsquo;t skip a dose without writing down
+                                why.
                             </p>
                         </div>
                     </div>

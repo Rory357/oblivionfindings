@@ -278,7 +278,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // Medication administration
     Route::post('/clients/{client}/medical/medications/{medication}/administrations', [ClientMedicalController::class, 'storeAdministration'])
-        ->middleware('permission:medications.administer.record|clients.update')
+        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
         ->name('operations.clients.medical.medications.administrations.store');
 
     // Medication administration corrections

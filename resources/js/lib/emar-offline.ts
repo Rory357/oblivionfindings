@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
+import {
+    getOfflineQueueSnapshot,
+    queueOfflineSubmission,
+    submitOffline,
+    type OfflineAction,
+} from './offline-queue';
+
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';
 
 type SyncStatus =
@@ -13,6 +20,7 @@ type SyncStatus =
 
 type SubmitMutationOptions = {
     method?: MutationMethod;
+    action?: OfflineAction;
     allowQueueWhenOffline?: boolean;
     queuedMessage?: string;
     successMessage?: string;
@@ -24,12 +32,12 @@ type SubmitMutationResult<T = unknown> = {
     data?: T;
 };
 
-type OfflineQueueEntry = {
-    id: string;
-    method: MutationMethod;
-    url: string;
-    payload: Record<string, unknown>;
-    queued_at: string;
+type LegacyOfflineQueueEntry = {
+    id?: string;
+    method?: MutationMethod;
+    url?: string;
+    payload?: Record<string, unknown>;
+    queued_at?: string;
 };
 
 const EMAR_QUEUE_STORAGE_KEY = 'emar-offline-queue:v1';
@@ -44,113 +52,32 @@ function canUseBrowserStorage() {
     );
 }
 
-function getQueue(): OfflineQueueEntry[] {
-    if (!canUseBrowserStorage()) {
-        return [];
-    }
-
-    try {
-        const raw = window.localStorage.getItem(EMAR_QUEUE_STORAGE_KEY);
-        if (!raw) {
-            return [];
-        }
-
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-}
-
-function saveQueue(queue: OfflineQueueEntry[]) {
-    if (!canUseBrowserStorage()) {
+function registerServiceWorker() {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
         return;
     }
 
-    window.localStorage.setItem(EMAR_QUEUE_STORAGE_KEY, JSON.stringify(queue));
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    });
 }
 
-function getDeviceId() {
-    if (!canUseBrowserStorage()) {
-        return 'emar-web';
+function inferAction(url: string): OfflineAction {
+    if (url.includes('/guided/items/')) return 'round_admin';
+    if (url.includes('/administrations') && url.includes('/corrections')) {
+        return 'correction';
+    }
+    if (url.includes('/administrations')) return 'administration';
+    if (url.includes('/controlled/loss-reports')) return 'cd_loss_report';
+    if (url.includes('/controlled/entries')) return 'cd_entry';
+    if (url.includes('/stock') || url.includes('/scheduled-counts')) {
+        return 'stock_update';
+    }
+    if (url.includes('/fleet-assets') || url.includes('/transports')) {
+        return 'transport_medication';
     }
 
-    const existing = window.localStorage.getItem(EMAR_DEVICE_STORAGE_KEY);
-    if (existing) {
-        return existing;
-    }
-
-    const fallback = `emar-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const deviceId =
-        typeof window.crypto !== 'undefined' &&
-        typeof window.crypto.randomUUID === 'function'
-            ? window.crypto.randomUUID()
-            : fallback;
-
-    window.localStorage.setItem(EMAR_DEVICE_STORAGE_KEY, deviceId);
-
-    return deviceId;
-}
-
-function createRequestUuid() {
-    const fallback = `emar-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-    return typeof window !== 'undefined' &&
-        typeof window.crypto !== 'undefined' &&
-        typeof window.crypto.randomUUID === 'function'
-        ? window.crypto.randomUUID()
-        : fallback;
-}
-
-function buildSyncPayload(
-    payload: Record<string, unknown>,
-    queuedOffline: boolean,
-) {
-    return {
-        ...payload,
-        client_request_uuid:
-            typeof payload.client_request_uuid === 'string'
-                ? payload.client_request_uuid
-                : createRequestUuid(),
-        captured_offline_at:
-            typeof payload.captured_offline_at === 'string'
-                ? payload.captured_offline_at
-                : new Date().toISOString(),
-        origin_device_id:
-            typeof payload.origin_device_id === 'string'
-                ? payload.origin_device_id
-                : getDeviceId(),
-        queued_offline: queuedOffline,
-    };
-}
-
-function queueMutation(entry: OfflineQueueEntry) {
-    const queue = getQueue();
-    queue.push(entry);
-    saveQueue(queue);
-}
-
-function isNetworkError(error: unknown) {
-    return axios.isAxiosError(error) && !error.response;
-}
-
-function extractMessage(error: unknown, fallback: string) {
-    if (axios.isAxiosError(error)) {
-        const responseMessage =
-            typeof error.response?.data?.message === 'string'
-                ? error.response.data.message
-                : typeof error.response?.data?.error === 'string'
-                  ? error.response.data.error
-                  : null;
-
-        return responseMessage ?? fallback;
-    }
-
-    if (error instanceof Error && error.message) {
-        return error.message;
-    }
-
-    return fallback;
+    return 'administration';
 }
 
 async function executeMutation<T = unknown>(
@@ -162,88 +89,48 @@ async function executeMutation<T = unknown>(
         method,
         url,
         data: payload,
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
     });
 
     return response.data as T;
 }
 
-async function replayQueuedMutations() {
-    if (typeof window === 'undefined' || !navigator.onLine) {
-        return;
+async function migrateLegacyQueue() {
+    if (!canUseBrowserStorage()) return;
+
+    const raw = window.localStorage.getItem(EMAR_QUEUE_STORAGE_KEY);
+    if (!raw) return;
+
+    let entries: LegacyOfflineQueueEntry[] = [];
+    try {
+        const parsed = JSON.parse(raw);
+        entries = Array.isArray(parsed) ? parsed : [];
+    } catch {
+        entries = [];
     }
 
-    const queue = getQueue();
+    window.localStorage.removeItem(EMAR_QUEUE_STORAGE_KEY);
+    window.localStorage.removeItem(EMAR_DEVICE_STORAGE_KEY);
 
-    if (queue.length === 0) {
-        return;
-    }
+    for (const entry of entries) {
+        if (!entry.url || !entry.payload) continue;
 
-    const remaining: OfflineQueueEntry[] = [];
-    let syncedCount = 0;
-
-    for (const entry of queue) {
-        try {
-            await executeMutation(entry.method, entry.url, {
+        await queueOfflineSubmission({
+            action: inferAction(entry.url),
+            method: entry.method ?? 'post',
+            url: entry.url,
+            payload: {
                 ...entry.payload,
+                client_request_uuid:
+                    entry.payload.client_request_uuid ?? entry.id,
                 queued_offline: true,
-            });
-            syncedCount += 1;
-        } catch (error) {
-            if (axios.isAxiosError(error) && error.response?.status === 409) {
-                window.dispatchEvent(
-                    new CustomEvent('emar:offline-conflict', {
-                        detail: {
-                            entry,
-                            response: error.response.data,
-                        },
-                    }),
-                );
-
-                toast.error(
-                    typeof error.response?.data?.sync?.message === 'string'
-                        ? error.response.data.sync.message
-                        : 'A queued eMAR action conflicted with newer server state and needs supervisor review.',
-                );
-                continue;
-            }
-
-            if (
-                isNetworkError(error) ||
-                (axios.isAxiosError(error) &&
-                    (error.response?.status ?? 0) >= 500)
-            ) {
-                remaining.push(entry);
-                continue;
-            }
-
-            toast.error(
-                extractMessage(
-                    error,
-                    'A queued eMAR action could not be synced.',
-                ),
-            );
-        }
+            },
+            createdAt: entry.queued_at,
+        });
     }
-
-    saveQueue(remaining);
-
-    if (syncedCount > 0) {
-        toast.success(
-            syncedCount === 1
-                ? 'Queued eMAR action synced successfully.'
-                : `${syncedCount} queued eMAR actions synced successfully.`,
-        );
-    }
-}
-
-function registerServiceWorker() {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-        return;
-    }
-
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-    });
 }
 
 export function bootEmarOffline() {
@@ -253,20 +140,7 @@ export function bootEmarOffline() {
 
     emarOfflineBooted = true;
     registerServiceWorker();
-
-    window.addEventListener('online', () => {
-        void replayQueuedMutations();
-    });
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            void replayQueuedMutations();
-        }
-    });
-
-    if (navigator.onLine) {
-        void replayQueuedMutations();
-    }
+    void migrateLegacyQueue();
 }
 
 export async function submitEmarMutation<T = unknown>(
@@ -276,39 +150,51 @@ export async function submitEmarMutation<T = unknown>(
 ): Promise<SubmitMutationResult<T>> {
     const {
         method = 'post',
+        action = inferAction(url),
         allowQueueWhenOffline = true,
         queuedMessage = 'Action saved offline and queued to sync when the device reconnects.',
         successMessage,
         duplicateMessage,
     } = options;
 
-    const onlinePayload = buildSyncPayload(payload, false);
+    try {
+        if (!allowQueueWhenOffline) {
+            const data = await executeMutation<
+                T & { sync?: { status?: SyncStatus; message?: string } }
+            >(method, url, payload);
+            const syncStatus = data?.sync?.status ?? 'processed';
 
-    if (
-        typeof navigator !== 'undefined' &&
-        !navigator.onLine &&
-        allowQueueWhenOffline
-    ) {
-        const queuedPayload = buildSyncPayload(onlinePayload, true);
+            if (syncStatus === 'duplicate') {
+                toast.info(
+                    duplicateMessage ??
+                        data?.sync?.message ??
+                        'This action was already synced.',
+                );
+            } else if (successMessage) {
+                toast.success(successMessage);
+            }
 
-        queueMutation({
-            id: queuedPayload.client_request_uuid as string,
+            return {
+                status: syncStatus,
+                data,
+            };
+        }
+
+        const result = await submitOffline({
+            action,
             method,
             url,
-            payload: queuedPayload,
-            queued_at: new Date().toISOString(),
+            payload,
+            queuedMessage,
         });
 
-        toast.info(queuedMessage);
+        if (result.status === 'queued') {
+            return { status: 'queued' };
+        }
 
-        return { status: 'queued' };
-    }
-
-    try {
-        const data = await executeMutation<
-            T & { sync?: { status?: SyncStatus; message?: string } }
-        >(method, url, onlinePayload);
-
+        const data = result.data as T & {
+            sync?: { status?: SyncStatus; message?: string };
+        };
         const syncStatus = data?.sync?.status ?? 'processed';
 
         if (syncStatus === 'duplicate') {
@@ -326,22 +212,6 @@ export async function submitEmarMutation<T = unknown>(
             data,
         };
     } catch (error) {
-        if (allowQueueWhenOffline && isNetworkError(error)) {
-            const queuedPayload = buildSyncPayload(onlinePayload, true);
-
-            queueMutation({
-                id: queuedPayload.client_request_uuid as string,
-                method,
-                url,
-                payload: queuedPayload,
-                queued_at: new Date().toISOString(),
-            });
-
-            toast.info(queuedMessage);
-
-            return { status: 'queued' };
-        }
-
         if (axios.isAxiosError(error) && error.response?.status === 409) {
             const message =
                 typeof error.response.data?.sync?.message === 'string'
@@ -363,5 +233,5 @@ export async function submitEmarMutation<T = unknown>(
 }
 
 export function getQueuedEmarMutationCount() {
-    return getQueue().length;
+    return getOfflineQueueSnapshot().pendingCount;
 }

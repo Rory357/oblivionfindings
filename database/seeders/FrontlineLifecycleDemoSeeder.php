@@ -5,15 +5,23 @@ namespace Database\Seeders;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientIncident;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
+use App\Models\MedicationRound;
+use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Models\Staff;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Seeds /my-day lifecycle scenarios on top of SystemShiftsSeeder so a fresh
@@ -53,7 +61,188 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         $this->seedReturnedTimesheet($worker, $admin, $client, $serviceContext);
         $this->seedPreShiftBriefing($worker, $admin, $client, $serviceContext);
 
+        $medsWorker = $this->ensureMedicationReadinessWorker();
+        $medsWitness = $this->ensureMedicationReadinessWitness();
+        $medsServiceContext = ServiceContext::updateOrCreate(
+            ['name' => 'PW Medication Readiness'],
+            [
+                'type' => 'residential',
+                'is_active' => true,
+            ],
+        );
+        $medsClient = $this->ensureMedicationReadinessClient($client, $medsServiceContext);
+        $medsClient->supportWorkers()->syncWithoutDetaching([$medsWorker->id]);
+        $this->grantSiteAccess($medsWorker, $medsClient);
+        $this->grantSiteAccess($medsWitness, $medsClient);
+        $restrictedMedsWorker = $this->ensureMedicationReadinessRestrictedWorker();
+        $this->grantSiteAccess($restrictedMedsWorker, $medsClient);
+        $this->seedMedicationReadinessFixtures($medsWorker, $admin, $medsClient, $medsServiceContext);
+
         $this->seedPlaywrightAttendanceFixtures($admin, $client, $serviceContext);
+    }
+
+    private function ensureMedicationReadinessWorker(): User
+    {
+        $worker = User::updateOrCreate(
+            ['email' => 'sw-meds@demo.test'],
+            [
+                'name' => 'Medication Demo Worker',
+                'password' => Hash::make('password'),
+                'role' => 'support_worker',
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+            ],
+        );
+
+        $role = Role::query()->where('name', 'support_worker')->first();
+        if ($role) {
+            $worker->roles()->syncWithoutDetaching([$role->id]);
+        }
+
+        Staff::updateOrCreate(
+            ['user_id' => $worker->id],
+            [
+                'employee_id' => 'SWMEDS',
+                'job_title' => 'Support Worker',
+                'department' => 'Clinical',
+                'status' => 'active',
+                'hire_date' => now()->subYear(),
+            ],
+        );
+
+        HrEmployeeProfile::updateOrCreate(
+            ['user_id' => $worker->id],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'employee_number' => 'SWMEDS',
+                'work_email' => $worker->email,
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'employment_type' => 'full_time',
+                'contract_type' => 'permanent',
+                'start_date' => now()->subYear()->toDateString(),
+                'is_active' => true,
+                'updated_by' => $worker->id,
+                'created_by' => $worker->id,
+            ],
+        );
+
+        return $worker;
+    }
+
+    private function ensureMedicationReadinessWitness(): User
+    {
+        $worker = User::updateOrCreate(
+            ['email' => 'sw-meds-witness@demo.test'],
+            [
+                'name' => 'Medication Demo Witness',
+                'password' => Hash::make('password'),
+                'role' => 'support_worker',
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+            ],
+        );
+
+        $role = Role::query()->where('name', 'support_worker')->first();
+        if ($role) {
+            $worker->roles()->syncWithoutDetaching([$role->id]);
+        }
+
+        Staff::updateOrCreate(
+            ['user_id' => $worker->id],
+            [
+                'employee_id' => 'SWMEDSWIT',
+                'job_title' => 'Support Worker',
+                'department' => 'Clinical',
+                'status' => 'active',
+                'hire_date' => now()->subYear(),
+            ],
+        );
+
+        HrEmployeeProfile::updateOrCreate(
+            ['user_id' => $worker->id],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'employee_number' => 'SWMEDSWIT',
+                'work_email' => $worker->email,
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'employment_type' => 'full_time',
+                'contract_type' => 'permanent',
+                'start_date' => now()->subYear()->toDateString(),
+                'is_active' => true,
+                'updated_by' => $worker->id,
+                'created_by' => $worker->id,
+            ],
+        );
+
+        return $worker;
+    }
+
+    private function ensureMedicationReadinessRestrictedWorker(): User
+    {
+        $worker = User::updateOrCreate(
+            ['email' => 'sw-meds-no-record@demo.test'],
+            [
+                'name' => 'Medication Restricted Worker',
+                'password' => Hash::make('password'),
+                'role' => 'support_worker',
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+            ],
+        );
+
+        $worker->roles()->sync([]);
+
+        Staff::updateOrCreate(
+            ['user_id' => $worker->id],
+            [
+                'employee_id' => 'SWMEDSNO',
+                'job_title' => 'Support Worker',
+                'department' => 'Clinical',
+                'status' => 'active',
+                'hire_date' => now()->subYear(),
+            ],
+        );
+
+        HrEmployeeProfile::updateOrCreate(
+            ['user_id' => $worker->id],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'employee_number' => 'SWMEDSNO',
+                'work_email' => $worker->email,
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'employment_type' => 'full_time',
+                'contract_type' => 'permanent',
+                'start_date' => now()->subYear()->toDateString(),
+                'is_active' => true,
+                'updated_by' => $worker->id,
+                'created_by' => $worker->id,
+            ],
+        );
+
+        return $worker;
+    }
+
+    private function ensureMedicationReadinessClient(Client $fallbackClient, ServiceContext $serviceContext): Client
+    {
+        return Client::updateOrCreate(
+            [
+                'first_name' => 'Playwright',
+                'last_name' => 'Meds',
+            ],
+            [
+                'site_id' => $fallbackClient->site_id,
+                'service_context_id' => $serviceContext->id,
+                'preferred_name' => 'PW Meds',
+                'date_of_birth' => now()->subYears(42)->toDateString(),
+                'gender' => 'not_stated',
+                'status' => 'active',
+                'city' => $fallbackClient->city ?: 'Auckland',
+                'funding_type' => 'demo',
+            ],
+        );
     }
 
     private function grantSiteAccess(User $worker, Client $client): void
@@ -233,6 +422,206 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'is_completed' => false,
             ]);
         }
+    }
+
+    private function seedMedicationReadinessFixtures(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
+    {
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $now = Carbon::now($timezone);
+        $anchor = $now->copy();
+
+        if ($anchor->hour === 0 && $anchor->minute < 30) {
+            $anchor->setTime(0, 30);
+        } elseif ($anchor->hour === 23 && $anchor->minute > 30) {
+            $anchor->setTime(23, 30);
+        }
+
+        $doseTimes = [
+            $anchor->copy()->subMinutes(15)->format('H:i'),
+            $anchor->copy()->format('H:i'),
+            $anchor->copy()->addMinutes(15)->format('H:i'),
+        ];
+
+        $medications = collect([
+            $this->upsertMedicationFixture($client, [
+                'name' => 'PW Meds Morning Tablets',
+                'dosage' => '1 tablet',
+                'frequency' => 'Three times daily',
+                'dose_times' => [$doseTimes[0]],
+                'route' => 'oral',
+                'form' => 'tablet',
+                'instructions' => 'Give with water.',
+            ]),
+            $this->upsertMedicationFixture($client, [
+                'name' => 'PW Meds Vitamin D',
+                'dosage' => '1 capsule',
+                'frequency' => 'Daily',
+                'dose_times' => [$doseTimes[1]],
+                'route' => 'oral',
+                'form' => 'capsule',
+                'instructions' => 'Give after breakfast.',
+            ]),
+            $this->upsertMedicationFixture($client, [
+                'name' => 'PW Meds Eye Drops',
+                'dosage' => '1 drop',
+                'frequency' => 'Daily',
+                'dose_times' => [$doseTimes[2]],
+                'route' => 'ophthalmic',
+                'form' => 'drops',
+                'instructions' => 'Right eye.',
+            ]),
+            $this->upsertMedicationFixture($client, [
+                'name' => 'PW Meds PRN Paracetamol',
+                'dosage' => '500mg',
+                'frequency' => 'As needed',
+                'dose_times' => [],
+                'route' => 'oral',
+                'form' => 'tablet',
+                'instructions' => 'Offer fluids after administration.',
+                'is_prn' => true,
+                'prn_reason' => 'Pain|Headache',
+                'max_per_day' => 4,
+                'min_hours_between_doses' => 1,
+            ]),
+            $this->upsertMedicationFixture($client, [
+                'name' => 'PW Meds Controlled PRN',
+                'dosage' => '1 capsule',
+                'frequency' => 'As needed',
+                'dose_times' => [],
+                'route' => 'oral',
+                'form' => 'capsule',
+                'instructions' => 'Requires a second staff witness.',
+                'is_prn' => true,
+                'prn_reason' => 'Severe pain',
+                'max_per_day' => 2,
+                'min_hours_between_doses' => 4,
+                'controlled_drug' => true,
+                'witness_required' => true,
+            ]),
+        ]);
+
+        ClientMedicationAdministration::query()
+            ->whereIn('client_medication_id', $medications->pluck('id')->all())
+            ->forceDelete();
+        ClientControlledDrugEntry::query()
+            ->whereIn('client_medication_id', $medications->pluck('id')->all())
+            ->delete();
+
+        $controlledPrn = $medications->firstWhere('name', 'PW Meds Controlled PRN');
+        if ($controlledPrn) {
+            ClientMedicationStock::updateOrCreate(
+                ['client_medication_id' => $controlledPrn->id],
+                [
+                    'on_hand' => 12,
+                    'unit' => 'capsules',
+                    'reorder_level' => 2,
+                    'last_counted_at' => now(),
+                ],
+            );
+        }
+
+        $startsAt = $now->copy()->subHour()->utc();
+        $endsAt = $now->copy()->addHours(5)->utc();
+        $shift = $this->upsertPlaywrightShift(
+            $worker,
+            $admin,
+            $client,
+            $serviceContext,
+            'PW:meds-readiness:active-shift',
+            $startsAt,
+            $endsAt,
+            'in_progress',
+            [
+                'actual_starts_at' => $startsAt,
+                'started_by' => $worker->id,
+                'expected_break_minutes' => 0,
+            ],
+        );
+
+        HrAttendanceSession::updateOrCreate(
+            [
+                'shift_id' => $shift->id,
+                'user_id' => $worker->id,
+            ],
+            [
+                'tenant_id' => $worker->tenant_id ?? 1,
+                'site_id' => $shift->site_id,
+                'clock_in_at' => $startsAt,
+                'clock_out_at' => null,
+                'break_minutes' => 0,
+                'status' => 'open',
+                'source' => 'playwright',
+                'created_by' => $worker->id,
+                'closed_by' => null,
+            ],
+        );
+
+        MedicationRound::updateOrCreate(
+            [
+                'name' => 'PW Meds Readiness Round',
+                'round_date' => $now->toDateString(),
+                'assigned_to' => $worker->id,
+            ],
+            [
+                'service_context_id' => $serviceContext->id,
+                'site_id' => $client->site_id,
+                'round_type' => 'scheduled',
+                'scheduled_time' => $anchor->format('H:i'),
+                'window_minutes' => 120,
+                'status' => 'pending',
+                'started_by' => null,
+                'completed_by' => null,
+                'started_at' => null,
+                'completed_at' => null,
+                'total_medications' => 3,
+                'administered_count' => 0,
+                'refused_count' => 0,
+                'withheld_count' => 0,
+                'missed_count' => 0,
+                'notes' => 'Playwright readiness guided round.',
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function upsertMedicationFixture(Client $client, array $overrides): ClientMedication
+    {
+        $attributes = array_merge([
+            'client_id' => $client->id,
+            'dosage' => null,
+            'frequency' => null,
+            'dose_times' => [],
+            'is_prn' => false,
+            'controlled_drug' => false,
+            'high_risk' => false,
+            'witness_required' => false,
+            'prn_reason' => null,
+            'max_per_day' => null,
+            'min_hours_between_doses' => null,
+            'route' => null,
+            'form' => null,
+            'instructions' => null,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'active' => true,
+            'state' => 'active',
+            'version' => 1,
+        ], $overrides);
+
+        $medication = ClientMedication::withTrashed()
+            ->where('client_id', $client->id)
+            ->where('name', $attributes['name'])
+            ->first();
+
+        if ($medication) {
+            $medication->forceFill(array_merge($attributes, ['deleted_at' => null]))->save();
+
+            return $medication->fresh() ?? $medication;
+        }
+
+        return ClientMedication::create($attributes);
     }
 
     private function seedPlaywrightAttendanceFixtures(User $admin, Client $client, ServiceContext $serviceContext): void

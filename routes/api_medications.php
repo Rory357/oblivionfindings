@@ -29,11 +29,11 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->name('api.medications.scan_code.svg');
 
     Route::post('/clients/{client}/medications/{medication}/scan-verify', [MedicationsApiController::class, 'verifyScan'])
-        ->middleware('permission:medications.administer.record|clients.update')
+        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
         ->name('api.medications.scan.verify');
 
     Route::post('/clients/{client}/medications/{medication}/administrations', [MedicationsApiController::class, 'recordAdministration'])
-        ->middleware('permission:medications.administer.record|clients.update')
+        ->middleware('permission:medications.administer.record|clients.update|medications.orders.manage')
         ->name('api.medications.administrations.record');
 
     Route::post('/clients/{client}/administrations/{administration}/attachments', [MedicationsApiController::class, 'uploadAdministrationAttachment'])

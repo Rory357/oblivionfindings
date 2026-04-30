@@ -1,5 +1,9 @@
 # Enterprise Medication Management System - Implementation Guide
 
+> Archived: this document predates the eMAR consolidation. Use
+> [docs/emar-meds-readiness-plan.md](../emar-meds-readiness-plan.md) and the
+> canonical `/emar/*` routes as the current source of truth.
+
 ## Overview
 
 This document outlines the comprehensive, enterprise-grade Medication Management System built for NZ Supported Living (Oblivion Findings).

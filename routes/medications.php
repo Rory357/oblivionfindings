@@ -1,14 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsReportController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
-use App\Http\Controllers\ClientMarController;
 use App\Http\Controllers\Compliance\ComplianceDashboardController;
 use App\Support\EmarUrl;
-use Inertia\Inertia;
 
 /**
  * Medication Management Routes
@@ -23,29 +20,6 @@ Route::middleware(['auth'])->group(function () {
     })
         ->middleware('permission:medications.view')
         ->name('medications.index');
-
-    // Enhanced Medication Dashboard
-    Route::get('/medications/dashboard', function () {
-        return redirect()->to(EmarUrl::dashboard());
-    })
-        ->middleware('permission:medications.view')
-        ->name('medications.dashboard');
-
-    // Enhanced MAR (Medication Administration Record)
-    Route::get('/medications/enhanced-mar/{client}', function (\App\Models\Client $client) {
-        return redirect()->to(EmarUrl::mar($client, request('date', now()->toDateString())));
-    })
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
-        ->name('medications.enhanced-mar');
-
-    // Legacy MAR view (for backwards compatibility)
-    Route::get('/clients/{client}/mar', [ClientMarController::class, 'show'])
-        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
-        ->name('clients.mar.show');
-
-    Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
-        ->middleware('permission:medications.reports.export|reports.viewAny|clients.update')
-        ->name('clients.mar.export_csv');
 
     // Medication audit log
     Route::get('/medications/audit', [MedicationAuditController::class, 'index'])

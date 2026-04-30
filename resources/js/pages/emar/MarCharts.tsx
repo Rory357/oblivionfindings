@@ -1,10 +1,10 @@
 import ClientAllergyBanner from '@/components/emar/ClientAllergyBanner';
 import DrugInteractionAlert from '@/components/emar/DrugInteractionAlert';
+import FleetHero from '@/components/fleet-hero';
 import AdministrationEvidenceDialog from '@/components/medications/AdministrationEvidenceDialog';
 import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
 import RefusalFollowUpDialog from '@/components/medications/RefusalFollowUpDialog';
 import { type SafetyCheck } from '@/components/medications/SafetyCheckPanel';
-import FleetHero from '@/components/fleet-hero';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
+import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -29,6 +35,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     AlertTriangle,
+    ArrowUpDown,
     Check,
     ChevronLeft,
     ChevronRight,
@@ -44,6 +51,7 @@ import {
     Syringe,
     XCircle,
 } from 'lucide-react';
+import type { KeyboardEvent } from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -133,6 +141,9 @@ type PrnMed = {
     scan_verification: MedicationScanVerification;
     stock: MedicationStock | null;
 };
+
+type MarSortColumn = 'medication' | 'dose' | 'status';
+type MarSortDirection = 'asc' | 'desc';
 
 type MarData = {
     scheduled: ScheduledMed[];
@@ -301,6 +312,55 @@ function statusBadge(status: string) {
     );
 }
 
+function medicationRowKey(med: ScheduledMed | PrnMed, isPrn: boolean) {
+    return `${isPrn ? 'prn' : 'scheduled'}-${med.id}`;
+}
+
+function formatMedicationTime(value?: string | null) {
+    if (!value) return '—';
+
+    return new Date(value).toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function medicationStatusSortValue(med: ScheduledMed | PrnMed) {
+    return (
+        med.administrations.find(
+            (administration) => administration.status !== 'pending',
+        )?.status ??
+        med.administrations[0]?.status ??
+        'pending'
+    );
+}
+
+function medicationSortValue(
+    med: ScheduledMed | PrnMed,
+    column: MarSortColumn,
+) {
+    if (column === 'dose') return med.dosage ?? '';
+    if (column === 'status') return medicationStatusSortValue(med);
+
+    return med.name;
+}
+
+function sortMedicationList<T extends ScheduledMed | PrnMed>(
+    medications: T[],
+    column: MarSortColumn,
+    direction: MarSortDirection,
+): T[] {
+    return [...medications].sort((a, b) => {
+        const result = medicationSortValue(a, column).localeCompare(
+            medicationSortValue(b, column),
+            undefined,
+            { numeric: true, sensitivity: 'base' },
+        );
+
+        return direction === 'asc' ? result : -result;
+    });
+}
+
 export default function MarCharts({
     clients,
     selectedClient,
@@ -342,6 +402,15 @@ export default function MarCharts({
     const [selectedScheduledTime, setSelectedScheduledTime] = useState<
         string | null
     >(null);
+    const [detailSelection, setDetailSelection] = useState<{
+        id: number;
+        isPrn: boolean;
+    } | null>(null);
+    const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+    const [marSortColumn, setMarSortColumn] =
+        useState<MarSortColumn>('medication');
+    const [marSortDirection, setMarSortDirection] =
+        useState<MarSortDirection>('asc');
     const [followUpTarget, setFollowUpTarget] = useState<{
         administrationId: number;
         medicationName: string;
@@ -417,6 +486,9 @@ export default function MarCharts({
         isPrn: boolean,
     ) {
         if (!selectedClient) return;
+        const shouldWaitForMobileSheet = mobileDetailOpen;
+
+        setMobileDetailOpen(false);
         setLoadingSafety(true);
         setSelectedMed(med);
         setSelectedIsPrn(isPrn);
@@ -427,6 +499,11 @@ export default function MarCharts({
         );
         setPrnHistoryData(null);
         setSafetyCheck(null);
+
+        if (shouldWaitForMobileSheet) {
+            await new Promise((resolve) => window.setTimeout(resolve, 340));
+        }
+
         setDialogOpen(true);
 
         try {
@@ -510,6 +587,108 @@ export default function MarCharts({
         return med.administrations.some((administration) =>
             ['pending', 'missed'].includes(administration.status),
         );
+    }
+
+    function toggleMarSort(column: MarSortColumn) {
+        if (marSortColumn === column) {
+            setMarSortDirection((current) =>
+                current === 'asc' ? 'desc' : 'asc',
+            );
+            return;
+        }
+
+        setMarSortColumn(column);
+        setMarSortDirection('asc');
+    }
+
+    const scheduledRows = sortMedicationList(
+        marData?.scheduled ?? [],
+        marSortColumn,
+        marSortDirection,
+    );
+    const prnRows = sortMedicationList(
+        marData?.prn ?? [],
+        marSortColumn,
+        marSortDirection,
+    );
+
+    const medicationRows = [
+        ...scheduledRows.map((med) => ({
+            key: medicationRowKey(med, false),
+            med,
+            isPrn: false,
+        })),
+        ...prnRows.map((med) => ({
+            key: medicationRowKey(med, true),
+            med,
+            isPrn: true,
+        })),
+    ];
+
+    const detailEntry =
+        medicationRows.find(
+            (entry) =>
+                detailSelection &&
+                entry.med.id === detailSelection.id &&
+                entry.isPrn === detailSelection.isPrn,
+        ) ??
+        medicationRows[0] ??
+        null;
+
+    const selectedDetailKey = detailEntry?.key ?? null;
+
+    function selectMedicationForDetail(
+        med: ScheduledMed | PrnMed,
+        isPrn: boolean,
+        openMobile = false,
+    ) {
+        setDetailSelection({ id: med.id, isPrn });
+
+        if (
+            openMobile &&
+            typeof window !== 'undefined' &&
+            window.matchMedia('(max-width: 1023px)').matches
+        ) {
+            setMobileDetailOpen(true);
+        }
+    }
+
+    function handleMedicationRowKeyDown(
+        event: KeyboardEvent<HTMLTableRowElement>,
+        key: string,
+    ) {
+        const index = medicationRows.findIndex((entry) => entry.key === key);
+        if (index < 0) return;
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const offset = event.key === 'ArrowDown' ? 1 : -1;
+            const next =
+                medicationRows[
+                    Math.min(
+                        Math.max(index + offset, 0),
+                        medicationRows.length - 1,
+                    )
+                ];
+            if (!next) return;
+
+            selectMedicationForDetail(next.med, next.isPrn);
+            requestAnimationFrame(() => {
+                document
+                    .querySelector<HTMLTableRowElement>(
+                        `[data-mar-row-key="${next.key}"]`,
+                    )
+                    ?.focus();
+            });
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const entry = medicationRows[index];
+            if (entry) {
+                void openRecordDialog(entry.med, entry.isPrn);
+            }
+        }
     }
 
     function handleApproveCorrection(correctionId: number) {
@@ -1188,601 +1367,776 @@ export default function MarCharts({
                             </Card>
                         </div>
 
-                        {/* Scheduled Medications */}
-                        <Card className="mb-6">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">
-                                    Scheduled Medications (
-                                    {marData?.scheduled?.length ?? 0})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/50">
-                                                <th className="p-3 text-left font-medium">
-                                                    Medication
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Dose
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Route
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Frequency
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Flags
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Administrations
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(marData?.scheduled ?? []).map(
-                                                (med) => (
-                                                    <tr
-                                                        key={med.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="p-3">
-                                                            <span className="font-medium">
-                                                                {med.name}
-                                                            </span>
-                                                            {med.instructions && (
-                                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                                    {
-                                                                        med.instructions
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_440px]">
+                            <div className="min-w-0">
+                                {/* Scheduled Medications */}
+                                <Card className="mb-6">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base">
+                                            Scheduled Medications (
+                                            {marData?.scheduled?.length ?? 0})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead className="sticky top-0 z-10 bg-background">
+                                                    <tr className="border-b bg-muted/50">
+                                                        <SortableHeader
+                                                            label="Medication"
+                                                            column="medication"
+                                                            activeColumn={
+                                                                marSortColumn
+                                                            }
+                                                            direction={
+                                                                marSortDirection
+                                                            }
+                                                            onSort={
+                                                                toggleMarSort
+                                                            }
+                                                        />
+                                                        <SortableHeader
+                                                            label="Dose"
+                                                            column="dose"
+                                                            activeColumn={
+                                                                marSortColumn
+                                                            }
+                                                            direction={
+                                                                marSortDirection
+                                                            }
+                                                            onSort={
+                                                                toggleMarSort
+                                                            }
+                                                        />
+                                                        <th className="p-3 text-left font-medium">
+                                                            Route
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            Frequency
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            Flags
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            Administrations
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            Actions
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {scheduledRows.map(
+                                                        (med) => {
+                                                            const rowKey =
+                                                                medicationRowKey(
+                                                                    med,
+                                                                    false,
+                                                                );
+                                                            const selected =
+                                                                selectedDetailKey ===
+                                                                rowKey;
+
+                                                            return (
+                                                                <tr
+                                                                    key={med.id}
+                                                                    data-test="mar-row"
+                                                                    data-mar-row-key={
+                                                                        rowKey
                                                                     }
-                                                                </p>
-                                                            )}
-                                                            {med.stock && (
-                                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                                    Stock:{' '}
-                                                                    {
-                                                                        med
-                                                                            .stock
-                                                                            .on_hand
-                                                                    }{' '}
-                                                                    {
-                                                                        med
-                                                                            .stock
-                                                                            .unit
+                                                                    tabIndex={0}
+                                                                    aria-selected={
+                                                                        selected
                                                                     }
-                                                                </p>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            {med.dosage}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            {med.route ?? '—'}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            {med.frequency}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <div className="flex gap-1">
-                                                                {med.controlled_drug && (
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger>
-                                                                                <Shield className="h-4 w-4 text-status-critical" />
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                Controlled
-                                                                                Drug
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                )}
-                                                                {med.high_risk && (
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger>
-                                                                                <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                High
-                                                                                Risk
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                )}
-                                                                {med.witness_required && (
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger>
-                                                                                <Eye className="h-4 w-4 text-status-info" />
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                Witness
-                                                                                Required
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {med
-                                                                    .administrations
-                                                                    .length >
-                                                                0 ? (
-                                                                    med.administrations.map(
-                                                                        (
-                                                                            a,
-                                                                            idx,
-                                                                        ) => (
-                                                                            <div
-                                                                                key={
-                                                                                    a.id ??
-                                                                                    `slot-${idx}`
+                                                                    onClick={() =>
+                                                                        selectMedicationForDetail(
+                                                                            med,
+                                                                            false,
+                                                                            true,
+                                                                        )
+                                                                    }
+                                                                    onKeyDown={(
+                                                                        event,
+                                                                    ) =>
+                                                                        handleMedicationRowKeyDown(
+                                                                            event,
+                                                                            rowKey,
+                                                                        )
+                                                                    }
+                                                                    className={`border-b transition outline-none last:border-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-muted/60' : ''}`}
+                                                                >
+                                                                    <td className="p-3">
+                                                                        <span className="font-medium">
+                                                                            {
+                                                                                med.name
+                                                                            }
+                                                                        </span>
+                                                                        {med.instructions && (
+                                                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                                                {
+                                                                                    med.instructions
                                                                                 }
-                                                                                className="flex items-center gap-1"
-                                                                            >
+                                                                            </p>
+                                                                        )}
+                                                                        {med.stock && (
+                                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                                Stock:{' '}
+                                                                                {
+                                                                                    med
+                                                                                        .stock
+                                                                                        .on_hand
+                                                                                }{' '}
+                                                                                {
+                                                                                    med
+                                                                                        .stock
+                                                                                        .unit
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        {
+                                                                            med.dosage
+                                                                        }
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        {med.route ??
+                                                                            '—'}
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        {
+                                                                            med.frequency
+                                                                        }
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        <div className="flex gap-1">
+                                                                            {med.controlled_drug && (
                                                                                 <TooltipProvider>
                                                                                     <Tooltip>
                                                                                         <TooltipTrigger>
-                                                                                            <div
-                                                                                                className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
-                                                                                                    a.status ===
-                                                                                                    'given'
-                                                                                                        ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success'
-                                                                                                        : a.status ===
-                                                                                                            'missed'
-                                                                                                          ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
-                                                                                                          : a.status ===
-                                                                                                              'refused'
-                                                                                                            ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
-                                                                                                            : a.status ===
-                                                                                                                'withheld'
-                                                                                                              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
-                                                                                                              : 'border-muted bg-muted/30'
-                                                                                                }`}
-                                                                                            >
-                                                                                                {statusIcon(
-                                                                                                    a.status,
-                                                                                                )}
-                                                                                                <span className="font-mono text-xs">
-                                                                                                    {a.scheduled_for
-                                                                                                        ? new Date(
-                                                                                                              a.scheduled_for,
-                                                                                                          ).toLocaleTimeString(
-                                                                                                              'en-NZ',
-                                                                                                              {
-                                                                                                                  hour: '2-digit',
-                                                                                                                  minute: '2-digit',
-                                                                                                              },
-                                                                                                          )
-                                                                                                        : '—'}
-                                                                                                </span>
-                                                                                                {getAdministrationAttachments(
-                                                                                                    a,
-                                                                                                )
-                                                                                                    .length >
-                                                                                                    0 && (
-                                                                                                    <Paperclip className="h-3 w-3 text-muted-foreground" />
-                                                                                                )}
-                                                                                            </div>
+                                                                                            <Shield className="h-4 w-4 text-status-critical" />
                                                                                         </TooltipTrigger>
                                                                                         <TooltipContent>
-                                                                                            <p className="font-medium capitalize">
-                                                                                                {
-                                                                                                    a.status
-                                                                                                }
-                                                                                            </p>
-                                                                                            {a.administered_by && (
-                                                                                                <p>
-                                                                                                    By:{' '}
-                                                                                                    {
-                                                                                                        a.administered_by
-                                                                                                    }
-                                                                                                </p>
-                                                                                            )}
-                                                                                            {a.witnessed_by && (
-                                                                                                <p>
-                                                                                                    Witnessed:{' '}
-                                                                                                    {
-                                                                                                        a.witnessed_by
-                                                                                                    }
-                                                                                                </p>
-                                                                                            )}
-                                                                                            {a.reason && (
-                                                                                                <p>
-                                                                                                    Reason:{' '}
-                                                                                                    {
-                                                                                                        a.reason
-                                                                                                    }
-                                                                                                </p>
-                                                                                            )}
-                                                                                            {a.notes && (
-                                                                                                <p>
-                                                                                                    Notes:{' '}
-                                                                                                    {
-                                                                                                        a.notes
-                                                                                                    }
-                                                                                                </p>
-                                                                                            )}
-                                                                                            {a.is_correction && (
-                                                                                                <p>
-                                                                                                    Correction
-                                                                                                    pending{' '}
-                                                                                                    {a.correction_status ??
-                                                                                                        'review'}
-                                                                                                </p>
-                                                                                            )}
-                                                                                            {getAdministrationAttachments(
-                                                                                                a,
-                                                                                            )
-                                                                                                .length >
-                                                                                                0 && (
-                                                                                                <p>
-                                                                                                    Evidence:{' '}
-                                                                                                    {
-                                                                                                        getAdministrationAttachments(
-                                                                                                            a,
-                                                                                                        )
-                                                                                                            .length
-                                                                                                    }{' '}
-                                                                                                    file(s)
-                                                                                                </p>
-                                                                                            )}
+                                                                                            Controlled
+                                                                                            Drug
                                                                                         </TooltipContent>
                                                                                     </Tooltip>
                                                                                 </TooltipProvider>
-                                                                                {a.id && (
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        className="h-7 w-7"
-                                                                                        onClick={() =>
-                                                                                            setEvidenceTarget(
+                                                                            )}
+                                                                            {med.high_risk && (
+                                                                                <TooltipProvider>
+                                                                                    <Tooltip>
+                                                                                        <TooltipTrigger>
+                                                                                            <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                                                                        </TooltipTrigger>
+                                                                                        <TooltipContent>
+                                                                                            High
+                                                                                            Risk
+                                                                                        </TooltipContent>
+                                                                                    </Tooltip>
+                                                                                </TooltipProvider>
+                                                                            )}
+                                                                            {med.witness_required && (
+                                                                                <TooltipProvider>
+                                                                                    <Tooltip>
+                                                                                        <TooltipTrigger>
+                                                                                            <Eye className="h-4 w-4 text-status-info" />
+                                                                                        </TooltipTrigger>
+                                                                                        <TooltipContent>
+                                                                                            Witness
+                                                                                            Required
+                                                                                        </TooltipContent>
+                                                                                    </Tooltip>
+                                                                                </TooltipProvider>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                            {med
+                                                                                .administrations
+                                                                                .length >
+                                                                            0 ? (
+                                                                                med.administrations.map(
+                                                                                    (
+                                                                                        a,
+                                                                                        idx,
+                                                                                    ) => (
+                                                                                        <div
+                                                                                            key={
+                                                                                                a.id ??
+                                                                                                `slot-${idx}`
+                                                                                            }
+                                                                                            className="flex items-center gap-1"
+                                                                                        >
+                                                                                            <TooltipProvider>
+                                                                                                <Tooltip>
+                                                                                                    <TooltipTrigger>
+                                                                                                        <div
+                                                                                                            className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
+                                                                                                                a.status ===
+                                                                                                                'given'
+                                                                                                                    ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success'
+                                                                                                                    : a.status ===
+                                                                                                                        'missed'
+                                                                                                                      ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                                                                                                      : a.status ===
+                                                                                                                          'refused'
+                                                                                                                        ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                                                                                                        : a.status ===
+                                                                                                                            'withheld'
+                                                                                                                          ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                                                                                                          : 'border-muted bg-muted/30'
+                                                                                                            }`}
+                                                                                                        >
+                                                                                                            {statusIcon(
+                                                                                                                a.status,
+                                                                                                            )}
+                                                                                                            <span className="font-mono text-xs">
+                                                                                                                {a.scheduled_for
+                                                                                                                    ? new Date(
+                                                                                                                          a.scheduled_for,
+                                                                                                                      ).toLocaleTimeString(
+                                                                                                                          'en-NZ',
+                                                                                                                          {
+                                                                                                                              hour: '2-digit',
+                                                                                                                              minute: '2-digit',
+                                                                                                                          },
+                                                                                                                      )
+                                                                                                                    : '—'}
+                                                                                                            </span>
+                                                                                                            {getAdministrationAttachments(
+                                                                                                                a,
+                                                                                                            )
+                                                                                                                .length >
+                                                                                                                0 && (
+                                                                                                                <Paperclip className="h-3 w-3 text-muted-foreground" />
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    </TooltipTrigger>
+                                                                                                    <TooltipContent>
+                                                                                                        <p className="font-medium capitalize">
+                                                                                                            {
+                                                                                                                a.status
+                                                                                                            }
+                                                                                                        </p>
+                                                                                                        {a.administered_by && (
+                                                                                                            <p>
+                                                                                                                By:{' '}
+                                                                                                                {
+                                                                                                                    a.administered_by
+                                                                                                                }
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                        {a.witnessed_by && (
+                                                                                                            <p>
+                                                                                                                Witnessed:{' '}
+                                                                                                                {
+                                                                                                                    a.witnessed_by
+                                                                                                                }
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                        {a.reason && (
+                                                                                                            <p>
+                                                                                                                Reason:{' '}
+                                                                                                                {
+                                                                                                                    a.reason
+                                                                                                                }
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                        {a.notes && (
+                                                                                                            <p>
+                                                                                                                Notes:{' '}
+                                                                                                                {
+                                                                                                                    a.notes
+                                                                                                                }
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                        {a.is_correction && (
+                                                                                                            <p>
+                                                                                                                Correction
+                                                                                                                pending{' '}
+                                                                                                                {a.correction_status ??
+                                                                                                                    'review'}
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                        {getAdministrationAttachments(
+                                                                                                            a,
+                                                                                                        )
+                                                                                                            .length >
+                                                                                                            0 && (
+                                                                                                            <p>
+                                                                                                                Evidence:{' '}
+                                                                                                                {
+                                                                                                                    getAdministrationAttachments(
+                                                                                                                        a,
+                                                                                                                    )
+                                                                                                                        .length
+                                                                                                                }{' '}
+                                                                                                                file(s)
+                                                                                                            </p>
+                                                                                                        )}
+                                                                                                    </TooltipContent>
+                                                                                                </Tooltip>
+                                                                                            </TooltipProvider>
+                                                                                            {a.id && (
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    className="h-7 w-7"
+                                                                                                    onClick={() =>
+                                                                                                        setEvidenceTarget(
+                                                                                                            {
+                                                                                                                administration:
+                                                                                                                    a,
+                                                                                                                medicationName:
+                                                                                                                    med.name,
+                                                                                                            },
+                                                                                                        )
+                                                                                                    }
+                                                                                                >
+                                                                                                    <Paperclip className="h-3.5 w-3.5" />
+                                                                                                </Button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    ),
+                                                                                )
+                                                                            ) : med
+                                                                                  .dose_times
+                                                                                  .length >
+                                                                              0 ? (
+                                                                                med.dose_times.map(
+                                                                                    (
+                                                                                        t,
+                                                                                    ) => (
+                                                                                        <div
+                                                                                            key={
+                                                                                                t
+                                                                                            }
+                                                                                            className="flex items-center gap-1 rounded-md border border-muted bg-muted/30 px-2 py-1"
+                                                                                        >
+                                                                                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                                            <span className="font-mono text-xs text-muted-foreground">
                                                                                                 {
-                                                                                                    administration:
-                                                                                                        a,
-                                                                                                    medicationName:
-                                                                                                        med.name,
-                                                                                                },
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <Paperclip className="h-3.5 w-3.5" />
-                                                                                    </Button>
-                                                                                )}
-                                                                            </div>
-                                                                        ),
-                                                                    )
-                                                                ) : med
-                                                                      .dose_times
-                                                                      .length >
-                                                                  0 ? (
-                                                                    med.dose_times.map(
-                                                                        (t) => (
-                                                                            <div
-                                                                                key={
-                                                                                    t
-                                                                                }
-                                                                                className="flex items-center gap-1 rounded-md border border-muted bg-muted/30 px-2 py-1"
-                                                                            >
-                                                                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                                                                <span className="font-mono text-xs text-muted-foreground">
-                                                                                    {
-                                                                                        t
-                                                                                    }
+                                                                                                    t
+                                                                                                }
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    ),
+                                                                                )
+                                                                            ) : (
+                                                                                <span className="text-xs text-muted-foreground">
+                                                                                    No
+                                                                                    schedule
                                                                                 </span>
-                                                                            </div>
-                                                                        ),
-                                                                    )
-                                                                ) : (
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        No
-                                                                        schedule
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <div className="flex flex-wrap gap-2">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    disabled={
-                                                                        !can.record ||
-                                                                        !hasPendingDoses(
-                                                                            med,
-                                                                        )
-                                                                    }
-                                                                    onClick={() =>
-                                                                        openRecordDialog(
-                                                                            med,
-                                                                            false,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Syringe className="mr-1 h-3 w-3" />
-                                                                    Record
-                                                                </Button>
-                                                                {getLatestRefusalFollowUpTarget(
-                                                                    med,
-                                                                ) && (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        disabled={
-                                                                            !can.record
-                                                                        }
-                                                                        onClick={() =>
-                                                                            setFollowUpTarget(
-                                                                                {
-                                                                                    administrationId:
-                                                                                        getLatestRefusalFollowUpTarget(
-                                                                                            med,
-                                                                                        )
-                                                                                            ?.id as number,
-                                                                                    medicationName:
-                                                                                        med.name,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Phone className="mr-1 h-3 w-3" />
-                                                                        Follow-Up
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ),
-                                            )}
-                                            {(marData?.scheduled ?? [])
-                                                .length === 0 && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={7}
-                                                        className="p-6 text-center text-muted-foreground"
-                                                    >
-                                                        No scheduled
-                                                        medications.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* PRN Medications */}
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">
-                                    PRN / As-Needed Medications (
-                                    {marData?.prn?.length ?? 0})
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/50">
-                                                <th className="p-3 text-left font-medium">
-                                                    Medication
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Dose
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Indication
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    24h Usage
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Administrations
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(marData?.prn ?? []).map((med) => (
-                                                <tr
-                                                    key={med.id}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="p-3">
-                                                        <span className="font-medium">
-                                                            {med.name}
-                                                        </span>
-                                                        {med.controlled_drug && (
-                                                            <Badge
-                                                                variant="destructive"
-                                                                className="ml-2 text-[10px]"
-                                                            >
-                                                                CD
-                                                            </Badge>
-                                                        )}
-                                                        {med.stock && (
-                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                Stock:{' '}
-                                                                {
-                                                                    med.stock
-                                                                        .on_hand
-                                                                }{' '}
-                                                                {med.stock.unit}
-                                                            </p>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        {med.dosage}
-                                                    </td>
-                                                    <td className="p-3 text-xs">
-                                                        {med.indication ?? '—'}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <span
-                                                                className={`text-sm font-medium ${med.prn_remaining === 0 ? 'text-status-critical' : med.prn_remaining !== null && med.prn_remaining <= 1 ? 'text-status-warning' : ''}`}
-                                                            >
-                                                                {
-                                                                    med.prn_count_24h
-                                                                }{' '}
-                                                                /{' '}
-                                                                {med.max_per_day ??
-                                                                    '∞'}
-                                                            </span>
-                                                            {med.prn_remaining !==
-                                                                null && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    (
-                                                                    {
-                                                                        med.prn_remaining
-                                                                    }{' '}
-                                                                    remaining)
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {med.administrations.map(
-                                                                (a) => (
-                                                                    <div
-                                                                        key={
-                                                                            a.id
-                                                                        }
-                                                                        className="flex items-center gap-1"
-                                                                    >
-                                                                        {statusIcon(
-                                                                            a.status,
-                                                                        )}
-                                                                        <span className="text-xs">
-                                                                            {a.administered_at
-                                                                                ? new Date(
-                                                                                      a.administered_at,
-                                                                                  ).toLocaleTimeString(
-                                                                                      'en-NZ',
-                                                                                      {
-                                                                                          hour: '2-digit',
-                                                                                          minute: '2-digit',
-                                                                                      },
-                                                                                  )
-                                                                                : '—'}
-                                                                        </span>
-                                                                        {getAdministrationAttachments(
-                                                                            a,
-                                                                        )
-                                                                            .length >
-                                                                            0 && (
-                                                                            <Paperclip className="h-3 w-3 text-muted-foreground" />
-                                                                        )}
-                                                                        {a.id && (
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-3">
+                                                                        <div className="flex flex-wrap gap-2">
                                                                             <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-6 w-6"
-                                                                                onClick={() =>
-                                                                                    setEvidenceTarget(
-                                                                                        {
-                                                                                            administration:
-                                                                                                a,
-                                                                                            medicationName:
-                                                                                                med.name,
-                                                                                        },
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                disabled={
+                                                                                    !can.record ||
+                                                                                    !hasPendingDoses(
+                                                                                        med,
                                                                                     )
                                                                                 }
+                                                                                onClick={(
+                                                                                    event,
+                                                                                ) => {
+                                                                                    event.stopPropagation();
+                                                                                    void openRecordDialog(
+                                                                                        med,
+                                                                                        false,
+                                                                                    );
+                                                                                }}
                                                                             >
-                                                                                <Paperclip className="h-3.5 w-3.5" />
+                                                                                <Syringe className="mr-1 h-3 w-3" />
+                                                                                Record
                                                                             </Button>
-                                                                        )}
-                                                                    </div>
-                                                                ),
-                                                            )}
-                                                            {med.administrations
-                                                                .length ===
-                                                                0 && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    None today
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                disabled={
-                                                                    !can.record ||
-                                                                    med.prn_remaining ===
-                                                                        0
+                                                                            {getLatestRefusalFollowUpTarget(
+                                                                                med,
+                                                                            ) && (
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    disabled={
+                                                                                        !can.record
+                                                                                    }
+                                                                                    onClick={(
+                                                                                        event,
+                                                                                    ) => {
+                                                                                        event.stopPropagation();
+                                                                                        setFollowUpTarget(
+                                                                                            {
+                                                                                                administrationId:
+                                                                                                    getLatestRefusalFollowUpTarget(
+                                                                                                        med,
+                                                                                                    )
+                                                                                                        ?.id as number,
+                                                                                                medicationName:
+                                                                                                    med.name,
+                                                                                            },
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    <Phone className="mr-1 h-3 w-3" />
+                                                                                    Follow-Up
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        },
+                                                    )}
+                                                    {scheduledRows.length ===
+                                                        0 && (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={7}
+                                                                className="p-6 text-center text-muted-foreground"
+                                                            >
+                                                                No scheduled
+                                                                medications.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* PRN Medications */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base">
+                                            PRN / As-Needed Medications (
+                                            {marData?.prn?.length ?? 0})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead className="sticky top-0 z-10 bg-background">
+                                                    <tr className="border-b bg-muted/50">
+                                                        <SortableHeader
+                                                            label="Medication"
+                                                            column="medication"
+                                                            activeColumn={
+                                                                marSortColumn
+                                                            }
+                                                            direction={
+                                                                marSortDirection
+                                                            }
+                                                            onSort={
+                                                                toggleMarSort
+                                                            }
+                                                        />
+                                                        <SortableHeader
+                                                            label="Dose"
+                                                            column="dose"
+                                                            activeColumn={
+                                                                marSortColumn
+                                                            }
+                                                            direction={
+                                                                marSortDirection
+                                                            }
+                                                            onSort={
+                                                                toggleMarSort
+                                                            }
+                                                        />
+                                                        <th className="p-3 text-left font-medium">
+                                                            Indication
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            24h Usage
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            Administrations
+                                                        </th>
+                                                        <th className="p-3 text-left font-medium">
+                                                            Actions
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {prnRows.map((med) => {
+                                                        const rowKey =
+                                                            medicationRowKey(
+                                                                med,
+                                                                true,
+                                                            );
+                                                        const selected =
+                                                            selectedDetailKey ===
+                                                            rowKey;
+
+                                                        return (
+                                                            <tr
+                                                                key={med.id}
+                                                                data-test="mar-row"
+                                                                data-mar-row-key={
+                                                                    rowKey
+                                                                }
+                                                                tabIndex={0}
+                                                                aria-selected={
+                                                                    selected
                                                                 }
                                                                 onClick={() =>
-                                                                    openRecordDialog(
+                                                                    selectMedicationForDetail(
                                                                         med,
+                                                                        true,
                                                                         true,
                                                                     )
                                                                 }
+                                                                onKeyDown={(
+                                                                    event,
+                                                                ) =>
+                                                                    handleMedicationRowKeyDown(
+                                                                        event,
+                                                                        rowKey,
+                                                                    )
+                                                                }
+                                                                className={`border-b transition outline-none last:border-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-muted/60' : ''}`}
                                                             >
-                                                                <Plus className="mr-1 h-3 w-3" />
-                                                                Give
-                                                            </Button>
-                                                            {getLatestRefusalFollowUpTarget(
-                                                                med,
-                                                            ) && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    disabled={
-                                                                        !can.record
-                                                                    }
-                                                                    onClick={() =>
-                                                                        setFollowUpTarget(
+                                                                <td className="p-3">
+                                                                    <span className="font-medium">
+                                                                        {
+                                                                            med.name
+                                                                        }
+                                                                    </span>
+                                                                    {med.controlled_drug && (
+                                                                        <Badge
+                                                                            variant="destructive"
+                                                                            className="ml-2 text-[10px]"
+                                                                        >
+                                                                            CD
+                                                                        </Badge>
+                                                                    )}
+                                                                    {med.stock && (
+                                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                                            Stock:{' '}
                                                                             {
-                                                                                administrationId:
-                                                                                    getLatestRefusalFollowUpTarget(
-                                                                                        med,
+                                                                                med
+                                                                                    .stock
+                                                                                    .on_hand
+                                                                            }{' '}
+                                                                            {
+                                                                                med
+                                                                                    .stock
+                                                                                    .unit
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-3">
+                                                                    {med.dosage}
+                                                                </td>
+                                                                <td className="p-3 text-xs">
+                                                                    {med.indication ??
+                                                                        '—'}
+                                                                </td>
+                                                                <td className="p-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span
+                                                                            className={`text-sm font-medium ${med.prn_remaining === 0 ? 'text-status-critical' : med.prn_remaining !== null && med.prn_remaining <= 1 ? 'text-status-warning' : ''}`}
+                                                                        >
+                                                                            {
+                                                                                med.prn_count_24h
+                                                                            }{' '}
+                                                                            /{' '}
+                                                                            {med.max_per_day ??
+                                                                                '∞'}
+                                                                        </span>
+                                                                        {med.prn_remaining !==
+                                                                            null && (
+                                                                            <span className="text-xs text-muted-foreground">
+                                                                                (
+                                                                                {
+                                                                                    med.prn_remaining
+                                                                                }{' '}
+                                                                                remaining)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3">
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {med.administrations.map(
+                                                                            (
+                                                                                a,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        a.id
+                                                                                    }
+                                                                                    className="flex items-center gap-1"
+                                                                                >
+                                                                                    {statusIcon(
+                                                                                        a.status,
+                                                                                    )}
+                                                                                    <span className="text-xs">
+                                                                                        {a.administered_at
+                                                                                            ? new Date(
+                                                                                                  a.administered_at,
+                                                                                              ).toLocaleTimeString(
+                                                                                                  'en-NZ',
+                                                                                                  {
+                                                                                                      hour: '2-digit',
+                                                                                                      minute: '2-digit',
+                                                                                                  },
+                                                                                              )
+                                                                                            : '—'}
+                                                                                    </span>
+                                                                                    {getAdministrationAttachments(
+                                                                                        a,
                                                                                     )
-                                                                                        ?.id as number,
-                                                                                medicationName:
-                                                                                    med.name,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Phone className="mr-1 h-3 w-3" />
-                                                                    Follow-Up
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {(marData?.prn ?? []).length ===
-                                                0 && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={6}
-                                                        className="p-6 text-center text-muted-foreground"
-                                                    >
-                                                        No PRN medications.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                                                                        .length >
+                                                                                        0 && (
+                                                                                        <Paperclip className="h-3 w-3 text-muted-foreground" />
+                                                                                    )}
+                                                                                    {a.id && (
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="icon"
+                                                                                            className="h-6 w-6"
+                                                                                            onClick={() =>
+                                                                                                setEvidenceTarget(
+                                                                                                    {
+                                                                                                        administration:
+                                                                                                            a,
+                                                                                                        medicationName:
+                                                                                                            med.name,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <Paperclip className="h-3.5 w-3.5" />
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+                                                                        {med
+                                                                            .administrations
+                                                                            .length ===
+                                                                            0 && (
+                                                                            <span className="text-xs text-muted-foreground">
+                                                                                None
+                                                                                today
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3">
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            disabled={
+                                                                                !can.record ||
+                                                                                med.prn_remaining ===
+                                                                                    0
+                                                                            }
+                                                                            onClick={(
+                                                                                event,
+                                                                            ) => {
+                                                                                event.stopPropagation();
+                                                                                void openRecordDialog(
+                                                                                    med,
+                                                                                    true,
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <Plus className="mr-1 h-3 w-3" />
+                                                                            Give
+                                                                        </Button>
+                                                                        {getLatestRefusalFollowUpTarget(
+                                                                            med,
+                                                                        ) && (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                disabled={
+                                                                                    !can.record
+                                                                                }
+                                                                                onClick={(
+                                                                                    event,
+                                                                                ) => {
+                                                                                    event.stopPropagation();
+                                                                                    setFollowUpTarget(
+                                                                                        {
+                                                                                            administrationId:
+                                                                                                getLatestRefusalFollowUpTarget(
+                                                                                                    med,
+                                                                                                )
+                                                                                                    ?.id as number,
+                                                                                            medicationName:
+                                                                                                med.name,
+                                                                                        },
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <Phone className="mr-1 h-3 w-3" />
+                                                                                Follow-Up
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {prnRows.length === 0 && (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={6}
+                                                                className="p-6 text-center text-muted-foreground"
+                                                            >
+                                                                No PRN
+                                                                medications.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <MedicationDetailPanel
+                                entry={detailEntry}
+                                canRecord={can.record}
+                                onRecord={(med, isPrn) =>
+                                    void openRecordDialog(med, isPrn)
+                                }
+                            />
+                        </div>
+
+                        <Sheet
+                            open={mobileDetailOpen}
+                            onOpenChange={setMobileDetailOpen}
+                        >
+                            <SheetContent
+                                side="bottom"
+                                className="max-h-[88dvh] overflow-y-auto rounded-t-xl p-0 lg:hidden"
+                            >
+                                <SheetHeader className="border-b px-4 py-3 text-left">
+                                    <SheetTitle>Medication details</SheetTitle>
+                                </SheetHeader>
+                                <MedicationDetailPanel
+                                    entry={detailEntry}
+                                    canRecord={can.record}
+                                    onRecord={(med, isPrn) =>
+                                        void openRecordDialog(med, isPrn)
+                                    }
+                                    className="border-0 shadow-none"
+                                />
+                            </SheetContent>
+                        </Sheet>
 
                         <RecordAdministrationDialog
                             isOpen={dialogOpen}
@@ -1833,5 +2187,217 @@ export default function MarCharts({
                 )}
             </div>
         </AppLayout>
+    );
+}
+
+function SortableHeader({
+    label,
+    column,
+    activeColumn,
+    direction,
+    onSort,
+}: {
+    label: string;
+    column: MarSortColumn;
+    activeColumn: MarSortColumn;
+    direction: MarSortDirection;
+    onSort: (column: MarSortColumn) => void;
+}) {
+    const active = column === activeColumn;
+
+    return (
+        <th className="p-3 text-left font-medium">
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="-ml-2 h-8 gap-1 px-2"
+                aria-sort={
+                    active
+                        ? direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                        : 'none'
+                }
+                onClick={() => onSort(column)}
+            >
+                {label}
+                <ArrowUpDown className="h-3.5 w-3.5" />
+            </Button>
+        </th>
+    );
+}
+
+function MedicationDetailPanel({
+    entry,
+    canRecord,
+    onRecord,
+    className = 'hidden h-fit lg:sticky lg:top-4 lg:block',
+}: {
+    entry: { med: ScheduledMed | PrnMed; isPrn: boolean } | null;
+    canRecord: boolean;
+    onRecord: (med: ScheduledMed | PrnMed, isPrn: boolean) => void;
+    className?: string;
+}) {
+    if (!entry) {
+        return (
+            <Card className={className} data-test="mar-detail-pane">
+                <CardContent className="py-8 text-sm text-muted-foreground">
+                    Select a medication row to see details.
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const { med, isPrn } = entry;
+    const administrations = med.administrations ?? [];
+    const selectedDose = administrations.find((administration) =>
+        ['pending', 'missed'].includes(administration.status),
+    );
+    const recent = administrations
+        .filter((administration) => administration.status !== 'pending')
+        .slice(0, 5);
+    const canRecordSelected =
+        canRecord &&
+        (isPrn ||
+            administrations.some((administration) =>
+                ['pending', 'missed'].includes(administration.status),
+            ));
+
+    return (
+        <Card className={className} data-test="mar-detail-pane">
+            <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <CardTitle className="truncate text-base">
+                            {med.name}
+                        </CardTitle>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {med.dosage || 'Dose not recorded'}
+                            {'route' in med && med.route
+                                ? ` · ${med.route}`
+                                : ''}
+                        </p>
+                    </div>
+                    <Badge variant="outline">
+                        {isPrn ? 'PRN' : 'Scheduled'}
+                    </Badge>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+                <section className="space-y-2">
+                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        Selected dose
+                    </div>
+                    <div className="rounded-md border p-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <div className="font-medium">
+                                    {isPrn
+                                        ? 'As-needed dose'
+                                        : formatMedicationTime(
+                                              selectedDose?.scheduled_for,
+                                          )}
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                    {selectedDose
+                                        ? statusBadge(selectedDose.status)
+                                        : isPrn
+                                          ? 'Record when clinically needed.'
+                                          : 'No open dose selected.'}
+                                </div>
+                            </div>
+                            <Button
+                                size="sm"
+                                disabled={!canRecordSelected}
+                                onClick={() => onRecord(med, isPrn)}
+                            >
+                                {isPrn ? 'Give' : 'Record'}
+                            </Button>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="space-y-2">
+                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        Recent administrations
+                    </div>
+                    {recent.length > 0 ? (
+                        <div className="divide-y rounded-md border">
+                            {recent.map((administration, index) => (
+                                <div
+                                    key={administration.id ?? index}
+                                    className="flex items-start justify-between gap-3 p-3"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="font-medium capitalize">
+                                            {administration.status}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {formatMedicationTime(
+                                                administration.administered_at ??
+                                                    administration.scheduled_for,
+                                            )}
+                                            {administration.administered_by
+                                                ? ` · ${administration.administered_by}`
+                                                : ''}
+                                        </div>
+                                        {administration.reason && (
+                                            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                                {administration.reason}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {statusIcon(administration.status)}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="rounded-md border p-3 text-xs text-muted-foreground">
+                            No administrations recorded yet today.
+                        </p>
+                    )}
+                </section>
+
+                <section className="space-y-2">
+                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        Order details
+                    </div>
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-md border p-3 text-xs">
+                        <dt className="text-muted-foreground">Frequency</dt>
+                        <dd className="text-right">
+                            {'frequency' in med ? med.frequency : 'As needed'}
+                        </dd>
+                        <dt className="text-muted-foreground">Form</dt>
+                        <dd className="text-right">
+                            {'form' in med ? (med.form ?? '—') : '—'}
+                        </dd>
+                        <dt className="text-muted-foreground">Stock</dt>
+                        <dd className="text-right">
+                            {med.stock
+                                ? `${med.stock.on_hand} ${med.stock.unit}`
+                                : '—'}
+                        </dd>
+                        <dt className="text-muted-foreground">Flags</dt>
+                        <dd className="text-right">
+                            {[
+                                med.controlled_drug ? 'CD' : null,
+                                'high_risk' in med && med.high_risk
+                                    ? 'High risk'
+                                    : null,
+                                med.witness_required ? 'Witness' : null,
+                            ]
+                                .filter(Boolean)
+                                .join(', ') || 'None'}
+                        </dd>
+                    </dl>
+                    {'instructions' in med && med.instructions && (
+                        <p className="rounded-md border p-3 text-xs text-muted-foreground">
+                            {med.instructions}
+                        </p>
+                    )}
+                </section>
+            </CardContent>
+        </Card>
     );
 }

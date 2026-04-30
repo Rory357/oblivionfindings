@@ -1,4 +1,42 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+function resolvePhpBinary(): string {
+    const explicit = process.env.PHP_BINARY;
+    if (explicit && existsSync(explicit)) {
+        return explicit;
+    }
+
+    const candidates = [
+        `${process.env.USERPROFILE ?? ''}\\.config\\herd\\bin\\php.bat`,
+        `${process.env.USERPROFILE ?? ''}\\.config\\herd\\bin\\php.exe`,
+        `${process.env.HOME ?? ''}/.config/herd-lite/bin/php`,
+        `${process.env.HOME ?? ''}/Library/Application Support/Herd/bin/php`,
+        'php',
+    ];
+
+    return (
+        candidates.find(
+            (candidate) => candidate === 'php' || existsSync(candidate),
+        ) ?? 'php'
+    );
+}
+
+export function resetMedicationReadinessFixtures() {
+    const phpBin = resolvePhpBinary();
+    const useShell = phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
+
+    execFileSync(
+        phpBin,
+        ['artisan', 'db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force'],
+        {
+            cwd: process.cwd(),
+            stdio: ['ignore', 'pipe', 'pipe'],
+            shell: useShell,
+        },
+    );
+}
 
 export async function loginAs(
     page: Page,
@@ -31,6 +69,14 @@ export async function loginAsStaff(page: Page) {
  */
 export async function loginAsFrontlineDemoWorker(page: Page) {
     await loginAs(page, 'sw1@demo.test', 'password');
+}
+
+export async function loginAsMedsDemoWorker(page: Page) {
+    await loginAs(page, 'sw-meds@demo.test', 'password');
+}
+
+export async function loginAsRestrictedMedsWorker(page: Page) {
+    await loginAs(page, 'sw-meds-no-record@demo.test', 'password');
 }
 
 export async function loginAsClockOutCleanWorker(

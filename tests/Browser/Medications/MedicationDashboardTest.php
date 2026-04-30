@@ -10,18 +10,7 @@ test('medications index page loads', function () {
         $browser->loginAs($user)
             ->visit('/medications')
             ->waitForText('Medication', 10)
-            ->assertPathIs('/medications');
-    });
-});
-
-test('medications dashboard page loads', function () {
-    $user = User::where('email', 'admin@test.com')->first();
-
-    $this->browse(function (Browser $browser) use ($user) {
-        $browser->loginAs($user)
-            ->visit('/medications/dashboard')
-            ->waitForText('Dashboard', 10)
-            ->assertPathIs('/medications/dashboard');
+            ->assertPathIs('/emar/daily');
     });
 });
 

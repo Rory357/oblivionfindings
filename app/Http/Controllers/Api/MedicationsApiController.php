@@ -302,7 +302,9 @@ class MedicationsApiController extends Controller
         // Add permissions
         $user = $request->user();
         $marData['can'] = [
-            'record' => $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
+            'record' => $user->canDo('medications.administer.record')
+                || $user->canDo('clients.update')
+                || $user->canDo('medications.orders.manage'),
             'correct' => $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
             'witness' => $user->canDo('medications.controlled.witness'),
         ];
@@ -618,7 +620,9 @@ class MedicationsApiController extends Controller
         $user = $request->user();
         
         abort_unless(
-            $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
+            $user->canDo('medications.administer.record')
+                || $user->canDo('clients.update')
+                || $user->canDo('medications.orders.manage'),
             403,
             'You do not have permission to record medication administrations.'
         );

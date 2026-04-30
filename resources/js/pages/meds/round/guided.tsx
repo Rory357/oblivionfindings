@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { useOfflineQueueState } from '@/hooks/use-offline-queue';
+import { submitOffline } from '@/lib/offline-queue';
 
 /* -------------------------------------------------------------------------- */
 /*  PR 9 — Guided Medication Round                                            */
@@ -112,6 +114,10 @@ function statusLabel(status: string | null): string {
     }
 }
 
+function itemKey(item: RoundItem): string {
+    return `${item.medication_id}:${item.scheduled_for}`;
+}
+
 export default function GuidedRound({ round, items, progress }: Props) {
     // Start the worker at the first dose that still needs action. If the
     // whole round is already done we park on the last item so the completion
@@ -120,66 +126,94 @@ export default function GuidedRound({ round, items, progress }: Props) {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [pendingAction, setPendingAction] = useState<ActionKind | null>(null);
     const [reason, setReason] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [statusError, setStatusError] = useState<string | null>(null);
+    const [queuedKeys, setQueuedKeys] = useState<Set<string>>(() => new Set());
+    const { online } = useOfflineQueueState();
 
     const current: RoundItem | undefined = items[currentIndex];
     const isRoundFinished = progress.pending === 0;
+    const currentQueued = current ? queuedKeys.has(itemKey(current)) : false;
+    const currentActioned = !!current?.administration || currentQueued;
 
     // Reset the dialog state whenever we move between items so a stale reason
     // can't accidentally be submitted for the wrong dose.
     const goTo = (nextIndex: number) => {
         setPendingAction(null);
         setReason('');
-        setCurrentIndex(Math.min(Math.max(nextIndex, 0), Math.max(items.length - 1, 0)));
+        setStatusError(null);
+        setCurrentIndex(
+            Math.min(Math.max(nextIndex, 0), Math.max(items.length - 1, 0)),
+        );
     };
-
-    const form = useForm<{
-        status: ActionKind;
-        reason: string;
-        scheduled_for: string;
-    }>({
-        status: 'given',
-        reason: '',
-        scheduled_for: '',
-    });
 
     function openAction(action: ActionKind) {
         if (!current) return;
+        setStatusError(null);
         setPendingAction(action);
         setReason('');
     }
 
-    function submitAction() {
+    function advanceAfterSubmit(submittedKey: string) {
+        const nextPending = items.findIndex(
+            (it, idx) =>
+                idx > currentIndex &&
+                !it.administration &&
+                !queuedKeys.has(itemKey(it)) &&
+                itemKey(it) !== submittedKey,
+        );
+        if (nextPending >= 0) {
+            setCurrentIndex(nextPending);
+        } else if (currentIndex < items.length - 1) {
+            setCurrentIndex(currentIndex + 1);
+        }
+    }
+
+    async function submitAction() {
         if (!current || !pendingAction) return;
 
         // "Given" does not require a reason; "Refused" and "Held" always do.
         if (pendingAction !== 'given' && reason.trim().length === 0) return;
 
-        form.transform(() => ({
+        setProcessing(true);
+        setStatusError(null);
+
+        const key = itemKey(current);
+        const payload = {
             status: pendingAction,
             reason: pendingAction === 'given' ? '' : reason.trim(),
             scheduled_for: current.scheduled_for,
-        }));
+        };
 
-        form.post(
-            `/emar/rounds/${round.id}/guided/items/${current.medication_id}`,
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setPendingAction(null);
-                    setReason('');
-                    // Inertia will replace props; jump to the next pending
-                    // item on reload. For now advance locally for snappy feel.
-                    const nextPending = items.findIndex(
-                        (it, idx) => idx > currentIndex && !it.administration,
-                    );
-                    if (nextPending >= 0) {
-                        setCurrentIndex(nextPending);
-                    } else if (currentIndex < items.length - 1) {
-                        setCurrentIndex(currentIndex + 1);
-                    }
-                },
-            },
-        );
+        try {
+            const result = await submitOffline({
+                action: 'round_admin',
+                url: `/emar/rounds/${round.id}/guided/items/${current.medication_id}`,
+                payload,
+                queuedMessage:
+                    'Round dose saved on this device — we\u2019ll send it when you\u2019re back online.',
+            });
+
+            setPendingAction(null);
+            setReason('');
+
+            if (result.status === 'queued') {
+                setQueuedKeys((currentKeys) => new Set(currentKeys).add(key));
+                advanceAfterSubmit(key);
+                return;
+            }
+
+            router.reload({ preserveScroll: true });
+            advanceAfterSubmit(key);
+        } catch (error: unknown) {
+            setStatusError(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not record this dose.',
+            );
+        } finally {
+            setProcessing(false);
+        }
     }
 
     function completeRound() {
@@ -213,7 +247,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                         </Link>
                     </Button>
                     <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold leading-tight">
+                        <p className="truncate text-sm leading-tight font-semibold">
                             {headerTitle}
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -234,7 +268,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
             </header>
 
             {/* ── Content ─────────────────────────────────────────────── */}
-            <main className="mx-auto w-full max-w-2xl px-4 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-4 sm:pt-6">
+            <main className="mx-auto w-full max-w-2xl px-4 pt-4 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] sm:pt-6">
                 {items.length === 0 ? (
                     <EmptyRound roundName={headerTitle} />
                 ) : isRoundFinished ? (
@@ -250,12 +284,17 @@ export default function GuidedRound({ round, items, progress }: Props) {
                             <span>
                                 {currentIndex + 1} of {items.length}
                             </span>
-                            {current.administration && (
+                            {(current.administration || currentQueued) && (
                                 <Badge
                                     variant="outline"
-                                    className="text-[10px] uppercase tracking-wide"
+                                    className="text-[10px] tracking-wide uppercase"
                                 >
-                                    {statusLabel(current.administration.status)}
+                                    {currentQueued
+                                        ? 'Queued'
+                                        : statusLabel(
+                                              current.administration?.status ??
+                                                  null,
+                                          )}
                                 </Badge>
                             )}
                         </div>
@@ -274,9 +313,9 @@ export default function GuidedRound({ round, items, progress }: Props) {
                             requiresWitness={current.requires_witness}
                         />
 
-                        {form.errors.status && (
+                        {statusError && (
                             <p className="mt-3 rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
-                                {form.errors.status}
+                                {statusError}
                             </p>
                         )}
 
@@ -291,7 +330,10 @@ export default function GuidedRound({ round, items, progress }: Props) {
                                 aria-label="Previous dose"
                                 className="min-h-11 px-3"
                             >
-                                <ChevronLeft aria-hidden className="mr-1 h-4 w-4" />
+                                <ChevronLeft
+                                    aria-hidden
+                                    className="mr-1 h-4 w-4"
+                                />
                                 Previous
                             </Button>
                             <Button
@@ -303,7 +345,10 @@ export default function GuidedRound({ round, items, progress }: Props) {
                                 className="min-h-11 px-3"
                             >
                                 Next
-                                <ChevronRight aria-hidden className="ml-1 h-4 w-4" />
+                                <ChevronRight
+                                    aria-hidden
+                                    className="ml-1 h-4 w-4"
+                                />
                             </Button>
                         </div>
                     </>
@@ -317,8 +362,9 @@ export default function GuidedRound({ round, items, progress }: Props) {
                         <Button
                             size="lg"
                             className="h-14 w-full bg-status-success text-base font-semibold text-white hover:bg-status-success"
-                            disabled={!!current.administration || form.processing}
+                            disabled={currentActioned || processing}
                             onClick={() => openAction('given')}
+                            data-test="meds-round-given"
                         >
                             <CheckCircle2 className="mr-1 h-5 w-5" />
                             Given
@@ -327,8 +373,9 @@ export default function GuidedRound({ round, items, progress }: Props) {
                             size="lg"
                             variant="outline"
                             className="h-14 w-full border-status-warning/30 bg-status-warning-bg text-base font-semibold text-status-warning hover:bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
-                            disabled={!!current.administration || form.processing}
+                            disabled={currentActioned || processing}
                             onClick={() => openAction('refused')}
+                            data-test="meds-round-refused"
                         >
                             <XCircle className="mr-1 h-5 w-5" />
                             Refused
@@ -337,16 +384,19 @@ export default function GuidedRound({ round, items, progress }: Props) {
                             size="lg"
                             variant="outline"
                             className="h-14 w-full border-status-warning/30 bg-status-warning-bg text-base font-semibold text-status-warning hover:bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
-                            disabled={!!current.administration || form.processing}
+                            disabled={currentActioned || processing}
                             onClick={() => openAction('held')}
+                            data-test="meds-round-held"
                         >
                             <Pause className="mr-1 h-5 w-5" />
                             Held
                         </Button>
                     </div>
-                    {current.administration && (
+                    {currentActioned && (
                         <p className="mx-auto mt-2 max-w-2xl text-center text-xs text-muted-foreground">
-                            Already recorded as {statusLabel(current.administration.status)}.
+                            {currentQueued
+                                ? 'Saved on this device and waiting to send.'
+                                : `Already recorded as ${statusLabel(current.administration?.status ?? null)}.`}
                         </p>
                     )}
                 </div>
@@ -366,15 +416,18 @@ export default function GuidedRound({ round, items, progress }: Props) {
                     <DialogHeader>
                         <DialogTitle>
                             {pendingAction === 'given' && 'Give this dose now?'}
-                            {pendingAction === 'refused' && 'Why was this refused?'}
-                            {pendingAction === 'held' && 'Why is this being held?'}
+                            {pendingAction === 'refused' &&
+                                'Why was this refused?'}
+                            {pendingAction === 'held' &&
+                                'Why is this being held?'}
                         </DialogTitle>
                     </DialogHeader>
 
                     {current && (
                         <div className="rounded-lg border bg-muted/40 p-3 text-sm">
                             <p className="font-medium">
-                                {current.client_name} — {current.medication_name}
+                                {current.client_name} —{' '}
+                                {current.medication_name}
                             </p>
                             {current.dose && (
                                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -406,8 +459,20 @@ export default function GuidedRound({ round, items, progress }: Props) {
 
                     {pendingAction === 'given' && current?.requires_witness && (
                         <p className="rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-xs text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
-                            This med usually needs a witness. If no one is with you,
-                            hold it and tell your supervisor.
+                            This med usually needs a witness. If no one is with
+                            you, hold it and tell your supervisor.
+                        </p>
+                    )}
+
+                    {!online && (
+                        <p className="rounded-md border border-status-info/30 bg-status-info-bg px-3 py-2 text-xs text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
+                            This will send when you&rsquo;re back online.
+                        </p>
+                    )}
+
+                    {statusError && (
+                        <p className="rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-xs text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
+                            {statusError}
                         </p>
                     )}
 
@@ -418,15 +483,16 @@ export default function GuidedRound({ round, items, progress }: Props) {
                                 setPendingAction(null);
                                 setReason('');
                             }}
-                            disabled={form.processing}
+                            disabled={processing}
                         >
                             Cancel
                         </Button>
                         <Button
                             onClick={submitAction}
                             disabled={
-                                form.processing ||
-                                (pendingAction !== 'given' && reason.trim().length === 0)
+                                processing ||
+                                (pendingAction !== 'given' &&
+                                    reason.trim().length === 0)
                             }
                             className={
                                 pendingAction === 'given'
@@ -453,10 +519,13 @@ function EmptyRound({ roundName }: { roundName: string }) {
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
                 <Pill className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h2 className="mt-4 text-lg font-semibold">Nothing to give right now</h2>
+            <h2 className="mt-4 text-lg font-semibold">
+                Nothing to give right now
+            </h2>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 No scheduled medications fall inside the window for{' '}
-                <span className="font-medium text-foreground">{roundName}</span>.
+                <span className="font-medium text-foreground">{roundName}</span>
+                .
             </p>
             <Button asChild className="mt-6">
                 <Link href="/my-day">
@@ -537,7 +606,9 @@ function RoundCompleteView({
 
             {flaggedItems.length > 0 && (
                 <div className="rounded-2xl border bg-card p-4">
-                    <p className="text-sm font-semibold">Doses that need follow-up</p>
+                    <p className="text-sm font-semibold">
+                        Doses that need follow-up
+                    </p>
                     <ul className="mt-2 divide-y">
                         {flaggedItems.map((it) => (
                             <li
@@ -555,7 +626,9 @@ function RoundCompleteView({
                                     )}
                                 </div>
                                 <Badge variant="outline" className="shrink-0">
-                                    {statusLabel(it.administration?.status ?? null)}
+                                    {statusLabel(
+                                        it.administration?.status ?? null,
+                                    )}
                                 </Badge>
                             </li>
                         ))}

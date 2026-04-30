@@ -152,7 +152,7 @@ export default function RecordAdministrationDialog({
             setScanMessage('');
             setScanMatchSource(null);
         }
-    }, [isOpen, medication]);
+    }, [isOpen, medication?.id, medication?.dosage]);
 
     const needsReason = useMemo(() => {
         if (status !== 'given') return true;
@@ -269,7 +269,10 @@ export default function RecordAdministrationDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+            <DialogContent
+                className="grid max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-3xl"
+                data-test="record-administration-dialog"
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Pill className="h-5 w-5" />
@@ -277,7 +280,7 @@ export default function RecordAdministrationDialog({
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4">
+                <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
                     <div className="rounded-md bg-muted p-3">
                         <div className="font-medium">{medication.name}</div>
                         <div className="text-sm text-muted-foreground">
@@ -355,12 +358,13 @@ export default function RecordAdministrationDialog({
                                     : 'Scan the pack barcode or enter one of the registered medication codes before recording a given dose.'}
                             </p>
 
-                            <div className="grid gap-4 md:grid-cols-[1fr_140px]">
-                                <div className="space-y-3">
+                            <div className="grid min-w-0 gap-4 md:grid-cols-[1fr_140px]">
+                                <div className="min-w-0 space-y-3">
                                     <div className="space-y-2">
                                         <Label>Scanned or entered code</Label>
-                                        <div className="flex gap-2">
+                                        <div className="flex min-w-0 gap-2">
                                             <Input
+                                                className="min-w-0"
                                                 value={scanCode}
                                                 onChange={(event) => {
                                                     setScanCode(
@@ -380,6 +384,7 @@ export default function RecordAdministrationDialog({
                                                     !scanCode.trim() ||
                                                     verifyingScan
                                                 }
+                                                data-test="record-administration-scan-verify"
                                             >
                                                 {verifyingScan
                                                     ? 'Checking...'
@@ -419,7 +424,8 @@ export default function RecordAdministrationDialog({
                                                         type="button"
                                                         variant="secondary"
                                                         size="sm"
-                                                        className="h-auto justify-start px-2 py-1 font-mono text-xs"
+                                                        className="h-auto max-w-full justify-start whitespace-normal break-all px-2 py-1 text-left font-mono text-xs"
+                                                        data-test="record-administration-scan-code"
                                                         onClick={() => {
                                                             setScanCode(
                                                                 option.value,
@@ -624,7 +630,7 @@ export default function RecordAdministrationDialog({
                     </div>
                 </div>
 
-                <DialogFooter className="gap-2">
+                <DialogFooter className="gap-2 border-t pt-4">
                     <Button
                         variant="outline"
                         onClick={onClose}
@@ -635,6 +641,7 @@ export default function RecordAdministrationDialog({
                     <Button
                         onClick={handleSubmit}
                         disabled={!canSubmit || isLoading}
+                        data-test="record-administration-submit"
                     >
                         {isLoading ? 'Saving...' : 'Record Administration'}
                     </Button>

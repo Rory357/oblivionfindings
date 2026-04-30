@@ -54,7 +54,12 @@ class EmarController extends Controller
 
     private function getStaffList()
     {
-        return User::orderBy('name')->get(['id', 'name']);
+        return User::staff()
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role'])
+            ->filter(fn (User $user) => $user->canDo('medications.controlled.witness'))
+            ->values()
+            ->map(fn (User $user) => $user->only(['id', 'name']));
     }
 
     private function getClientsList()

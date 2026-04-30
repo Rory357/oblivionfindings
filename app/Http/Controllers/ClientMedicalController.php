@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Models\Client;
 use App\Models\ClientCondition;
 use App\Models\ClientControlledDrugDiscrepancy;
@@ -25,6 +26,8 @@ use Illuminate\Support\Facades\Cache;
 
 class ClientMedicalController extends Controller
 {
+    use HandlesMedicationSync;
+
     private function buildMedicationPayload(array $validated): array
     {
         $payload = [];
@@ -390,7 +393,12 @@ class ClientMedicalController extends Controller
         abort_unless($medication->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.administer.record') ?? false), 403);
+        abort_unless(
+            ($user?->canDo('clients.update') ?? false)
+            || ($user?->canDo('medications.administer.record') ?? false)
+            || ($user?->canDo('medications.orders.manage') ?? false),
+            403
+        );
 
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,missed,withheld'],
@@ -401,7 +409,19 @@ class ClientMedicalController extends Controller
             'shift_id' => ['nullable', 'integer'],
             'witnessed_by' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
         ]);
+
+        if ($cached = $this->getCachedMedicationSyncResponse('administration', $data)) {
+            if ($request->expectsJson()) {
+                return response()->json($cached);
+            }
+
+            return back()->with('success', 'Already saved — no changes needed.');
+        }
 
         // Require a reason whenever the outcome is not "given".
         if (($data['status'] ?? 'given') !== 'given' && empty($data['reason'])) {
@@ -451,6 +471,32 @@ class ClientMedicalController extends Controller
         $medication->loadMissing('stock');
 
         try {
+            if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
+                $scheduledFor = \Carbon\Carbon::parse($data['scheduled_for']);
+                $conflictingAdministration = ClientMedicationAdministration::query()
+                    ->where('client_id', $client->id)
+                    ->where('client_medication_id', $medication->id)
+                    ->whereBetween('scheduled_for', [
+                        $scheduledFor->copy()->subMinute(),
+                        $scheduledFor->copy()->addMinute(),
+                    ])
+                    ->latest('id')
+                    ->first();
+
+                if ($conflictingAdministration) {
+                    $payload = $this->buildMedicationConflictPayload(
+                        $data,
+                        'Medication state changed before this offline administration could sync. Supervisor review is required.',
+                    );
+
+                    if ($request->expectsJson()) {
+                        return response()->json($payload, 409);
+                    }
+
+                    return back()->withInput()->with('error', $payload['error']);
+                }
+            }
+
             $result = app(EnhancedMarService::class)->recordAdministration(
                 $client,
                 $medication,
@@ -470,6 +516,19 @@ class ClientMedicalController extends Controller
                         app(MedicationIncidentIntegrationService::class)
                             ->handlePrnOverLimit($client, $medication->fresh(), $user->id);
                     }
+                }
+
+                if ($request->expectsJson()) {
+                    return response()->json(
+                        $this->withMedicationSync(
+                            $result,
+                            $data,
+                            'rejected',
+                            false,
+                            $result['error'] ?? null,
+                        ),
+                        422,
+                    );
                 }
 
                 return back()->withInput()->with('error', $result['error'] ?? 'Failed to record administration.');
@@ -497,6 +556,10 @@ class ClientMedicalController extends Controller
                     'status' => $data['status'],
                     'reason' => $data['reason'] ?? null,
                     'witnessed_by' => $data['witnessed_by'] ?? null,
+                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                    'origin_device_id' => $data['origin_device_id'] ?? null,
+                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                 ]),
                 'visibility' => 'internal',
                 'is_pinned' => false,
@@ -519,6 +582,22 @@ class ClientMedicalController extends Controller
                 'title' => 'Medication administration recorded',
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
+
+            $payload = $this->withMedicationSync([
+                'success' => true,
+                'administration' => [
+                    'id' => $a->id,
+                    'status' => $a->status,
+                    'administered_at' => $a->administered_at?->toIso8601String(),
+                ],
+                'safety_check' => $result['safety_check'] ?? null,
+            ], $data, $this->medicationProcessedStatus($data));
+
+            $this->rememberMedicationSyncResponse('administration', $data, $payload);
+
+            if ($request->expectsJson()) {
+                return response()->json($payload);
+            }
 
             return back()->with('success', 'Medication administration recorded.');
         } catch (\Throwable $e) {

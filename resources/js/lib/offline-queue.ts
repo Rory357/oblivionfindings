@@ -25,7 +25,16 @@ import { toast } from 'sonner';
  *     actions wired through `submitOffline(...)` are queued.
  */
 
-export type OfflineAction = 'prn' | 'progress_note';
+export type OfflineAction =
+    | 'prn'
+    | 'progress_note'
+    | 'round_admin'
+    | 'administration'
+    | 'correction'
+    | 'cd_loss_report'
+    | 'cd_entry'
+    | 'stock_update'
+    | `transport_${string}`;
 type HttpMethod = 'post' | 'put' | 'patch' | 'delete';
 
 export interface OfflineSubmission {
@@ -43,6 +52,7 @@ export interface OfflineSubmission {
 export interface OfflineQueueState {
     online: boolean;
     pendingCount: number;
+    pendingSubmissions: OfflineSubmission[];
     syncing: boolean;
 }
 
@@ -58,6 +68,22 @@ export type SubmitOfflineResult =
     | { status: 'queued'; submission: OfflineSubmission }
     | { status: 'sent'; data: unknown };
 
+interface QueueOfflineSubmissionArgs {
+    action: OfflineAction;
+    method?: HttpMethod;
+    url: string;
+    payload: Record<string, unknown>;
+    createdAt?: string;
+    attempts?: number;
+    lastError?: string | null;
+}
+
+interface QueueStorage {
+    list(): Promise<OfflineSubmission[]>;
+    put(item: OfflineSubmission): Promise<void>;
+    remove(id: string): Promise<void>;
+}
+
 const DB_NAME = 'oblivion-offline';
 const DB_VERSION = 1;
 const STORE = 'submissions';
@@ -70,15 +96,20 @@ const subscribers = new Set<(state: OfflineQueueState) => void>();
 let lastBroadcast: OfflineQueueState = {
     online: typeof navigator === 'undefined' ? true : navigator.onLine,
     pendingCount: 0,
+    pendingSubmissions: [],
     syncing: false,
 };
+let lastPendingSignature = '';
+let storageOverride: QueueStorage | null = null;
 
 /* -------------------------------------------------------------------------- */
 /*  IndexedDB plumbing                                                        */
 /* -------------------------------------------------------------------------- */
 
 function canUseIdb(): boolean {
-    return typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
+    return (
+        typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined'
+    );
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -96,7 +127,8 @@ function openDb(): Promise<IDBDatabase> {
             }
         };
         req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
+        req.onerror = () =>
+            reject(req.error ?? new Error('IndexedDB open failed'));
     });
 }
 
@@ -117,7 +149,8 @@ async function withStore<T>(
                 .catch(reject);
             tx.oncomplete = () => resolve(result);
             tx.onerror = () => reject(tx.error);
-            tx.onabort = () => reject(tx.error ?? new Error('Transaction aborted'));
+            tx.onabort = () =>
+                reject(tx.error ?? new Error('Transaction aborted'));
         });
     } finally {
         db.close();
@@ -162,6 +195,12 @@ function getDeviceId(): string {
 /* -------------------------------------------------------------------------- */
 
 async function listQueue(): Promise<OfflineSubmission[]> {
+    if (storageOverride) {
+        const items = await storageOverride.list();
+
+        return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    }
+
     if (!canUseIdb()) return [];
     try {
         return await withStore('readonly', async (store) => {
@@ -176,6 +215,11 @@ async function listQueue(): Promise<OfflineSubmission[]> {
 }
 
 async function putQueueItem(item: OfflineSubmission): Promise<void> {
+    if (storageOverride) {
+        await storageOverride.put(item);
+        return;
+    }
+
     if (!canUseIdb()) return;
     await withStore('readwrite', async (store) => {
         await idbRequest(store.put(item));
@@ -183,10 +227,37 @@ async function putQueueItem(item: OfflineSubmission): Promise<void> {
 }
 
 async function removeQueueItem(id: string): Promise<void> {
+    if (storageOverride) {
+        await storageOverride.remove(id);
+        return;
+    }
+
     if (!canUseIdb()) return;
     await withStore('readwrite', async (store) => {
         await idbRequest(store.delete(id));
     });
+}
+
+export async function queueOfflineSubmission(
+    args: QueueOfflineSubmissionArgs,
+): Promise<OfflineSubmission> {
+    const payload = enrichPayload(args.payload, true);
+    const submission: OfflineSubmission = {
+        id: payload.client_request_uuid as string,
+        action: args.action,
+        method: args.method ?? 'post',
+        url: args.url,
+        payload,
+        createdAt: args.createdAt ?? new Date().toISOString(),
+        lastAttemptAt: null,
+        attempts: args.attempts ?? 0,
+        lastError: args.lastError ?? null,
+    };
+
+    await putQueueItem(submission);
+    void broadcastState();
+
+    return submission;
 }
 
 export async function getPendingCount(): Promise<number> {
@@ -199,20 +270,24 @@ export async function getPendingCount(): Promise<number> {
 /* -------------------------------------------------------------------------- */
 
 async function broadcastState(): Promise<void> {
-    const pendingCount = await getPendingCount();
+    const queue = await listQueue();
+    const pendingSignature = queue.map((item) => item.id).join('|');
     const next: OfflineQueueState = {
         online: typeof navigator === 'undefined' ? true : navigator.onLine,
-        pendingCount,
+        pendingCount: queue.length,
+        pendingSubmissions: queue,
         syncing,
     };
     if (
         next.online === lastBroadcast.online &&
         next.pendingCount === lastBroadcast.pendingCount &&
-        next.syncing === lastBroadcast.syncing
+        next.syncing === lastBroadcast.syncing &&
+        pendingSignature === lastPendingSignature
     ) {
         return;
     }
     lastBroadcast = next;
+    lastPendingSignature = pendingSignature;
     for (const cb of subscribers) {
         try {
             cb(next);
@@ -238,6 +313,27 @@ export function getOfflineQueueSnapshot(): OfflineQueueState {
     return lastBroadcast;
 }
 
+export function __setOfflineQueueStorageForTests(
+    storage: QueueStorage | null,
+): void {
+    storageOverride = storage;
+}
+
+export function __resetOfflineQueueRuntimeForTests(): void {
+    booted = false;
+    syncing = false;
+    replayScheduled = false;
+    subscribers.clear();
+    lastBroadcast = {
+        online: typeof navigator === 'undefined' ? true : navigator.onLine,
+        pendingCount: 0,
+        pendingSubmissions: [],
+        syncing: false,
+    };
+    lastPendingSignature = '';
+    storageOverride = null;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Submit / replay                                                           */
 /* -------------------------------------------------------------------------- */
@@ -252,7 +348,7 @@ function enrichPayload(
         client_request_uuid:
             typeof payload.client_request_uuid === 'string'
                 ? payload.client_request_uuid
-                : existingUuid ?? createUuid(),
+                : (existingUuid ?? createUuid()),
         captured_offline_at:
             typeof payload.captured_offline_at === 'string'
                 ? payload.captured_offline_at
@@ -311,20 +407,13 @@ export async function submitOffline(
     const id = enriched.client_request_uuid as string;
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        const submission: OfflineSubmission = {
-            id,
+        const submission = await queueOfflineSubmission({
             action,
             method,
             url,
             payload: enrichPayload(payload, true, id),
-            createdAt: new Date().toISOString(),
-            lastAttemptAt: null,
-            attempts: 0,
-            lastError: null,
-        };
-        await putQueueItem(submission);
+        });
         toast.info(queuedMessage);
-        void broadcastState();
         return { status: 'queued', submission };
     }
 
@@ -333,28 +422,25 @@ export async function submitOffline(
         return { status: 'sent', data };
     } catch (error) {
         if (isNetworkError(error)) {
-            const submission: OfflineSubmission = {
-                id,
+            const submission = await queueOfflineSubmission({
                 action,
                 method,
                 url,
                 payload: enrichPayload(payload, true, id),
-                createdAt: new Date().toISOString(),
-                lastAttemptAt: new Date().toISOString(),
                 attempts: 1,
                 lastError:
                     error instanceof Error ? error.message : 'Network error',
-            };
-            await putQueueItem(submission);
+            });
             toast.info(queuedMessage);
-            void broadcastState();
             return { status: 'queued', submission };
         }
         throw error;
     }
 }
 
-async function replayOne(item: OfflineSubmission): Promise<'sent' | 'retry' | 'failed'> {
+async function replayOne(
+    item: OfflineSubmission,
+): Promise<'sent' | 'retry' | 'failed' | 'conflict'> {
     try {
         await postMutation(item.method, item.url, item.payload);
         await removeQueueItem(item.id);
@@ -364,11 +450,15 @@ async function replayOne(item: OfflineSubmission): Promise<'sent' | 'retry' | 'f
             ...item,
             attempts: item.attempts + 1,
             lastAttemptAt: new Date().toISOString(),
-            lastError:
-                error instanceof Error ? error.message : 'Unknown error',
+            lastError: error instanceof Error ? error.message : 'Unknown error',
         };
 
         if (isNetworkError(error)) {
+            if (next.attempts >= 8) {
+                await removeQueueItem(item.id);
+                return 'failed';
+            }
+
             await putQueueItem(next);
             return 'retry';
         }
@@ -381,8 +471,25 @@ async function replayOne(item: OfflineSubmission): Promise<'sent' | 'retry' | 'f
             // Drop the queued item and surface a clear error so the worker
             // re-enters if needed.
             if (status === 409) {
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(
+                        new CustomEvent('emar:offline-conflict', {
+                            detail: {
+                                entry: item,
+                                response: error.response.data,
+                            },
+                        }),
+                    );
+                }
                 await removeQueueItem(item.id);
-                return 'failed';
+                const message =
+                    typeof error.response.data?.sync?.message === 'string'
+                        ? error.response.data.sync.message
+                        : typeof error.response.data?.error === 'string'
+                          ? error.response.data.error
+                          : 'A queued item conflicted with newer server state. Please re-enter it if needed.';
+                toast.error(message);
+                return 'conflict';
             }
             // 422 validation means the payload isn't acceptable — there is no
             // amount of retrying that helps. Drop and notify.
@@ -415,12 +522,14 @@ export async function replayOfflineQueue(): Promise<void> {
 
     let sent = 0;
     let failed = 0;
+    let conflicts = 0;
 
     try {
         for (const item of queue) {
             const result = await replayOne(item);
             if (result === 'sent') sent += 1;
             else if (result === 'failed') failed += 1;
+            else if (result === 'conflict') conflicts += 1;
             else if (result === 'retry') {
                 // Stop the sweep on the first network retry — we'll try again
                 // on the next online/visibility event.
@@ -436,9 +545,7 @@ export async function replayOfflineQueue(): Promise<void> {
 
     if (sent > 0) {
         toast.success(
-            sent === 1
-                ? 'Queued item sent.'
-                : `${sent} queued items sent.`,
+            sent === 1 ? 'Queued item sent.' : `${sent} queued items sent.`,
         );
     }
     if (failed > 0) {
@@ -446,6 +553,11 @@ export async function replayOfflineQueue(): Promise<void> {
             failed === 1
                 ? 'A queued item could not be saved to the server. Please re-enter it.'
                 : `${failed} queued items could not be saved. Please re-enter them.`,
+        );
+    }
+    if (conflicts > 1) {
+        toast.error(
+            `${conflicts} queued items conflicted with newer server state. Please re-enter them if needed.`,
         );
     }
 }
