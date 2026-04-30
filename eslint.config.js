@@ -86,7 +86,19 @@ export default [
         },
     },
     {
-        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js'],
+        ignores: [
+            'vendor',
+            'node_modules',
+            'public',
+            'bootstrap/ssr',
+            'tailwind.config.js',
+            // Claude Code agent worktrees: each is a full repo checkout so
+            // recursing into them duplicates lint work for every parallel
+            // session and overflows ESLint's stylish formatter on machines
+            // with several active worktrees. CI never has these.
+            '.claude/worktrees/**',
+            '.claude/**',
+        ],
     },
     prettier, // Turn off all rules that might conflict with Prettier
 ];
