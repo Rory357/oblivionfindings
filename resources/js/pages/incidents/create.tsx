@@ -368,10 +368,10 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
             <Head title="Report incident" />
             <div
                 data-test="incident-wizard-root"
-                className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:pb-8 lg:max-w-5xl"
+                className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] lg:max-w-5xl lg:pb-8"
             >
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 lg:grid-rows-[auto_auto]">
-                    <div className="lg:row-start-2">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
                         <h1 className="text-xl font-semibold tracking-tight">
                             Report an incident
                         </h1>
@@ -383,7 +383,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                         href="/incidents"
                         data-test="incident-wizard-exit"
                         aria-label="Cancel incident report and return to incidents list"
-                        className="frontline-focus inline-flex min-h-11 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted lg:row-start-1 lg:min-h-10"
+                        className="frontline-focus inline-flex min-h-11 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted lg:min-h-10"
                     >
                         <span className="lg:hidden">Exit</span>
                         <span className="hidden lg:inline">Cancel</span>
@@ -432,7 +432,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                         {step < 2 ? (
                             <div
                                 data-test="incident-wizard-actions"
-                                className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0"
+                                className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0"
                             >
                                 {step > 0 && (
                                     <Button
@@ -440,7 +440,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                                         variant="outline"
                                         size="lg"
                                         onClick={goBack}
-                                        className="flex-1 sm:flex-none"
+                                        className="flex-1 lg:flex-none"
                                     >
                                         <ArrowLeft className="mr-1.5 h-4 w-4" />
                                         Back
@@ -454,7 +454,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                                         processing ||
                                         (step === 1 && !stepTwoValid)
                                     }
-                                    className="flex-1 sm:min-w-[180px] sm:flex-none"
+                                    className="flex-1 lg:min-w-[180px] lg:flex-none"
                                 >
                                     {processing ? (
                                         <>
@@ -477,7 +477,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                         ) : (
                             <div
                                 data-test="incident-wizard-actions"
-                                className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0"
+                                className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur lg:static lg:flex-row lg:items-center lg:justify-between lg:border-0 lg:bg-transparent lg:p-0"
                             >
                                 <Button
                                     data-test="incident-wizard-skip"
@@ -485,7 +485,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                                     size="lg"
                                     onClick={skipToIncident}
                                     disabled={processing}
-                                    className="w-full sm:w-auto"
+                                    className="w-full lg:w-auto"
                                 >
                                     Skip extra detail
                                 </Button>
@@ -494,7 +494,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                                     size="lg"
                                     onClick={() => submitStepThree('submit')}
                                     disabled={processing}
-                                    className="w-full sm:w-auto sm:min-w-[180px]"
+                                    className="w-full lg:w-auto lg:min-w-[180px]"
                                 >
                                     {processing ? (
                                         <>
