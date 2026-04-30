@@ -350,6 +350,17 @@ export default function EndOfShiftChecklist({
         session.tasks ?? [],
     );
 
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        setSubmitting(false);
+        setNotes('');
+        setOverrideReason('');
+        setBreakMinutes(session.break_minutes ?? 0);
+    }, [open, session.id, session.break_minutes]);
+
     // Resync local tasks if the session payload changes (e.g. live refresh).
     useEffect(() => {
         setTasks(session.tasks ?? []);
@@ -404,11 +415,13 @@ export default function EndOfShiftChecklist({
     useEffect(() => {
         if (!open) {
             setResumeAvailable(null);
+            setHandoverValue(emptyHandoverWriteValue);
             return;
         }
 
         if (!handoverEligibleForSave) {
             setResumeAvailable(null);
+            setHandoverValue(emptyHandoverWriteValue);
             return;
         }
 
