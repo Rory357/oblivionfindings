@@ -793,6 +793,8 @@ export default function MarCharts({
                         <Button
                             variant="outline"
                             size="icon"
+                            data-test="mar-date-prev"
+                            aria-label="Previous day"
                             onClick={() => navigateDate(-1)}
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -800,6 +802,8 @@ export default function MarCharts({
                         <Input
                             type="date"
                             value={date}
+                            data-test="mar-date-input"
+                            aria-label="MAR date"
                             onChange={(e) =>
                                 router.get(
                                     '/emar/mar',
@@ -815,6 +819,8 @@ export default function MarCharts({
                         <Button
                             variant="outline"
                             size="icon"
+                            data-test="mar-date-next"
+                            aria-label="Next day"
                             onClick={() => navigateDate(1)}
                         >
                             <ChevronRight className="h-4 w-4" />
