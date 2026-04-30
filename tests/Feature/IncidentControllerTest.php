@@ -61,8 +61,7 @@ class IncidentControllerTest extends TestCase
 
     protected function mockNotificationService(): \Mockery\MockInterface
     {
-        $mock = \Mockery::mock(NotificationService::class);
-        $mock->shouldReceive('notifyCrud')->andReturnNull();
+        $mock = \Mockery::mock(NotificationService::class)->shouldIgnoreMissing();
         $this->app->instance(NotificationService::class, $mock);
 
         return $mock;

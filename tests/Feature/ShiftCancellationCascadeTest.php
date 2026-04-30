@@ -73,7 +73,7 @@ class ShiftCancellationCascadeTest extends TestCase
 
         $this->from('/operations/shifts')
             ->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel")
+            ->patch("/operations/shifts/{$shift->id}/cancel")
             ->assertRedirect('/operations/shifts')
             ->assertSessionHas('success', 'Shift occurrence cancelled.');
 
@@ -107,7 +107,7 @@ class ShiftCancellationCascadeTest extends TestCase
 
         $this->from('/operations/shifts')
             ->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel")
+            ->patch("/operations/shifts/{$shift->id}/cancel")
             ->assertRedirect('/operations/shifts')
             ->assertSessionHasErrors(['shift']);
 
@@ -145,7 +145,7 @@ class ShiftCancellationCascadeTest extends TestCase
             'notes' => 'Created before cancellation',
         ]);
 
-        $this->actingAs($this->admin)->patch("/shifts/{$shift->id}/cancel");
+        $this->actingAs($this->admin)->patch("/operations/shifts/{$shift->id}/cancel");
 
         $administration->refresh();
         $round->refresh();
@@ -184,7 +184,7 @@ class ShiftCancellationCascadeTest extends TestCase
             'notes' => 'Open transport',
         ]);
 
-        $this->actingAs($this->admin)->patch("/shifts/{$shift->id}/cancel");
+        $this->actingAs($this->admin)->patch("/operations/shifts/{$shift->id}/cancel");
 
         $transport->refresh();
         $booking->refresh();
@@ -208,7 +208,7 @@ class ShiftCancellationCascadeTest extends TestCase
             'reported_by' => $this->staff->id,
         ]);
 
-        $this->actingAs($this->admin)->patch("/shifts/{$shift->id}/cancel");
+        $this->actingAs($this->admin)->patch("/operations/shifts/{$shift->id}/cancel");
 
         $this->assertDatabaseHas('client_incidents', [
             'id' => $incident->id,
@@ -250,7 +250,7 @@ class ShiftCancellationCascadeTest extends TestCase
 
         $this->from('/operations/shifts')
             ->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel")
+            ->patch("/operations/shifts/{$shift->id}/cancel")
             ->assertRedirect('/operations/shifts')
             ->assertSessionHas('success', 'Shift occurrence cancelled.');
     }
@@ -290,11 +290,11 @@ class ShiftCancellationCascadeTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel");
+            ->patch("/operations/shifts/{$shift->id}/cancel");
 
         $notifications = DatabaseNotification::query()
             ->where('notifiable_id', $incomingStaff->id)
-            ->where('notifiable_type', User::class)
+            ->where('notifiable_type', $incomingStaff->getMorphClass())
             ->get();
 
         $this->assertCount(1, $notifications);
@@ -311,7 +311,7 @@ class ShiftCancellationCascadeTest extends TestCase
         $shift = $this->makeShift();
 
         $this->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel");
+            ->patch("/operations/shifts/{$shift->id}/cancel");
 
         $this->assertSame(
             0,
@@ -339,15 +339,15 @@ class ShiftCancellationCascadeTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel");
+            ->patch("/operations/shifts/{$shift->id}/cancel");
 
         // Second attempt — shift already cancelled, cancel() returns early
         $this->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel");
+            ->patch("/operations/shifts/{$shift->id}/cancel");
 
         $count = DatabaseNotification::query()
             ->where('notifiable_id', $incomingStaff->id)
-            ->where('notifiable_type', User::class)
+            ->where('notifiable_type', $incomingStaff->getMorphClass())
             ->whereJsonContains('data->event_key', 'shifts.handover.cancelled')
             ->count();
 
@@ -385,7 +385,7 @@ class ShiftCancellationCascadeTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->patch("/shifts/{$shift->id}/cancel");
+            ->patch("/operations/shifts/{$shift->id}/cancel");
 
         $count = DatabaseNotification::query()
             ->where('notifiable_id', $incomingStaff->id)

@@ -13,6 +13,7 @@ const authenticatedPages = [
     { name: 'finance-accounts', path: '/finance/accounts' },
     { name: 'governance-policies', path: '/governance/policies' },
     { name: 'health-clinical-events', path: '/health-clinical/events' },
+    { name: 'incident-create', path: '/incidents/create' },
     { name: 'sites-checklist-templates', path: '/sites/checklists/templates' },
     { name: 'notifications', path: '/notifications' },
 ] as const;

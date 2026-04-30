@@ -24,7 +24,10 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">
+                    <Label
+                        htmlFor="incident-description"
+                        className="text-sm font-medium"
+                    >
                         Describe what happened
                     </Label>
                     <DictateButton
@@ -34,15 +37,27 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
                     />
                 </div>
                 <Textarea
+                    id="incident-description"
+                    data-test="incident-description"
                     value={data.description}
                     onChange={(e) => onChange({ description: e.target.value })}
                     placeholder="In your own words, what happened?"
                     rows={8}
                     className="text-base"
+                    aria-invalid={!!errors?.description}
+                    aria-describedby={
+                        errors?.description
+                            ? 'incident-description-error'
+                            : undefined
+                    }
                     autoFocus
                 />
                 {errors?.description && (
-                    <p className="text-xs text-status-critical">
+                    <p
+                        id="incident-description-error"
+                        data-test="incident-description-error"
+                        className="text-xs text-status-critical"
+                    >
                         {errors.description}
                     </p>
                 )}

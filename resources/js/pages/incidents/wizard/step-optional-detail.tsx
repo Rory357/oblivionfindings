@@ -69,48 +69,64 @@ export default function StepOptionalDetail({
                 </p>
             </div>
 
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">
-                        What you did straight away
-                    </Label>
-                    <DictateButton
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <Label
+                            htmlFor="incident-immediate-action"
+                            className="text-sm font-medium"
+                        >
+                            What you did straight away
+                        </Label>
+                        <DictateButton
+                            value={data.immediate_action_taken}
+                            onChange={(next) =>
+                                onChange({ immediate_action_taken: next })
+                            }
+                            fieldLabel="What you did straight away"
+                        />
+                    </div>
+                    <Textarea
+                        id="incident-immediate-action"
+                        data-test="incident-immediate-action"
                         value={data.immediate_action_taken}
-                        onChange={(next) =>
-                            onChange({ immediate_action_taken: next })
+                        onChange={(e) =>
+                            onChange({
+                                immediate_action_taken: e.target.value,
+                            })
                         }
-                        fieldLabel="What you did straight away"
+                        placeholder="First aid, moved the client, called a manager…"
+                        rows={3}
+                        className="text-base"
                     />
                 </div>
-                <Textarea
-                    value={data.immediate_action_taken}
-                    onChange={(e) =>
-                        onChange({ immediate_action_taken: e.target.value })
-                    }
-                    placeholder="First aid, moved the client, called a manager…"
-                    rows={3}
-                    className="text-base"
-                />
-            </div>
 
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">
-                        Who else was there
-                    </Label>
-                    <DictateButton
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <Label
+                            htmlFor="incident-witnesses"
+                            className="text-sm font-medium"
+                        >
+                            Who else was there
+                        </Label>
+                        <DictateButton
+                            value={data.witnesses}
+                            onChange={(next) => onChange({ witnesses: next })}
+                            fieldLabel="Who else was there"
+                        />
+                    </div>
+                    <Textarea
+                        id="incident-witnesses"
+                        data-test="incident-witnesses"
                         value={data.witnesses}
-                        onChange={(next) => onChange({ witnesses: next })}
-                        fieldLabel="Who else was there"
+                        onChange={(e) =>
+                            onChange({ witnesses: e.target.value })
+                        }
+                        placeholder="Names of anyone who saw it, and how to reach them."
+                        rows={2}
+                        className="text-base"
                     />
                 </div>
-                <Textarea
-                    value={data.witnesses}
-                    onChange={(e) => onChange({ witnesses: e.target.value })}
-                    placeholder="Names of anyone who saw it, and how to reach them."
-                    rows={2}
-                    className="text-base"
-                />
             </div>
 
             {showInjuryFields && (
@@ -119,10 +135,15 @@ export default function StepOptionalDetail({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">
+                            <Label
+                                htmlFor="incident-injured-person-name"
+                                className="text-xs font-medium"
+                            >
                                 Injured person
                             </Label>
                             <Input
+                                id="incident-injured-person-name"
+                                data-test="incident-injured-person-name"
                                 value={data.injured_person_name}
                                 onChange={(e) =>
                                     onChange({
@@ -133,7 +154,12 @@ export default function StepOptionalDetail({
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Role</Label>
+                            <Label
+                                htmlFor="incident-injured-person-role"
+                                className="text-xs font-medium"
+                            >
+                                Role
+                            </Label>
                             <Select
                                 value={data.injured_person_role || '__none__'}
                                 onValueChange={(v) =>
@@ -143,7 +169,11 @@ export default function StepOptionalDetail({
                                     })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="incident-injured-person-role"
+                                    data-test="incident-injured-person-role"
+                                    aria-label="Injured person role"
+                                >
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -165,10 +195,15 @@ export default function StepOptionalDetail({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">
+                            <Label
+                                htmlFor="incident-injury-body-part"
+                                className="text-xs font-medium"
+                            >
                                 Body part
                             </Label>
                             <Input
+                                id="incident-injury-body-part"
+                                data-test="incident-injury-body-part"
                                 value={data.injury_body_part}
                                 onChange={(e) =>
                                     onChange({
@@ -179,7 +214,10 @@ export default function StepOptionalDetail({
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">
+                            <Label
+                                htmlFor="incident-injury-nature"
+                                className="text-xs font-medium"
+                            >
                                 Type of injury
                             </Label>
                             <Select
@@ -191,7 +229,11 @@ export default function StepOptionalDetail({
                                     })
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger
+                                    id="incident-injury-nature"
+                                    data-test="incident-injury-nature"
+                                    aria-label="Type of injury"
+                                >
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -212,7 +254,10 @@ export default function StepOptionalDetail({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">
+                        <Label
+                            htmlFor="incident-medical-treatment-type"
+                            className="text-xs font-medium"
+                        >
                             Medical treatment
                         </Label>
                         <Select
@@ -224,7 +269,11 @@ export default function StepOptionalDetail({
                                 })
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger
+                                id="incident-medical-treatment-type"
+                                data-test="incident-medical-treatment-type"
+                                aria-label="Medical treatment"
+                            >
                                 <SelectValue placeholder="Select…" />
                             </SelectTrigger>
                             <SelectContent>

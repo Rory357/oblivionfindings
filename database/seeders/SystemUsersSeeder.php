@@ -57,20 +57,21 @@ class SystemUsersSeeder extends Seeder
         ];
 
         foreach ($users as $u) {
-            $user = User::updateOrCreate(
-                ['email' => $u['email']],
-                [
-                    'name' => $u['name'],
-                    'password' => $password,
-                    'role' => $u['role'],
-                    'approved_at' => now(),
-                    'email_verified_at' => now(),
-                ]
-            );
+            $user = User::query()->firstOrNew(['email' => $u['email']]);
+            $user->forceFill([
+                'name' => $u['name'],
+                'password' => $password,
+                'role' => $u['role'],
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+            ])->save();
 
             $role = Role::query()->where('name', $u['role'])->first();
             if ($role) {
-                $user->roles()->syncWithoutDetaching([$role->id]);
+                $user->roles()->sync([$role->id]);
             }
 
             // Create staff record for staff users
@@ -93,38 +94,36 @@ class SystemUsersSeeder extends Seeder
         // Support workers (primary test actors)
         $supportRole = Role::query()->where('name', 'support_worker')->first();
 
-        $workers = User::query()->where('email', 'like', 'sw%@demo.test')->get();
-        if ($workers->isEmpty()) {
-            for ($i = 1; $i <= 8; $i++) {
-                $w = User::create([
-                    'name' => "Support Worker {$i}",
-                    'email' => "sw{$i}@demo.test",
-                    'password' => $password,
-                    'role' => 'support_worker',
-                    'approved_at' => now(),
-                    'email_verified_at' => now(),
-                ]);
-                if ($supportRole) {
-                    $w->roles()->syncWithoutDetaching([$supportRole->id]);
-                }
+        for ($i = 1; $i <= 8; $i++) {
+            $w = User::query()->firstOrNew(['email' => "sw{$i}@demo.test"]);
+            $w->forceFill([
+                'name' => "Support Worker {$i}",
+                'password' => $password,
+                'role' => 'support_worker',
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+            ])->save();
 
-                // Create staff record for support worker
-                $staff = Staff::create([
-                    'user_id' => $w->id,
+            if ($supportRole) {
+                $w->roles()->sync([$supportRole->id]);
+            }
+
+            // Create staff record for support worker
+            $staff = Staff::updateOrCreate(
+                ['user_id' => $w->id],
+                [
                     'employee_id' => 'SW' . str_pad($i, 3, '0', STR_PAD_LEFT),
                     'job_title' => 'Support Worker',
                     'department' => 'Clinical',
                     'status' => 'active',
                     'hire_date' => now()->subMonths(rand(1, 24)),
-                ]);
+                ]
+            );
 
-                $this->upsertHrEmployeeProfile($w, $staff);
-            }
-        } else {
-            foreach ($workers as $worker) {
-                $staff = Staff::query()->where('user_id', $worker->id)->first();
-                $this->upsertHrEmployeeProfile($worker, $staff);
-            }
+            $this->upsertHrEmployeeProfile($w, $staff);
         }
 
         // Ensure every staff user has an HR profile, even if the legacy staff
@@ -136,19 +135,21 @@ class SystemUsersSeeder extends Seeder
         });
 
         // Create a board member
-        $boardUser = User::updateOrCreate(
-            ['email' => 'board@demo.test'],
-            [
-                'name' => 'Demo Board Member',
-                'password' => $password,
-                'role' => 'board_member',
-                'approved_at' => now(),
-                'email_verified_at' => now(),
-            ]
-        );
+        $boardUser = User::query()->firstOrNew(['email' => 'board@demo.test']);
+        $boardUser->forceFill([
+            'name' => 'Demo Board Member',
+            'password' => $password,
+            'role' => 'board_member',
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
+        ])->save();
+
         $boardRole = Role::query()->where('name', 'board_member')->first();
         if ($boardRole) {
-            $boardUser->roles()->syncWithoutDetaching([$boardRole->id]);
+            $boardUser->roles()->sync([$boardRole->id]);
         }
 
         $this->command?->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');

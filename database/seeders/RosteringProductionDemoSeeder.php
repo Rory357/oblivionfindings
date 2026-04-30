@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
 use App\Models\HsTrainingRequirement;
+use App\Models\Role;
 use App\Models\RosterPeriod;
 use App\Models\RosterTemplate;
 use App\Models\RosterTemplateShift;
@@ -23,13 +24,23 @@ class RosteringProductionDemoSeeder extends Seeder
     {
         $this->publishExistingAssignedDemoShifts();
 
-        $manager = User::query()->where('email', 'admin@demo.test')->first()
-            ?? User::factory()->create([
-                'name' => 'Demo Admin',
-                'email' => 'admin@demo.test',
-                'password' => Hash::make('password'),
-                'organization_id' => 1,
-            ]);
+        $manager = User::query()->firstOrNew(['email' => 'admin@demo.test']);
+        $manager->forceFill([
+            'name' => 'Demo Admin',
+            'password' => Hash::make('password'),
+            'role' => 'admin',
+            'organization_id' => 1,
+            'approved_at' => now(),
+            'email_verified_at' => now(),
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
+        ])->save();
+
+        $adminRole = Role::query()->where('name', 'admin')->first();
+        if ($adminRole) {
+            $manager->roles()->sync([$adminRole->id]);
+        }
 
         $site = $this->site(9001, 'Rostering E2E House');
         $frontlineSite = $this->site(9002, 'Rostering E2E Frontline House');

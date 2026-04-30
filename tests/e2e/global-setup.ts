@@ -58,6 +58,10 @@ async function globalSetup(): Promise<void> {
         const useShell =
             phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
         const seederClasses = [
+            'RbacSeeder',
+            'SystemCatalogSeeder',
+            'SystemUsersSeeder',
+            'SystemClientsSeeder',
             'RosteringProductionDemoSeeder',
             'FrontlineLifecycleDemoSeeder',
             'JobBoardReadinessDemoSeeder',

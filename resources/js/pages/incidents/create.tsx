@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import WizardStepper, { type WizardStep } from '@/components/wizard-stepper';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
 import AppLayout from '@/layouts/app-layout';
-import { formatTime } from '@/lib/datetime';
+import { formatDateTime, formatTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -68,6 +68,46 @@ const STEPS: WizardStep[] = [
     { key: 'who-what', label: 'Who & what' },
     { key: 'describe', label: 'Describe' },
     { key: 'detail', label: 'Detail (optional)' },
+];
+
+const TYPE_LABELS: Record<IncidentType, string> = {
+    injury: 'Injury',
+    behaviour: 'Behaviour',
+    medication: 'Medication',
+    safeguarding: 'Safeguarding',
+    near_miss: 'Near miss',
+    other: 'Other',
+};
+
+const SEVERITY_PREVIEW: Record<
+    IncidentSeverity,
+    { label: string; className: string; dotClassName: string }
+> = {
+    low: {
+        label: 'Low',
+        className:
+            'border-status-success/40 bg-status-success-bg text-foreground',
+        dotClassName: 'bg-status-success',
+    },
+    medium: {
+        label: 'Medium',
+        className:
+            'border-status-warning/40 bg-status-warning-bg text-foreground',
+        dotClassName: 'bg-status-warning',
+    },
+    high: {
+        label: 'High',
+        className:
+            'border-status-critical/40 bg-status-critical-bg text-foreground',
+        dotClassName: 'bg-status-critical',
+    },
+};
+
+const WORKFLOW_HELP = [
+    'Draft saved now',
+    'Submit when ready',
+    'Manager review',
+    'Close after follow-up',
 ];
 
 export default function IncidentCreate({ clients, resumeIncident }: Props) {
@@ -158,14 +198,18 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
         setData((prev) => ({ ...prev, ...p }));
     }, []);
 
-    const stepOneValid = useMemo(
-        () => !!data.client_id && !!data.type && !!data.severity,
-        [data],
-    );
     const stepTwoValid = useMemo(
         () => (data.description ?? '').trim().length >= 3,
         [data.description],
     );
+    const selectedClient = useMemo(
+        () => clients.find((client) => String(client.id) === data.client_id),
+        [clients, data.client_id],
+    );
+    const severityPreview = SEVERITY_PREVIEW[data.severity];
+    const occurredAtPreview = data.occurred_at
+        ? formatDateTime(data.occurred_at)
+        : 'Now';
 
     const goNext = () => {
         const e: typeof errors = {};
@@ -284,7 +328,10 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                 ]}
             >
                 <Head title="Resume draft incident" />
-                <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-10">
+                <div
+                    data-test="incident-wizard-resume-prompt"
+                    className="mx-auto flex max-w-md flex-col gap-4 px-4 py-10"
+                >
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                             <AlertTriangle className="h-5 w-5" />
@@ -319,9 +366,12 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
             ]}
         >
             <Head title="Report incident" />
-            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:pb-8">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
+            <div
+                data-test="incident-wizard-root"
+                className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:pb-8 lg:max-w-5xl"
+            >
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 lg:grid-rows-[auto_auto]">
+                    <div className="lg:row-start-2">
                         <h1 className="text-xl font-semibold tracking-tight">
                             Report an incident
                         </h1>
@@ -331,118 +381,229 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                     </div>
                     <Link
                         href="/incidents"
-                        aria-label="Exit incident report and return to incidents list"
-                        className="frontline-focus inline-flex min-h-11 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+                        data-test="incident-wizard-exit"
+                        aria-label="Cancel incident report and return to incidents list"
+                        className="frontline-focus inline-flex min-h-11 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted lg:row-start-1 lg:min-h-10"
                     >
-                        Exit
+                        <span className="lg:hidden">Exit</span>
+                        <span className="hidden lg:inline">Cancel</span>
                     </Link>
                 </div>
 
-                <WizardStepper steps={STEPS} current={step} />
+                <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+                    <div className="space-y-6 lg:space-y-8">
+                        <WizardStepper steps={STEPS} current={step} />
 
-                <Card className="p-4 sm:p-6">
-                    {step === 0 && (
-                        <StepWhoWhat
-                            data={data}
-                            onChange={patch}
-                            clients={clients}
-                            clientLabel={clientSingular}
-                            errors={errors}
-                        />
-                    )}
-                    {step === 1 && (
-                        <StepDescribe
-                            data={data}
-                            onChange={patch}
-                            errors={errors}
-                        />
-                    )}
-                    {step === 2 && (
-                        <StepOptionalDetail
-                            data={data}
-                            onChange={patch}
-                            showInjuryFields={showInjuryFields}
-                        />
-                    )}
-                </Card>
+                        <Card className="p-4 sm:p-6 lg:p-8">
+                            <div data-test={`incident-wizard-step-${step}`}>
+                                {step === 0 && (
+                                    <StepWhoWhat
+                                        data={data}
+                                        onChange={patch}
+                                        clients={clients}
+                                        clientLabel={clientSingular}
+                                        errors={errors}
+                                    />
+                                )}
+                                {step === 1 && (
+                                    <StepDescribe
+                                        data={data}
+                                        onChange={patch}
+                                        errors={errors}
+                                    />
+                                )}
+                                {step === 2 && (
+                                    <StepOptionalDetail
+                                        data={data}
+                                        onChange={patch}
+                                        showInjuryFields={showInjuryFields}
+                                    />
+                                )}
+                            </div>
+                        </Card>
 
-                {savedAt && (
-                    <p className="text-xs text-muted-foreground">
-                        Draft saved on this device · {formatTime(savedAt)}
-                    </p>
-                )}
-
-                {step < 2 ? (
-                    <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0">
-                        {step > 0 && (
-                            <Button
-                                variant="outline"
-                                size="lg"
-                                onClick={goBack}
-                                className="flex-1 sm:flex-none"
-                            >
-                                <ArrowLeft className="mr-1.5 h-4 w-4" />
-                                Back
-                            </Button>
+                        {savedAt && (
+                            <p className="text-xs text-muted-foreground lg:hidden">
+                                Draft saved on this device ·{' '}
+                                {formatTime(savedAt)}
+                            </p>
                         )}
-                        <Button
-                            size="lg"
-                            onClick={goNext}
-                            disabled={
-                                processing ||
-                                (step === 0 ? !stepOneValid : !stepTwoValid)
-                            }
-                            className="flex-1 sm:min-w-[180px] sm:flex-none"
-                        >
-                            {processing ? (
-                                <>
-                                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                    Saving…
-                                </>
-                            ) : step === 0 ? (
-                                <>
-                                    Next
-                                    <ArrowRight className="ml-1.5 h-4 w-4" />
-                                </>
-                            ) : (
-                                <>
-                                    Save and continue
-                                    <ArrowRight className="ml-1.5 h-4 w-4" />
-                                </>
-                            )}
-                        </Button>
+
+                        {step < 2 ? (
+                            <div
+                                data-test="incident-wizard-actions"
+                                className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0"
+                            >
+                                {step > 0 && (
+                                    <Button
+                                        data-test="incident-wizard-back"
+                                        variant="outline"
+                                        size="lg"
+                                        onClick={goBack}
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        <ArrowLeft className="mr-1.5 h-4 w-4" />
+                                        Back
+                                    </Button>
+                                )}
+                                <Button
+                                    data-test="incident-wizard-next"
+                                    size="lg"
+                                    onClick={goNext}
+                                    disabled={
+                                        processing ||
+                                        (step === 1 && !stepTwoValid)
+                                    }
+                                    className="flex-1 sm:min-w-[180px] sm:flex-none"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            Saving…
+                                        </>
+                                    ) : step === 0 ? (
+                                        <>
+                                            Next
+                                            <ArrowRight className="ml-1.5 h-4 w-4" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            Save and continue
+                                            <ArrowRight className="ml-1.5 h-4 w-4" />
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        ) : (
+                            <div
+                                data-test="incident-wizard-actions"
+                                className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0"
+                            >
+                                <Button
+                                    data-test="incident-wizard-skip"
+                                    variant="outline"
+                                    size="lg"
+                                    onClick={skipToIncident}
+                                    disabled={processing}
+                                    className="w-full sm:w-auto"
+                                >
+                                    Skip extra detail
+                                </Button>
+                                <Button
+                                    data-test="incident-wizard-finish"
+                                    size="lg"
+                                    onClick={() => submitStepThree('submit')}
+                                    disabled={processing}
+                                    className="w-full sm:w-auto sm:min-w-[180px]"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            Saving…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check className="mr-1.5 h-4 w-4" />
+                                            Save and finish
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0">
-                        <Button
-                            variant="outline"
-                            size="lg"
-                            onClick={skipToIncident}
-                            disabled={processing}
-                            className="w-full sm:w-auto"
-                        >
-                            Skip extra detail
-                        </Button>
-                        <Button
-                            size="lg"
-                            onClick={() => submitStepThree('submit')}
-                            disabled={processing}
-                            className="w-full sm:w-auto sm:min-w-[180px]"
-                        >
-                            {processing ? (
-                                <>
-                                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                                    Saving…
-                                </>
-                            ) : (
-                                <>
-                                    <Check className="mr-1.5 h-4 w-4" />
-                                    Save and finish
-                                </>
+
+                    <aside
+                        data-test="incident-wizard-summary"
+                        aria-label="Incident report summary"
+                        className="hidden lg:block"
+                    >
+                        <Card className="sticky top-4 space-y-6 p-5">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                    Step {step + 1} of {STEPS.length}
+                                </p>
+                                <h2 className="text-base font-semibold">
+                                    Report summary
+                                </h2>
+                            </div>
+
+                            <dl className="space-y-4 text-sm">
+                                <div>
+                                    <dt className="text-xs font-medium text-muted-foreground">
+                                        {clientSingular}
+                                    </dt>
+                                    <dd className="mt-1 font-medium">
+                                        {selectedClient
+                                            ? `${selectedClient.first_name} ${selectedClient.last_name}`
+                                            : `Choose a ${clientSingular.toLowerCase()}`}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium text-muted-foreground">
+                                        Incident type
+                                    </dt>
+                                    <dd className="mt-1 font-medium">
+                                        {TYPE_LABELS[data.type]}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium text-muted-foreground">
+                                        Severity
+                                    </dt>
+                                    <dd className="mt-1">
+                                        <span
+                                            className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${severityPreview.className}`}
+                                        >
+                                            <span
+                                                aria-hidden
+                                                className={`h-2 w-2 rounded-full ${severityPreview.dotClassName}`}
+                                            />
+                                            {severityPreview.label}
+                                        </span>
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-xs font-medium text-muted-foreground">
+                                        Occurred
+                                    </dt>
+                                    <dd className="mt-1 font-medium">
+                                        {occurredAtPreview}
+                                    </dd>
+                                </div>
+                            </dl>
+
+                            {savedAt && (
+                                <div className="rounded-md border bg-muted/30 p-3">
+                                    <p className="text-xs font-medium text-foreground">
+                                        Saved on this device
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Draft saved at {formatTime(savedAt)}
+                                    </p>
+                                </div>
                             )}
-                        </Button>
-                    </div>
-                )}
+
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold">
+                                    What happens next
+                                </h3>
+                                <ol className="space-y-2">
+                                    {WORKFLOW_HELP.map((item, index) => (
+                                        <li
+                                            key={item}
+                                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                                        >
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold text-foreground">
+                                                {index + 1}
+                                            </span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        </Card>
+                    </aside>
+                </div>
             </div>
         </AppLayout>
     );

@@ -278,11 +278,14 @@ class IncidentController extends Controller
 
         // The show page mixes full-form saves with smaller partial updates
         // (for example corrective actions), so preserve the existing core
-        // values when those fields are omitted from the request.
-        $request->merge([
-            'type' => $request->input('type', $incident->type),
-            'severity' => $request->input('severity', $incident->severity),
-        ]);
+        // values when those fields are omitted from non-empty partial requests.
+        // A truly empty update should still surface required-field validation.
+        if ($request->except(['_token', '_method']) !== []) {
+            $request->merge([
+                'type' => $request->input('type', $incident->type),
+                'severity' => $request->input('severity', $incident->severity),
+            ]);
+        }
 
         // Audit guardrail: once submitted/reviewed, lock core incident fields.
         // Managers can still add review notes and manage portal visibility.
@@ -489,6 +492,11 @@ class IncidentController extends Controller
         // Guardrail: closing is only valid for reviewed incidents.
         abort_unless($incident->status === 'reviewed', 403);
 
+        $data = $request->validate([
+            'closed_outcome' => ['required', 'string', 'max:120'],
+            'closed_notes' => ['nullable', 'string'],
+        ]);
+
         // Guardrail: high-severity incidents require a completed investigation before closure.
         if (in_array($incident->severity, ['high', 'critical'], true) && $incident->investigation_status !== 'completed') {
             return back()->with('error', 'High-severity incidents require a completed investigation before closure.');
@@ -500,11 +508,6 @@ class IncidentController extends Controller
         if ($hasOpenFollowups) {
             return back()->with('error', 'There are open follow-ups. Please complete them before closing the incident.');
         }
-
-        $data = $request->validate([
-            'closed_outcome' => ['required', 'string', 'max:120'],
-            'closed_notes' => ['nullable', 'string'],
-        ]);
 
         $incident->update([
             'status' => 'closed',
