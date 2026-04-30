@@ -3,7 +3,7 @@
 exports[`<StaffStatus kind="shift"> > matches snapshot for state active 1`] = `
 <span
   aria-label="Active"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="active"
   data-staff-status-tone="progress"
@@ -40,7 +40,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state active 1`] = `
 exports[`<StaffStatus kind="shift"> > matches snapshot for state completed 1`] = `
 <span
   aria-label="Completed"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/40 dark:bg-status-success-bg dark:text-status-success"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-success/30 bg-status-success-bg text-status-success-foreground dark:border-status-success/40 dark:bg-status-success-bg dark:text-status-success-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="completed"
   data-staff-status-tone="success"
@@ -77,7 +77,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state completed 1`] =
 exports[`<StaffStatus kind="shift"> > matches snapshot for state ending-soon 1`] = `
 <span
   aria-label="Ending soon"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="ending-soon"
   data-staff-status-tone="warning"
@@ -114,7 +114,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state ending-soon 1`]
 exports[`<StaffStatus kind="shift"> > matches snapshot for state late 1`] = `
 <span
   aria-label="Late"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-critical/30 bg-status-critical-bg text-status-critical-foreground dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="late"
   data-staff-status-tone="danger"
@@ -152,7 +152,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state late 1`] = `
 exports[`<StaffStatus kind="shift"> > matches snapshot for state missed 1`] = `
 <span
   aria-label="Missed"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-critical/30 bg-status-critical-bg text-status-critical-foreground dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="missed"
   data-staff-status-tone="danger"
@@ -192,7 +192,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state missed 1`] = `
 exports[`<StaffStatus kind="shift"> > matches snapshot for state on-break 1`] = `
 <span
   aria-label="On break"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="on-break"
   data-staff-status-tone="warning"
@@ -238,7 +238,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state on-break 1`] = 
 exports[`<StaffStatus kind="shift"> > matches snapshot for state returned-timesheet 1`] = `
 <span
   aria-label="Timesheet returned"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="returned-timesheet"
   data-staff-status-tone="warning"
@@ -276,7 +276,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state returned-timesh
 exports[`<StaffStatus kind="shift"> > matches snapshot for state starting-soon 1`] = `
 <span
   aria-label="Starting soon"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="starting-soon"
   data-staff-status-tone="warning"
@@ -313,7 +313,7 @@ exports[`<StaffStatus kind="shift"> > matches snapshot for state starting-soon 1
 exports[`<StaffStatus kind="shift"> > matches snapshot for state upcoming 1`] = `
 <span
   aria-label="Upcoming"
-  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info"
+  class="inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap align-middle px-2 py-0.5 text-xs [&_svg]:size-3 border-status-info/30 bg-status-info-bg text-status-info-foreground dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info-foreground"
   data-staff-status-kind="shift"
   data-staff-status-state="upcoming"
   data-staff-status-tone="info"
