@@ -8,7 +8,6 @@ use App\Domain\Finance\Services\InvoicePdfService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
@@ -30,13 +29,14 @@ class SendInvoiceEmailJob implements ShouldQueue
 
         try {
             // Generate PDF if not already generated
-            if (!$invoice->pdf_path) {
+            if (! $invoice->pdf_path) {
                 $pdfService->generate($invoice);
                 $invoice->refresh();
             }
 
-            if (!$invoice->client_email) {
+            if (! $invoice->client_email) {
                 Log::warning("Invoice {$invoice->invoice_number} has no client email address. Skipping send.");
+
                 return;
             }
 
@@ -45,8 +45,8 @@ class SendInvoiceEmailJob implements ShouldQueue
                 ->notify(new InvoiceEmailNotification($invoice));
 
             $invoice->update([
-                'status' => 'sent',
-                'sent_at' => now(),
+                'status' => $invoice->status === 'draft' ? 'sent' : $invoice->status,
+                'sent_at' => $invoice->sent_at ?? now(),
             ]);
 
             Log::info("Invoice {$invoice->invoice_number} emailed to {$invoice->client_email}.");

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinBill extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
@@ -39,6 +39,8 @@ class FinBill extends Model
         'approved_at',
         'journal_id',
         'notes',
+        'xero_invoice_id',
+        'myob_invoice_id',
         'created_by',
     ];
 
@@ -89,7 +91,7 @@ class FinBill extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn ($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeWithStatus($query, string $status)

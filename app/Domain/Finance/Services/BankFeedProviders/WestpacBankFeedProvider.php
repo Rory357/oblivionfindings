@@ -4,20 +4,15 @@ namespace App\Domain\Finance\Services\BankFeedProviders;
 
 use App\Domain\Finance\Contracts\BankFeedProviderInterface;
 use App\Domain\Finance\Models\FinBankFeed;
-use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class WestpacBankFeedProvider implements BankFeedProviderInterface
 {
     public function fetchTransactions(FinBankFeed $feed, string $fromDate, string $toDate): array
     {
-        Log::info('Westpac bank feed integration pending. No transactions fetched.', [
-            'bank_feed_id' => $feed->id,
-            'from_date' => $fromDate,
-            'to_date' => $toDate,
-            'client_id_configured' => ! empty(config('services.bank_feeds.westpac.client_id')),
-        ]);
-
-        return [];
+        throw new RuntimeException(
+            'Westpac bank-feed API import is not yet supported. Use the bank transaction CSV import workflow.'
+        );
     }
 
     public function initiateConsent(FinBankFeed $feed): string

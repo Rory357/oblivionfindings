@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinEftposBatch extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $table = 'fin_eftpos_batches';
 
@@ -33,6 +33,8 @@ class FinEftposBatch extends Model
         'reconciled_by',
         'discrepancy_amount',
         'discrepancy_notes',
+        'journal_id',
+        'gl_posted_at',
         'created_by',
     ];
 
@@ -40,6 +42,7 @@ class FinEftposBatch extends Model
         'batch_date' => 'date',
         'settlement_date' => 'date',
         'reconciled_at' => 'datetime',
+        'gl_posted_at' => 'datetime',
         'total_transactions' => 'integer',
         'total_amount' => 'decimal:2',
         'total_refunds' => 'decimal:2',
@@ -62,6 +65,11 @@ class FinEftposBatch extends Model
     public function bankTransaction(): BelongsTo
     {
         return $this->belongsTo(FinBankTransaction::class, 'bank_transaction_id');
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 
     public function reconciledBy(): BelongsTo

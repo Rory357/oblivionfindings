@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,12 +22,15 @@ class ClientFundTransaction extends Model
         'transaction_date',
         'recorded_by',
         'receipt_path',
+        'journal_id',
+        'gl_posted_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'running_balance' => 'decimal:2',
         'transaction_date' => 'date',
+        'gl_posted_at' => 'datetime',
     ];
 
     public function fund()
@@ -37,5 +41,10 @@ class ClientFundTransaction extends Model
     public function recorder()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function journal()
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 }

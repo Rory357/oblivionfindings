@@ -63,7 +63,7 @@ class IntercompanyService
             // Create and post journal in the "from" entity
             $fromJournal = $this->journalService->createAndPost($fromOrgId, [
                 'journal_date' => $ict->transaction_date->toDateString(),
-                'type' => 'general',
+                'type' => 'standard',
                 'reference' => "ICT-{$ict->id}",
                 'description' => "Intercompany: {$ict->description} (to {$ict->toEntity->entity_name})",
                 'lines' => [
@@ -90,7 +90,7 @@ class IntercompanyService
             // Create and post journal in the "to" entity
             $toJournal = $this->journalService->createAndPost($toOrgId, [
                 'journal_date' => $ict->transaction_date->toDateString(),
-                'type' => 'general',
+                'type' => 'standard',
                 'reference' => "ICT-{$ict->id}",
                 'description' => "Intercompany: {$ict->description} (from {$ict->fromEntity->entity_name})",
                 'lines' => [

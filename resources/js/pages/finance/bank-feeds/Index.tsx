@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -52,6 +53,10 @@ interface Props {
     feeds: BankFeed[];
     bankAccounts: BankAccount[];
     existingAccountIds: number[];
+    providerSetupEnabled: boolean;
+    csvImportSupported: boolean;
+    providerSetupMessage: string;
+    csvImportUrl: string;
 }
 
 const providerLabels: Record<string, string> = {
@@ -87,7 +92,15 @@ const statusLabel = (status: string | null): string => {
     }
 };
 
-export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds }: Props) {
+export default function BankFeedsIndex({
+    feeds,
+    bankAccounts,
+    existingAccountIds,
+    providerSetupEnabled,
+    csvImportSupported,
+    providerSetupMessage,
+    csvImportUrl,
+}: Props) {
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [syncing, setSyncing] = useState<number | null>(null);
     const [syncingAll, setSyncingAll] = useState(false);
@@ -153,7 +166,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                             <Button
                                 variant="outline"
                                 onClick={handleSyncAll}
-                                disabled={syncingAll}
+                                disabled={syncingAll || !providerSetupEnabled}
                             >
                                 <RefreshCw className={`w-4 h-4 mr-2 ${syncingAll ? 'animate-spin' : ''}`} />
                                 Sync All
@@ -161,7 +174,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                         )}
                         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                             <DialogTrigger asChild>
-                                <Button disabled={availableAccounts.length === 0}>
+                                <Button disabled={availableAccounts.length === 0 || !providerSetupEnabled}>
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Bank Feed
                                 </Button>
@@ -249,18 +262,47 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                     </div>
                 </div>
 
+                {!providerSetupEnabled && (
+                    <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Bank provider setup unavailable</AlertTitle>
+                        <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <span>{providerSetupMessage}</span>
+                            {csvImportSupported && (
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={csvImportUrl}>
+                                        <FileText className="w-4 h-4 mr-1" />
+                                        CSV import
+                                    </Link>
+                                </Button>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 {feeds.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                             <Radio className="h-12 w-12 text-muted-foreground/40 mb-4" />
                             <h3 className="text-lg font-medium text-foreground mb-1">No bank feeds</h3>
                             <p className="text-muted-foreground mb-4">
-                                Connect a bank feed to automatically import transactions from your NZ bank.
+                                {providerSetupEnabled
+                                    ? 'Connect a bank feed to automatically import transactions from your NZ bank.'
+                                    : 'CSV import is the supported bank transaction import path.'}
                             </p>
-                            <Button onClick={() => setShowAddDialog(true)} disabled={availableAccounts.length === 0}>
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add Bank Feed
-                            </Button>
+                            {providerSetupEnabled ? (
+                                <Button onClick={() => setShowAddDialog(true)} disabled={availableAccounts.length === 0}>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Bank Feed
+                                </Button>
+                            ) : csvImportSupported && (
+                                <Button asChild>
+                                    <Link href={csvImportUrl}>
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        Open CSV import
+                                    </Link>
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
                 ) : (
@@ -319,7 +361,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => handleSync(feed.id)}
-                                                disabled={syncing === feed.id}
+                                                disabled={syncing === feed.id || !providerSetupEnabled}
                                             >
                                                 <RefreshCw className={`w-4 h-4 mr-1 ${syncing === feed.id ? 'animate-spin' : ''}`} />
                                                 Sync

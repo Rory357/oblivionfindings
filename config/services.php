@@ -59,6 +59,16 @@ return [
         'ingest_token' => env('TELEMETRY_INGEST_TOKEN'),
     ],
 
+    'xero' => [
+        'client_id' => env('XERO_CLIENT_ID'),
+        'client_secret' => env('XERO_CLIENT_SECRET'),
+    ],
+
+    'ird' => [
+        'api_key' => env('IRD_API_KEY'),
+        'api_secret' => env('IRD_API_SECRET'),
+    ],
+
     'sms' => [
         'provider' => env('SMS_PROVIDER'),
 

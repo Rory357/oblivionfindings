@@ -56,11 +56,20 @@ class BankFeedController extends Controller
             'feeds' => $feeds,
             'bankAccounts' => $bankAccounts,
             'existingAccountIds' => $existingAccountIds,
+            'providerSetupEnabled' => (bool) config('finance.bank_feeds.provider_setup_enabled', false),
+            'csvImportSupported' => (bool) config('finance.bank_feeds.csv_import_supported', true),
+            'providerSetupMessage' => config('finance.bank_feeds.provider_setup_message'),
+            'csvImportUrl' => route('finance.bank-transactions.index'),
         ]);
     }
 
     public function store(Request $request)
     {
+        if (! config('finance.bank_feeds.provider_setup_enabled', false)) {
+            return redirect()->back()
+                ->withErrors(['provider' => config('finance.bank_feeds.provider_setup_message')]);
+        }
+
         $orgId = $request->user()->organization_id;
 
         $validated = $request->validate([
@@ -94,6 +103,11 @@ class BankFeedController extends Controller
 
     public function sync(Request $request, FinBankFeed $feed)
     {
+        if (! config('finance.bank_feeds.provider_setup_enabled', false)) {
+            return redirect()->back()
+                ->with('error', config('finance.bank_feeds.provider_setup_message'));
+        }
+
         $orgId = $request->user()->organization_id;
 
         if ($feed->organization_id !== $orgId) {
@@ -112,6 +126,11 @@ class BankFeedController extends Controller
 
     public function syncAll(Request $request)
     {
+        if (! config('finance.bank_feeds.provider_setup_enabled', false)) {
+            return redirect()->back()
+                ->with('error', config('finance.bank_feeds.provider_setup_message'));
+        }
+
         $orgId = $request->user()->organization_id;
 
         $logs = $this->service->syncAllActive($orgId);

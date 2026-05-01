@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinInvoice extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
@@ -23,18 +24,25 @@ class FinInvoice extends Model
 
     protected $fillable = [
         'organization_id',
+        'client_id',
         'invoice_number',
         'invoice_date',
         'due_date',
         'client_name',
         'client_email',
         'client_address',
+        'funding_body',
         'bill_id',
+        'source',
+        'source_type',
+        'source_id',
         'subtotal',
         'tax_amount',
         'total_amount',
         'currency_code',
         'status',
+        'journal_id',
+        'gl_posted_at',
         'sent_at',
         'viewed_at',
         'paid_at',
@@ -52,6 +60,7 @@ class FinInvoice extends Model
         'subtotal' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
+        'gl_posted_at' => 'datetime',
         'sent_at' => 'datetime',
         'viewed_at' => 'datetime',
         'paid_at' => 'datetime',
@@ -67,14 +76,24 @@ class FinInvoice extends Model
         return $this->belongsTo(FinBill::class, 'bill_id');
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
+    }
+
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn ($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeOfStatus($query, string $status)

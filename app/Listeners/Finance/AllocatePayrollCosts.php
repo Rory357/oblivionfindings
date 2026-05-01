@@ -27,8 +27,13 @@ class AllocatePayrollCosts
             return;
         }
 
-        // Find the payroll run that owns this journal
+        // Find the payroll run that owns this journal. During posting the
+        // journal source is the stable idempotency key; journal_id is the back-link.
         $payrollRun = HrPayrollRun::where('journal_id', $journal->id)->first();
+
+        if (! $payrollRun && $journal->source_type === 'payroll_run' && $journal->source_id) {
+            $payrollRun = HrPayrollRun::find($journal->source_id);
+        }
 
         if (! $payrollRun) {
             return;

@@ -4,9 +4,9 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Jobs\GenerateAuditExportJob;
 use App\Domain\Finance\Models\FinAuditExport;
+use App\Domain\Finance\Services\AuditExportService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class AuditExportController extends Controller
@@ -68,33 +68,32 @@ class AuditExportController extends Controller
             ->with('success', 'Audit export is being generated. You will be able to download it shortly.');
     }
 
-    public function download(Request $request, FinAuditExport $export)
+    public function download(Request $request, FinAuditExport $export, AuditExportService $exports)
     {
-        if ($export->status !== 'completed' || !$export->file_path) {
+        if ($export->status !== 'completed' || ! $export->file_path) {
             return back()->withErrors(['export' => 'Export is not ready for download.']);
         }
 
-        if (!Storage::disk('local')->exists($export->file_path)) {
+        $contents = $exports->contentsForDownload($export);
+
+        if ($contents === null) {
             return back()->withErrors(['export' => 'Export file not found. Please regenerate.']);
         }
 
         $export->update(['downloaded_at' => now()]);
 
-        $filename = str_replace(' ', '_', $export->export_name) . '.zip';
+        $filename = str_replace(' ', '_', $export->export_name).'.zip';
 
-        return Storage::disk('local')->download(
-            $export->file_path,
+        return response()->streamDownload(
+            fn () => print $contents,
             $filename,
             ['Content-Type' => 'application/zip']
         );
     }
 
-    public function destroy(Request $request, FinAuditExport $export)
+    public function destroy(Request $request, FinAuditExport $export, AuditExportService $exports)
     {
-        // Clean up the file if it exists
-        if ($export->file_path && Storage::disk('local')->exists($export->file_path)) {
-            Storage::disk('local')->delete($export->file_path);
-        }
+        $exports->deleteFile($export);
 
         $export->delete();
 

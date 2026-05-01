@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinAccount extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
@@ -33,6 +33,8 @@ class FinAccount extends Model
         'is_active',
         'opening_balance',
         'description',
+        'xero_account_id',
+        'myob_account_id',
         'gst_applicable',
         'default_tax_rate_id',
         'created_by',
@@ -77,7 +79,7 @@ class FinAccount extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn ($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeActive($query)

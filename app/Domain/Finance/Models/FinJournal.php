@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FinJournal extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected static function newFactory()
     {
@@ -36,6 +36,8 @@ class FinJournal extends Model
         'posted_by',
         'reversed_by_journal_id',
         'total_amount',
+        'xero_journal_id',
+        'myob_journal_id',
         'currency_id',
         'exchange_rate',
         'base_currency_amount',
@@ -97,7 +99,7 @@ class FinJournal extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn ($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopePosted($query)

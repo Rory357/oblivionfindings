@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FinPaymentMatch extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $table = 'fin_payment_matches';
 
@@ -25,6 +25,7 @@ class FinPaymentMatch extends Model
         'status',
         'confirmed_by',
         'confirmed_at',
+        'journal_id',
     ];
 
     protected $casts = [
@@ -48,9 +49,14 @@ class FinPaymentMatch extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
+    }
+
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn ($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeSuggested($query)

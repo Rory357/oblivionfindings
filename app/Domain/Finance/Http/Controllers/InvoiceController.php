@@ -2,14 +2,16 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Http\Requests\StoreInvoiceRequest;
+use App\Domain\Finance\Http\Requests\UpdateInvoiceRequest;
+use App\Domain\Finance\Jobs\PostFinInvoiceJournalJob;
 use App\Domain\Finance\Jobs\SendInvoiceEmailJob;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinTaxRate;
+use App\Domain\Finance\Services\FinInvoiceJournalService;
 use App\Domain\Finance\Services\InvoicePdfService;
-use App\Domain\Finance\Http\Requests\StoreInvoiceRequest;
-use App\Domain\Finance\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -181,6 +183,7 @@ class InvoiceController extends Controller
             'lines.account:id,code,name',
             'bill:id,bill_number',
             'createdBy:id,name',
+            'journal:id,journal_number,status,posted_at',
         ]);
 
         return Inertia::render('finance/invoices/Show', [
@@ -305,7 +308,7 @@ class InvoiceController extends Controller
     {
         $this->authorize('update', $invoice);
 
-        if (!$invoice->client_email) {
+        if (! $invoice->client_email) {
             return back()->withErrors(['invoice' => 'Invoice has no client email address.']);
         }
 
@@ -313,10 +316,31 @@ class InvoiceController extends Controller
             return back()->withErrors(['invoice' => 'Cannot send a cancelled invoice.']);
         }
 
+        $shouldPostJournal = false;
+
+        DB::transaction(function () use ($invoice, &$shouldPostJournal) {
+            $invoice->refresh();
+
+            if ($invoice->status === 'draft') {
+                $invoice->update([
+                    'status' => 'sent',
+                    'sent_at' => $invoice->sent_at ?? now(),
+                ]);
+
+                $shouldPostJournal = $invoice->journal_id === null;
+            }
+        });
+
+        $invoice->refresh();
+
+        if ($shouldPostJournal) {
+            PostFinInvoiceJournalJob::dispatch($invoice);
+        }
+
         SendInvoiceEmailJob::dispatch($invoice->id);
 
         return redirect()->route('finance.invoices.show', $invoice)
-            ->with('success', 'Invoice is being sent to ' . $invoice->client_email);
+            ->with('success', 'Invoice is being sent to '.$invoice->client_email);
     }
 
     public function downloadPdf(Request $request, FinInvoice $invoice, InvoicePdfService $pdfService)
@@ -324,7 +348,7 @@ class InvoiceController extends Controller
         $this->authorize('view', $invoice);
 
         // Generate PDF if not exists
-        if (!$invoice->pdf_path || !Storage::disk('local')->exists($invoice->pdf_path)) {
+        if (! $invoice->pdf_path || ! Storage::disk('local')->exists($invoice->pdf_path)) {
             $pdfService->generate($invoice);
             $invoice->refresh();
         }
@@ -336,8 +360,11 @@ class InvoiceController extends Controller
         );
     }
 
-    public function markPaid(Request $request, FinInvoice $invoice)
+    public function markPaid(Request $request, int $invoiceId)
     {
+        $invoice = FinInvoice::forOrganization($request->user()->organization_id)
+            ->findOrFail($invoiceId);
+
         $this->authorize('update', $invoice);
 
         if ($invoice->status === 'cancelled') {
@@ -347,11 +374,38 @@ class InvoiceController extends Controller
         $invoice->update([
             'status' => 'paid',
             'paid_at' => now(),
-            'paid_by' => $request->user()->id,
         ]);
 
         return redirect()->route('finance.invoices.show', $invoice)
             ->with('success', 'Invoice marked as paid.');
+    }
+
+    public function cancel(Request $request, FinInvoice $invoice, FinInvoiceJournalService $journalService)
+    {
+        $this->authorize('update', $invoice);
+
+        if ($invoice->status === 'paid') {
+            return back()->withErrors(['invoice' => 'Cannot cancel a paid invoice.']);
+        }
+
+        if ($invoice->status === 'cancelled') {
+            return redirect()->route('finance.invoices.show', $invoice)
+                ->with('success', 'Invoice already cancelled.');
+        }
+
+        DB::transaction(function () use ($invoice, $journalService) {
+            $invoice->refresh();
+
+            if ($invoice->journal_id !== null) {
+                $journalService->reverseInvoiceJournal($invoice);
+                $invoice->refresh();
+            }
+
+            $invoice->update(['status' => 'cancelled']);
+        });
+
+        return redirect()->route('finance.invoices.show', $invoice)
+            ->with('success', 'Invoice cancelled.');
     }
 
     private function generateInvoiceNumber(int $orgId): string
@@ -367,6 +421,6 @@ class InvoiceController extends Controller
             $next = 1;
         }
 
-        return 'INV-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+        return 'INV-'.str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 }

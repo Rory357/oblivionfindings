@@ -1,35 +1,34 @@
 <?php
 
 use App\Domain\Finance\Http\Controllers\AccountingIntegrationController;
-use App\Domain\Finance\Http\Controllers\BudgetForecastApiController;
-use App\Domain\Finance\Http\Controllers\ClientFinancialsController;
-use App\Domain\Finance\Http\Controllers\ExecutiveFinancialDashboardController;
-use App\Domain\Finance\Http\Controllers\FinancialInsightsApiController;
-use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\AccountsReceivableController;
 use App\Domain\Finance\Http\Controllers\AuditExportController;
-use App\Domain\Finance\Http\Controllers\ConsolidationController;
-use App\Domain\Finance\Http\Controllers\IntercompanyController;
 use App\Domain\Finance\Http\Controllers\BankAccountController;
 use App\Domain\Finance\Http\Controllers\BankFeedController;
 use App\Domain\Finance\Http\Controllers\BankReconciliationController;
 use App\Domain\Finance\Http\Controllers\BankTransactionController;
 use App\Domain\Finance\Http\Controllers\BillController;
 use App\Domain\Finance\Http\Controllers\BudgetActualsController;
+use App\Domain\Finance\Http\Controllers\BudgetForecastApiController;
 use App\Domain\Finance\Http\Controllers\CashFlowForecastController;
 use App\Domain\Finance\Http\Controllers\ChartOfAccountsController;
+use App\Domain\Finance\Http\Controllers\ClientFinancialsController;
+use App\Domain\Finance\Http\Controllers\ConsolidationController;
 use App\Domain\Finance\Http\Controllers\CostCentreController;
 use App\Domain\Finance\Http\Controllers\CreditNoteController;
 use App\Domain\Finance\Http\Controllers\CurrencyController;
-use App\Domain\Finance\Http\Controllers\FinanceDashboardController;
 use App\Domain\Finance\Http\Controllers\DonorFundController;
 use App\Domain\Finance\Http\Controllers\EftposController;
+use App\Domain\Finance\Http\Controllers\ExecutiveFinancialDashboardController;
+use App\Domain\Finance\Http\Controllers\FinanceDashboardController;
+use App\Domain\Finance\Http\Controllers\FinancialInsightsApiController;
 use App\Domain\Finance\Http\Controllers\FinancialReportController;
 use App\Domain\Finance\Http\Controllers\FiscalPeriodController;
 use App\Domain\Finance\Http\Controllers\FixedAssetController;
 use App\Domain\Finance\Http\Controllers\FundingStreamController;
 use App\Domain\Finance\Http\Controllers\FxRevaluationController;
 use App\Domain\Finance\Http\Controllers\GstReturnController;
+use App\Domain\Finance\Http\Controllers\IntercompanyController;
 use App\Domain\Finance\Http\Controllers\InvoiceController;
 use App\Domain\Finance\Http\Controllers\IrdFilingController;
 use App\Domain\Finance\Http\Controllers\JournalController;
@@ -39,13 +38,13 @@ use App\Domain\Finance\Http\Controllers\PaymentMatchController;
 use App\Domain\Finance\Http\Controllers\PaymentRunController;
 use App\Domain\Finance\Http\Controllers\PettyCashController;
 use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
+use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
 /**
  * Finance Module Routes
  */
-
 Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function () {
 
     // Dashboard
@@ -242,7 +241,7 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/payment-runs/{paymentRun}', [PaymentRunController::class, 'show'])
         ->name('payment-runs.show')
         ->middleware('permission:finance.ap.view');
-    Route::post('/payment-runs/{paymentRun}/approve', [PaymentRunController::class, 'approve'])
+    Route::post('/payment-runs/{paymentRunId}/approve', [PaymentRunController::class, 'approve'])
         ->name('payment-runs.approve')
         ->middleware('permission:finance.ap.manage');
     Route::post('/payment-runs/{paymentRun}/process', [PaymentRunController::class, 'process'])
@@ -519,8 +518,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])
         ->name('invoices.pdf')
         ->middleware('permission:finance.ar.view');
-    Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
+    Route::post('/invoices/{invoiceId}/mark-paid', [InvoiceController::class, 'markPaid'])
         ->name('invoices.mark-paid')
+        ->middleware('permission:finance.ar.manage');
+    Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])
+        ->name('invoices.cancel')
         ->middleware('permission:finance.ar.manage');
 
     // ── Audit Exports ─────────────────────────────────────────────────
@@ -580,6 +582,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->middleware('permission:finance.reports.view');
     Route::get('/donor-funds/{fund}/reports', [DonorFundController::class, 'reports'])
         ->name('donor-funds.reports')
+        ->middleware('permission:finance.reports.view');
+    Route::get('/donor-funds/{fund}/reports/{report}/download', [DonorFundController::class, 'downloadReport'])
+        ->name('donor-funds.reports.download')
         ->middleware('permission:finance.reports.view');
 
     // ── Financial Insights API (JSON) ──────────────────────────────────

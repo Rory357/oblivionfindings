@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Finance\Models\FinAuditExport;
 use App\Models\DataRetentionPolicy;
 use App\Models\LegalHold;
 use App\Services\AuditLogger;
@@ -13,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class EnforceDataRetentionJob implements ShouldQueue
 {
@@ -26,12 +28,56 @@ class EnforceDataRetentionJob implements ShouldQueue
             try {
                 $this->enforcePolicy($policy);
             } catch (\Throwable $e) {
-                Log::error("Data retention enforcement failed for policy {$policy->id}: " . $e->getMessage(), [
+                Log::error("Data retention enforcement failed for policy {$policy->id}: ".$e->getMessage(), [
                     'policy_id' => $policy->id,
                     'model_type' => $policy->model_type,
                     'exception' => $e,
                 ]);
             }
+        }
+
+        $this->pruneFinanceAuditExports();
+    }
+
+    private function pruneFinanceAuditExports(): void
+    {
+        $retentionYears = (int) config('finance.audit_exports.retention_years', 7);
+
+        if ($retentionYears <= 0) {
+            return;
+        }
+
+        $cutoff = now()->subYears($retentionYears);
+        $disk = Storage::disk((string) config('finance.audit_exports.disk', 'local'));
+
+        $exports = FinAuditExport::query()
+            ->where('status', 'completed')
+            ->where(function ($query) use ($cutoff) {
+                $query->where('generated_at', '<', $cutoff)
+                    ->orWhere(function ($query) use ($cutoff) {
+                        $query->whereNull('generated_at')
+                            ->where('created_at', '<', $cutoff);
+                    });
+            })
+            ->get();
+
+        foreach ($exports as $export) {
+            DB::transaction(function () use ($export, $disk, $retentionYears) {
+                if ($export->file_path && $disk->exists($export->file_path)) {
+                    $disk->delete($export->file_path);
+                }
+
+                AuditLogger::log('data_retention.finance_audit_export_pruned', $export, [
+                    'retention_period_years' => $retentionYears,
+                    'file_path' => $export->file_path,
+                ]);
+
+                $export->delete();
+            });
+        }
+
+        if ($exports->isNotEmpty()) {
+            Log::info("Data retention: pruned {$exports->count()} finance audit export(s).");
         }
     }
 
@@ -47,14 +93,14 @@ class EnforceDataRetentionJob implements ShouldQueue
 
         $model = new $modelClass;
         $usesSoftDeletes = in_array(SoftDeletes::class, class_uses_recursive($modelClass));
-        $createdAtColumn = $model->getTable() . '.' . $model->getCreatedAtColumn();
+        $createdAtColumn = $model->getTable().'.'.$model->getCreatedAtColumn();
 
         // --- Phase 1: Soft-delete records past retention_period_years ---
         if ($policy->retention_period_years && $usesSoftDeletes) {
             $cutoff = now()->subYears($policy->retention_period_years);
 
             $query = $modelClass::where($createdAtColumn, '<', $cutoff)
-                ->whereNull($model->getTable() . '.deleted_at');
+                ->whereNull($model->getTable().'.deleted_at');
 
             $this->applyExemptions($query, $policy, $modelClass);
 
@@ -95,7 +141,7 @@ class EnforceDataRetentionJob implements ShouldQueue
             $recordsToAnonymize = $query->get();
 
             foreach ($recordsToAnonymize as $record) {
-                DB::transaction(function () use ($record, $policy, $usesSoftDeletes) {
+                DB::transaction(function () use ($record, $policy) {
                     $this->anonymizeRecord($record);
 
                     AuditLogger::log('data_retention.anonymized', $record, [
@@ -116,7 +162,7 @@ class EnforceDataRetentionJob implements ShouldQueue
             $archiveCutoff = now()->subYears($policy->archive_after_years);
 
             $query = $modelClass::where($createdAtColumn, '<', $archiveCutoff)
-                ->whereNull($model->getTable() . '.deleted_at');
+                ->whereNull($model->getTable().'.deleted_at');
 
             $this->applyExemptions($query, $policy, $modelClass);
 
@@ -163,7 +209,7 @@ class EnforceDataRetentionJob implements ShouldQueue
                     ->pluck('holdable_id');
 
                 if ($heldIds->isNotEmpty()) {
-                    $query->whereNotIn($model->getTable() . '.' . $model->getKeyName(), $heldIds);
+                    $query->whereNotIn($model->getTable().'.'.$model->getKeyName(), $heldIds);
                 }
             }
         }

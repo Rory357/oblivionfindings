@@ -4,11 +4,16 @@ use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\FinancePermissionsSeeder;
+use Database\Seeders\GovernancePermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(FinancePermissionsSeeder::class);
+    // Governance permissions are defined in their own seeder; without this,
+    // admin/board roles cannot be granted governance.view and the dashboard
+    // route returns 403 even for users we expect to authorise.
+    $this->seed(GovernancePermissionsSeeder::class);
 });
 
 /**
@@ -59,7 +64,9 @@ test('legacy admin column without role_user entry cannot access governance dashb
 // ─── 2. eMAR CRUD routes require medication permissions ────────────────
 
 test('user without medication permissions cannot access eMAR dashboard', function () {
-    $user = rbacUser('support_worker');
+    // Note: support_worker is granted medications.view (they administer meds),
+    // so we use the hr role here which legitimately lacks that permission.
+    $user = rbacUser('hr');
 
     $response = $this->actingAs($user)->get('/emar');
 
@@ -122,8 +129,11 @@ test('health safety officer can access health safety dashboard', function () {
 test('user without HR permissions cannot access HR employees API', function () {
     $user = rbacUser('support_worker');
 
-    // HR API uses auth:sanctum, so we use Sanctum token for API calls
-    $response = $this->actingAs($user)->getJson('/api/hr/employees');
+    // HR API uses auth:sanctum — actingAs() with no explicit guard would
+    // default to the web guard, so we authenticate against the sanctum guard
+    // (configured as session-backed in this workspace) before the permission
+    // check can run.
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/hr/employees');
 
     $response->assertForbidden();
 });
@@ -131,7 +141,7 @@ test('user without HR permissions cannot access HR employees API', function () {
 test('user with HR role can access HR employees API', function () {
     $user = rbacUser('hr');
 
-    $response = $this->actingAs($user)->getJson('/api/hr/employees');
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/hr/employees');
 
     expect($response->status())->not->toBe(403);
 });
@@ -139,7 +149,7 @@ test('user with HR role can access HR employees API', function () {
 test('user without HR permissions cannot access HR leave requests API', function () {
     $user = rbacUser('support_worker');
 
-    $response = $this->actingAs($user)->getJson('/api/hr/leave/requests');
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/hr/leave/requests');
 
     $response->assertForbidden();
 });

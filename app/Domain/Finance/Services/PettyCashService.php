@@ -47,14 +47,14 @@ class PettyCashService
                 $fund->decrement('current_balance', $amount);
 
                 // Create GL journal if expense account provided
-                if (!empty($data['account_id']) && $fund->gl_account_id) {
+                if (! empty($data['account_id']) && $fund->gl_account_id) {
                     $journal = $this->journalPostingService->createAndPost(
                         $fund->organization_id,
                         [
                             'journal_date' => $data['transaction_date'],
-                            'type' => 'petty_cash',
+                            'type' => 'standard',
                             'reference' => "PC-{$fund->id}",
-                            'description' => "Petty cash expense: " . ($data['description'] ?? ''),
+                            'description' => 'Petty cash expense: '.($data['description'] ?? ''),
                             'lines' => [
                                 [
                                     'account_id' => $data['account_id'],
@@ -134,7 +134,7 @@ class PettyCashService
                 'type' => $txn->type,
                 'description' => $txn->description,
                 'amount' => (float) $txn->amount,
-                'account_name' => $txn->account ? $txn->account->code . ' - ' . $txn->account->name : null,
+                'account_name' => $txn->account ? $txn->account->code.' - '.$txn->account->name : null,
                 'receipt_path' => $txn->receipt_path,
                 'created_by' => $txn->createdBy->name ?? null,
                 'running_balance' => $balanceMap[$txn->id] ?? null,
@@ -148,7 +148,7 @@ class PettyCashService
                 'float_amount' => (float) $fund->float_amount,
                 'current_balance' => (float) $fund->current_balance,
                 'custodian_name' => $fund->custodian->name ?? null,
-                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code . ' - ' . $fund->glAccount->name : null,
+                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
                 'is_active' => $fund->is_active,
                 'variance' => round((float) $fund->current_balance - (float) $fund->float_amount, 2),
             ],

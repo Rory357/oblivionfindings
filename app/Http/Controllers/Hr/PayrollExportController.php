@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Finance\Jobs\PostPayrollJournalJob;
 use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\PayrollExportService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -148,11 +149,15 @@ class PayrollExportController extends Controller
         }
 
         try {
-            $this->payrollService->lockRun($run, $user->id);
+            $run = $this->payrollService->lockRun($run, $user->id);
         } catch (ValidationException $e) {
             return redirect()->back()->withErrors($e->errors());
         } catch (\LogicException $e) {
             return redirect()->back()->withErrors(['lock' => $e->getMessage()]);
+        }
+
+        if ($run->journal_id === null) {
+            PostPayrollJournalJob::dispatch($run);
         }
 
         $this->webhookService->publish($run->tenant_id, 'payroll.run.locked', [
@@ -352,8 +357,8 @@ class PayrollExportController extends Controller
     }
 
     /**
-     * @param array<int, array<string, mixed>> $mappings
-     * @param array<int, string> $fieldKeys
+     * @param  array<int, array<string, mixed>>  $mappings
+     * @param  array<int, string>  $fieldKeys
      * @return array<int, array{header: string, source: string, value?: mixed}>
      */
     protected function normalizeProfileMappings(array $mappings, array $fieldKeys): array

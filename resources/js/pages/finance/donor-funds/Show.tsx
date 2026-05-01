@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowLeft, Download, TrendingUp, TrendingDown } from 'lucide-react';
 import { FormEvent } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -61,6 +61,7 @@ interface Report {
     total_expenditure: number;
     closing_balance: number;
     status: string;
+    download_url: string | null;
 }
 
 interface Account {
@@ -609,6 +610,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                     <TableHead className="text-right">Expenditure</TableHead>
                                                     <TableHead className="text-right">Closing</TableHead>
                                                     <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">PDF</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -630,6 +632,18 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant="outline">{report.status}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            {report.download_url ? (
+                                                                <Button asChild variant="ghost" size="sm">
+                                                                    <a href={report.download_url}>
+                                                                        <Download className="mr-1 h-4 w-4" />
+                                                                        PDF
+                                                                    </a>
+                                                                </Button>
+                                                            ) : (
+                                                                <span className="text-sm text-muted-foreground">-</span>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}

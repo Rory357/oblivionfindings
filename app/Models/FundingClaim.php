@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class FundingClaim extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'organization_id',
@@ -26,6 +27,8 @@ class FundingClaim extends Model
         'approved_by',
         'paid_at',
         'rejection_reason',
+        'journal_id',
+        'gl_posted_at',
     ];
 
     protected $casts = [
@@ -35,6 +38,7 @@ class FundingClaim extends Model
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'paid_at' => 'datetime',
+        'gl_posted_at' => 'datetime',
     ];
 
     public function serviceAgreement()
@@ -60,5 +64,10 @@ class FundingClaim extends Model
     public function items()
     {
         return $this->hasMany(FundingClaimItem::class);
+    }
+
+    public function journal()
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 }

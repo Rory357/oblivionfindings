@@ -5,10 +5,12 @@ namespace App\Domain\Finance\Http\Controllers;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinDonorFund;
+use App\Domain\Finance\Models\FinDonorFundReport;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Services\DonorFundService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class DonorFundController extends Controller
@@ -43,7 +45,7 @@ class DonorFundController extends Controller
                 'start_date' => $fund->start_date?->toDateString(),
                 'end_date' => $fund->end_date?->toDateString(),
                 'next_report_due' => $fund->next_report_due?->toDateString(),
-                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code . ' - ' . $fund->glAccount->name : null,
+                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
                 'funding_stream_name' => $fund->fundingStream?->name,
             ]);
 
@@ -154,6 +156,9 @@ class DonorFundController extends Controller
                 'total_expenditure' => (float) $report->total_expenditure,
                 'closing_balance' => (float) $report->closing_balance,
                 'status' => $report->status,
+                'download_url' => $report->file_path
+                    ? route('finance.donor-funds.reports.download', [$fund, $report])
+                    : null,
             ]);
 
         $expenseAccounts = FinAccount::forOrganization($orgId)
@@ -187,7 +192,7 @@ class DonorFundController extends Controller
                 'next_report_due' => $fund->next_report_due?->toDateString(),
                 'status' => $fund->status,
                 'is_restricted' => $fund->is_restricted,
-                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code . ' - ' . $fund->glAccount->name : null,
+                'gl_account_name' => $fund->glAccount ? $fund->glAccount->code.' - '.$fund->glAccount->name : null,
                 'funding_stream_name' => $fund->fundingStream?->name,
                 'created_by' => $fund->createdBy?->name,
             ],
@@ -284,7 +289,8 @@ class DonorFundController extends Controller
         ]);
 
         try {
-            $this->donorFundService->generateReport($fund, $validated['period_from'], $validated['period_to']);
+            $report = $this->donorFundService->generateReport($fund, $validated['period_from'], $validated['period_to']);
+            $this->donorFundService->exportReportPdf($report);
         } catch (\Exception $e) {
             return back()->withErrors(['report' => $e->getMessage()]);
         }
@@ -298,31 +304,18 @@ class DonorFundController extends Controller
      */
     public function reports(Request $request, FinDonorFund $fund)
     {
-        $reports = $fund->reports()
-            ->with('createdBy:id,name')
-            ->orderByDesc('period_to')
-            ->get()
-            ->map(fn ($report) => [
-                'id' => $report->id,
-                'report_name' => $report->report_name,
-                'period_from' => $report->period_from->toDateString(),
-                'period_to' => $report->period_to->toDateString(),
-                'opening_balance' => (float) $report->opening_balance,
-                'total_receipts' => (float) $report->total_receipts,
-                'total_expenditure' => (float) $report->total_expenditure,
-                'closing_balance' => (float) $report->closing_balance,
-                'status' => $report->status,
-                'submitted_at' => $report->submitted_at?->toDateTimeString(),
-                'created_by' => $report->createdBy?->name,
-            ]);
+        return $this->show($request, $fund);
+    }
 
-        return Inertia::render('finance/donor-funds/Show', [
-            'fund' => [
-                'id' => $fund->id,
-                'fund_code' => $fund->fund_code,
-                'fund_name' => $fund->fund_name,
-            ],
-            'reports' => $reports,
-        ]);
+    public function downloadReport(Request $request, FinDonorFund $fund, FinDonorFundReport $report)
+    {
+        abort_unless($fund->organization_id === $request->user()->organization_id, 403);
+        abort_unless($report->fund_id === $fund->id, 404);
+        abort_unless($report->file_path && Storage::disk('local')->exists($report->file_path), 404);
+
+        return Storage::disk('local')->download(
+            $report->file_path,
+            str($report->report_name)->slug()->append('.pdf')->toString()
+        );
     }
 }

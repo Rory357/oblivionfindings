@@ -12,6 +12,8 @@ use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinPaymentRun;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
@@ -59,19 +61,19 @@ class AuditExportService
             $sheets['Depreciation'] = $this->getDepreciationData($orgId, $from, $to);
         }
 
-        $zipPath = "audit-exports/{$orgId}/{$export->id}.zip";
-        $fullPath = Storage::disk('local')->path($zipPath);
+        $zipPath = "audit-exports/{$orgId}/{$export->id}.zip.enc";
+        $tempPath = tempnam(storage_path('app'), 'audit-export-');
 
-        // Ensure directory exists
-        $dir = dirname($fullPath);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        if ($tempPath === false) {
+            $export->update(['status' => 'failed']);
+            throw new \RuntimeException('Could not allocate temporary audit export archive.');
         }
 
-        $zip = new ZipArchive();
-        if ($zip->open($fullPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        $zip = new ZipArchive;
+        if ($zip->open($tempPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             $export->update(['status' => 'failed']);
-            throw new \RuntimeException("Could not create ZIP archive at {$fullPath}");
+            @unlink($tempPath);
+            throw new \RuntimeException("Could not create ZIP archive at {$tempPath}");
         }
 
         foreach ($sheets as $name => $rows) {
@@ -83,15 +85,78 @@ class AuditExportService
         $zip->addFromString('_manifest.txt', $this->buildManifest($export, $sheets));
 
         $zip->close();
+        $zipBytes = file_get_contents($tempPath);
+        @unlink($tempPath);
+
+        if ($zipBytes === false) {
+            $export->update(['status' => 'failed']);
+            throw new \RuntimeException('Could not read generated audit export archive.');
+        }
+
+        $stored = Storage::disk($this->diskName())->put($zipPath, $this->encryptArchive($zipBytes));
+
+        if (! $stored) {
+            $export->update(['status' => 'failed']);
+            throw new \RuntimeException("Could not store encrypted audit export at {$zipPath}");
+        }
 
         $export->update([
             'status' => 'completed',
             'file_path' => $zipPath,
-            'file_size_bytes' => filesize($fullPath),
+            'file_size_bytes' => strlen($zipBytes),
             'generated_at' => now(),
         ]);
 
         return $zipPath;
+    }
+
+    public function exists(FinAuditExport $export): bool
+    {
+        return (bool) $export->file_path
+            && Storage::disk($this->diskName())->exists($export->file_path);
+    }
+
+    public function contentsForDownload(FinAuditExport $export): ?string
+    {
+        if (! $this->exists($export)) {
+            return null;
+        }
+
+        $contents = Storage::disk($this->diskName())->get($export->file_path);
+
+        if ($contents === null) {
+            return null;
+        }
+
+        return $this->decryptArchive($contents, $export->file_path);
+    }
+
+    public function deleteFile(FinAuditExport $export): void
+    {
+        if ($this->exists($export)) {
+            Storage::disk($this->diskName())->delete($export->file_path);
+        }
+    }
+
+    public function diskName(): string
+    {
+        return (string) config('finance.audit_exports.disk', 'local');
+    }
+
+    private function encryptArchive(string $zipBytes): string
+    {
+        return Crypt::encryptString(base64_encode($zipBytes));
+    }
+
+    private function decryptArchive(string $contents, string $path): ?string
+    {
+        try {
+            $decoded = base64_decode(Crypt::decryptString($contents), true);
+
+            return $decoded === false ? null : $decoded;
+        } catch (DecryptException) {
+            return str_ends_with($path, '.enc') ? null : $contents;
+        }
     }
 
     private function getJournalsData(int $orgId, $from, $to): array
@@ -101,7 +166,7 @@ class AuditExportService
             ->with(['createdBy:id,name', 'postedBy:id,name', 'fiscalPeriod:id,name'])
             ->orderBy('journal_date')
             ->get()
-            ->map(fn($j) => [
+            ->map(fn ($j) => [
                 'Journal Number' => $j->journal_number,
                 'Date' => $j->journal_date->format('Y-m-d'),
                 'Type' => $j->type,
@@ -121,8 +186,8 @@ class AuditExportService
     private function getJournalLinesData(int $orgId, $from, $to): array
     {
         return FinJournalLine::whereHas('journal', function ($q) use ($orgId, $from, $to) {
-                $q->forOrganization($orgId)->forPeriod($from, $to);
-            })
+            $q->forOrganization($orgId)->forPeriod($from, $to);
+        })
             ->with([
                 'journal:id,journal_number,journal_date',
                 'account:id,code,name',
@@ -132,7 +197,7 @@ class AuditExportService
             ])
             ->orderBy('journal_id')
             ->get()
-            ->map(fn($l) => [
+            ->map(fn ($l) => [
                 'Journal Number' => $l->journal->journal_number ?? '',
                 'Journal Date' => $l->journal->journal_date?->format('Y-m-d') ?? '',
                 'Account Code' => $l->account->code ?? '',
@@ -155,7 +220,7 @@ class AuditExportService
             ->with(['bankAccount:id,account_name,account_number', 'completedBy:id,name', 'createdBy:id,name'])
             ->orderBy('statement_date')
             ->get()
-            ->map(fn($r) => [
+            ->map(fn ($r) => [
                 'Statement Date' => $r->statement_date->format('Y-m-d'),
                 'Bank Account' => $r->bankAccount->account_name ?? '',
                 'Account Number' => $r->bankAccount->account_number ?? '',
@@ -178,7 +243,7 @@ class AuditExportService
             ->with(['vendor:id,name', 'approvedBy:id,name', 'createdBy:id,name'])
             ->orderBy('bill_date')
             ->get()
-            ->map(fn($b) => [
+            ->map(fn ($b) => [
                 'Bill Number' => $b->bill_number,
                 'Vendor' => $b->vendor->name ?? '',
                 'Vendor Reference' => $b->vendor_reference,
@@ -204,7 +269,7 @@ class AuditExportService
             ->with(['bankAccount:id,account_name', 'approvedBy:id,name', 'processedBy:id,name', 'createdBy:id,name'])
             ->orderBy('payment_date')
             ->get()
-            ->map(fn($pr) => [
+            ->map(fn ($pr) => [
                 'Run Number' => $pr->run_number,
                 'Payment Date' => $pr->payment_date->format('Y-m-d'),
                 'Bank Account' => $pr->bankAccount->account_name ?? '',
@@ -228,7 +293,7 @@ class AuditExportService
             ->with(['createdBy:id,name'])
             ->orderBy('payment_date')
             ->get()
-            ->map(fn($pa) => [
+            ->map(fn ($pa) => [
                 'Payment Date' => $pa->payment_date->format('Y-m-d'),
                 'Type' => $pa->type,
                 'Amount' => $pa->amount,
@@ -251,7 +316,7 @@ class AuditExportService
             ->with(['createdBy:id,name'])
             ->orderBy('period_start')
             ->get()
-            ->map(fn($g) => [
+            ->map(fn ($g) => [
                 'Period Start' => $g->period_start->format('Y-m-d'),
                 'Period End' => $g->period_end->format('Y-m-d'),
                 'Filing Frequency' => $g->filing_frequency,
@@ -286,7 +351,7 @@ class AuditExportService
             ->with(['createdBy:id,name'])
             ->orderBy('asset_tag')
             ->get()
-            ->map(fn($a) => [
+            ->map(fn ($a) => [
                 'Asset Tag' => $a->asset_tag,
                 'Asset Name' => $a->asset_name,
                 'Category' => $a->category,
@@ -309,13 +374,13 @@ class AuditExportService
     private function getDepreciationData(int $orgId, $from, $to): array
     {
         return FinFixedAssetDepreciation::whereHas('fixedAsset', function ($q) use ($orgId) {
-                $q->where('organization_id', $orgId);
-            })
+            $q->where('organization_id', $orgId);
+        })
             ->whereBetween('depreciation_date', [$from, $to])
             ->with(['fixedAsset:id,asset_tag,asset_name', 'journal:id,journal_number'])
             ->orderBy('depreciation_date')
             ->get()
-            ->map(fn($d) => [
+            ->map(fn ($d) => [
                 'Asset Tag' => $d->fixedAsset->asset_tag ?? '',
                 'Asset Name' => $d->fixedAsset->asset_name ?? '',
                 'Depreciation Date' => $d->depreciation_date->format('Y-m-d'),
@@ -364,13 +429,13 @@ class AuditExportService
             '',
             "Export Name: {$export->export_name}",
             "Period: {$export->period_from->format('Y-m-d')} to {$export->period_to->format('Y-m-d')}",
-            "Generated At: " . now()->format('Y-m-d H:i:s'),
+            'Generated At: '.now()->format('Y-m-d H:i:s'),
             '',
             'Included Sections:',
         ];
 
         foreach ($sheets as $name => $rows) {
-            $lines[] = "  - {$name}: " . count($rows) . ' records';
+            $lines[] = "  - {$name}: ".count($rows).' records';
         }
 
         $lines[] = '';

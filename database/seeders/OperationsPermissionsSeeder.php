@@ -41,6 +41,7 @@ class OperationsPermissionsSeeder extends Seeder
             ['key' => 'invoices.viewAny', 'description' => 'View Invoices'],
             ['key' => 'invoices.create', 'description' => 'Create Invoices'],
             ['key' => 'invoices.send', 'description' => 'Send Invoices'],
+            ['key' => 'invoices.update', 'description' => 'Update Invoices'],
             ['key' => 'invoices.void', 'description' => 'Void Invoices'],
 
             // Funding

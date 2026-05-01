@@ -107,7 +107,7 @@ return [
         // ── Incidents (future) ─────────────────────────────────
         'incident_remediation' => [
             'debit' => '6600',   // Incident Remediation Expense
-            'credit' => '2500',  // Provision for Claims
+            'credit' => '2510',  // Provision for Claims
             'journal_type' => 'standard',
         ],
     ],
@@ -129,21 +129,21 @@ return [
     */
 
     'house_ledger_expense_categories' => [
-        'groceries'       => '6431',  // House Groceries
-        'activities'      => '6432',  // Resident Activities
-        'petty_cash'      => '6433',  // Petty Cash Expenditure
-        'maintenance'     => '6420',  // Property Maintenance (shared with site maintenance)
-        'transport'       => '6434',  // House Transport Costs
-        'medical'         => '6435',  // Medical Supplies
-        'clothing'        => '6436',  // Resident Clothing
-        'household'       => '6437',  // Household Supplies
+        'groceries' => '6431',  // House Groceries
+        'activities' => '6432',  // Resident Activities
+        'petty_cash' => '6433',  // Petty Cash Expenditure
+        'maintenance' => '6420',  // Property Maintenance (shared with site maintenance)
+        'transport' => '6434',  // House Transport Costs
+        'medical' => '6435',  // Medical Supplies
+        'clothing' => '6436',  // Resident Clothing
+        'household' => '6437',  // Household Supplies
         // Unmapped categories → 6430 (generic House Operating Expense)
     ],
 
     'house_ledger_income_categories' => [
         'resident_contribution' => '4210',  // Resident Contributions
-        'donations'             => '4220',  // Donations Received
-        'funding'               => '4100',  // Funding Income
+        'donations' => '4220',  // Donations Received
+        'funding' => '4100',  // Funding Income
         // Unmapped categories → 4200 (generic House Income)
     ],
 
@@ -158,21 +158,53 @@ return [
     */
 
     'client_ledger_expense_categories' => [
-        'groceries'   => '6431',  // House Groceries (shared with house ledger)
-        'clothing'    => '6436',  // Resident Clothing
-        'activities'  => '6432',  // Resident Activities
-        'medical'     => '6435',  // Medical Supplies
-        'transport'   => '6434',  // Transport Costs
-        'personal'    => '6440',  // Client Personal Expenses (generic)
+        'groceries' => '6431',  // House Groceries (shared with house ledger)
+        'clothing' => '6436',  // Resident Clothing
+        'activities' => '6432',  // Resident Activities
+        'medical' => '6435',  // Medical Supplies
+        'transport' => '6434',  // Transport Costs
+        'personal' => '6440',  // Client Personal Expenses (generic)
         // Unmapped → 6440
     ],
 
     'client_ledger_income_categories' => [
-        'contribution'          => '4210',  // Resident Contributions
+        'contribution' => '4210',  // Resident Contributions
         'resident_contribution' => '4210',  // Alias
-        'donation'              => '4220',  // Donations
-        'funding'               => '4100',  // Funding Income
+        'donation' => '4220',  // Donations
+        'funding' => '4100',  // Funding Income
         // Unmapped → 4210
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | EFTPOS Settlement Account Mapping
+    |--------------------------------------------------------------------------
+    |
+    | Reconciled EFTPOS batches move settled card funds from the card clearing
+    | asset account into the operating bank account.
+    |
+    */
+
+    'eftpos_settlement_accounts' => [
+        'bank' => '1000',
+        'card_clearing' => '1180',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bank Feed Provider Availability
+    |--------------------------------------------------------------------------
+    |
+    | Automated NZ bank API feeds are intentionally hidden until provider access
+    | and consent flows are production-ready. CSV import remains the supported
+    | transaction import path.
+    |
+    */
+
+    'bank_feeds' => [
+        'provider_setup_enabled' => env('FINANCE_BANK_FEED_PROVIDER_SETUP_ENABLED', false),
+        'csv_import_supported' => true,
+        'provider_setup_message' => 'Automated NZ bank-feed provider setup is not available yet. Use CSV import for bank transactions.',
     ],
 
     /*
@@ -186,8 +218,8 @@ return [
     */
 
     'payment_type_accounts' => [
-        'ap'        => '2000',  // Accounts Payable (vendor invoice)
-        'cash'      => '1000',  // Bank / Cash at Bank
+        'ap' => '2000',  // Accounts Payable (vendor invoice)
+        'cash' => '1000',  // Bank / Cash at Bank
         'reimburse' => '2310',  // Expense Claims Payable (staff reimbursement)
     ],
 
@@ -265,6 +297,27 @@ return [
         // Staffing insights
         'employer_oncost_high_pct' => 12, // Info when employer on-costs ≥ 12% of wages
         'staffing_pct_of_total_warning' => 75, // Warning when staffing ≥ 75% of total site cost
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Budget Variance Alert Delivery
+    |--------------------------------------------------------------------------
+    */
+
+    'budget_variance_alerts' => [
+        'debounce_hours' => env('FINANCE_BUDGET_VARIANCE_ALERT_DEBOUNCE_HOURS', 24),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Audit Export Storage
+    |--------------------------------------------------------------------------
+    */
+
+    'audit_exports' => [
+        'disk' => env('FINANCE_AUDIT_EXPORT_DISK', 'local'),
+        'retention_years' => env('FINANCE_AUDIT_EXPORT_RETENTION_YEARS', 7),
     ],
 
 ];

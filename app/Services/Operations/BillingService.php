@@ -2,22 +2,21 @@
 
 namespace App\Services\Operations;
 
+use App\Domain\Finance\Models\FinInvoice;
 use App\Models\BillingEntry;
-use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\ServiceAgreement;
 use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
 use App\Models\Timesheet;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class BillingService
 {
     public function __construct(
         protected PayrollRateResolver $rateResolver,
         protected \App\Services\ShiftOperationalSnapshotService $snapshots,
-    ) {
-    }
+    ) {}
 
     public function generateFromTimesheet(Timesheet $timesheet): ?BillingEntry
     {
@@ -37,7 +36,7 @@ class BillingService
         $shift = $timesheet->shift;
         $client = $timesheet->client;
 
-        if (!$client) {
+        if (! $client) {
             return null;
         }
 
@@ -47,7 +46,7 @@ class BillingService
             ->where('starts_at', '<=', $timesheet->work_date)
             ->where(function ($q) use ($timesheet) {
                 $q->whereNull('ends_at')
-                  ->orWhere('ends_at', '>=', $timesheet->work_date);
+                    ->orWhere('ends_at', '>=', $timesheet->work_date);
             })
             ->first();
 
@@ -75,55 +74,72 @@ class BillingService
         ]);
     }
 
-    public function generateInvoice(array $billingEntryIds, int $organizationId, int $createdBy): Invoice
+    public function generateInvoice(array $billingEntryIds, int $organizationId, int $createdBy): FinInvoice
     {
         $entries = BillingEntry::whereIn('id', $billingEntryIds)
             ->where('organization_id', $organizationId)
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'approved'])
+            ->with(['client', 'serviceAgreement'])
             ->get();
 
-        abort_if($entries->isEmpty(), 422, 'No pending billing entries found.');
+        abort_if($entries->isEmpty(), 422, 'No billable billing entries found.');
 
-        $clientId = $entries->first()->client_id;
-        $subtotal = $entries->sum('amount');
-        $taxRate = 0.15; // NZ GST
-        $taxAmount = round($subtotal * $taxRate, 2);
+        return DB::transaction(function () use ($entries, $organizationId, $createdBy) {
+            $firstEntry = $entries->first();
+            $client = $firstEntry->client;
+            $subtotal = $entries->sum('amount');
+            $taxRate = 0.15; // NZ GST
+            $taxAmount = round($subtotal * $taxRate, 2);
 
-        $invoice = Invoice::create([
-            'organization_id' => $organizationId,
-            'client_id' => $clientId,
-            'funding_body' => $entries->first()->serviceAgreement?->funding_body,
-            'invoice_number' => $this->generateInvoiceNumber($organizationId),
-            'status' => 'draft',
-            'issue_date' => now()->toDateString(),
-            'due_date' => now()->addDays(20)->toDateString(),
-            'subtotal' => $subtotal,
-            'tax_amount' => $taxAmount,
-            'total_amount' => $subtotal + $taxAmount,
-            'payment_terms' => 'Due within 20 days of the 20th of the month',
-            'created_by' => $createdBy,
-        ]);
-
-        foreach ($entries as $entry) {
-            InvoiceItem::create([
-                'invoice_id' => $invoice->id,
-                'description' => sprintf(
-                    '%s — %s (%s hrs @ $%s)',
-                    $entry->service_date->format('d M Y'),
-                    $entry->rate_type,
-                    $entry->hours,
-                    number_format($entry->rate, 2)
-                ),
-                'quantity' => $entry->hours,
-                'unit_price' => $entry->rate,
-                'amount' => $entry->amount,
-                'tax_rate' => $taxRate,
+            $invoice = FinInvoice::create([
+                'organization_id' => $organizationId,
+                'client_id' => $firstEntry->client_id,
+                'funding_body' => $firstEntry->serviceAgreement?->funding_body,
+                'invoice_number' => $this->generateInvoiceNumber($organizationId),
+                'invoice_date' => now()->toDateString(),
+                'due_date' => now()->addDays(20)->toDateString(),
+                'client_name' => $client?->full_name ?? $firstEntry->client_name_snapshot ?? 'Client',
+                'client_email' => $client?->email,
+                'client_address' => $this->formatClientAddress($client),
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxAmount,
+                'total_amount' => $subtotal + $taxAmount,
+                'currency_code' => 'NZD',
+                'status' => 'draft',
+                'terms' => 'Due within 20 days of the 20th of the month',
+                'source' => 'operations',
+                'source_type' => BillingEntry::class,
+                'source_id' => $firstEntry->id,
+                'created_by' => $createdBy,
             ]);
 
-            $entry->update(['status' => 'invoiced']);
-        }
+            foreach ($entries as $index => $entry) {
+                $lineSubtotal = (float) $entry->amount;
+                $lineTax = round($lineSubtotal * $taxRate, 2);
 
-        return $invoice;
+                $invoice->lines()->create([
+                    'billing_entry_id' => $entry->id,
+                    'description' => sprintf(
+                        '%s - %s (%s hrs @ $%s)',
+                        $entry->service_date->format('d M Y'),
+                        $entry->rate_type,
+                        $entry->hours,
+                        number_format((float) $entry->rate, 2)
+                    ),
+                    'quantity' => $entry->hours,
+                    'unit_price' => $entry->rate,
+                    'tax_amount' => $lineTax,
+                    'line_total' => $lineSubtotal + $lineTax,
+                    'sort_order' => $index,
+                    'service_date' => $entry->service_date,
+                    'category' => $entry->rate_type,
+                ]);
+
+                $entry->update(['status' => 'invoiced']);
+            }
+
+            return $invoice;
+        });
     }
 
     public function updateAgreementUsage(ServiceAgreement $agreement): void
@@ -156,7 +172,7 @@ class BillingService
 
     protected function calculateHours(Timesheet $timesheet): float
     {
-        if (!$timesheet->starts_at || !$timesheet->ends_at) {
+        if (! $timesheet->starts_at || ! $timesheet->ends_at) {
             return 0;
         }
 
@@ -198,7 +214,7 @@ class BillingService
 
     protected function resolveRate(?ServiceAgreement $agreement, string $rateType): float
     {
-        if (!$agreement) {
+        if (! $agreement) {
             return $agreement?->hourly_rate ?? 0;
         }
 
@@ -206,11 +222,11 @@ class BillingService
             ->where('rate_type', $rateType)
             ->where(function ($q) {
                 $q->whereNull('effective_from')
-                  ->orWhere('effective_from', '<=', now());
+                    ->orWhere('effective_from', '<=', now());
             })
             ->where(function ($q) {
                 $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', now());
+                    ->orWhere('effective_to', '>=', now());
             })
             ->first();
 
@@ -226,15 +242,16 @@ class BillingService
         return ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
             ->where(function ($q) use ($rateType) {
                 $q->where('category', 'like', "%{$rateType}%")
-                  ->orWhereNull('category');
+                    ->orWhereNull('category');
             })
-            ->orderByRaw("CASE WHEN category LIKE ? THEN 0 ELSE 1 END", ["%{$rateType}%"])
+            ->orderByRaw('CASE WHEN category LIKE ? THEN 0 ELSE 1 END', ["%{$rateType}%"])
             ->first();
     }
 
     protected function generateInvoiceNumber(int $organizationId): string
     {
-        $lastInvoice = Invoice::where('organization_id', $organizationId)
+        $lastInvoice = FinInvoice::withTrashed()
+            ->where('organization_id', $organizationId)
             ->orderByDesc('id')
             ->first();
 
@@ -242,6 +259,21 @@ class BillingService
             ? ((int) preg_replace('/[^0-9]/', '', $lastInvoice->invoice_number)) + 1
             : 1001;
 
-        return 'INV-' . str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+        return 'INV-'.str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+    }
+
+    protected function formatClientAddress($client): ?string
+    {
+        if (! $client) {
+            return null;
+        }
+
+        return collect([
+            $client->address_line_1,
+            $client->address_line_2,
+            $client->suburb,
+            $client->city,
+            $client->postcode,
+        ])->filter()->implode(', ') ?: null;
     }
 }

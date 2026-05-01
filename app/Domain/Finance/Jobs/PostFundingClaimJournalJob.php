@@ -15,12 +15,24 @@ class PostFundingClaimJournalJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 1;
+
     public function __construct(
         public readonly FundingClaim $claim,
     ) {}
 
     public function handle(FundingClaimJournalService $service): void
     {
+        $this->claim->refresh();
+
+        if ($this->claim->journal_id !== null) {
+            return;
+        }
+
+        if (! in_array($this->claim->status, ['submitted', 'approved'], true)) {
+            return;
+        }
+
         $journal = $service->postFundingClaimJournal($this->claim);
 
         Log::info("Posted funding claim #{$this->claim->id} ({$this->claim->claim_reference}) to journal {$journal->journal_number}.");

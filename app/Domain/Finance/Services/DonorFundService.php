@@ -7,9 +7,12 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinDonorFund;
 use App\Domain\Finance\Models\FinDonorFundReport;
 use App\Domain\Finance\Models\FinDonorFundTransaction;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class DonorFundService
@@ -145,7 +148,7 @@ class DonorFundService
 
         return FinDonorFundReport::create([
             'fund_id' => $fund->id,
-            'report_name' => "{$fund->fund_name} - Report " . now()->format('M Y'),
+            'report_name' => "{$fund->fund_name} - Report ".now()->format('M Y'),
             'period_from' => $periodFrom,
             'period_to' => $periodTo,
             'opening_balance' => $openingBalance,
@@ -159,6 +162,31 @@ class DonorFundService
             'status' => 'draft',
             'created_by' => Auth::id(),
         ]);
+    }
+
+    public function exportReportPdf(FinDonorFundReport $report, string $disk = 'local'): FinDonorFundReport
+    {
+        $report->loadMissing('fund');
+
+        $transactions = collect($report->report_data['transactions'] ?? []);
+        $path = sprintf(
+            'donor-fund-reports/%d/%s-%d.pdf',
+            $report->fund->organization_id,
+            Str::slug($report->report_name),
+            $report->id,
+        );
+
+        $pdf = Pdf::loadView('finance.donor-funds.report-pdf', [
+            'fund' => $report->fund,
+            'report' => $report,
+            'transactions' => $transactions,
+        ]);
+
+        Storage::disk($disk)->put($path, $pdf->output());
+
+        $report->update(['file_path' => $path]);
+
+        return $report->refresh();
     }
 
     /**

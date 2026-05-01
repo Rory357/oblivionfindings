@@ -178,14 +178,14 @@ class AccountsPayableService
             // CR Accounts Payable for the total amount
             $journalLines[] = [
                 'account_id' => $apAccount->id,
-                'description' => 'Bill ' . $bill->bill_number . ' — ' . ($bill->vendor?->name ?? 'Unknown vendor'),
+                'description' => 'Bill '.$bill->bill_number.' — '.($bill->vendor?->name ?? 'Unknown vendor'),
                 'debit' => 0,
                 'credit' => $bill->total_amount,
             ];
 
             $journal = $this->journalPostingService->createAndPost($bill->organization_id, [
                 'journal_date' => $bill->bill_date->toDateString(),
-                'type' => 'bill',
+                'type' => 'standard',
                 'reference' => $bill->bill_number,
                 'description' => "Bill {$bill->bill_number} approved",
                 'source_type' => FinBill::class,
@@ -365,7 +365,7 @@ class AccountsPayableService
 
             $journal = $this->journalPostingService->createAndPost($cn->organization_id, [
                 'journal_date' => $cn->credit_date->toDateString(),
-                'type' => 'credit_note',
+                'type' => 'adjustment',
                 'reference' => $cn->credit_note_number,
                 'description' => "Credit Note {$cn->credit_note_number} approved",
                 'source_type' => FinCreditNote::class,
@@ -469,16 +469,16 @@ class AccountsPayableService
      */
     private function generateBillNumber(?int $orgId): string
     {
-        $prefix = 'BILL-' . now()->format('Ym') . '-';
+        $prefix = 'BILL-'.now()->format('Ym').'-';
 
         $maxNumber = FinBill::where('organization_id', $orgId)
-            ->where('bill_number', 'like', $prefix . '%')
-            ->selectRaw("MAX(CAST(SUBSTRING(bill_number, " . (strlen($prefix) + 1) . ") AS UNSIGNED)) as max_num")
+            ->where('bill_number', 'like', $prefix.'%')
+            ->selectRaw('MAX(CAST(SUBSTRING(bill_number, '.(strlen($prefix) + 1).') AS UNSIGNED)) as max_num')
             ->value('max_num');
 
         $next = ($maxNumber ?? 0) + 1;
 
-        return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $next, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -487,15 +487,15 @@ class AccountsPayableService
      */
     private function generateCreditNoteNumber(?int $orgId): string
     {
-        $prefix = 'CN-' . now()->format('Ym') . '-';
+        $prefix = 'CN-'.now()->format('Ym').'-';
 
         $maxNumber = FinCreditNote::where('organization_id', $orgId)
-            ->where('credit_note_number', 'like', $prefix . '%')
-            ->selectRaw("MAX(CAST(SUBSTRING(credit_note_number, " . (strlen($prefix) + 1) . ") AS UNSIGNED)) as max_num")
+            ->where('credit_note_number', 'like', $prefix.'%')
+            ->selectRaw('MAX(CAST(SUBSTRING(credit_note_number, '.(strlen($prefix) + 1).') AS UNSIGNED)) as max_num')
             ->value('max_num');
 
         $next = ($maxNumber ?? 0) + 1;
 
-        return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $next, 3, '0', STR_PAD_LEFT);
     }
 }

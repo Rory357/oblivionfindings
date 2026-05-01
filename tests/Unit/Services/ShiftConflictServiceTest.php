@@ -119,12 +119,14 @@ class ShiftConflictServiceTest extends TestCase
             'ends_at' => now()->setTime(13, 0),
             'status' => 'cancelled',
         ]);
-        Shift::factory()->create([
+        // Use the completed() factory state so the shift is created with the
+        // actual_starts_at / actual_ends_at evidence the safety invariant
+        // requires for completed shifts.
+        Shift::factory()->completed()->create([
             'client_id' => $this->client->id,
             'user_id' => $this->staff->id,
             'starts_at' => now()->setTime(13, 15),
             'ends_at' => now()->setTime(17, 0),
-            'status' => 'completed',
         ]);
 
         $conflicts = $this->service->findBlockingStaffConflicts(

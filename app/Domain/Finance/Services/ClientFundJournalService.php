@@ -5,7 +5,7 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\ClientFundTransaction;
-use InvalidArgumentException;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class ClientFundJournalService
@@ -27,78 +27,85 @@ class ClientFundJournalService
 
     public function postClientFundJournal(ClientFundTransaction $txn): FinJournal
     {
-        if ($txn->journal_id !== null) {
-            throw new InvalidArgumentException(
-                "Client fund transaction #{$txn->id} has already been posted to journal #{$txn->journal_id}."
-            );
-        }
+        return DB::transaction(function () use ($txn) {
+            $txn = ClientFundTransaction::query()
+                ->lockForUpdate()
+                ->findOrFail($txn->id);
 
-        $orgId = $txn->organization_id;
-        $amount = (string) $txn->amount;
-        $absAmount = ltrim($amount, '-');
+            if ($txn->journal_id !== null) {
+                return FinJournal::findOrFail($txn->journal_id);
+            }
 
-        if (bccomp($absAmount, '0', 2) === 0) {
-            throw new RuntimeException(
-                "Client fund transaction #{$txn->id} has a zero amount. Cannot post."
-            );
-        }
+            $orgId = $txn->organization_id;
+            $amount = (string) $txn->amount;
+            $absAmount = ltrim($amount, '-');
 
-        $bankTrustAccount    = $this->findAccountByCode($orgId, '1010');
-        $clientTrustAccount  = $this->findAccountByCode($orgId, '2500');
+            if (bccomp($absAmount, '0', 2) === 0) {
+                throw new RuntimeException(
+                    "Client fund transaction #{$txn->id} has a zero amount. Cannot post."
+                );
+            }
 
-        $isDeposit = bccomp($amount, '0', 2) > 0;
+            $bankTrustAccount = $this->findAccountByCode($orgId, '1010');
+            $clientTrustAccount = $this->findAccountByCode($orgId, '2500');
 
-        $lines = [];
+            $transactionType = strtolower((string) $txn->transaction_type);
+            $isWithdrawal = in_array($transactionType, ['debit', 'withdrawal', 'outflow'], true)
+                || bccomp($amount, '0', 2) < 0;
+            $isDeposit = ! $isWithdrawal;
 
-        if ($isDeposit) {
-            // Deposit: DR 1010 Bank - Trust, CR 2500 Client Trust Funds
-            $lines[] = [
-                'account_id'  => $bankTrustAccount->id,
-                'description' => 'Bank - Trust Account (deposit)',
-                'debit'       => $absAmount,
-                'credit'      => 0,
-            ];
-            $lines[] = [
-                'account_id'  => $clientTrustAccount->id,
-                'description' => 'Client Trust Funds (deposit)',
-                'debit'       => 0,
-                'credit'      => $absAmount,
-            ];
-        } else {
-            // Withdrawal: DR 2500 Client Trust Funds, CR 1010 Bank - Trust
-            $lines[] = [
-                'account_id'  => $clientTrustAccount->id,
-                'description' => 'Client Trust Funds (withdrawal)',
-                'debit'       => $absAmount,
-                'credit'      => 0,
-            ];
-            $lines[] = [
-                'account_id'  => $bankTrustAccount->id,
-                'description' => 'Bank - Trust Account (withdrawal)',
-                'debit'       => 0,
-                'credit'      => $absAmount,
-            ];
-        }
+            $lines = [];
 
-        $description = $txn->description
-            ? "Client fund {$txn->transaction_type}: {$txn->description}"
-            : "Client fund {$txn->transaction_type}";
+            if ($isDeposit) {
+                // Deposit: DR 1010 Bank - Trust, CR 2500 Client Trust Funds
+                $lines[] = [
+                    'account_id' => $bankTrustAccount->id,
+                    'description' => 'Bank - Trust Account (deposit)',
+                    'debit' => $absAmount,
+                    'credit' => 0,
+                ];
+                $lines[] = [
+                    'account_id' => $clientTrustAccount->id,
+                    'description' => 'Client Trust Funds (deposit)',
+                    'debit' => 0,
+                    'credit' => $absAmount,
+                ];
+            } else {
+                // Withdrawal: DR 2500 Client Trust Funds, CR 1010 Bank - Trust
+                $lines[] = [
+                    'account_id' => $clientTrustAccount->id,
+                    'description' => 'Client Trust Funds (withdrawal)',
+                    'debit' => $absAmount,
+                    'credit' => 0,
+                ];
+                $lines[] = [
+                    'account_id' => $bankTrustAccount->id,
+                    'description' => 'Bank - Trust Account (withdrawal)',
+                    'debit' => 0,
+                    'credit' => $absAmount,
+                ];
+            }
 
-        $journal = $this->journalPostingService->createAndPost($orgId, [
-            'journal_date' => ($txn->transaction_date ?? now())->toDateString(),
-            'type'         => 'standard',
-            'source_type'  => 'client_fund_transaction',
-            'source_id'    => $txn->id,
-            'description'  => $description,
-            'lines'        => $lines,
-        ]);
+            $description = $txn->description
+                ? "Client fund {$txn->transaction_type}: {$txn->description}"
+                : "Client fund {$txn->transaction_type}";
 
-        $txn->update([
-            'journal_id'   => $journal->id,
-            'gl_posted_at' => now(),
-        ]);
+            $journal = $this->journalPostingService->createAndPost($orgId, [
+                'journal_date' => ($txn->transaction_date ?? now())->toDateString(),
+                'type' => 'standard',
+                'source_type' => 'client_fund_transaction',
+                'source_id' => $txn->id,
+                'description' => $description,
+                'lines' => $lines,
+            ]);
 
-        return $journal;
+            $txn->forceFill([
+                'journal_id' => $journal->id,
+                'gl_posted_at' => now(),
+            ])->save();
+
+            return $journal;
+        });
     }
 
     /* ------------------------------------------------------------------

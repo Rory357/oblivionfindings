@@ -4738,6 +4738,8 @@ CREATE TABLE `fin_eftpos_batches` (
   `reconciled_by` bigint unsigned DEFAULT NULL,
   `discrepancy_amount` decimal(14,2) NOT NULL DEFAULT '0.00',
   `discrepancy_notes` text COLLATE utf8mb4_unicode_ci,
+  `journal_id` bigint unsigned DEFAULT NULL,
+  `gl_posted_at` datetime DEFAULT NULL,
   `created_by` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -4746,10 +4748,12 @@ CREATE TABLE `fin_eftpos_batches` (
   KEY `fin_eftpos_batches_bank_transaction_id_foreign` (`bank_transaction_id`),
   KEY `fin_eftpos_batches_reconciled_by_foreign` (`reconciled_by`),
   KEY `fin_eftpos_batches_created_by_foreign` (`created_by`),
+  KEY `fin_eftpos_batches_journal_id_foreign` (`journal_id`),
   KEY `fin_eftpos_batch_org_stat_date` (`organization_id`,`status`,`batch_date`),
   KEY `fin_eftpos_batches_organization_id_index` (`organization_id`),
   CONSTRAINT `fin_eftpos_batches_bank_transaction_id_foreign` FOREIGN KEY (`bank_transaction_id`) REFERENCES `fin_bank_transactions` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_eftpos_batches_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fin_eftpos_batches_journal_id_foreign` FOREIGN KEY (`journal_id`) REFERENCES `fin_journals` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_eftpos_batches_reconciled_by_foreign` FOREIGN KEY (`reconciled_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_eftpos_batches_terminal_id_foreign` FOREIGN KEY (`terminal_id`) REFERENCES `fin_eftpos_terminals` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -5091,18 +5095,23 @@ DROP TABLE IF EXISTS `fin_invoice_lines`;
 CREATE TABLE `fin_invoice_lines` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `invoice_id` bigint unsigned NOT NULL,
+  `billing_entry_id` bigint unsigned DEFAULT NULL,
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `quantity` decimal(10,2) NOT NULL DEFAULT '1.00',
   `unit_price` decimal(14,2) NOT NULL,
   `tax_rate_id` bigint unsigned DEFAULT NULL,
   `tax_amount` decimal(14,2) NOT NULL DEFAULT '0.00',
   `line_total` decimal(14,2) NOT NULL,
+  `service_date` date DEFAULT NULL,
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sort_order` int NOT NULL DEFAULT '0',
   `account_id` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fin_invoice_lines_invoice_id_foreign` (`invoice_id`),
+  KEY `fin_invoice_lines_billing_entry_id_foreign` (`billing_entry_id`),
+  CONSTRAINT `fin_invoice_lines_billing_entry_id_foreign` FOREIGN KEY (`billing_entry_id`) REFERENCES `billing_entries` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_invoice_lines_invoice_id_foreign` FOREIGN KEY (`invoice_id`) REFERENCES `fin_invoices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -5110,18 +5119,25 @@ DROP TABLE IF EXISTS `fin_invoices`;
 CREATE TABLE `fin_invoices` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `organization_id` bigint unsigned NOT NULL,
+  `client_id` bigint unsigned DEFAULT NULL,
   `invoice_number` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `invoice_date` date NOT NULL,
   `due_date` date NOT NULL,
   `client_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `client_email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `client_address` text COLLATE utf8mb4_unicode_ci,
+  `funding_body` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bill_id` bigint unsigned DEFAULT NULL,
+  `source` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_id` bigint unsigned DEFAULT NULL,
   `subtotal` decimal(14,2) NOT NULL DEFAULT '0.00',
   `tax_amount` decimal(14,2) NOT NULL DEFAULT '0.00',
   `total_amount` decimal(14,2) NOT NULL DEFAULT '0.00',
   `currency_code` char(3) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NZD',
   `status` enum('draft','sent','viewed','paid','overdue','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `journal_id` bigint unsigned DEFAULT NULL,
+  `gl_posted_at` datetime DEFAULT NULL,
   `sent_at` datetime DEFAULT NULL,
   `viewed_at` datetime DEFAULT NULL,
   `paid_at` datetime DEFAULT NULL,
@@ -5137,11 +5153,19 @@ CREATE TABLE `fin_invoices` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `fin_inv_org_num_unique` (`organization_id`,`invoice_number`),
   KEY `fin_invoices_created_by_foreign` (`created_by`),
+  KEY `fin_invoices_client_id_foreign` (`client_id`),
   KEY `fin_inv_org_status_idx` (`organization_id`,`status`),
   KEY `fin_inv_org_due_idx` (`organization_id`,`due_date`),
   KEY `fin_inv_bill_id_idx` (`bill_id`),
+  KEY `fin_inv_source_name_idx` (`source`),
+  KEY `fin_inv_org_client_idx` (`organization_id`,`client_id`),
+  KEY `fin_inv_source_idx` (`source_type`,`source_id`),
+  KEY `fin_invoices_journal_id_foreign` (`journal_id`),
+  KEY `fin_inv_org_journal_idx` (`organization_id`,`journal_id`),
   KEY `fin_invoices_organization_id_index` (`organization_id`),
-  CONSTRAINT `fin_invoices_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `fin_invoices_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fin_invoices_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fin_invoices_journal_id_foreign` FOREIGN KEY (`journal_id`) REFERENCES `fin_journals` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `fin_ird_filings`;
@@ -5216,10 +5240,12 @@ CREATE TABLE `fin_journals` (
   `exchange_rate` decimal(14,6) DEFAULT NULL,
   `base_currency_amount` decimal(14,2) DEFAULT NULL,
   `created_by` bigint unsigned DEFAULT NULL,
+  `posted_payroll_source_id` bigint unsigned GENERATED ALWAYS AS ((case when ((`type` = _utf8mb4'payroll') and (`source_type` = _utf8mb4'payroll_run') and (`status` = _utf8mb4'posted')) then `source_id` else NULL end)) STORED,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `fin_journals_organization_id_journal_number_unique` (`organization_id`,`journal_number`),
+  UNIQUE KEY `fin_journals_payroll_posted_source_unique` (`organization_id`,`posted_payroll_source_id`),
   KEY `fin_journals_posted_by_foreign` (`posted_by`),
   KEY `fin_journals_created_by_foreign` (`created_by`),
   KEY `fin_journals_organization_id_status_journal_date_index` (`organization_id`,`status`,`journal_date`),
@@ -5311,6 +5337,7 @@ CREATE TABLE `fin_payment_matches` (
   `status` enum('suggested','confirmed','rejected','auto_confirmed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'suggested',
   `confirmed_by` bigint unsigned DEFAULT NULL,
   `confirmed_at` datetime DEFAULT NULL,
+  `journal_id` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -5318,9 +5345,11 @@ CREATE TABLE `fin_payment_matches` (
   KEY `fin_pm_org_status_idx` (`organization_id`,`status`),
   KEY `fin_pm_bank_txn_idx` (`bank_transaction_id`),
   KEY `fin_pm_matchable_idx` (`matchable_type`,`matchable_id`),
+  KEY `fin_pm_journal_id_idx` (`journal_id`),
   KEY `fin_payment_matches_organization_id_index` (`organization_id`),
   CONSTRAINT `fin_payment_matches_bank_transaction_id_foreign` FOREIGN KEY (`bank_transaction_id`) REFERENCES `fin_bank_transactions` (`id`),
-  CONSTRAINT `fin_payment_matches_confirmed_by_foreign` FOREIGN KEY (`confirmed_by`) REFERENCES `users` (`id`)
+  CONSTRAINT `fin_payment_matches_confirmed_by_foreign` FOREIGN KEY (`confirmed_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fin_pm_journal_id_fk` FOREIGN KEY (`journal_id`) REFERENCES `fin_journals` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `fin_payment_run_items`;
@@ -14738,12 +14767,14 @@ CREATE TABLE `site_budget_lines` (
   `created_by` bigint unsigned DEFAULT NULL,
   `approved_by` bigint unsigned DEFAULT NULL,
   `approved_at` datetime DEFAULT NULL,
+  `last_alerted_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `site_budget_unique` (`site_id`,`period`,`category`),
   KEY `site_budget_lines_created_by_foreign` (`created_by`),
   KEY `site_budget_lines_approved_by_foreign` (`approved_by`),
+  KEY `site_budget_lines_last_alerted_at_index` (`last_alerted_at`),
   KEY `site_budget_lines_tenant_id_period_index` (`tenant_id`,`period`),
   KEY `site_budget_lines_site_id_period_index` (`site_id`,`period`),
   KEY `site_budget_lines_tenant_id_index` (`tenant_id`),
@@ -17150,7 +17181,14 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
     (494, '2026_04_29_000200_create_roster_suggestion_tables', 1),
     (495, '2026_04_29_000300_enhance_roster_period_metadata', 1),
     (496, '2026_05_01_000000_create_hr_attendance_break_events_table', 1),
-    (497, '2026_05_01_090000_create_coverage_gap_acknowledgements_table', 1);
+    (497, '2026_05_01_090000_create_coverage_gap_acknowledgements_table', 1),
+    (498, '2026_05_01_210500_add_journal_id_to_fin_payment_matches_table', 1),
+    (499, '2026_05_01_000100_add_gl_posting_columns_to_fin_invoices_table', 1),
+    (500, '2026_05_01_100500_add_last_alerted_at_to_site_budget_lines_table', 1),
+    (501, '2026_05_01_100000_reconcile_finance_chart_config_accounts', 1),
+    (502, '2026_05_01_211000_add_posted_payroll_journal_source_uniqueness', 1),
+    (503, '2026_05_01_212000_add_eftpos_settlement_journal_support', 1),
+    (504, '2026_05_02_100000_add_operations_metadata_to_fin_invoices', 1);
 
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE,'system') */;
@@ -17161,4 +17199,3 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES,1) */;
-

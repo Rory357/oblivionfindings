@@ -4,61 +4,65 @@ namespace App\Providers;
 
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Events\FleetSignalEmitted;
+use App\Events\FleetWanderingAlertTriggered;
 use App\Models\AssetMaintenanceLog;
 use App\Models\Client;
+use App\Models\ClientFundTransaction;
 use App\Models\ClientIncident;
-use App\Models\EmergencyDrill;
+use App\Models\ClientLedgerEntry;
 use App\Models\ClientNote;
+use App\Models\EmergencyDrill;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
+use App\Models\FundingClaim;
+use App\Models\HouseLedgerEntry;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
-use App\Models\SiteHazard;
 use App\Models\SiteChecklistRun;
-use App\Models\ClientLedgerEntry;
-use App\Models\HouseLedgerEntry;
+use App\Models\SiteHazard;
 use App\Models\Timesheet;
+use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Observers\AssetMaintenanceLogObserver;
+use App\Observers\ClientFundTransactionObserver;
 use App\Observers\ClientIncidentObserver;
-use App\Observers\EmergencyDrillObserver;
 use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
+use App\Observers\EmergencyDrillObserver;
 use App\Observers\FleetFuelLogObserver;
 use App\Observers\FleetIncidentObserver;
-use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\FleetWorkOrderObserver;
+use App\Observers\FundingClaimObserver;
+use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\HrCourseEnrollmentObserver;
 use App\Observers\HrExpenseClaimObserver;
 use App\Observers\RestraintEventObserver;
 use App\Observers\SafeguardingConcernObserver;
 use App\Observers\ShiftObserver;
-use App\Observers\SiteObserver;
-use App\Observers\SiteHazardObserver;
 use App\Observers\SiteChecklistRunObserver;
+use App\Observers\SiteHazardObserver;
+use App\Observers\SiteObserver;
 use App\Observers\TimesheetMileageObserver;
 use App\Observers\WorkplaceInjuryObserver;
-use App\Events\FleetSignalEmitted;
-use App\Events\FleetWanderingAlertTriggered;
 use App\Services\AuditLogger;
 use App\Services\Integration\Adapters\UnifiAdapter;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Notifications\ExpoPushProvider;
-use App\Services\Notifications\FailingSmsProvider;
 use App\Services\Notifications\FailingPushProvider;
+use App\Services\Notifications\FailingSmsProvider;
 use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use App\Services\Notifications\TwilioSmsProvider;
-use App\Models\User;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -69,7 +73,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(IntegrationAdapterRegistry::class, function () {
-            $registry = new IntegrationAdapterRegistry();
+            $registry = new IntegrationAdapterRegistry;
             $registry->register('unifi', UnifiAdapter::class);
             $registry->register(
                 \App\Services\Integration\Adapters\QueclinkAdapter::PROVIDER_SLUG,
@@ -147,6 +151,8 @@ class AppServiceProvider extends ServiceProvider
         Timesheet::observe(TimesheetMileageObserver::class);
         HouseLedgerEntry::observe(HouseLedgerEntryObserver::class);
         ClientLedgerEntry::observe(ClientLedgerEntryObserver::class);
+        FundingClaim::observe(FundingClaimObserver::class);
+        ClientFundTransaction::observe(ClientFundTransactionObserver::class);
 
         // Register Socialite providers (Microsoft + Google)
         Event::listen(
@@ -177,7 +183,7 @@ class AppServiceProvider extends ServiceProvider
                         alertId: $event->signal->id,
                         alertType: $event->signal->signal_type,
                         severity: $event->signal->severity_hint ?? 'medium',
-                        clientName: $client ? trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')) : null,
+                        clientName: $client ? trim(($client->first_name ?? '').' '.($client->last_name ?? '')) : null,
                         clientId: $asset->client_id,
                         latitude: $payload['lat'] ?? $payload['latitude'] ?? null,
                         longitude: $payload['lng'] ?? $payload['longitude'] ?? null,
@@ -209,7 +215,7 @@ class AppServiceProvider extends ServiceProvider
         // Treat password setup/reset as email verification if user is not verified yet.
         Event::listen(PasswordReset::class, function (PasswordReset $event): void {
             $user = $event->user;
-            if (!$user || $user->email_verified_at) {
+            if (! $user || $user->email_verified_at) {
                 return;
             }
 

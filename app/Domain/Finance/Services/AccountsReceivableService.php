@@ -53,7 +53,7 @@ class AccountsReceivableService
                 $clientBuckets[$clientId] = [
                     'client_id' => $clientId,
                     'client_name' => $invoice->client
-                        ? $invoice->client->first_name . ' ' . $invoice->client->last_name
+                        ? $invoice->client->first_name.' '.$invoice->client->last_name
                         : 'Unknown',
                     'current' => '0',
                     '1_30' => '0',
@@ -133,7 +133,7 @@ class AccountsReceivableService
             // Create the GL journal: DR Bank, CR Accounts Receivable
             $journal = $this->journalPostingService->createAndPost($orgId, [
                 'journal_date' => $data['payment_date'],
-                'type' => 'receipt',
+                'type' => 'standard',
                 'reference' => "PMT-{$invoice->invoice_number}",
                 'description' => "Payment received for invoice {$invoice->invoice_number}",
                 'source_type' => Invoice::class,
@@ -230,7 +230,7 @@ class AccountsReceivableService
         return [
             'client' => [
                 'id' => $client->id,
-                'name' => $client->first_name . ' ' . $client->last_name,
+                'name' => $client->first_name.' '.$client->last_name,
                 'email' => $client->email,
                 'address_line_1' => $client->address_line_1,
                 'address_line_2' => $client->address_line_2,

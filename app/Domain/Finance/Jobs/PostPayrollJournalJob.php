@@ -18,12 +18,7 @@ class PostPayrollJournalJob implements ShouldQueue
     /**
      * Number of times the job may be attempted.
      */
-    public int $tries = 3;
-
-    /**
-     * Seconds to wait before retrying the job.
-     */
-    public int $backoff = 30;
+    public int $tries = 1;
 
     public function __construct(
         public readonly HrPayrollRun $payrollRun,
@@ -31,18 +26,45 @@ class PostPayrollJournalJob implements ShouldQueue
 
     public function handle(PayrollJournalService $service): void
     {
+        $payrollRun = $this->payrollRun->fresh();
+
+        if (! $payrollRun) {
+            Log::warning('Skipping payroll journal posting because the payroll run no longer exists.', [
+                'payroll_run_id' => $this->payrollRun->id,
+            ]);
+
+            return;
+        }
+
+        if ($payrollRun->locked_at === null) {
+            Log::warning('Skipping payroll journal posting because the payroll run is not locked.', [
+                'payroll_run_id' => $payrollRun->id,
+            ]);
+
+            return;
+        }
+
+        if ($payrollRun->journal_id !== null) {
+            Log::info('Skipping payroll journal posting because the payroll run is already linked to a journal.', [
+                'payroll_run_id' => $payrollRun->id,
+                'journal_id' => $payrollRun->journal_id,
+            ]);
+
+            return;
+        }
+
         try {
-            $journal = $service->postPayrollJournal($this->payrollRun);
+            $journal = $service->postPayrollJournal($payrollRun);
 
             Log::info('Payroll journal posted successfully.', [
-                'payroll_run_id' => $this->payrollRun->id,
-                'journal_id'    => $journal->id,
+                'payroll_run_id' => $payrollRun->id,
+                'journal_id' => $journal->id,
                 'journal_number' => $journal->journal_number,
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to post payroll journal.', [
-                'payroll_run_id' => $this->payrollRun->id,
-                'error'          => $e->getMessage(),
+                'payroll_run_id' => $payrollRun->id,
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;

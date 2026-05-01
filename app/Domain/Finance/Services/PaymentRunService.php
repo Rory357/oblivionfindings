@@ -2,7 +2,6 @@
 
 namespace App\Domain\Finance\Services;
 
-use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinPaymentRun;
 use Illuminate\Database\Eloquent\Collection;
@@ -142,7 +141,7 @@ class PaymentRunService
 
             $journal = $this->journalPostingService->createAndPost($run->organization_id, [
                 'journal_date' => $run->payment_date->toDateString(),
-                'type' => 'payment',
+                'type' => 'standard',
                 'reference' => $run->run_number,
                 'description' => "Payment run {$run->run_number} — {$run->item_count} payments",
                 'source_type' => FinPaymentRun::class,
@@ -207,16 +206,16 @@ class PaymentRunService
      */
     private function generateRunNumber(?int $orgId): string
     {
-        $prefix = 'PAY-' . now()->format('Ym') . '-';
+        $prefix = 'PAY-'.now()->format('Ym').'-';
 
         $maxNumber = FinPaymentRun::where('organization_id', $orgId)
-            ->where('run_number', 'like', $prefix . '%')
-            ->selectRaw("MAX(CAST(SUBSTRING(run_number, " . (strlen($prefix) + 1) . ") AS UNSIGNED)) as max_num")
+            ->where('run_number', 'like', $prefix.'%')
+            ->selectRaw('MAX(CAST(SUBSTRING(run_number, '.(strlen($prefix) + 1).') AS UNSIGNED)) as max_num')
             ->value('max_num');
 
         $next = ($maxNumber ?? 0) + 1;
 
-        return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $next, 3, '0', STR_PAD_LEFT);
     }
 
     /**

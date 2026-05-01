@@ -31,11 +31,13 @@ class SiteBudgetLine extends Model
         'created_by',
         'approved_by',
         'approved_at',
+        'last_alerted_at',
     ];
 
     protected $casts = [
         'planned_amount' => 'decimal:2',
         'approved_at' => 'datetime',
+        'last_alerted_at' => 'datetime',
     ];
 
     /**
@@ -67,7 +69,7 @@ class SiteBudgetLine extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function site(): BelongsTo
@@ -86,7 +88,7 @@ class SiteBudgetLine extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant($query, ?int $tenantId)

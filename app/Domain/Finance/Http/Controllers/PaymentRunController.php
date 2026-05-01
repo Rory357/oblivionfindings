@@ -166,8 +166,11 @@ class PaymentRunController extends Controller
         ]);
     }
 
-    public function approve(Request $request, FinPaymentRun $paymentRun)
+    public function approve(Request $request, int $paymentRunId)
     {
+        $paymentRun = FinPaymentRun::forOrganization($request->user()->organization_id)
+            ->findOrFail($paymentRunId);
+
         $this->authorize('approve', $paymentRun);
 
         try {
@@ -200,13 +203,13 @@ class PaymentRunController extends Controller
             return back()->withErrors(['payment_run' => 'No bank file available for this payment run.']);
         }
 
-        $fullPath = storage_path('app/' . $paymentRun->file_path);
+        $fullPath = storage_path('app/'.$paymentRun->file_path);
 
         if (! file_exists($fullPath)) {
             return back()->withErrors(['payment_run' => 'Bank file not found on disk.']);
         }
 
-        return response()->download($fullPath, $paymentRun->run_number . '.csv', [
+        return response()->download($fullPath, $paymentRun->run_number.'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }
@@ -221,6 +224,6 @@ class PaymentRunController extends Controller
             return $accountNumber;
         }
 
-        return str_repeat('*', $length - 4) . substr($accountNumber, -4);
+        return str_repeat('*', $length - 4).substr($accountNumber, -4);
     }
 }

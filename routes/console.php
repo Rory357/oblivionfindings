@@ -1,9 +1,18 @@
 <?php
 
+use App\Domain\Finance\Jobs\CalculateGstReturnJob;
+use App\Domain\Finance\Jobs\CheckBillDueDatesJob;
+use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
 use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
 use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
+use App\Domain\Finance\Jobs\RunDepreciationJob;
+use App\Domain\Finance\Jobs\RunPaymentMatchingJob;
+use App\Domain\Finance\Jobs\SnapshotFinancialReportsJob;
+use App\Domain\Finance\Jobs\SyncAccountingIntegrationJob;
+use App\Domain\Finance\Jobs\SyncBankFeedsJob;
 use App\Domain\Finance\Jobs\SyncBudgetActualsJob;
+use App\Domain\Finance\Models\FinAccountingIntegration;
 use App\Domain\Governance\Jobs\SendBoardDigest;
 use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
@@ -234,6 +243,70 @@ app(Schedule::class)
     ->job(new PostLeaveProvisionJob)
     ->timezone('Pacific/Auckland')
     ->monthlyOn(1, '01:00');
+
+// Finance recurring journals: daily before rent/utilities/depreciation posting
+app(Schedule::class)
+    ->job(new GenerateRecurringJournalsJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:45')
+    ->withoutOverlapping();
+
+// Fixed asset depreciation: monthly on the 1st after recurring site costs
+app(Schedule::class)
+    ->job(new RunDepreciationJob)
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '03:00')
+    ->withoutOverlapping();
+
+// Bank feed sync: regular import cadence for active feeds
+app(Schedule::class)
+    ->job(new SyncBankFeedsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping();
+
+// Payment matching: trails bank-feed sync by 15 minutes
+app(Schedule::class)
+    ->job(new RunPaymentMatchingJob(null))
+    ->timezone('Pacific/Auckland')
+    ->cron('15,45 * * * *')
+    ->withoutOverlapping();
+
+// Accounts payable reminders: unpaid bills due soon or overdue
+app(Schedule::class)
+    ->job(new CheckBillDueDatesJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:00')
+    ->withoutOverlapping();
+
+// GST draft calculation: two-monthly, before the 28th filing cycle
+app(Schedule::class)
+    ->job(new CalculateGstReturnJob)
+    ->timezone('Pacific/Auckland')
+    ->cron('0 4 28 */2 *')
+    ->withoutOverlapping();
+
+// Immutable financial report snapshots: month opening snapshot for audit trail
+app(Schedule::class)
+    ->job(new SnapshotFinancialReportsJob)
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '23:55')
+    ->withoutOverlapping();
+
+// Accounting integration sync: only dispatch active Xero integrations.
+app(Schedule::class)
+    ->call(function () {
+        FinAccountingIntegration::query()
+            ->active()
+            ->forProvider('xero')
+            ->whereNotNull('tenant_id')
+            ->pluck('id')
+            ->each(fn (int $integrationId) => SyncAccountingIntegrationJob::dispatch($integrationId));
+    })
+    ->name(SyncAccountingIntegrationJob::class)
+    ->timezone('Pacific/Auckland')
+    ->hourlyAt(10)
+    ->withoutOverlapping();
 
 // Leave approval SLA escalations: every 30 minutes
 app(Schedule::class)

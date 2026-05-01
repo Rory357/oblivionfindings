@@ -41,7 +41,7 @@ const STATUS_VARIANT: Record<string, string> = {
     sent: 'default',
     paid: 'default',
     overdue: 'destructive',
-    void: 'outline',
+    cancelled: 'outline',
 };
 
 function formatCurrency(n: number): string {
@@ -59,7 +59,15 @@ export default function InvoiceShow({ invoice }: Props) {
         : 'Unknown';
 
     const handleAction = (action: string) => {
-        router.post(`/operations/invoices/${invoice.id}/${action}`, {}, { preserveScroll: true });
+        const url = `/operations/invoices/${invoice.id}/${action}`;
+
+        if (action === 'mark-paid' || action === 'void') {
+            router.patch(url, {}, { preserveScroll: true });
+
+            return;
+        }
+
+        router.post(url, {}, { preserveScroll: true });
     };
 
     const isOverdue = invoice.status === 'sent' && new Date(invoice.due_date) < new Date();
@@ -94,7 +102,7 @@ export default function InvoiceShow({ invoice }: Props) {
                                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark Paid
                             </Button>
                         )}
-                        {invoice.status !== 'void' && invoice.status !== 'paid' && (
+                        {invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
                             <Button size="sm" variant="outline" onClick={() => handleAction('void')}>
                                 <Ban className="mr-1.5 h-3.5 w-3.5" /> Void
                             </Button>
