@@ -16,6 +16,8 @@ use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
 use App\Http\Controllers\ClientRiskController;
 use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\CoverageGapController;
+use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Operations\ActivityFeedController;
 use App\Http\Controllers\Operations\AvailabilityController;
@@ -447,6 +449,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/shifts', [ShiftController::class, 'store'])
         ->middleware('permission:shifts.create')
         ->name('operations.shifts.store');
+    Route::post('/coverage/reservations', [CoverageReservationController::class, 'store'])
+        ->middleware('permission:shifts.create|shifts.manageAny')
+        ->name('operations.coverage.reservations.store');
     Route::get('/shifts/eligibility-preview', [ShiftController::class, 'eligibilityPreview'])
         ->middleware('permission:shifts.create|shifts.update')
         ->name('operations.shifts.eligibility_preview');
@@ -548,6 +553,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::middleware(['role_scope:my-day', 'permission:rostering.viewAny'])->group(function () {
         Route::get('/rostering', [RosteringController::class, 'index'])->name('operations.rostering.index');
         Route::get('/rostering/conflicts', [RosteringController::class, 'conflicts'])->name('operations.rostering.conflicts');
+        Route::post('/rostering/coverage/{key}/ack', [CoverageGapController::class, 'ack'])
+            ->name('operations.rostering.coverage.ack');
+        Route::post('/rostering/coverage/{key}/dismiss', [CoverageGapController::class, 'dismiss'])
+            ->name('operations.rostering.coverage.dismiss');
+        Route::delete('/rostering/coverage/{key}/clear', [CoverageGapController::class, 'clear'])
+            ->name('operations.rostering.coverage.clear');
     });
 
     // Roster templates

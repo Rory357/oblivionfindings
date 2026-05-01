@@ -3312,6 +3312,32 @@ CREATE TABLE `controlled_drug_loss_reports` (
   CONSTRAINT `controlled_drug_loss_reports_resolved_by_foreign` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `coverage_gap_acknowledgements`;
+CREATE TABLE `coverage_gap_acknowledgements` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `site_id` bigint unsigned NOT NULL,
+  `coverage_requirement_id` bigint unsigned DEFAULT NULL,
+  `coverage_window_key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `window_starts_at` datetime NOT NULL,
+  `window_ends_at` datetime NOT NULL,
+  `state` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reason` text COLLATE utf8mb4_unicode_ci,
+  `actor_user_id` bigint unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `cleared_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `coverage_gap_acknowledgements_site_id_foreign` (`site_id`),
+  KEY `coverage_gap_acknowledgements_coverage_requirement_id_foreign` (`coverage_requirement_id`),
+  KEY `coverage_gap_acknowledgements_actor_user_id_foreign` (`actor_user_id`),
+  KEY `coverage_gap_acknowledgements_organization_id_index` (`organization_id`),
+  KEY `coverage_gap_ack_key_cleared_idx` (`coverage_window_key`,`cleared_at`),
+  KEY `coverage_gap_ack_org_site_window_idx` (`organization_id`,`site_id`,`window_starts_at`),
+  CONSTRAINT `coverage_gap_acknowledgements_actor_user_id_foreign` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `coverage_gap_acknowledgements_coverage_requirement_id_foreign` FOREIGN KEY (`coverage_requirement_id`) REFERENCES `site_coverage_requirements` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `coverage_gap_acknowledgements_site_id_foreign` FOREIGN KEY (`site_id`) REFERENCES `sites` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `coverage_reservations`;
 CREATE TABLE `coverage_reservations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -17115,7 +17141,8 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
     (493, '2026_04_29_000100_create_roster_periods_and_publish_columns', 1),
     (494, '2026_04_29_000200_create_roster_suggestion_tables', 1),
     (495, '2026_04_29_000300_enhance_roster_period_metadata', 1),
-    (496, '2026_05_01_000000_create_hr_attendance_break_events_table', 1);
+    (496, '2026_05_01_000000_create_hr_attendance_break_events_table', 1),
+    (497, '2026_05_01_090000_create_coverage_gap_acknowledgements_table', 1);
 
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE,'system') */;

@@ -3,12 +3,17 @@
 namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\CoverageGapAcknowledgement;
+use App\Models\CoverageReservation;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\ShiftSignalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -141,6 +146,132 @@ class ShiftControllerTest extends TestCase
             ->where('clients.0.site.id', $site->id)
             ->where('clients.0.site.name', 'Kauri House')
         );
+    }
+
+    public function test_coverage_reservation_post_is_idempotent_and_shift_create_get_only_validates_token(): void
+    {
+        $startsAt = now()->addDay()->setTime(9, 0);
+        $endsAt = now()->addDay()->setTime(10, 0);
+        $rule = SiteCoverageRequirement::create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'name' => 'Morning coverage',
+            'coverage_type' => 'custom',
+            'day_of_week' => strtolower($startsAt->format('D')),
+            'starts_time' => $startsAt->format('H:i'),
+            'ends_time' => $endsAt->format('H:i'),
+            'minimum_staff' => 1,
+            'role_requirements' => [],
+            'allow_overstaffing' => true,
+            'is_active' => true,
+        ]);
+        $payload = [
+            'site_id' => $this->site->id,
+            'coverage_rule_id' => $rule->id,
+            'starts_at' => $startsAt->toIso8601String(),
+            'ends_at' => $endsAt->toIso8601String(),
+            'return_to' => '/operations/rostering',
+        ];
+
+        $first = $this->actingAs($this->admin)
+            ->postJson(route('operations.coverage.reservations.store'), $payload)
+            ->assertOk()
+            ->json();
+        $second = $this->actingAs($this->admin)
+            ->postJson(route('operations.coverage.reservations.store'), $payload)
+            ->assertOk()
+            ->json();
+
+        $this->assertSame($first['token'], $second['token']);
+        $this->assertSame(1, CoverageReservation::query()->count());
+
+        $this->actingAs($this->admin)
+            ->get(route('operations.shifts.create', array_merge($payload, [
+                'coverage_reservation_token' => $first['token'],
+            ])))
+            ->assertOk();
+
+        $this->assertSame(1, CoverageReservation::query()->count());
+    }
+
+    public function test_manager_can_ack_dismiss_and_clear_coverage_gap(): void
+    {
+        $startsAt = now()->addDay()->setTime(9, 0);
+        $endsAt = now()->addDay()->setTime(10, 0);
+        $rule = SiteCoverageRequirement::create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'name' => 'Morning coverage',
+            'coverage_type' => 'custom',
+            'day_of_week' => strtolower($startsAt->format('D')),
+            'starts_time' => $startsAt->format('H:i'),
+            'ends_time' => $endsAt->format('H:i'),
+            'minimum_staff' => 1,
+            'role_requirements' => [],
+            'allow_overstaffing' => true,
+            'is_active' => true,
+        ]);
+        $key = app(ShiftSignalService::class)->buildCoverageWindowKey([
+            'site_id' => $this->site->id,
+            'rule_id' => $rule->id,
+            'starts_at' => $startsAt->toIso8601String(),
+            'ends_at' => $endsAt->toIso8601String(),
+        ]);
+        $payload = [
+            'site_id' => $this->site->id,
+            'coverage_requirement_id' => $rule->id,
+            'window_starts_at' => $startsAt->toIso8601String(),
+            'window_ends_at' => $endsAt->toIso8601String(),
+        ];
+
+        $this->actingAs($this->admin)
+            ->postJson(route('operations.rostering.coverage.ack', $key), $payload + [
+                'reason' => 'Calling staff',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', CoverageGapAcknowledgement::STATE_ACKED);
+
+        $this->assertDatabaseHas('coverage_gap_acknowledgements', [
+            'coverage_window_key' => $key,
+            'state' => CoverageGapAcknowledgement::STATE_ACKED,
+            'reason' => 'Calling staff',
+            'actor_user_id' => $this->admin->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'rostering.coverage.ack']);
+
+        $this->actingAs($this->admin)
+            ->postJson(route('operations.rostering.coverage.dismiss', $key), $payload + [
+                'reason' => 'Resolved outside roster',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', CoverageGapAcknowledgement::STATE_DISMISSED);
+
+        $this->assertSame(1, CoverageGapAcknowledgement::query()
+            ->where('coverage_window_key', $key)
+            ->whereNull('cleared_at')
+            ->count());
+        $this->assertDatabaseHas('coverage_gap_acknowledgements', [
+            'coverage_window_key' => $key,
+            'state' => CoverageGapAcknowledgement::STATE_DISMISSED,
+            'reason' => 'Resolved outside roster',
+        ]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'rostering.coverage.dismiss']);
+
+        $this->actingAs($this->admin)
+            ->deleteJson(route('operations.rostering.coverage.clear', $key), $payload)
+            ->assertOk()
+            ->assertJsonPath('status', 'cleared');
+
+        $this->assertSame(0, CoverageGapAcknowledgement::query()
+            ->where('coverage_window_key', $key)
+            ->whereNull('cleared_at')
+            ->count());
+        $this->assertDatabaseHas('audit_logs', ['action' => 'rostering.coverage.clear']);
+        $this->assertSame(3, AuditLog::query()->whereIn('action', [
+            'rostering.coverage.ack',
+            'rostering.coverage.dismiss',
+            'rostering.coverage.clear',
+        ])->count());
     }
 
     public function test_store_creates_shift_with_valid_data(): void

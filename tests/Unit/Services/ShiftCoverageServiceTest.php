@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Client;
+use App\Models\CoverageGapAcknowledgement;
 use App\Models\CoverageReservation;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -146,6 +147,99 @@ class ShiftCoverageServiceTest extends TestCase
         $this->assertTrue($status['has_role_gap']);
         $this->assertTrue($status['has_planned_role_gap']);
         $this->assertSame('mixed_open', $status['gap_kind']);
+    }
+
+    public function test_partial_window_uncovered_slices_show_remaining_uncovered_time(): void
+    {
+        $rule = $this->makeRequirement([
+            'minimum_staff' => 1,
+            'starts_time' => now()->addDay()->setTime(9, 0)->format('H:i'),
+            'ends_time' => now()->addDay()->setTime(13, 0)->format('H:i'),
+        ]);
+
+        $this->makeShift([
+            'starts_at' => now()->addDay()->setTime(9, 0),
+            'ends_at' => now()->addDay()->setTime(11, 0),
+        ]);
+
+        $window = collect($this->service->buildRangeCoverage(
+            now()->addDay()->setTime(9, 0),
+            now()->addDay()->setTime(13, 0),
+            $this->site->id,
+        ))->firstWhere('rule_id', $rule->id);
+
+        $this->assertNotNull($window);
+        $this->assertSame('under', $window['coverage_state']);
+        $this->assertCount(1, $window['partial_window_uncovered_slices']);
+        $this->assertSame(
+            now()->addDay()->setTime(11, 0)->toIso8601String(),
+            $window['partial_window_uncovered_slices'][0]['starts_at'],
+        );
+        $this->assertSame(
+            now()->addDay()->setTime(13, 0)->toIso8601String(),
+            $window['partial_window_uncovered_slices'][0]['ends_at'],
+        );
+    }
+
+    public function test_role_shortage_uses_worst_slice_not_best_slice(): void
+    {
+        $rule = $this->makeRequirement([
+            'minimum_staff' => 1,
+            'starts_time' => now()->addDay()->setTime(9, 0)->format('H:i'),
+            'ends_time' => now()->addDay()->setTime(13, 0)->format('H:i'),
+            'role_requirements' => [
+                'caregiver' => 1,
+            ],
+        ]);
+
+        $this->makeShift([
+            'starts_at' => now()->addDay()->setTime(9, 0),
+            'ends_at' => now()->addDay()->setTime(11, 0),
+        ]);
+
+        $window = collect($this->service->buildRangeCoverage(
+            now()->addDay()->setTime(9, 0),
+            now()->addDay()->setTime(13, 0),
+            $this->site->id,
+        ))->firstWhere('rule_id', $rule->id);
+
+        $this->assertNotNull($window);
+        $this->assertSame('caregiver', $window['role_shortages'][0]['key']);
+        $this->assertSame(1, $window['role_shortages'][0]['missing']);
+    }
+
+    public function test_active_acknowledgement_is_attached_to_coverage_alerts(): void
+    {
+        $rule = $this->makeRequirement(['minimum_staff' => 1]);
+        $actor = User::factory()->create();
+        $window = collect($this->service->buildRangeCoverage(
+            now()->addDay()->setTime(9, 0),
+            now()->addDay()->setTime(10, 0),
+            $this->site->id,
+        ))->firstWhere('rule_id', $rule->id);
+
+        CoverageGapAcknowledgement::query()->create([
+            'organization_id' => null,
+            'site_id' => $this->site->id,
+            'coverage_requirement_id' => $rule->id,
+            'coverage_window_key' => $window['coverage_window_key'],
+            'window_starts_at' => $window['starts_at'],
+            'window_ends_at' => $window['ends_at'],
+            'state' => CoverageGapAcknowledgement::STATE_ACKED,
+            'reason' => 'Calling team',
+            'actor_user_id' => $actor->id,
+            'created_at' => now(),
+        ]);
+
+        $freshWindow = collect($this->service->buildRangeCoverage(
+            now()->addDay()->setTime(9, 0),
+            now()->addDay()->setTime(10, 0),
+            $this->site->id,
+        ))->firstWhere('rule_id', $rule->id);
+
+        $this->assertSame('acked', $freshWindow['acknowledgement']['state']);
+        $this->assertSame('Calling team', $freshWindow['acknowledgement']['reason']);
+        $this->assertSame($actor->id, $freshWindow['acknowledgement']['actor']['id']);
     }
 
     protected function makeRequirement(array $attributes = []): SiteCoverageRequirement

@@ -32,6 +32,7 @@ class ControlRoomSeeder extends Seeder
             ['name' => 'Queclink Fleet', 'slug' => 'queclink_fleet', 'vendor' => 'queclink'],
             ['name' => 'Personal Tracker', 'slug' => 'personal_tracker', 'vendor' => 'generic'],
             ['name' => 'Asset Tracker', 'slug' => 'asset_tracker', 'vendor' => 'generic'],
+            ['name' => 'Shift Operations', 'slug' => 'shift_operations', 'vendor' => 'internal'],
             ['name' => 'Manual Entry', 'slug' => 'manual', 'vendor' => 'internal'],
         ];
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\CoverageSupplyAdded;
 use App\Models\CoverageReservation;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
@@ -47,13 +48,6 @@ class CoverageReservationService
                 ]);
             }
 
-            $remainingSlots = $this->availableSlotsForWindow($window, $roleKey);
-            if ($remainingSlots <= 0) {
-                throw ValidationException::withMessages([
-                    'coverage' => 'Another scheduler has already reserved the remaining coverage for this window.',
-                ]);
-            }
-
             $active = CoverageReservation::query()
                 ->where('status', self::STATUS_ACTIVE)
                 ->where('site_id', $siteId)
@@ -66,6 +60,7 @@ class CoverageReservationService
                 ->where('window_ends_at', $windowEndsAt)
                 ->where('reserved_by_user_id', $actor->id)
                 ->where('reason', 'quick_fill')
+                ->when($roleKey, fn ($query) => $query->where('role_key', $roleKey), fn ($query) => $query->whereNull('role_key'))
                 ->first();
 
             if ($active) {
@@ -78,6 +73,13 @@ class CoverageReservationService
                 ]);
 
                 return $active->fresh();
+            }
+
+            $remainingSlots = $this->availableSlotsForWindow($window, $roleKey);
+            if ($remainingSlots <= 0) {
+                throw ValidationException::withMessages([
+                    'coverage' => 'Another scheduler has already reserved the remaining coverage for this window.',
+                ]);
             }
 
             return CoverageReservation::create([
@@ -158,6 +160,29 @@ class CoverageReservationService
             'shift_open_position_id' => $position?->id ?? $reservation->shift_open_position_id,
             'expires_at' => now(),
         ]);
+
+        $reservation->refresh();
+
+        if ($reservation->site_id && $reservation->window_starts_at && $reservation->window_ends_at) {
+            $coverageWindowKey = app(ShiftSignalService::class)->buildCoverageWindowKey([
+                'site_id' => $reservation->site_id,
+                'rule_id' => $reservation->coverage_requirement_id,
+                'starts_at' => $reservation->window_starts_at->toIso8601String(),
+                'ends_at' => $reservation->window_ends_at->toIso8601String(),
+            ]);
+
+            event(new CoverageSupplyAdded(
+                $coverageWindowKey,
+                (int) $reservation->site_id,
+                $reservation->coverage_requirement_id ? (int) $reservation->coverage_requirement_id : null,
+                $reservation->window_starts_at->toIso8601String(),
+                $reservation->window_ends_at->toIso8601String(),
+                $shift?->id ?? $reservation->shift_id,
+                $shift?->shift_series_id,
+                $reservation->reserved_by_user_id ? (int) $reservation->reserved_by_user_id : null,
+                $reservation->reason,
+            ));
+        }
     }
 
     public function release(?CoverageReservation $reservation): void
@@ -246,7 +271,9 @@ class CoverageReservationService
         $windowStartsAt = Carbon::parse((string) $startsAt);
         $windowEndsAt = Carbon::parse((string) $endsAt);
         $coverageRequirementId = ! empty($payload['coverage_rule_id']) ? (int) $payload['coverage_rule_id'] : null;
-        $roleKey = collect($payload['coverage_roles'] ?? [])
+        $roleKey = ! empty($payload['role_key'])
+            ? trim((string) $payload['role_key'])
+            : collect($payload['coverage_roles'] ?? [])
             ->map(fn ($role) => is_string($role) ? trim($role) : null)
             ->first(fn (?string $role) => $role !== null && $role !== '');
 
@@ -261,8 +288,11 @@ class CoverageReservationService
                 return null;
             }
 
+            $roleShortagePool = ($window['planned_role_shortages'] ?? []) !== []
+                ? ($window['planned_role_shortages'] ?? [])
+                : ($window['role_shortages'] ?? []);
             $hasRoleGap = $roleKey
-                ? collect($window['role_shortages'] ?? [])->contains(fn (array $role) => ($role['key'] ?? null) === $roleKey && (int) ($role['missing'] ?? 0) > 0)
+                ? collect($roleShortagePool)->contains(fn (array $role) => ($role['key'] ?? null) === $roleKey && (int) ($role['missing'] ?? 0) > 0)
                 : false;
             $hasHeadcountGap = (int) ($window['unfilled_after_open_shifts'] ?? $window['missing_staff'] ?? 0) > 0;
 
@@ -270,7 +300,35 @@ class CoverageReservationService
                 return null;
             }
 
-            $remainingSlots = $this->availableSlotsForWindow($window, $hasRoleGap ? $roleKey : null);
+            $reservationRoleKey = $hasRoleGap ? $roleKey : null;
+            $active = CoverageReservation::query()
+                ->where('status', self::STATUS_ACTIVE)
+                ->where('site_id', $siteId)
+                ->when(
+                    $coverageRequirementId,
+                    fn ($query) => $query->where('coverage_requirement_id', $coverageRequirementId),
+                    fn ($query) => $query->whereNull('coverage_requirement_id'),
+                )
+                ->where('window_starts_at', $windowStartsAt)
+                ->where('window_ends_at', $windowEndsAt)
+                ->where('reserved_by_user_id', $actor->id)
+                ->where('reason', $reason)
+                ->when($reservationRoleKey, fn ($query) => $query->where('role_key', $reservationRoleKey), fn ($query) => $query->whereNull('role_key'))
+                ->first();
+
+            if ($active) {
+                $active->update([
+                    'expires_at' => now()->addMinutes(5),
+                    'meta' => array_merge($active->meta ?? [], [
+                        'source' => $reason,
+                        'slot_key' => $this->nextAvailableSlotKey($window, $reservationRoleKey),
+                    ]),
+                ]);
+
+                return $active->fresh();
+            }
+
+            $remainingSlots = $this->availableSlotsForWindow($window, $reservationRoleKey);
             if ($remainingSlots <= 0) {
                 throw ValidationException::withMessages([
                     'coverage' => 'Another scheduler has already filled or reserved this coverage window.',
@@ -285,13 +343,13 @@ class CoverageReservationService
                 'reservation_token' => (string) Str::uuid(),
                 'status' => self::STATUS_ACTIVE,
                 'reason' => $reason,
-                'role_key' => $hasRoleGap ? $roleKey : null,
+                'role_key' => $reservationRoleKey,
                 'window_starts_at' => $windowStartsAt,
                 'window_ends_at' => $windowEndsAt,
                 'expires_at' => now()->addMinutes(5),
                 'meta' => [
                     'source' => $reason,
-                    'slot_key' => $this->nextAvailableSlotKey($window, $hasRoleGap ? $roleKey : null),
+                    'slot_key' => $this->nextAvailableSlotKey($window, $reservationRoleKey),
                 ],
             ]);
         });
@@ -325,8 +383,12 @@ class CoverageReservationService
             ->when($roleKey, fn ($query) => $query->where('role_key', $roleKey))
             ->count();
 
-        if ($roleKey && ! empty($window['role_shortages'])) {
-            $required = collect($window['role_shortages'])
+        $roleShortagePool = ($window['planned_role_shortages'] ?? []) !== []
+            ? ($window['planned_role_shortages'] ?? [])
+            : ($window['role_shortages'] ?? []);
+
+        if ($roleKey && ! empty($roleShortagePool)) {
+            $required = collect($roleShortagePool)
                 ->firstWhere('key', $roleKey);
 
             return max(0, (int) ($required['missing'] ?? 0) - $activeReservations);

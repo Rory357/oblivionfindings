@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\CoverageGapAcknowledgement;
 use App\Models\CoverageReservation;
 use App\Models\Shift;
 use App\Models\ShiftSeries;
 use App\Models\SiteCoverageRequirement;
+use App\Services\ShiftSignalService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -141,7 +143,7 @@ class ShiftCoverageService
             }
         }
 
-        return collect($results)
+        $windows = collect($results)
             ->sortBy([
                 ['starts_at', 'asc'],
                 ['site_name', 'asc'],
@@ -149,6 +151,8 @@ class ShiftCoverageService
             ])
             ->values()
             ->all();
+
+        return $this->attachCoverageLifecycleMetadata($windows);
     }
 
     /**
@@ -164,7 +168,7 @@ class ShiftCoverageService
             ->groupBy('site_id')
             ->map(function (Collection $windows, $groupSiteId) {
                 $siteName = (string) ($windows->first()['site_name'] ?? 'Site');
-                $underCovered = $windows->filter(fn (array $window) => ! empty($window['has_actionable_gap']) || ! empty($window['has_actionable_imbalance']));
+                $underCovered = $windows->filter(fn (array $window) => $this->isWindowActionable($window));
                 $exact = $windows->where('coverage_state', 'exact');
                 $over = $windows->where('coverage_state', 'over');
 
@@ -234,6 +238,8 @@ class ShiftCoverageService
             'site_client_count' => $worst['site_client_count'] ?? null,
             'site_clients' => $worst['site_clients'] ?? [],
             'rule_id' => $worst['rule_id'] ?? null,
+            'coverage_window_key' => $worst['coverage_window_key'] ?? null,
+            'acknowledgement' => $worst['acknowledgement'] ?? null,
             'role_shortages' => $worst['role_shortages'] ?? [],
             'planned_role_shortages' => $worst['planned_role_shortages'] ?? [],
             'preferred_client_id' => $worst['preferred_client_id'] ?? null,
@@ -249,6 +255,7 @@ class ShiftCoverageService
             'has_actionable_imbalance' => $worst['has_actionable_imbalance'] ?? false,
             'imbalance_kind' => $worst['imbalance_kind'] ?? null,
             'contradictions' => $worst['contradictions'] ?? [],
+            'partial_window_uncovered_slices' => $worst['partial_window_uncovered_slices'] ?? [],
             'starts_at' => $worst['starts_at'],
             'ends_at' => $worst['ends_at'],
             'missing_staff' => $worst['missing_staff'],
@@ -274,8 +281,8 @@ class ShiftCoverageService
         ?int $coverageRequirementId = null,
     ): ?array {
         return collect($this->buildRangeCoverage(
-            $windowStart->copy()->subMinute(),
-            $windowEnd->copy()->addMinute(),
+            $windowStart,
+            $windowEnd,
             $siteId,
         ))->first(function (array $window) use ($windowStart, $windowEnd, $coverageRequirementId) {
             if ($coverageRequirementId && (int) ($window['rule_id'] ?? 0) !== (int) $coverageRequirementId) {
@@ -303,6 +310,7 @@ class ShiftCoverageService
         $roleRequirements = $this->coverageRoles->normalizeRequirements($rule->role_requirements ?? null);
         $roleSliceMinimums = [];
         $plannedRoleSliceMinimums = [];
+        $uncoveredSlices = [];
 
         for ($cursor = $windowStart->copy(); $cursor->lt($windowEnd); $cursor = $cursor->copy()->addMinutes($sliceMinutes)) {
             $sliceEnd = $cursor->copy()->addMinutes($sliceMinutes)->min($windowEnd);
@@ -340,7 +348,7 @@ class ShiftCoverageService
                     ->count();
                 $minimumMissing = max(0, (int) $roleRequirement['minimum'] - $assignedRoleCount);
                 $roleSliceMinimums[$roleRequirement['key']] = isset($roleSliceMinimums[$roleRequirement['key']])
-                    ? min($roleSliceMinimums[$roleRequirement['key']], $minimumMissing)
+                    ? max($roleSliceMinimums[$roleRequirement['key']], $minimumMissing)
                     : $minimumMissing;
 
                 $roleSlices[] = [
@@ -355,13 +363,21 @@ class ShiftCoverageService
 
                 $plannedMinimumMissing = max(0, (int) $roleRequirement['minimum'] - ($assignedRoleCount + $openRoleCount));
                 $plannedRoleSliceMinimums[$roleRequirement['key']] = isset($plannedRoleSliceMinimums[$roleRequirement['key']])
-                    ? min($plannedRoleSliceMinimums[$roleRequirement['key']], $plannedMinimumMissing)
+                    ? max($plannedRoleSliceMinimums[$roleRequirement['key']], $plannedMinimumMissing)
                     : $plannedMinimumMissing;
             }
 
             $lowestAssigned = $lowestAssigned === null ? $assigned : min($lowestAssigned, $assigned);
             $lowestTotal = $lowestTotal === null ? $total : min($lowestTotal, $total);
             $highestAssigned = max($highestAssigned, $assigned);
+
+            if ($missing > 0) {
+                $uncoveredSlices[] = [
+                    'starts_at' => $cursor->toIso8601String(),
+                    'ends_at' => $sliceEnd->toIso8601String(),
+                    'missing_staff' => $missing,
+                ];
+            }
 
             $slices[] = [
                 'starts_at' => $cursor->toIso8601String(),
@@ -376,6 +392,7 @@ class ShiftCoverageService
 
         $lowestAssigned ??= 0;
         $lowestTotal ??= 0;
+        $partialWindowUncoveredSlices = $this->mergeMissingSlices($uncoveredSlices);
 
         $coverageState = 'exact';
         if ($lowestAssigned < (int) $rule->minimum_staff) {
@@ -537,6 +554,7 @@ class ShiftCoverageService
             'has_actionable_gap' => $gapKind !== null,
             'has_actionable_imbalance' => $imbalanceKind !== null,
             'contradictions' => $contradictions,
+            'partial_window_uncovered_slices' => $partialWindowUncoveredSlices,
             'coverage_slots' => $coverageSlots,
             'slice_minutes' => $sliceMinutes,
             'slices' => $slices,
@@ -584,6 +602,117 @@ class ShiftCoverageService
         }
 
         return $occurrences;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $windows
+     * @return array<int, array<string, mixed>>
+     */
+    protected function attachCoverageLifecycleMetadata(array $windows): array
+    {
+        if ($windows === []) {
+            return [];
+        }
+
+        $signalService = app(ShiftSignalService::class);
+        $windows = collect($windows)
+            ->map(function (array $window) use ($signalService) {
+                $key = $window['coverage_window_key'] ?? $signalService->buildCoverageWindowKey($window);
+
+                return array_merge($window, [
+                    'coverage_window_key' => $key,
+                    'acknowledgement' => null,
+                ]);
+            })
+            ->values();
+
+        $acknowledgements = CoverageGapAcknowledgement::query()
+            ->with('actor:id,name')
+            ->whereIn('coverage_window_key', $windows->pluck('coverage_window_key')->all())
+            ->whereNull('cleared_at')
+            ->orderBy('created_at')
+            ->get()
+            ->keyBy('coverage_window_key');
+
+        return $windows
+            ->map(function (array $window) use ($acknowledgements) {
+                $acknowledgement = $acknowledgements->get($window['coverage_window_key']);
+
+                return array_merge($window, [
+                    'acknowledgement' => $this->serializeAcknowledgement($acknowledgement),
+                ]);
+            })
+            ->all();
+    }
+
+    protected function serializeAcknowledgement(?CoverageGapAcknowledgement $acknowledgement): ?array
+    {
+        if (! $acknowledgement) {
+            return null;
+        }
+
+        return [
+            'state' => $acknowledgement->state,
+            'actor' => $acknowledgement->actor ? [
+                'id' => $acknowledgement->actor->id,
+                'name' => $acknowledgement->actor->name,
+            ] : null,
+            'reason' => $acknowledgement->reason,
+            'since' => $acknowledgement->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param array<int, array{starts_at: string, ends_at: string, missing_staff: int}> $slices
+     * @return array<int, array{starts_at: string, ends_at: string, missing_staff: int}>
+     */
+    protected function mergeMissingSlices(array $slices): array
+    {
+        $merged = [];
+
+        foreach ($slices as $slice) {
+            $lastIndex = count($merged) - 1;
+            $last = $lastIndex >= 0 ? $merged[$lastIndex] : null;
+
+            if (
+                $last
+                && (int) $last['missing_staff'] === (int) $slice['missing_staff']
+                && Carbon::parse($last['ends_at'])->equalTo(Carbon::parse($slice['starts_at']))
+            ) {
+                $merged[$lastIndex]['ends_at'] = $slice['ends_at'];
+                continue;
+            }
+
+            $merged[] = [
+                'starts_at' => $slice['starts_at'],
+                'ends_at' => $slice['ends_at'],
+                'missing_staff' => (int) $slice['missing_staff'],
+            ];
+        }
+
+        return $merged;
+    }
+
+    protected function isWindowActionable(array $window): bool
+    {
+        if (! empty($window['has_actionable_gap']) || ! empty($window['has_actionable_imbalance'])) {
+            return true;
+        }
+
+        if ((int) ($window['unfilled_after_open_shifts'] ?? 0) > 0) {
+            return true;
+        }
+
+        if (! empty($window['partial_window_uncovered_slices'] ?? [])) {
+            return true;
+        }
+
+        if (in_array('partial_window_undercoverage', $window['contradictions'] ?? [], true)) {
+            return true;
+        }
+
+        return collect($window['role_shortages'] ?? [])
+            ->contains(fn (array $shortage) => (int) ($shortage['missing'] ?? 0) > 0);
     }
 
     protected function shiftMatchesRule(Shift $shift, SiteCoverageRequirement $rule): bool

@@ -68,6 +68,7 @@ type Props = {
         site_id: number;
         site_name: string;
         rule_id?: number;
+        coverage_window_key?: string | null;
         rule_name: string;
         window_label: string;
         starts_at?: string;
@@ -93,6 +94,17 @@ type Props = {
         gap_kind?: string | null;
         recommended_fill_action?: string | null;
         contradictions?: string[];
+        partial_window_uncovered_slices?: Array<{
+            starts_at: string;
+            ends_at: string;
+            missing_staff?: number;
+        }>;
+        acknowledgement?: {
+            state: 'acked' | 'dismissed';
+            actor?: { id: number; name?: string | null } | null;
+            reason?: string | null;
+            since?: string | null;
+        } | null;
         open_shift_ids?: number[];
         contributing_shifts?: ShiftRow[];
         matching_series?: Array<{
@@ -241,6 +253,20 @@ function shouldOfferCreation(action?: string | null) {
     );
 }
 
+function formatCoverageSlice(startsAt?: string | null, endsAt?: string | null) {
+    if (!startsAt || !endsAt) return 'Partial window';
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+
+    return `${start.toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}-${end.toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}`;
+}
+
 function ShiftSummary({ shift }: { shift: ShiftRow }) {
     return (
         <div className="rounded-xl border p-3">
@@ -299,6 +325,7 @@ export default function RosteringConflicts({
         gap: {
             site_id: number;
             rule_id?: number;
+            coverage_window_key?: string | null;
             rule_name: string;
             starts_at?: string;
             ends_at?: string;
@@ -310,8 +337,14 @@ export default function RosteringConflicts({
                 label?: string | null;
                 missing?: number;
             }>;
+            planned_role_shortages?: Array<{
+                key: string;
+                label?: string | null;
+                missing?: number;
+            }>;
         },
         options?: { openShift?: boolean; repeatWeekly?: boolean },
+        reservationToken?: string | null,
     ) => {
         const params = new URLSearchParams();
         params.set('site_id', String(gap.site_id));
@@ -329,6 +362,9 @@ export default function RosteringConflicts({
             params.set('coverage_role_shortages', JSON.stringify(actionRoles));
         }
         params.set('return_to', returnTo);
+        if (reservationToken) {
+            params.set('coverage_reservation_token', reservationToken);
+        }
         if (options?.openShift) params.set('open_shift', '1');
         if (options?.repeatWeekly) {
             params.set('repeat_weekly', '1');
@@ -343,6 +379,99 @@ export default function RosteringConflicts({
         }
 
         return `/operations/shifts/create?${params.toString()}`;
+    };
+    const coverageRoleKey = (gap: (typeof coverageGaps)[number]) =>
+        coverageRolesForAction(gap)[0]?.key ?? null;
+    const coverageLifecyclePayload = (gap: (typeof coverageGaps)[number]) => ({
+        site_id: gap.site_id,
+        coverage_requirement_id: gap.rule_id ?? null,
+        window_starts_at: gap.starts_at,
+        window_ends_at: gap.ends_at,
+        return_to: returnTo,
+    });
+    const openCoverageCreate = async (
+        gap: (typeof coverageGaps)[number],
+        options?: { openShift?: boolean; repeatWeekly?: boolean },
+    ) => {
+        if (!gap.starts_at || !gap.ends_at) {
+            router.visit(buildCoverageCreateHref(gap, options));
+            return;
+        }
+
+        try {
+            const response = await fetch('/operations/coverage/reservations', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN':
+                        document.querySelector<HTMLMetaElement>(
+                            'meta[name="csrf-token"]',
+                        )?.content ?? '',
+                },
+                body: JSON.stringify({
+                    site_id: gap.site_id,
+                    coverage_rule_id: gap.rule_id ?? null,
+                    starts_at: gap.starts_at,
+                    ends_at: gap.ends_at,
+                    role_key: coverageRoleKey(gap),
+                    return_to: returnTo,
+                }),
+            });
+
+            if (!response.ok) {
+                router.reload({
+                    only: ['coverageGaps', 'recurringCoverageAlignment'],
+                    preserveScroll: true,
+                });
+                return;
+            }
+
+            const payload = (await response.json()) as {
+                token?: string | null;
+            };
+            router.visit(buildCoverageCreateHref(gap, options, payload.token));
+        } catch {
+            router.reload({
+                only: ['coverageGaps', 'recurringCoverageAlignment'],
+                preserveScroll: true,
+            });
+        }
+    };
+    const updateCoverageAcknowledgement = (
+        gap: (typeof coverageGaps)[number],
+        state: 'acked' | 'dismissed',
+    ) => {
+        if (!gap.coverage_window_key || !gap.starts_at || !gap.ends_at) return;
+        const reason =
+            state === 'dismissed'
+                ? window.prompt('Dismiss reason')?.trim()
+                : undefined;
+        if (state === 'dismissed' && !reason) return;
+
+        router.post(
+            `/operations/rostering/coverage/${encodeURIComponent(gap.coverage_window_key)}/${state === 'acked' ? 'ack' : 'dismiss'}`,
+            {
+                ...coverageLifecyclePayload(gap),
+                reason,
+            },
+            { preserveScroll: true },
+        );
+    };
+    const clearCoverageAcknowledgement = (
+        gap: (typeof coverageGaps)[number],
+    ) => {
+        if (!gap.coverage_window_key || !gap.starts_at || !gap.ends_at) return;
+
+        router.delete(
+            `/operations/rostering/coverage/${encodeURIComponent(gap.coverage_window_key)}/clear`,
+            {
+                data: coverageLifecyclePayload(gap),
+                preserveScroll: true,
+            },
+        );
     };
 
     return (
@@ -539,7 +668,12 @@ export default function RosteringConflicts({
                                     coverageGaps.map((gap, index) => (
                                         <div
                                             key={`${gap.site_id}-${gap.rule_name}-${gap.window_label}-${index}`}
-                                            className="rounded-xl border p-4"
+                                            className={`rounded-xl border p-4 ${
+                                                gap.acknowledgement?.state ===
+                                                'dismissed'
+                                                    ? 'bg-muted/40 opacity-80'
+                                                    : ''
+                                            }`}
                                         >
                                             <div className="mb-3 flex items-center justify-between gap-2">
                                                 <div>
@@ -551,9 +685,23 @@ export default function RosteringConflicts({
                                                         {gap.window_label}
                                                     </div>
                                                 </div>
-                                                <Badge variant="destructive">
-                                                    {gapKindLabel(gap.gap_kind)}
-                                                </Badge>
+                                                <div className="flex flex-wrap justify-end gap-2">
+                                                    {gap.acknowledgement ? (
+                                                        <Badge variant="outline">
+                                                            {gap
+                                                                .acknowledgement
+                                                                .state ===
+                                                            'dismissed'
+                                                                ? 'Dismissed'
+                                                                : 'Acked'}
+                                                        </Badge>
+                                                    ) : null}
+                                                    <Badge variant="destructive">
+                                                        {gapKindLabel(
+                                                            gap.gap_kind,
+                                                        )}
+                                                    </Badge>
+                                                </div>
                                             </div>
                                             <div className="text-sm text-muted-foreground">
                                                 Need {gap.required_staff} staff
@@ -584,6 +732,26 @@ export default function RosteringConflicts({
                                                             {role.missing ?? 1}
                                                         </Badge>
                                                     ))}
+                                                </div>
+                                            ) : null}
+                                            {gap
+                                                .partial_window_uncovered_slices
+                                                ?.length ? (
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {gap.partial_window_uncovered_slices.map(
+                                                        (slice, sliceIndex) => (
+                                                            <Badge
+                                                                key={`${gap.site_id}-${gap.rule_name}-slice-${sliceIndex}`}
+                                                                variant="outline"
+                                                            >
+                                                                {formatCoverageSlice(
+                                                                    slice.starts_at,
+                                                                    slice.ends_at,
+                                                                )}{' '}
+                                                                still uncovered
+                                                            </Badge>
+                                                        ),
+                                                    )}
                                                 </div>
                                             ) : null}
                                             {gap.contradictions &&
@@ -732,58 +900,91 @@ export default function RosteringConflicts({
                                                         Open rostering
                                                     </Link>
                                                 </Button>
+                                                {gap.acknowledgement ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            clearCoverageAcknowledgement(
+                                                                gap,
+                                                            )
+                                                        }
+                                                    >
+                                                        Clear
+                                                    </Button>
+                                                ) : (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                updateCoverageAcknowledgement(
+                                                                    gap,
+                                                                    'acked',
+                                                                )
+                                                            }
+                                                        >
+                                                            Ack
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                updateCoverageAcknowledgement(
+                                                                    gap,
+                                                                    'dismissed',
+                                                                )
+                                                            }
+                                                        >
+                                                            Dismiss
+                                                        </Button>
+                                                    </>
+                                                )}
                                                 {shouldOfferCreation(
                                                     gap.recommended_fill_action,
                                                 ) ? (
                                                     <>
                                                         <Button
                                                             size="sm"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={buildCoverageCreateHref(
+                                                            onClick={() =>
+                                                                void openCoverageCreate(
                                                                     gap,
-                                                                )}
-                                                            >
-                                                                {fillActionLabel(
-                                                                    gap.recommended_fill_action,
-                                                                )}
-                                                            </Link>
+                                                                )
+                                                            }
+                                                        >
+                                                            {fillActionLabel(
+                                                                gap.recommended_fill_action,
+                                                            )}
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={buildCoverageCreateHref(
+                                                            onClick={() =>
+                                                                void openCoverageCreate(
                                                                     gap,
                                                                     {
                                                                         openShift: true,
                                                                     },
-                                                                )}
-                                                            >
-                                                                Create open
-                                                                shift
-                                                            </Link>
+                                                                )
+                                                            }
+                                                        >
+                                                            Create open shift
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={buildCoverageCreateHref(
+                                                            onClick={() =>
+                                                                void openCoverageCreate(
                                                                     gap,
                                                                     {
                                                                         openShift: true,
                                                                         repeatWeekly: true,
                                                                     },
-                                                                )}
-                                                            >
-                                                                Create recurring
-                                                                cover
-                                                            </Link>
+                                                                )
+                                                            }
+                                                        >
+                                                            Create recurring
+                                                            cover
                                                         </Button>
                                                     </>
                                                 ) : null}
@@ -954,20 +1155,17 @@ export default function RosteringConflicts({
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={buildCoverageCreateHref(
-                                                                issue,
+                                                        onClick={() =>
+                                                            void openCoverageCreate(
+                                                                issue as unknown as (typeof coverageGaps)[number],
                                                                 {
                                                                     openShift: true,
                                                                     repeatWeekly: true,
                                                                 },
-                                                            )}
-                                                        >
-                                                            Create recurring
-                                                            cover
-                                                        </Link>
+                                                            )
+                                                        }
+                                                    >
+                                                        Create recurring cover
                                                     </Button>
                                                     {(issue.matching_series ??
                                                         [])[0] ? (

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Events\CoverageSupplyAdded;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -10,6 +11,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
+use App\Models\CoverageGapAcknowledgement;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetVehicleBooking;
 use App\Models\MedicationRound;
@@ -438,6 +440,154 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
         $this->assertSame($coverageWindowKey, $alert->context['resolution']['coverage_window_key'] ?? null);
     }
 
+    public function test_future_uncovered_alert_stays_open_until_stored_window_elapses(): void
+    {
+        $this->travelTo(Carbon::parse('2026-04-06 10:05:00'));
+
+        $site = Site::factory()->create();
+        $serviceContext = ServiceContext::factory()->create();
+        $rule = $this->createCoverageRequirement($site, $serviceContext, [
+            'minimum_staff' => 1,
+            'day_of_week' => 'mon',
+            'starts_time' => '11:00',
+            'ends_time' => '12:00',
+        ]);
+        $alert = $this->createCoverageAlertForWindow(
+            $site,
+            $rule,
+            Carbon::parse('2026-04-06 11:00:00'),
+            Carbon::parse('2026-04-06 12:00:00'),
+        );
+
+        $this->runJob();
+        $alert->refresh();
+
+        $this->assertSame('open', $alert->status);
+        $this->assertNull($alert->resolved_at);
+
+        $this->travelTo(Carbon::parse('2026-04-06 12:01:00'));
+        $this->runJob();
+        $alert->refresh();
+
+        $this->assertSame('resolved', $alert->status);
+        $this->assertSame('window_elapsed', $alert->context['resolution']['source'] ?? null);
+    }
+
+    public function test_partial_window_uncovered_alert_waits_for_remaining_slice_to_be_filled(): void
+    {
+        $this->travelTo(Carbon::parse('2026-04-06 10:30:00'));
+
+        $primaryShift = $this->makeShift([
+            'starts_at' => Carbon::parse('2026-04-06 10:00:00'),
+            'ends_at' => Carbon::parse('2026-04-06 11:00:00'),
+            'status' => 'scheduled',
+        ]);
+
+        $rule = $this->createCoverageRequirement($primaryShift->site, $primaryShift->serviceContext, [
+            'minimum_staff' => 1,
+            'day_of_week' => 'mon',
+            'starts_time' => '10:00',
+            'ends_time' => '12:00',
+        ]);
+        $alert = $this->createCoverageAlertForWindow(
+            $primaryShift->site,
+            $rule,
+            Carbon::parse('2026-04-06 10:00:00'),
+            Carbon::parse('2026-04-06 12:00:00'),
+        );
+
+        $this->runJob();
+        $alert->refresh();
+
+        $this->assertSame('open', $alert->status);
+        $this->assertNull($alert->resolved_at);
+
+        $this->makeShift([
+            'site' => $primaryShift->site,
+            'client' => $primaryShift->client,
+            'service_context' => $primaryShift->serviceContext,
+            'starts_at' => Carbon::parse('2026-04-06 11:00:00'),
+            'ends_at' => Carbon::parse('2026-04-06 12:00:00'),
+            'status' => 'scheduled',
+        ]);
+
+        $this->travelTo(Carbon::parse('2026-04-06 10:40:00'));
+        $this->runJob();
+        $alert->refresh();
+
+        $this->assertSame('resolved', $alert->status);
+        $this->assertSame('coverage_restored', $alert->context['resolution']['source'] ?? null);
+    }
+
+    public function test_supply_added_event_resolves_coverage_alert_with_action_metadata(): void
+    {
+        $this->travelTo(Carbon::parse('2026-04-06 10:05:00'));
+
+        $site = Site::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+        $serviceContext = ServiceContext::factory()->create();
+        $actor = User::factory()->create();
+        $rule = $this->createCoverageRequirement($site, $serviceContext, [
+            'minimum_staff' => 1,
+            'day_of_week' => 'mon',
+            'starts_time' => '10:00',
+            'ends_time' => '11:00',
+        ]);
+        $windowStart = Carbon::parse('2026-04-06 10:05:00');
+        $windowEnd = Carbon::parse('2026-04-06 10:35:00');
+        $alert = $this->createCoverageAlertForWindow($site, $rule, $windowStart, $windowEnd);
+        $coverageWindowKey = $alert->context['normalized_data']['coverage_window_key'];
+
+        CoverageGapAcknowledgement::query()->create([
+            'site_id' => $site->id,
+            'coverage_requirement_id' => $rule->id,
+            'coverage_window_key' => $coverageWindowKey,
+            'window_starts_at' => $windowStart,
+            'window_ends_at' => $windowEnd,
+            'state' => CoverageGapAcknowledgement::STATE_ACKED,
+            'reason' => 'Calling staff',
+            'actor_user_id' => $actor->id,
+            'created_at' => now(),
+        ]);
+
+        $shift = $this->makeShift([
+            'site' => $site,
+            'client' => $client,
+            'service_context' => $serviceContext,
+            'starts_at' => Carbon::parse('2026-04-06 10:00:00'),
+            'ends_at' => Carbon::parse('2026-04-06 11:00:00'),
+            'status' => 'scheduled',
+        ]);
+
+        CoverageSupplyAdded::dispatch(
+            $coverageWindowKey,
+            $site->id,
+            $rule->id,
+            $windowStart->toIso8601String(),
+            $windowEnd->toIso8601String(),
+            $shift->id,
+            null,
+            $actor->id,
+            'create_cover_shift',
+        );
+
+        $alert->refresh();
+
+        $this->assertSame('resolved', $alert->status);
+        $this->assertSame('coverage_restored', $alert->context['resolution']['source'] ?? null);
+        $this->assertSame($coverageWindowKey, $alert->context['resolution']['coverage_window_key'] ?? null);
+        $this->assertSame($actor->id, $alert->context['resolution']['actor_user_id'] ?? null);
+        $this->assertSame($shift->id, $alert->context['resolution']['shift_id'] ?? null);
+        $this->assertSame('create_cover_shift', $alert->context['resolution']['action'] ?? null);
+        $this->assertSame(0, CoverageGapAcknowledgement::query()
+            ->where('coverage_window_key', $coverageWindowKey)
+            ->whereNull('cleared_at')
+            ->count());
+    }
+
     public function test_scheduler_reruns_do_not_create_noisy_duplicates_for_same_coverage_deficit_window(): void
     {
         $this->travelTo(Carbon::parse('2026-04-06 10:05:00'));
@@ -461,6 +611,37 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
         $this->assertSame(1, ShiftSignal::query()->where('signal_type', 'shift_uncovered')->count());
         $this->assertSame(1, Signal::query()->where('signal_type_code', 'shift_uncovered')->count());
         $this->assertSame(1, ControlRoomAlert::query()->where('alert_type', 'Shift Uncovered')->count());
+    }
+
+    public function test_legacy_uncovered_cleanup_is_bounded_to_unresolved_shift_alerts(): void
+    {
+        $this->travelTo(Carbon::parse('2026-04-06 10:05:00'));
+
+        foreach (range(1, 501) as $shiftId) {
+            ControlRoomAlert::factory()->create([
+                'source' => 'shift_operations',
+                'alert_type' => 'Shift Uncovered',
+                'severity' => 'medium',
+                'status' => 'open',
+                'triggered_at' => now(),
+                'context' => [
+                    'normalized_data' => [
+                        'shift_id' => $shiftId,
+                    ],
+                ],
+            ]);
+        }
+
+        $this->runJob();
+
+        $this->assertSame(500, ControlRoomAlert::query()
+            ->where('alert_type', 'Shift Uncovered')
+            ->where('status', 'resolved')
+            ->count());
+        $this->assertSame(1, ControlRoomAlert::query()
+            ->where('alert_type', 'Shift Uncovered')
+            ->where('status', 'open')
+            ->count());
     }
 
     public function test_resolution_metadata_is_persisted_and_queryable(): void
@@ -543,6 +724,44 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'allow_overstaffing' => true,
             'is_active' => true,
         ], $overrides));
+    }
+
+    protected function createCoverageAlertForWindow(
+        Site $site,
+        SiteCoverageRequirement $rule,
+        Carbon $windowStart,
+        Carbon $windowEnd,
+    ): ControlRoomAlert {
+        $coverageWindow = [
+            'site_id' => $site->id,
+            'site_name' => $site->name,
+            'rule_id' => $rule->id,
+            'rule_name' => $rule->name,
+            'starts_at' => $windowStart->toIso8601String(),
+            'ends_at' => $windowEnd->toIso8601String(),
+        ];
+        $coverageWindowKey = app(\App\Services\ShiftSignalService::class)->buildCoverageWindowKey($coverageWindow);
+
+        return ControlRoomAlert::factory()->create([
+            'source' => 'shift_operations',
+            'alert_type' => 'Shift Uncovered',
+            'severity' => 'high',
+            'status' => 'open',
+            'site_id' => $site->id,
+            'triggered_at' => now(),
+            'context' => [
+                'normalized_data' => [
+                    'coverage_window_key' => $coverageWindowKey,
+                    'site_id' => $site->id,
+                    'rule_id' => $rule->id,
+                ],
+                'signal_payload' => [
+                    'shift_context' => [
+                        'coverage_window' => $coverageWindow,
+                    ],
+                ],
+            ],
+        ]);
     }
 
     protected function runJob(): void

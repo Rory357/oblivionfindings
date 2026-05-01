@@ -2,8 +2,12 @@
 
 namespace App\Jobs;
 
+use App\Models\ControlRoomAlert;
+use App\Models\CoverageGapAcknowledgement;
+use App\Models\CoverageReservation;
 use App\Models\Shift;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\CoverageReservationService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftSignalService;
 use Carbon\CarbonInterface;
@@ -61,7 +65,7 @@ class ShiftAutoAlertJob implements ShouldQueue
             $this->detectNotCompleted($signals, $now);
             $this->resolveNotCompletedAlerts($processor);
             $activeCoverageWindows = $this->detectUncoveredShifts($signals, $coverage, $now);
-            $this->resolveCoverageAlerts($processor, $activeCoverageWindows);
+            $this->resolveCoverageAlerts($processor, $coverage, $now);
         } catch (\Throwable $exception) {
             Log::error('ShiftAutoAlertJob failed: '.$exception->getMessage(), [
                 'exception' => $exception,
@@ -350,9 +354,13 @@ class ShiftAutoAlertJob implements ShouldQueue
             });
     }
 
-    protected function resolveCoverageAlerts(SignalProcessingService $processor, array $activeCoverageWindowKeys): void
+    protected function resolveCoverageAlerts(
+        SignalProcessingService $processor,
+        ShiftCoverageService $coverage,
+        CarbonInterface $now,
+    ): void
     {
-        $openCoverageAlerts = \App\Models\ControlRoomAlert::query()
+        $openCoverageAlerts = ControlRoomAlert::query()
             ->unresolved()
             ->where('source', 'shift_operations')
             ->where('alert_type', $this->alertTypeFor(ShiftSignalService::TYPE_UNCOVERED))
@@ -361,7 +369,45 @@ class ShiftAutoAlertJob implements ShouldQueue
 
         foreach ($openCoverageAlerts as $alert) {
             $coverageWindowKey = data_get($alert->context, 'normalized_data.coverage_window_key');
-            if (! $coverageWindowKey || in_array($coverageWindowKey, $activeCoverageWindowKeys, true)) {
+            $alertWindow = $this->coverageWindowFromAlert($alert);
+
+            if (! $coverageWindowKey || ! $alertWindow) {
+                continue;
+            }
+
+            $windowStart = Carbon::parse($alertWindow['starts_at']);
+            $windowEnd = Carbon::parse($alertWindow['ends_at']);
+
+            if ($windowEnd->lte($now)) {
+                $processor->resolveShiftCoverageAlert(
+                    $coverageWindowKey,
+                    'Coverage-gap alert resolved because the stored coverage window has elapsed.',
+                    'window_elapsed',
+                    [
+                        'coverage_window_key' => $coverageWindowKey,
+                        'site_id' => $alertWindow['site_id'],
+                        'rule_id' => $alertWindow['rule_id'],
+                        'window_starts_at' => $windowStart->toIso8601String(),
+                        'window_ends_at' => $windowEnd->toIso8601String(),
+                    ],
+                );
+                $this->clearCoverageAcknowledgements($coverageWindowKey);
+
+                continue;
+            }
+
+            $currentWindow = $coverage->findCoverageWindow(
+                (int) $alertWindow['site_id'],
+                $windowStart,
+                $windowEnd,
+                $alertWindow['rule_id'] ? (int) $alertWindow['rule_id'] : null,
+            );
+
+            if (! $currentWindow) {
+                continue;
+            }
+
+            if (! $this->coverageWindowIsResolved($currentWindow)) {
                 continue;
             }
 
@@ -369,10 +415,9 @@ class ShiftAutoAlertJob implements ShouldQueue
                 $coverageWindowKey,
                 'Coverage-gap alert resolved because the current window no longer shows an actionable deficit.',
                 ShiftSignalService::RESOLUTION_SOURCE_COVERAGE,
-                [
-                    'coverage_window_key' => $coverageWindowKey,
-                ],
+                $this->resolutionMetadataForCoverageWindow($currentWindow, $coverageWindowKey),
             );
+            $this->clearCoverageAcknowledgements($coverageWindowKey);
         }
     }
 
@@ -427,7 +472,19 @@ class ShiftAutoAlertJob implements ShouldQueue
             return true;
         }
 
+        if (! empty($window['has_actionable_imbalance'])) {
+            return true;
+        }
+
         if ((int) ($window['unfilled_after_open_shifts'] ?? 0) > 0) {
+            return true;
+        }
+
+        if (! empty($window['partial_window_uncovered_slices'] ?? [])) {
+            return true;
+        }
+
+        if (in_array('partial_window_undercoverage', $window['contradictions'] ?? [], true)) {
             return true;
         }
 
@@ -471,6 +528,7 @@ class ShiftAutoAlertJob implements ShouldQueue
             'service_context_id' => $window['service_context_id'] ?? null,
             'service_context_name' => $window['service_context_name'] ?? null,
             'role_shortages' => $window['role_shortages'] ?? [],
+            'planned_role_shortages' => $window['planned_role_shortages'] ?? [],
             'required_staff' => (int) ($window['required_staff'] ?? 0),
             'assigned_staff' => (int) ($window['assigned_staff'] ?? 0),
             'planned_staff' => (int) ($window['planned_staff'] ?? 0),
@@ -485,38 +543,147 @@ class ShiftAutoAlertJob implements ShouldQueue
             'ends_at' => $window['ends_at'] ?? null,
             'open_shift_ids' => $window['open_shift_ids'] ?? [],
             'recommended_fill_action' => $window['recommended_fill_action'] ?? null,
+            'gap_kind' => $window['gap_kind'] ?? null,
+            'has_actionable_gap' => $window['has_actionable_gap'] ?? false,
+            'has_actionable_imbalance' => $window['has_actionable_imbalance'] ?? false,
+            'contradictions' => $window['contradictions'] ?? [],
+            'partial_window_uncovered_slices' => $window['partial_window_uncovered_slices'] ?? [],
             'coverage_window_key' => $coverageWindowKey,
         ];
     }
 
     protected function resolveLegacyShiftUncoveredAlerts(ShiftCoverageService $coverage, array $activeCoverageWindowKeys): void
     {
-        Shift::query()
+        $alerts = ControlRoomAlert::query()
+            ->unresolved()
+            ->where('source', 'shift_operations')
+            ->where('alert_type', $this->alertTypeFor(ShiftSignalService::TYPE_UNCOVERED))
+            ->whereRaw("JSON_EXTRACT(context, '$.normalized_data.shift_id') IS NOT NULL")
+            ->limit(500)
+            ->get();
+
+        if ($alerts->isEmpty()) {
+            return;
+        }
+
+        $shiftIds = $alerts
+            ->map(fn (ControlRoomAlert $alert) => (int) data_get($alert->context, 'normalized_data.shift_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $shifts = Shift::query()
             ->with(['client:id,site_id'])
-            ->where(function ($query) {
-                $query->whereNotNull('user_id')
-                    ->orWhereIn('status', ['cancelled', 'completed']);
-            })
-            ->each(function (Shift $shift) use ($coverage, $activeCoverageWindowKeys) {
-                $coverageStatus = $coverage->coverageStatusForShift($shift);
-                $coverageWindowKey = is_array($coverageStatus)
-                    ? app(ShiftSignalService::class)->buildCoverageWindowKey($coverageStatus)
-                    : null;
+            ->whereIn('id', $shiftIds->all())
+            ->get()
+            ->keyBy('id');
 
-                if ($coverageWindowKey && in_array($coverageWindowKey, $activeCoverageWindowKeys, true)) {
-                    return;
-                }
+        foreach ($alerts as $alert) {
+            $shiftId = (int) data_get($alert->context, 'normalized_data.shift_id');
+            if (! $shiftId) {
+                continue;
+            }
 
-                app(SignalProcessingService::class)->resolveShiftAlertsByShift(
-                    $shift->id,
-                    [ShiftSignalService::TYPE_UNCOVERED],
-                    'Uncovered-shift alert resolved because staffing or coverage for the shift is now restored.',
-                    ShiftSignalService::RESOLUTION_SOURCE_COVERAGE,
-                    [
-                        'shift_id' => $shift->id,
-                    ],
-                );
-            });
+            $shift = $shifts->get($shiftId);
+            $coverageStatus = $shift ? $coverage->coverageStatusForShift($shift) : null;
+            $coverageWindowKey = is_array($coverageStatus)
+                ? app(ShiftSignalService::class)->buildCoverageWindowKey($coverageStatus)
+                : null;
+
+            if ($coverageWindowKey && in_array($coverageWindowKey, $activeCoverageWindowKeys, true)) {
+                continue;
+            }
+
+            app(SignalProcessingService::class)->resolveShiftAlertsByShift(
+                $shiftId,
+                [ShiftSignalService::TYPE_UNCOVERED],
+                'Uncovered-shift alert resolved because staffing or coverage for the shift is now restored.',
+                ShiftSignalService::RESOLUTION_SOURCE_COVERAGE,
+                [
+                    'shift_id' => $shiftId,
+                ],
+            );
+        }
+    }
+
+    protected function coverageWindowFromAlert(ControlRoomAlert $alert): ?array
+    {
+        $contextWindow = data_get($alert->context, 'signal_payload.shift_context.coverage_window')
+            ?: data_get($alert->context, 'signal_payload.coverage_status')
+            ?: data_get($alert->context, 'normalized_data.coverage_status');
+
+        $siteId = data_get($contextWindow, 'site_id') ?? data_get($alert->context, 'normalized_data.site_id') ?? $alert->site_id;
+        $startsAt = data_get($contextWindow, 'starts_at');
+        $endsAt = data_get($contextWindow, 'ends_at');
+
+        if (! $siteId || ! $startsAt || ! $endsAt) {
+            return null;
+        }
+
+        return [
+            'site_id' => (int) $siteId,
+            'rule_id' => data_get($contextWindow, 'rule_id'),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ];
+    }
+
+    protected function coverageWindowIsResolved(array $window): bool
+    {
+        if (($window['has_actionable_gap'] ?? false) || ($window['has_actionable_imbalance'] ?? false)) {
+            return false;
+        }
+
+        if (($window['missing_staff'] ?? 0) > 0) {
+            return false;
+        }
+
+        foreach (($window['role_shortages'] ?? []) as $shortage) {
+            if (($shortage['missing'] ?? 0) > 0) {
+                return false;
+            }
+        }
+
+        if (! empty($window['partial_window_uncovered_slices'] ?? [])) {
+            return false;
+        }
+
+        return ! in_array('partial_window_undercoverage', $window['contradictions'] ?? [], true);
+    }
+
+    protected function resolutionMetadataForCoverageWindow(array $window, string $coverageWindowKey): array
+    {
+        $reservation = CoverageReservation::query()
+            ->where('status', CoverageReservationService::STATUS_FULFILLED)
+            ->where('site_id', $window['site_id'])
+            ->when(
+                $window['rule_id'] ?? null,
+                fn ($query, $ruleId) => $query->where('coverage_requirement_id', $ruleId),
+                fn ($query) => $query->whereNull('coverage_requirement_id'),
+            )
+            ->where('window_starts_at', Carbon::parse($window['starts_at']))
+            ->where('window_ends_at', Carbon::parse($window['ends_at']))
+            ->where('updated_at', '>=', now()->subMinutes(30))
+            ->latest('updated_at')
+            ->first();
+
+        return [
+            'coverage_window_key' => $coverageWindowKey,
+            'coverage_status' => $this->normalizeCoverageWindow($window, $coverageWindowKey),
+            'actor_user_id' => $reservation?->reserved_by_user_id,
+            'shift_id' => $reservation?->shift_id,
+            'shift_open_position_id' => $reservation?->shift_open_position_id,
+            'series_id' => $reservation?->shift?->shift_series_id,
+            'action' => $reservation?->reason,
+        ];
+    }
+
+    protected function clearCoverageAcknowledgements(string $coverageWindowKey): void
+    {
+        CoverageGapAcknowledgement::query()
+            ->where('coverage_window_key', $coverageWindowKey)
+            ->whereNull('cleared_at')
+            ->update(['cleared_at' => now()]);
     }
 
     protected function alertTypeFor(string $signalType): string

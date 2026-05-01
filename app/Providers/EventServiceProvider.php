@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
+use App\Events\CoverageSupplyAdded;
 use App\Listeners\Care\NotifyOnBedExit;
 use App\Listeners\Care\NotifyOnFallDetected;
 use App\Listeners\Care\NotifyOnMedicationCabinetOpen;
+use App\Listeners\ResolveCoverageAlertForAddedSupply;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 /**
@@ -29,6 +31,9 @@ class EventServiceProvider extends ServiceProvider
             NotifyOnFallDetected::class,
             NotifyOnBedExit::class,
             NotifyOnMedicationCabinetOpen::class,
+        ],
+        CoverageSupplyAdded::class => [
+            ResolveCoverageAlertForAddedSupply::class,
         ],
     ];
 

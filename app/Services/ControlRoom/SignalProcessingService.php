@@ -513,7 +513,14 @@ class SignalProcessingService
         ]);
 
         $shiftContext = $this->buildShiftContext($shiftSignal);
-        $source = SignalSource::query()->where('slug', 'shift_operations')->first();
+        $source = SignalSource::query()->firstOrCreate(
+            ['slug' => 'shift_operations'],
+            [
+                'name' => 'Shift Operations',
+                'vendor' => 'internal',
+                'status' => 'active',
+            ],
+        );
 
         $data = [
             'signal_source_id' => $source?->id,
@@ -908,6 +915,21 @@ class SignalProcessingService
         ]);
 
         $alert->sla?->recordResolution();
+
+        if (
+            $alert->source === 'shift_operations'
+            && $alert->alert_type === $this->shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_UNCOVERED)
+        ) {
+            Log::info('coverage.alert.resolved', [
+                'alert_id' => $alert->id,
+                'coverage_window_key' => $metadata['coverage_window_key'] ?? data_get($alert->context, 'normalized_data.coverage_window_key'),
+                'source' => $resolutionSource,
+                'actor_user_id' => $metadata['actor_user_id'] ?? null,
+                'shift_id' => $metadata['shift_id'] ?? null,
+                'series_id' => $metadata['series_id'] ?? null,
+                'action' => $metadata['action'] ?? null,
+            ]);
+        }
 
         AuditLogger::log('controlRoom.alert.resolve', $alert, [
             'source' => 'shift_signal_pipeline',

@@ -558,20 +558,17 @@ class ShiftController extends Controller
         $coverageContext = null;
 
         if ($defaultSiteId && $request->filled('starts_at') && $request->filled('ends_at')) {
-            try {
-                $coverageReservation = app(CoverageReservationService::class)->createQuickFillReservation(
+            if ($request->filled('coverage_reservation_token')) {
+                $coverageReservation = app(CoverageReservationService::class)->validateToken(
+                    (string) $request->query('coverage_reservation_token'),
                     $auth,
-                    (int) $defaultSiteId,
-                    Carbon::parse((string) $request->query('starts_at')),
-                    Carbon::parse((string) $request->query('ends_at')),
-                    $coverageRuleId ? (int) $coverageRuleId : null,
-                    null,
                     [
-                        'return_to' => $request->query('return_to'),
+                        'site_id' => (int) $defaultSiteId,
+                        'coverage_requirement_id' => $coverageRuleId ? (int) $coverageRuleId : null,
+                        'window_starts_at' => (string) $request->query('starts_at'),
+                        'window_ends_at' => (string) $request->query('ends_at'),
                     ],
                 );
-            } catch (\Throwable $e) {
-                $coverageReservation = null;
             }
 
             $coverageContext = $this->coverageContextFromWindow(

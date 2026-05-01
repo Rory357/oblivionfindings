@@ -172,6 +172,7 @@ type CoverageAlert = {
     site_id: number;
     site_name: string;
     rule_id?: number;
+    coverage_window_key?: string | null;
     rule_name: string;
     window_label: string;
     starts_at?: string;
@@ -197,6 +198,17 @@ type CoverageAlert = {
     gap_kind?: string | null;
     recommended_fill_action?: string | null;
     contradictions?: string[];
+    partial_window_uncovered_slices?: Array<{
+        starts_at: string;
+        ends_at: string;
+        missing_staff?: number;
+    }>;
+    acknowledgement?: {
+        state: 'acked' | 'dismissed';
+        actor?: { id: number; name?: string | null } | null;
+        reason?: string | null;
+        since?: string | null;
+    } | null;
     open_shift_ids?: number[];
 };
 
@@ -463,6 +475,20 @@ function shouldOfferCreation(action?: string | null) {
     );
 }
 
+function formatCoverageSlice(startsAt?: string | null, endsAt?: string | null) {
+    if (!startsAt || !endsAt) return 'Partial window';
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+
+    return `${start.toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}-${end.toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}`;
+}
+
 function rangesOverlap(
     aStartIso: string,
     aEndIso: string,
@@ -528,6 +554,7 @@ export default function RosteringIndex(props: Props) {
     const buildCoverageCreateHref = (
         alert: CoverageAlert,
         options?: { openShift?: boolean; repeatWeekly?: boolean },
+        reservationToken?: string | null,
     ) => {
         const params = new URLSearchParams();
         params.set('site_id', String(alert.site_id));
@@ -548,6 +575,9 @@ export default function RosteringIndex(props: Props) {
             );
         }
         params.set('return_to', coverageReturnTo);
+        if (reservationToken) {
+            params.set('coverage_reservation_token', reservationToken);
+        }
         if (options?.openShift) params.set('open_shift', '1');
         if (options?.repeatWeekly) {
             params.set('repeat_weekly', '1');
@@ -562,6 +592,99 @@ export default function RosteringIndex(props: Props) {
         }
 
         return `/operations/shifts/create?${params.toString()}`;
+    };
+    const coverageRoleKey = (alert: CoverageAlert) =>
+        coverageRolesForAction(alert)[0]?.key ?? null;
+    const coverageLifecyclePayload = (alert: CoverageAlert) => ({
+        site_id: alert.site_id,
+        coverage_requirement_id: alert.rule_id ?? null,
+        window_starts_at: alert.starts_at,
+        window_ends_at: alert.ends_at,
+        return_to: coverageReturnTo,
+    });
+    const openCoverageCreate = async (
+        alert: CoverageAlert,
+        options?: { openShift?: boolean; repeatWeekly?: boolean },
+    ) => {
+        if (!alert.starts_at || !alert.ends_at) {
+            router.visit(buildCoverageCreateHref(alert, options));
+            return;
+        }
+
+        try {
+            const response = await fetch('/operations/coverage/reservations', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN':
+                        document.querySelector<HTMLMetaElement>(
+                            'meta[name="csrf-token"]',
+                        )?.content ?? '',
+                },
+                body: JSON.stringify({
+                    site_id: alert.site_id,
+                    coverage_rule_id: alert.rule_id ?? null,
+                    starts_at: alert.starts_at,
+                    ends_at: alert.ends_at,
+                    role_key: coverageRoleKey(alert),
+                    return_to: coverageReturnTo,
+                }),
+            });
+
+            if (!response.ok) {
+                router.reload({
+                    only: ['coverageAlerts', 'coverageSites'],
+                    preserveScroll: true,
+                });
+                return;
+            }
+
+            const payload = (await response.json()) as {
+                token?: string | null;
+            };
+            router.visit(buildCoverageCreateHref(alert, options, payload.token));
+        } catch {
+            router.reload({
+                only: ['coverageAlerts', 'coverageSites'],
+                preserveScroll: true,
+            });
+        }
+    };
+    const updateCoverageAcknowledgement = (
+        alert: CoverageAlert,
+        state: 'acked' | 'dismissed',
+    ) => {
+        if (!alert.coverage_window_key || !alert.starts_at || !alert.ends_at)
+            return;
+        const reason =
+            state === 'dismissed'
+                ? window.prompt('Dismiss reason')?.trim()
+                : undefined;
+        if (state === 'dismissed' && !reason) return;
+
+        router.post(
+            `/operations/rostering/coverage/${encodeURIComponent(alert.coverage_window_key)}/${state === 'acked' ? 'ack' : 'dismiss'}`,
+            {
+                ...coverageLifecyclePayload(alert),
+                reason,
+            },
+            { preserveScroll: true },
+        );
+    };
+    const clearCoverageAcknowledgement = (alert: CoverageAlert) => {
+        if (!alert.coverage_window_key || !alert.starts_at || !alert.ends_at)
+            return;
+
+        router.delete(
+            `/operations/rostering/coverage/${encodeURIComponent(alert.coverage_window_key)}/clear`,
+            {
+                data: coverageLifecyclePayload(alert),
+                preserveScroll: true,
+            },
+        );
     };
 
     const resolveState = useMemo(() => {
@@ -2213,7 +2336,14 @@ export default function RosteringIndex(props: Props) {
                                                                     ) => (
                                                                         <div
                                                                             key={`${alert.site_id}-${alert.rule_name}-${alert.window_label}-${index}`}
-                                                                            className="rounded-xl border p-3"
+                                                                            className={`rounded-xl border p-3 ${
+                                                                                alert
+                                                                                    .acknowledgement
+                                                                                    ?.state ===
+                                                                                'dismissed'
+                                                                                    ? 'bg-muted/40 opacity-80'
+                                                                                    : ''
+                                                                            }`}
                                                                         >
                                                                             <div className="flex items-start justify-between gap-2">
                                                                                 <div>
@@ -2232,11 +2362,23 @@ export default function RosteringIndex(props: Props) {
                                                                                         }
                                                                                     </div>
                                                                                 </div>
-                                                                                <Badge variant="destructive">
-                                                                                    {gapKindLabel(
-                                                                                        alert.gap_kind,
-                                                                                    )}
-                                                                                </Badge>
+                                                                                <div className="flex flex-wrap justify-end gap-2">
+                                                                                    {alert.acknowledgement ? (
+                                                                                        <Badge variant="outline">
+                                                                                            {alert
+                                                                                                .acknowledgement
+                                                                                                .state ===
+                                                                                            'dismissed'
+                                                                                                ? 'Dismissed'
+                                                                                                : 'Acked'}
+                                                                                        </Badge>
+                                                                                    ) : null}
+                                                                                    <Badge variant="destructive">
+                                                                                        {gapKindLabel(
+                                                                                            alert.gap_kind,
+                                                                                        )}
+                                                                                    </Badge>
+                                                                                </div>
                                                                             </div>
 
                                                                             <div className="mt-2 text-xs text-foreground">
@@ -2282,6 +2424,30 @@ export default function RosteringIndex(props: Props) {
                                                                                                 x
                                                                                                 {role.missing ??
                                                                                                     1}
+                                                                                            </Badge>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : null}
+                                                                            {alert
+                                                                                .partial_window_uncovered_slices
+                                                                                ?.length ? (
+                                                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                                                    {alert.partial_window_uncovered_slices.map(
+                                                                                        (
+                                                                                            slice,
+                                                                                            sliceIndex,
+                                                                                        ) => (
+                                                                                            <Badge
+                                                                                                key={`${alert.site_id}-${alert.rule_name}-slice-${sliceIndex}`}
+                                                                                                variant="outline"
+                                                                                            >
+                                                                                                {formatCoverageSlice(
+                                                                                                    slice.starts_at,
+                                                                                                    slice.ends_at,
+                                                                                                )}{' '}
+                                                                                                still
+                                                                                                uncovered
                                                                                             </Badge>
                                                                                         ),
                                                                                     )}
@@ -2354,55 +2520,94 @@ export default function RosteringIndex(props: Props) {
                                                                                         queue
                                                                                     </Button>
                                                                                 </Link>
+                                                                                {alert.acknowledgement ? (
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        onClick={() =>
+                                                                                            clearCoverageAcknowledgement(
+                                                                                                alert,
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        Clear
+                                                                                    </Button>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            onClick={() =>
+                                                                                                updateCoverageAcknowledgement(
+                                                                                                    alert,
+                                                                                                    'acked',
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            Ack
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            onClick={() =>
+                                                                                                updateCoverageAcknowledgement(
+                                                                                                    alert,
+                                                                                                    'dismissed',
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            Dismiss
+                                                                                        </Button>
+                                                                                    </>
+                                                                                )}
                                                                                 {shouldOfferCreation(
                                                                                     alert.recommended_fill_action,
                                                                                 ) ? (
                                                                                     <>
-                                                                                        <Link
-                                                                                            href={buildCoverageCreateHref(
-                                                                                                alert,
-                                                                                            )}
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            onClick={() =>
+                                                                                                void openCoverageCreate(
+                                                                                                    alert,
+                                                                                                )
+                                                                                            }
                                                                                         >
-                                                                                            <Button size="sm">
-                                                                                                {fillActionLabel(
-                                                                                                    alert.recommended_fill_action,
-                                                                                                )}
-                                                                                            </Button>
-                                                                                        </Link>
-                                                                                        <Link
-                                                                                            href={buildCoverageCreateHref(
-                                                                                                alert,
-                                                                                                {
-                                                                                                    openShift: true,
-                                                                                                },
+                                                                                            {fillActionLabel(
+                                                                                                alert.recommended_fill_action,
                                                                                             )}
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            onClick={() =>
+                                                                                                void openCoverageCreate(
+                                                                                                    alert,
+                                                                                                    {
+                                                                                                        openShift: true,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
                                                                                         >
-                                                                                            <Button
-                                                                                                size="sm"
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                Create
-                                                                                                open
-                                                                                                shift
-                                                                                            </Button>
-                                                                                        </Link>
-                                                                                        <Link
-                                                                                            href={buildCoverageCreateHref(
-                                                                                                alert,
-                                                                                                {
-                                                                                                    openShift: true,
-                                                                                                    repeatWeekly: true,
-                                                                                                },
-                                                                                            )}
+                                                                                            Create
+                                                                                            open
+                                                                                            shift
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            onClick={() =>
+                                                                                                void openCoverageCreate(
+                                                                                                    alert,
+                                                                                                    {
+                                                                                                        openShift: true,
+                                                                                                        repeatWeekly: true,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
                                                                                         >
-                                                                                            <Button
-                                                                                                size="sm"
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                Recurring
-                                                                                                cover
-                                                                                            </Button>
-                                                                                        </Link>
+                                                                                            Recurring
+                                                                                            cover
+                                                                                        </Button>
                                                                                     </>
                                                                                 ) : null}
                                                                             </div>
