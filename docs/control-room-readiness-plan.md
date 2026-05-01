@@ -29,6 +29,63 @@ test-coverage uplift, and a Playwright smoke layer. Roughly one focused week.
 
 ---
 
+## Implementation status (post-audit)
+
+> Updated after PR1–PR4, PR6, PR7 landed. The status column is the source of
+> truth; the original sections below remain as historical reference.
+
+| ID | Description | Status | Notes |
+|---|---|---|---|
+| **P0 / B1.1** | Resolve sends `resolution_notes` | ✅ Done | [`show.tsx:490`](../resources/js/pages/control-room/show.tsx#L490) |
+| **P0 / B1.2** | Escalate sends `escalation_reason` | ✅ Done | [`show.tsx:497`](../resources/js/pages/control-room/show.tsx#L497) |
+| **P0 / B1.3** | Add note sends `note` | ✅ Done | [`show.tsx:504`](../resources/js/pages/control-room/show.tsx#L504) |
+| **P0 / B1.4** | Assign sends `assigned_to_user_id` | ✅ Done | [`show.tsx:509`](../resources/js/pages/control-room/show.tsx#L509) |
+| **P0 / B1.5** | Playbook step → `playbook/advance` & `playbook/skip` | ✅ Done | [`show.tsx:1069,1084`](../resources/js/pages/control-room/show.tsx#L1067); empty `{}` body is correct since [`advanceStep`](../app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php#L433) and [`skipStep`](../app/Http/Controllers/ControlRoom/ControlRoomPlaybookController.php#L483) read the in-progress step server-side |
+| **P0 / B1.6** | Evidence upload → real file input + `POST /evidence/{pack}/items` | ✅ Done | [`show.tsx:1172-1196`](../resources/js/pages/control-room/show.tsx#L1172) |
+| **P0 / B2** | `AlertController::createIncident` placeholder | ✅ Removed | controller method + integration-alerts route both gone |
+| **P0 / B3** | Inline route closure → `ControlRoomMyTasksController::completeFollowup` | ✅ Done | [`routes/control-room.php:38`](../routes/control-room.php#L38), [`controller:138`](../app/Http/Controllers/ControlRoom/ControlRoomMyTasksController.php#L138) |
+| **P0 / B4** | MySQL-only SQL — driver assertion + module README | ✅ Done | [`ControlRoomDbDriverTest.php`](../tests/Feature/ControlRoom/ControlRoomDbDriverTest.php), [`app/Services/ControlRoom/README.md`](../app/Services/ControlRoom/README.md) |
+| **P1 / H1** | Per-controller feature tests | ✅ Done | 13 new feature test files added — SLA, Playbook, Settings, Escalation, Task, Discussion, TimeEntry, Evidence, Watcher, Handover, MyTasks, Stats, Incident. Each covers auth, permission, happy path, validation failure, and key business rules. |
+| **P1 / H2** | `recent_activity` site-scoped | ✅ Done | [`ControlRoomDashboardController.php:165-178`](../app/Http/Controllers/ControlRoom/ControlRoomDashboardController.php#L165) — uses `applyAlertScope` subquery + morphClass filter |
+| **P1 / H3** | `whereNumber('alert')` everywhere | ✅ Done | 35+ uses in [`routes/control-room.php`](../routes/control-room.php); enforced by `ControlRoomRouteReadinessTest::test_alert_detail_sub_routes_constrain_alert_to_numeric_ids` |
+| **P1 / H4** | RbacSeeder permission-distinction comment | ✅ Done | [`RbacSeeder.php:192-195`](../database/seeders/RbacSeeder.php#L192) |
+| **P1 / H5** | Replace Dusk smoke with Playwright | ✅ Done | `tests/Browser/ControlRoom/ControlRoomTest.php` removed; coverage now in `tests/e2e/control-room-*.spec.ts` |
+| **P1 / H6** | Service unit-test gaps | ✅ Done | [`AlertAutomationServiceTest`](../tests/Unit/ControlRoom/AlertAutomationServiceTest.php) covers the 4-tier auto-assign chain, autoStartPlaybook lifecycle, and escalation-watcher rules. New [`SignalProcessingTransitionTest`](../tests/Unit/ControlRoom/SignalProcessingTransitionTest.php) covers the no-show ↔ late-start transition path and severity-bump on correlated higher-severity signals. |
+| **P2** | Delete `Placeholder.tsx` | ✅ Removed | confirmed gone |
+| **P2** | Dashboard query duplication, dedup `deriveSlaStatus`, split `show.tsx`, sweep deprecated `Alert` model | ❌ Deferred | not blocking; revisit when touching those files |
+
+### Verification commands
+
+```bash
+# Backend — all green required to ship
+php artisan test --testsuite=Feature --filter=ControlRoom
+php artisan test --testsuite=Unit --filter=ControlRoom
+
+# Frontend
+npm run types
+npm run build
+
+# E2E — desktop project covers the full lifecycle through show.tsx
+npm run visual:test -- --grep "control room"
+```
+
+### Outstanding (non-blocking)
+
+1. **P2 polish items** — listed above; defer until you're already in those
+   files.
+
+All P0 and P1 items are now closed.
+
+---
+
+## Historical reference
+
+The sections below are the original audit findings as filed before
+implementation. They remain accurate as a record of what was investigated;
+the *current* state is the table above.
+
+---
+
 ## 1. Why "partial/strong"
 
 The reviewer almost certainly saw:
