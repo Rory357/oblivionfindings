@@ -101,6 +101,17 @@ class IntegrationAlertControllerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_create_incident_placeholder_route_is_removed(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'integration_unifi',
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/integration-alerts/{$alert->id}/create-incident")
+            ->assertNotFound();
+    }
+
     public function test_integration_alert_assign_blocks_out_of_scope_assignee_for_scoped_user(): void
     {
         $visibleSite = Site::factory()->create(['type' => 'house']);

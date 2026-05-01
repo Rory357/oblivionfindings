@@ -163,8 +163,19 @@ class ControlRoomDashboardController extends Controller
         }
 
         // --- Recent activity ---
+        $recentActivityAlertIds = ControlRoomAlert::query()->select('id');
+        $siteAccess->applyAlertScope($recentActivityAlertIds, $user, $bypassPermissions);
+        if ($siteId) {
+            $recentActivityAlertIds->where(function ($scopedQuery) use ($siteId) {
+                $scopedQuery->where('site_id', $siteId)
+                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
+            });
+        }
+
         $recentActivity = AuditLog::where('action', 'like', 'controlRoom.%')
             ->where('action', '!=', 'controlRoom.dashboard.view')
+            ->where('auditable_type', (new ControlRoomAlert())->getMorphClass())
+            ->whereIn('auditable_id', $recentActivityAlertIds)
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->limit(15)

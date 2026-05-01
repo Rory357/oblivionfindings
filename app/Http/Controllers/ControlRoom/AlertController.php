@@ -246,18 +246,6 @@ class AlertController extends Controller
     }
 
     /**
-     * Placeholder for incident creation from an alert.
-     */
-    public function createIncident(Request $request, ControlRoomAlert $alert)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessIntegrationAlert($user, $alert);
-
-        return redirect()->back()->with('info', 'Incident linking will be available in a future update');
-    }
-
-    /**
      * Derive SLA status for a given alert (green/yellow/red/none).
      * Same logic as ControlRoomAlertController::deriveSlaStatus().
      */

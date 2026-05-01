@@ -57,11 +57,11 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_reports_blocked_for_support_worker(): void
+    public function test_reports_accessible_by_support_worker_with_view_any_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room/reports')
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_reports_blocked_for_user_without_permission(): void
@@ -263,11 +263,11 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_export_blocked_for_support_worker(): void
+    public function test_export_accessible_by_support_worker_with_view_any_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/control-room/reports/export')
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_export_returns_csv(): void

@@ -207,13 +207,13 @@ const SEVERITY_BADGE: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, string> = {
     open: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
-    acknowledged: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    ack: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     triaging: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     resolved: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     closed: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
 };
 
-const WORKFLOW_STEPS = ['open', 'acknowledged', 'triaging', 'resolved', 'closed'] as const;
+const WORKFLOW_STEPS = ['open', 'ack', 'triaging', 'resolved', 'closed'] as const;
 
 function fmtDate(d: string | null): string {
     if (!d) return '\u2014';
@@ -271,7 +271,7 @@ function useCountdown(deadline: string | null, breached: boolean): string {
 function getStepTimestamp(alert: Alert, step: string): string | null {
     switch (step) {
         case 'open': return alert.triggered_at;
-        case 'acknowledged': return alert.acknowledged_at;
+        case 'ack': return alert.acknowledged_at;
         case 'triaging': return alert.context?.triaging_at ?? null;
         case 'resolved': return alert.resolved_at;
         case 'closed': return alert.closed_at;
@@ -487,26 +487,26 @@ export default function ControlRoomAlertShow({
 
     function handleResolve() {
         if (!resolveNotes.trim()) return;
-        doAction('resolve', { notes: resolveNotes });
+        doAction('resolve', { resolution_notes: resolveNotes });
         setResolveOpen(false);
         setResolveNotes('');
     }
 
     function handleEscalate() {
         if (!escalateReason.trim()) return;
-        doAction('escalate', { reason: escalateReason });
+        doAction('escalate', { escalation_reason: escalateReason });
         setEscalateOpen(false);
         setEscalateReason('');
     }
 
     function handleAddNote() {
         if (!newNote.trim()) return;
-        doAction('note', { content: newNote });
+        doAction('note', { note: newNote });
         setNewNote('');
     }
 
     function handleAssign(staffId: string) {
-        doAction('assign', { staff_id: staffId });
+        doAction('assign', { assigned_to_user_id: staffId });
         setAssigneeId('');
     }
 
@@ -1055,9 +1055,8 @@ export default function ControlRoomAlertShow({
                                                                 {step.status.replace('_', ' ')}
                                                             </Badge>
                                                             {can.manage &&
-                                                                (step.status === 'pending' ||
-                                                                    step.status ===
-                                                                        'in_progress') && (
+                                                                step.status ===
+                                                                    'in_progress' && (
                                                                     <>
                                                                         <Button
                                                                             variant="ghost"
@@ -1067,12 +1066,8 @@ export default function ControlRoomAlertShow({
                                                                             disabled={processing}
                                                                             onClick={() =>
                                                                                 doAction(
-                                                                                    'playbook-step',
-                                                                                    {
-                                                                                        step_id:
-                                                                                            step.id,
-                                                                                        action: 'complete',
-                                                                                    },
+                                                                                    'playbook/advance',
+                                                                                    {},
                                                                                 )
                                                                             }
                                                                         >
@@ -1086,12 +1081,8 @@ export default function ControlRoomAlertShow({
                                                                             disabled={processing}
                                                                             onClick={() =>
                                                                                 doAction(
-                                                                                    'playbook-step',
-                                                                                    {
-                                                                                        step_id:
-                                                                                            step.id,
-                                                                                        action: 'skip',
-                                                                                    },
+                                                                                    'playbook/skip',
+                                                                                    {},
                                                                                 )
                                                                             }
                                                                         >
@@ -1177,20 +1168,50 @@ export default function ControlRoomAlertShow({
                                                     </div>
                                                 )}
                                                 {can.manage && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="mt-3"
-                                                        onClick={() =>
-                                                            doAction('evidence-upload', {
-                                                                pack_id: pack.id,
-                                                            })
-                                                        }
-                                                        disabled={processing}
-                                                    >
-                                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                                        Upload Evidence
-                                                    </Button>
+                                                    <>
+                                                        <input
+                                                            id={`evidence-upload-${pack.id}`}
+                                                            type="file"
+                                                            className="sr-only"
+                                                            onChange={(event) => {
+                                                                const file =
+                                                                    event.currentTarget
+                                                                        .files?.[0];
+                                                                if (!file) return;
+
+                                                                setProcessing(true);
+                                                                router.post(
+                                                                    `/control-room/evidence/${pack.id}/items`,
+                                                                    { file },
+                                                                    {
+                                                                        forceFormData: true,
+                                                                        preserveScroll: true,
+                                                                        onFinish: () => {
+                                                                            setProcessing(false);
+                                                                            event.currentTarget.value =
+                                                                                '';
+                                                                        },
+                                                                    },
+                                                                );
+                                                            }}
+                                                        />
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="mt-3"
+                                                            onClick={() =>
+                                                                document
+                                                                    .getElementById(
+                                                                        `evidence-upload-${pack.id}`,
+                                                                    )
+                                                                    ?.click()
+                                                            }
+                                                            disabled={processing}
+                                                        >
+                                                            <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                            Upload Evidence
+                                                        </Button>
+                                                    </>
                                                 )}
                                             </CardContent>
                                         </Card>
@@ -1413,7 +1434,7 @@ export default function ControlRoomAlertShow({
                                     className="w-full justify-start gap-3 h-auto py-3 bg-status-info-bg text-status-info border border-status-info/30 hover:bg-status-info dark:text-status-info"
                                     variant="outline"
                                     disabled={
-                                        !['open', 'acknowledged'].includes(alert.status) ||
+                                        !['open', 'ack'].includes(alert.status) ||
                                         !can.manage ||
                                         processing
                                     }

@@ -174,11 +174,12 @@ const severityColors: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-    open: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-    ack: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-    triaging: 'bg-status-info-bg text-status-info border-status-info/30',
+    open: 'bg-status-critical-bg text-status-critical-foreground border-status-critical/30',
+    ack: 'bg-status-warning-bg text-status-warning-foreground border-status-warning/30',
+    triaging:
+        'bg-status-info-bg text-status-info-foreground border-status-info/30',
     resolved:
-        'bg-status-success-bg text-status-success border-status-success/30',
+        'bg-status-success-bg text-status-success-foreground border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
@@ -917,7 +918,12 @@ export default function ControlRoomIndex({
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="max-h-48 space-y-2.5 overflow-y-auto">
+                            <div
+                                className="max-h-48 space-y-2.5 overflow-y-auto"
+                                role="region"
+                                aria-label="Recent activity feed"
+                                tabIndex={0}
+                            >
                                 {recent_activity.length > 0 ? (
                                     recent_activity
                                         .slice(0, 10)
@@ -1299,7 +1305,10 @@ export default function ControlRoomIndex({
                             value={filters.status || 'all'}
                             onValueChange={(v) => applyFilter('status', v)}
                         >
-                            <SelectTrigger className="w-32">
+                            <SelectTrigger
+                                className="w-32"
+                                aria-label="Filter alerts by status"
+                            >
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1322,7 +1331,10 @@ export default function ControlRoomIndex({
                             value={filters.severity || 'all'}
                             onValueChange={(v) => applyFilter('severity', v)}
                         >
-                            <SelectTrigger className="w-32">
+                            <SelectTrigger
+                                className="w-32"
+                                aria-label="Filter alerts by severity"
+                            >
                                 <SelectValue placeholder="Severity" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1342,7 +1354,10 @@ export default function ControlRoomIndex({
                             value={filters.source || 'all'}
                             onValueChange={(v) => applyFilter('source', v)}
                         >
-                            <SelectTrigger className="w-36">
+                            <SelectTrigger
+                                className="w-36"
+                                aria-label="Filter alerts by source"
+                            >
                                 <SelectValue placeholder="Source" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1373,7 +1388,10 @@ export default function ControlRoomIndex({
                                 applyFilter('assigned_to', v === 'all' ? '' : v)
                             }
                         >
-                            <SelectTrigger className="w-40">
+                            <SelectTrigger
+                                className="w-40"
+                                aria-label="Filter alerts by assignee"
+                            >
                                 <SelectValue placeholder="Assignee" />
                             </SelectTrigger>
                             <SelectContent>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -132,5 +133,25 @@ class ControlRoomMyTasksController extends Controller
                 'escalate' => $user->canDo('controlRoom.alerts.escalate'),
             ],
         ]);
+    }
+
+    public function completeFollowup(Request $request, int $note)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+
+        $operatorNote = OperatorNote::where('id', $note)
+            ->where('user_id', $user->id)
+            ->where('requires_followup', true)
+            ->firstOrFail();
+
+        $operatorNote->update(['requires_followup' => false]);
+
+        AuditLogger::log('controlRoom.myTasks.followupComplete', $operatorNote, [
+            'operator_note_id' => $operatorNote->id,
+            'alert_id' => $operatorNote->alert_id,
+        ]);
+
+        return back()->with('success', 'Follow-up completed.');
     }
 }

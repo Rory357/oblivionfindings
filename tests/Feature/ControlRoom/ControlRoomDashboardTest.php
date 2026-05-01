@@ -3,6 +3,7 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
@@ -184,6 +185,50 @@ class ControlRoomDashboardTest extends TestCase
                 ->has('staff', 2)
                 ->has('sites', 1)
                 ->where('sites.0.id', $visibleSite->id)
+            );
+    }
+
+    public function test_dashboard_recent_activity_is_scoped_to_visible_alerts(): void
+    {
+        $visibleSite = Site::factory()->create(['name' => 'Visible Site', 'type' => 'house']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'type' => 'house']);
+
+        $this->scopeUserToSite($this->coordinator, $visibleSite);
+
+        $visibleAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $visibleSite->id,
+        ]);
+
+        $hiddenAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $hiddenSite->id,
+        ]);
+
+        AuditLog::create([
+            'user_id' => $this->admin->id,
+            'action' => 'controlRoom.alert.acknowledge',
+            'auditable_type' => $visibleAlert->getMorphClass(),
+            'auditable_id' => $visibleAlert->id,
+            'meta' => ['alert_id' => $visibleAlert->id],
+            'created_at' => now()->subMinute(),
+            'updated_at' => now()->subMinute(),
+        ]);
+
+        AuditLog::create([
+            'user_id' => $this->admin->id,
+            'action' => 'controlRoom.alert.escalate',
+            'auditable_type' => $hiddenAlert->getMorphClass(),
+            'auditable_id' => $hiddenAlert->id,
+            'meta' => ['alert_id' => $hiddenAlert->id],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/control-room')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('recent_activity', 1)
+                ->where('recent_activity.0.meta.alert_id', $visibleAlert->id)
             );
     }
 

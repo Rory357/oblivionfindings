@@ -35,19 +35,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:controlRoom.viewAny')
         ->name('control-room.my-tasks');
 
-    Route::post('/control-room/my-tasks/followups/{note}/complete', function (\Illuminate\Http\Request $request, int $note) {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
-
-        $operatorNote = \App\Models\ControlRoom\OperatorNote::where('id', $note)
-            ->where('user_id', $user->id)
-            ->where('requires_followup', true)
-            ->firstOrFail();
-
-        $operatorNote->update(['requires_followup' => false]);
-
-        return back()->with('success', 'Follow-up completed.');
-    })->middleware('permission:controlRoom.viewAny')->name('control-room.my-tasks.followup-complete');
+    Route::post('/control-room/my-tasks/followups/{note}/complete', [ControlRoomMyTasksController::class, 'completeFollowup'])
+        ->whereNumber('note')
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.my-tasks.followup-complete');
 
     // Dashboard and viewing
     Route::middleware('permission:controlRoom.viewAny')->group(function () {
@@ -120,8 +111,10 @@ Route::middleware(['auth'])->group(function () {
 
         // Alert tasks
         Route::get('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'index'])
+            ->whereNumber('alert')
             ->name('control-room.tasks.index');
         Route::post('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'store'])
+            ->whereNumber('alert')
             ->name('control-room.tasks.store');
         Route::put('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'update'])
             ->name('control-room.tasks.update');
@@ -130,6 +123,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'destroy'])
             ->name('control-room.tasks.destroy');
         Route::post('/control-room/alerts/{alert}/tasks/reorder', [ControlRoomTaskController::class, 'reorder'])
+            ->whereNumber('alert')
             ->name('control-room.tasks.reorder');
     });
 
@@ -163,17 +157,17 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('permission:controlRoom.alerts.view')
             ->name('control-room.integration-alerts.index');
         Route::post('/{alert}/ack', [IntegrationAlertController::class, 'acknowledge'])
+            ->whereNumber('alert')
             ->middleware('permission:controlRoom.alerts.manage')
             ->name('control-room.integration-alerts.ack');
         Route::post('/{alert}/assign', [IntegrationAlertController::class, 'assign'])
+            ->whereNumber('alert')
             ->middleware('permission:controlRoom.alerts.assign')
             ->name('control-room.integration-alerts.assign');
         Route::post('/{alert}/close', [IntegrationAlertController::class, 'close'])
+            ->whereNumber('alert')
             ->middleware('permission:controlRoom.alerts.manage')
             ->name('control-room.integration-alerts.close');
-        Route::post('/{alert}/create-incident', [IntegrationAlertController::class, 'createIncident'])
-            ->middleware('permission:controlRoom.alerts.manage')
-            ->name('control-room.integration-alerts.create-incident');
     });
 
     Route::redirect('/control-room/sla-breaches', '/control-room/sla/breaches')
@@ -209,14 +203,17 @@ Route::middleware(['auth'])->group(function () {
         ->name('control-room.escalations.index');
     Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
         Route::post('/control-room/escalations/{alert}/move', [ControlRoomEscalationController::class, 'moveToQueue'])
+            ->whereNumber('alert')
             ->name('control-room.escalations.move');
         Route::post('/control-room/escalations/bulk-escalate', [ControlRoomEscalationController::class, 'bulkEscalate'])
             ->name('control-room.escalations.bulk-escalate');
     });
     Route::post('/control-room/escalations/{alert}/acknowledge', [ControlRoomEscalationController::class, 'acknowledgeFromQueue'])
+        ->whereNumber('alert')
         ->middleware('permission:controlRoom.alerts.manage')
         ->name('control-room.escalations.acknowledge');
     Route::post('/control-room/escalations/{alert}/assign-to-me', [ControlRoomEscalationController::class, 'assignToMe'])
+        ->whereNumber('alert')
         ->middleware('permission:controlRoom.alerts.assign')
         ->name('control-room.escalations.assign-to-me');
 
@@ -261,8 +258,10 @@ Route::middleware(['auth'])->group(function () {
     // Evidence management
     Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
         Route::get('/control-room/alerts/{alert}/evidence', [ControlRoomEvidenceController::class, 'index'])
+            ->whereNumber('alert')
             ->name('control-room.evidence.index');
         Route::post('/control-room/alerts/{alert}/evidence', [ControlRoomEvidenceController::class, 'storePack'])
+            ->whereNumber('alert')
             ->name('control-room.evidence.store-pack');
         Route::post('/control-room/evidence/{pack}/items', [ControlRoomEvidenceController::class, 'storeItem'])
             ->name('control-room.evidence.store-item');
@@ -346,18 +345,23 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/playbooks/{playbook}/toggle-active', [ControlRoomPlaybookController::class, 'toggleActive'])
             ->name('control-room.playbooks.toggle-active');
         Route::post('/control-room/alerts/{alert}/playbook/start', [ControlRoomPlaybookController::class, 'startRun'])
+            ->whereNumber('alert')
             ->name('control-room.alerts.playbook.start');
         Route::post('/control-room/alerts/{alert}/playbook/advance', [ControlRoomPlaybookController::class, 'advanceStep'])
+            ->whereNumber('alert')
             ->name('control-room.alerts.playbook.advance');
         Route::post('/control-room/alerts/{alert}/playbook/skip', [ControlRoomPlaybookController::class, 'skipStep'])
+            ->whereNumber('alert')
             ->name('control-room.alerts.playbook.skip');
     });
 
     // Alert discussions
     Route::get('/control-room/alerts/{alert}/discussions', [ControlRoomDiscussionController::class, 'index'])
+        ->whereNumber('alert')
         ->middleware('permission:controlRoom.viewAny')
         ->name('control-room.discussions.index');
     Route::post('/control-room/alerts/{alert}/discussions', [ControlRoomDiscussionController::class, 'store'])
+        ->whereNumber('alert')
         ->middleware('permission:controlRoom.alerts.manage')
         ->name('control-room.discussions.store');
     Route::put('/control-room/discussions/{discussion}', [ControlRoomDiscussionController::class, 'update'])
@@ -370,24 +374,31 @@ Route::middleware(['auth'])->group(function () {
     // Watchers
     Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
         Route::get('/control-room/alerts/{alert}/watchers', [ControlRoomWatcherController::class, 'index'])
+            ->whereNumber('alert')
             ->name('control-room.watchers.index');
         Route::post('/control-room/alerts/{alert}/watchers', [ControlRoomWatcherController::class, 'store'])
+            ->whereNumber('alert')
             ->name('control-room.watchers.store');
         Route::post('/control-room/alerts/{alert}/watchers/toggle', [ControlRoomWatcherController::class, 'toggle'])
+            ->whereNumber('alert')
             ->name('control-room.watchers.toggle');
         Route::delete('/control-room/alerts/{alert}/watchers/{userId}', [ControlRoomWatcherController::class, 'destroy'])
+            ->whereNumber('alert')
             ->name('control-room.watchers.destroy');
     });
 
     // Time entries
     Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
         Route::get('/control-room/alerts/{alert}/time-entries', [ControlRoomTimeEntryController::class, 'index'])
+            ->whereNumber('alert')
             ->name('control-room.time-entries.index');
         Route::post('/control-room/alerts/{alert}/time-entries/start', [ControlRoomTimeEntryController::class, 'start'])
+            ->whereNumber('alert')
             ->name('control-room.time-entries.start');
         Route::post('/control-room/time-entries/{entry}/stop', [ControlRoomTimeEntryController::class, 'stop'])
             ->name('control-room.time-entries.stop');
         Route::post('/control-room/alerts/{alert}/time-entries', [ControlRoomTimeEntryController::class, 'store'])
+            ->whereNumber('alert')
             ->name('control-room.time-entries.store');
         Route::delete('/control-room/time-entries/{entry}', [ControlRoomTimeEntryController::class, 'destroy'])
             ->name('control-room.time-entries.destroy');

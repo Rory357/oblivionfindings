@@ -189,6 +189,10 @@ class RbacSeeder extends Seeder
             ['key' => 'fleet.outings.manage', 'description' => 'Manage fleet outings', 'group' => 'fleet', 'module' => 'Resources'],
 
             // Control Room
+            // `controlRoom.viewAny` is the full operator dashboard permission.
+            // `controlRoom.alerts.view` is intentionally narrower: it grants
+            // read-only access to alert lists used by team-lead-tier roles and
+            // does not imply manage, assign, escalate, or create capability.
             ['key' => 'controlRoom.viewAny', 'description' => 'View Control Room', 'group' => 'control_room', 'module' => 'System'],
             ['key' => 'controlRoom.alerts.view', 'description' => 'View Control Room alerts', 'group' => 'control_room', 'module' => 'System'],
             ['key' => 'controlRoom.alerts.manage', 'description' => 'Manage alerts (acknowledge, triage, resolve, close)', 'group' => 'control_room', 'module' => 'System'],

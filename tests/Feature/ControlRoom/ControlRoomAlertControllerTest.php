@@ -3,11 +3,17 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoom\PlaybookRun;
+use App\Models\ControlRoom\PlaybookStep;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ControlRoomAlertControllerTest extends TestCase
@@ -595,6 +601,158 @@ class ControlRoomAlertControllerTest extends TestCase
             'source' => 'compliance',
             'alert_type' => 'Training Expired',
         ]);
+    }
+
+    // ──────────────────────────────────────
+    // Readiness payload-shape regressions
+    // ──────────────────────────────────────
+
+    public function test_show_page_payload_shape_resolves_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->triaging()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/resolve", [
+                'resolution_notes' => 'Resolved from show page shape',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'resolved',
+            'resolved_by_user_id' => $this->admin->id,
+            'notes' => 'Resolved from show page shape',
+        ]);
+    }
+
+    public function test_show_page_payload_shape_escalates_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['escalation_level' => 0]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Escalated from show page shape',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $alert->refresh();
+        $this->assertSame(1, $alert->escalation_level);
+        $this->assertSame($this->admin->id, $alert->escalated_by_user_id);
+    }
+
+    public function test_show_page_payload_shape_adds_note(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['context' => []]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/note", [
+                'note' => 'Show page note payload',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $alert->refresh();
+        $activityLog = $alert->context['activity_log'] ?? [];
+
+        $this->assertNotEmpty($activityLog);
+        $this->assertSame('Show page note payload', $activityLog[0]['content']);
+    }
+
+    public function test_show_page_payload_shape_assigns_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/assign", [
+                'assigned_to_user_id' => $this->coordinator->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'assigned_to_user_id' => $this->coordinator->id,
+            'assigned_by_user_id' => $this->admin->id,
+        ]);
+    }
+
+    public function test_show_page_playbook_advance_route_completes_current_step(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+        $playbook = Playbook::factory()->create([
+            'category' => Playbook::CATEGORY_EMERGENCY,
+            'created_by_user_id' => $this->admin->id,
+            'updated_by_user_id' => $this->admin->id,
+        ]);
+
+        $firstStep = PlaybookStep::create([
+            'playbook_id' => $playbook->id,
+            'order' => 1,
+            'title' => 'Check first step',
+            'type' => 'task',
+        ]);
+
+        $secondStep = PlaybookStep::create([
+            'playbook_id' => $playbook->id,
+            'order' => 2,
+            'title' => 'Check next step',
+            'type' => 'task',
+        ]);
+
+        $run = PlaybookRun::create([
+            'playbook_id' => $playbook->id,
+            'alert_id' => $alert->id,
+            'status' => PlaybookRun::STATUS_PENDING,
+        ]);
+        $run->start($this->admin);
+        $alert->update(['playbook_run_id' => $run->id]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/playbook/advance")
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('control_room_playbook_run_steps', [
+            'playbook_run_id' => $run->id,
+            'playbook_step_id' => $firstStep->id,
+            'status' => 'completed',
+        ]);
+        $this->assertDatabaseHas('control_room_playbook_run_steps', [
+            'playbook_run_id' => $run->id,
+            'playbook_step_id' => $secondStep->id,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    public function test_show_page_evidence_upload_route_stores_file_item(): void
+    {
+        Storage::fake('local');
+
+        $alert = ControlRoomAlert::factory()->open()->create();
+        $pack = EvidencePack::create([
+            'alert_id' => $alert->id,
+            'title' => 'Show page evidence',
+            'status' => 'collecting',
+            'item_count' => 0,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/evidence/{$pack->id}/items", [
+                'file' => UploadedFile::fake()->create('evidence.pdf', 12, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('control_room_evidence_items', [
+            'evidence_pack_id' => $pack->id,
+            'type' => 'document',
+            'title' => 'evidence.pdf',
+            'captured_by_user_id' => $this->admin->id,
+        ]);
+        $this->assertSame(1, $pack->refresh()->item_count);
     }
 
     // ──────────────────────────────────────
