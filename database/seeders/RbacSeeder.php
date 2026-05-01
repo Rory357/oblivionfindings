@@ -163,9 +163,6 @@ class RbacSeeder extends Seeder
             ['key' => 'staff.availability.updateSelf', 'description' => 'Manage own availability', 'group' => 'staff', 'module' => 'HR'],
             ['key' => 'staff.vetting.view', 'description' => 'View background checks', 'group' => 'staff', 'module' => 'HR'],
             ['key' => 'staff.vetting.manage', 'description' => 'Manage background checks (DBS, references)', 'group' => 'staff', 'module' => 'HR'],
-            ['key' => 'staff.training.viewAny', 'description' => 'View all training records', 'group' => 'staff', 'module' => 'HR'],
-            ['key' => 'staff.training.manage', 'description' => 'Manage training (enroll, record completion)', 'group' => 'staff', 'module' => 'HR'],
-            ['key' => 'staff.competency.assess', 'description' => 'Conduct competency assessments', 'group' => 'staff', 'module' => 'HR'],
             ['key' => 'staff.induction.manage', 'description' => 'Manage staff induction process', 'group' => 'staff', 'module' => 'HR'],
 
             // Workers / modules
@@ -366,9 +363,9 @@ class RbacSeeder extends Seeder
             ['key' => 'hr.reports.export', 'description' => 'Export HR reports', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.driver.view', 'description' => 'View driver eligibility register', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.driver.manage', 'description' => 'Manage driver eligibility', 'group' => 'hr', 'module' => 'HR'],
-            ['key' => 'hr.time.viewAny', 'description' => 'View HR time tracking dashboard', 'group' => 'hr', 'module' => 'HR'],
-            ['key' => 'hr.time.manage', 'description' => 'Manage all HR time entries and timesheets', 'group' => 'hr', 'module' => 'HR'],
-            ['key' => 'hr.time.approveTeam', 'description' => 'Approve team HR timesheets and amend time entries', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.time.viewAny', 'description' => 'Legacy alias for timesheets.viewAny', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.time.manage', 'description' => 'Legacy alias for timesheets.manageAny', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.time.approveTeam', 'description' => 'Legacy alias for timesheets.approve', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.wellbeing.view', 'description' => 'View wellbeing dashboard', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.onboarding.view', 'description' => 'View onboarding checklists', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.onboarding.manage', 'description' => 'Manage onboarding checklists', 'group' => 'hr', 'module' => 'HR'],
@@ -478,6 +475,14 @@ class RbacSeeder extends Seeder
             );
         }
 
+        Permission::query()
+            ->whereIn('key', [
+                'staff.training.viewAny',
+                'staff.training.manage',
+                'staff.competency.assess',
+            ])
+            ->delete();
+
         /*
         |--------------------------------------------------------------------------
         | 3. Attach permissions to roles
@@ -534,8 +539,7 @@ class RbacSeeder extends Seeder
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update',
             'safeguarding.investigate', 'safeguarding.report.external', 'safeguarding.viewSensitive',
             'consents.viewAny', 'consents.manage', 'consents.record', 'consents.withdraw', 'consents.export', 'consents.request',
-            'staff.vetting.view', 'staff.vetting.manage', 'staff.training.viewAny', 'staff.training.manage',
-            'staff.competency.assess', 'staff.induction.manage',
+            'staff.vetting.view', 'staff.vetting.manage', 'staff.induction.manage',
             'privacy.viewRequests', 'privacy.processRequests', 'privacy.manageRetention',
             'privacy.manageLegalHolds', 'privacy.reportBreaches', 'privacy.conductDPIA',
             'integrations.view', 'integrations.manage_tenant_secrets', 'integrations.manage_site_secrets',
@@ -549,7 +553,6 @@ class RbacSeeder extends Seeder
             'hr.policies.view', 'hr.policies.manage', 'hr.policies.attest',
             'hr.documents.view', 'hr.documents.manage', 'hr.payroll.view', 'hr.payroll.export',
             'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
-            'hr.time.viewAny', 'hr.time.manage',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
@@ -591,7 +594,6 @@ class RbacSeeder extends Seeder
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.vetting.view', 'hr.leave.viewAny', 'hr.leave.approve',
             'hr.performance.view', 'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
-            'hr.time.viewAny', 'hr.time.approveTeam',
             'sites.damages.view', 'sites.damages.create',
             'sites.ledger.view', 'sites.ledger.create',
             'clinical.observations.view', 'clinical.observations.record',
@@ -647,8 +649,7 @@ class RbacSeeder extends Seeder
         $syncPermissions($hr, [
             'staff.viewAny', 'staff.update', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
             'staff.availability.updateAny', 'reports.viewAny', 'audit.viewAny', 'compliance.view',
-            'staff.vetting.view', 'staff.vetting.manage', 'staff.training.viewAny', 'staff.training.manage',
-            'staff.competency.assess', 'staff.induction.manage',
+            'staff.vetting.view', 'staff.vetting.manage', 'staff.induction.manage',
             'safeguarding.viewAny', 'safeguarding.create',
             'hr.recruitment.view', 'hr.recruitment.manage', 'hr.employees.viewAny', 'hr.employees.manage',
             'hr.employees.viewFinancial', 'hr.employees.viewRestricted', 'hr.compliance.view', 'hr.compliance.manage',
@@ -658,7 +659,7 @@ class RbacSeeder extends Seeder
             'hr.disciplinary.view', 'hr.disciplinary.manage', 'hr.policies.view', 'hr.policies.manage',
             'hr.policies.attest', 'hr.documents.view', 'hr.documents.manage', 'hr.payroll.view',
             'hr.payroll.export', 'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
-            'hr.time.viewAny', 'hr.time.manage',
+            'timesheets.viewAny', 'timesheets.manageAny',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
         ]);
 
@@ -671,7 +672,7 @@ class RbacSeeder extends Seeder
             'respite.viewAny', 'respite.evidence.view',
             'assets.telemetry.view', 'assets.alerts.view',
             'safeguarding.viewAny', 'consents.viewAny',
-            'staff.vetting.view', 'staff.training.viewAny',
+            'staff.vetting.view',
             'privacy.viewRequests', 'hr.employees.viewAny', 'hr.compliance.view',
             'hr.training.view', 'hr.vetting.view', 'hr.performance.view',
             'hr.policies.view', 'hr.onboarding.view',
@@ -693,7 +694,7 @@ class RbacSeeder extends Seeder
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.leave.viewAny', 'hr.leave.approve', 'hr.performance.view', 'hr.performance.manage',
             'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
-            'hr.time.viewAny', 'hr.time.approveTeam',
+            'timesheets.viewAny', 'timesheets.approve',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create',
             'clinical.observations.view', 'clinical.observations.record',

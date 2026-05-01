@@ -597,11 +597,11 @@ class HandleInertiaRequests extends Middleware
                     'manage' => $user->canDo('hr.orgchart.manage'),
                 ],
                 'time' => [
-                    'view' => $user->canDo('hr.time.viewAny'),
-                    'viewAny' => $user->canDo('hr.time.viewAny'),
-                    'manage' => $user->canDo('hr.time.manage'),
-                    'approve' => $user->canDo('hr.time.manage') || $user->canDo('hr.time.approveTeam'),
-                    'approveTeam' => $user->canDo('hr.time.approveTeam'),
+                    'view' => $user->canDo('timesheets.viewAny'),
+                    'viewAny' => $user->canDo('timesheets.viewAny'),
+                    'manage' => $user->canDo('timesheets.manageAny'),
+                    'approve' => $user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve'),
+                    'approveTeam' => $user->canDo('timesheets.approve'),
                 ],
                 'compensation' => [
                     'view' => $user->canDo('hr.compensation.view'),

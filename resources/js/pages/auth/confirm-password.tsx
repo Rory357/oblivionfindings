@@ -21,7 +21,7 @@ export default function ConfirmPassword() {
         >
             <Head title={t('app.auth.confirm.head', 'Confirm password')} />
 
-            <Form {...store.form()} resetOnSuccess={['password']}>
+            <Form action={store()} resetOnSuccess={['password']}>
                 {({ processing, errors }) => (
                     <div className="space-y-6">
                         <div className="grid gap-2">

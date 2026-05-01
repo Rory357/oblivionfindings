@@ -28,8 +28,8 @@ class TimeTrackingController extends Controller
 
     private function resolveAccess($user): array
     {
-        $canManage = $user->canDo('hr.time.manage');
-        $canApproveTeam = $user->canDo('hr.time.approveTeam');
+        $canManage = $user->canDo('timesheets.manageAny');
+        $canApproveTeam = $user->canDo('timesheets.approve');
         $teamUserIds = [];
 
         if ($canApproveTeam && ! $canManage) {
@@ -63,7 +63,7 @@ class TimeTrackingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.time.viewAny'), 403);
+        abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
 
         $tenantId = $user->tenant_id;
         $access = $this->resolveAccess($user);
@@ -314,7 +314,7 @@ class TimeTrackingController extends Controller
     public function clockIn(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.time.viewAny'), 403);
+        abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
 
         $validated = $request->validate([
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
@@ -343,7 +343,7 @@ class TimeTrackingController extends Controller
     public function clockOut(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.time.viewAny'), 403);
+        abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
 
         $validated = $request->validate([
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
@@ -446,7 +446,7 @@ class TimeTrackingController extends Controller
 
     public function timesheets(Request $request)
     {
-        abort_unless($request->user()?->canDo('hr.time.viewAny'), 403);
+        abort_unless($request->user()?->canDo('timesheets.viewAny'), 403);
 
         // Redirect to main page with timesheets tab
         return redirect()->route('hr.time.index', ['tab' => 'timesheets']);

@@ -383,7 +383,7 @@ export default function Profile({
                             </CardHeader>
                             <CardContent>
                                 <Form
-                                    {...profileRoutes.update.form()}
+                                    action={profileRoutes.update()}
                                     options={{ preserveScroll: true }}
                                     className="space-y-5"
                                 >
@@ -932,10 +932,7 @@ export default function Profile({
                                         asChild
                                     >
                                         <Link href="/settings/password">
-                                            {t(
-                                                'app.actions.change',
-                                                'Change',
-                                            )}
+                                            {t('app.actions.change', 'Change')}
                                         </Link>
                                     </Button>
                                 </div>
@@ -979,10 +976,7 @@ export default function Profile({
                                         asChild
                                     >
                                         <Link href="/settings/two-factor">
-                                            {t(
-                                                'app.actions.manage',
-                                                'Manage',
-                                            )}
+                                            {t('app.actions.manage', 'Manage')}
                                         </Link>
                                     </Button>
                                 </div>
@@ -1271,7 +1265,7 @@ export default function Profile({
                                         </DialogDescription>
 
                                         <Form
-                                            {...profileRoutes.destroy.form()}
+                                            action={profileRoutes.destroy()}
                                             options={{ preserveScroll: true }}
                                             onError={() =>
                                                 passwordInput.current?.focus()

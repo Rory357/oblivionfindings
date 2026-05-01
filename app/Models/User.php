@@ -5,14 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Support\Facades\Storage;
 use Lab404\Impersonate\Models\Impersonate;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, Impersonate;
+    use HasFactory, Impersonate, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -74,7 +74,6 @@ class User extends Authenticatable
 
     protected $appends = ['profile_photo_url', 'avatar'];
 
-
     /**
      * Get the attributes that should be cast.
      *
@@ -102,7 +101,7 @@ class User extends Authenticatable
         static::updating(function (self $user): void {
             if (
                 $user->isDirty('password')
-                && !$user->email_verified_at
+                && ! $user->email_verified_at
             ) {
                 $user->email_verified_at = now();
             }
@@ -111,7 +110,7 @@ class User extends Authenticatable
 
     public function isApproved(): bool
     {
-        return !is_null($this->approved_at);
+        return ! is_null($this->approved_at);
     }
 
     /**
@@ -127,7 +126,6 @@ class User extends Authenticatable
             ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
             ->whereNotIn('role', ['client', 'next_of_kin']);
     }
-
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
@@ -330,9 +328,11 @@ class User extends Authenticatable
 
     public function canDo(string $permissionKey): bool
     {
+        $permissionKeys = $this->permissionLookupKeys($permissionKey);
+
         // 1) explicit deny override wins
         $deny = $this->permissionOverrides()
-            ->where('permissions.key', $permissionKey)
+            ->whereIn('permissions.key', $permissionKeys)
             ->wherePivot('allowed', false)
             ->exists();
 
@@ -342,7 +342,7 @@ class User extends Authenticatable
 
         // 2) explicit allow override
         $allow = $this->permissionOverrides()
-            ->where('permissions.key', $permissionKey)
+            ->whereIn('permissions.key', $permissionKeys)
             ->wherePivot('allowed', true)
             ->exists();
 
@@ -352,8 +352,37 @@ class User extends Authenticatable
 
         // 3) role permissions
         return $this->roles()
-            ->whereHas('permissions', fn($q) => $q->where('key', $permissionKey))
+            ->whereHas('permissions', fn ($q) => $q->whereIn('key', $permissionKeys))
             ->exists();
+    }
+
+    /**
+     * Legacy permission keys kept as policy-layer synonyms while routes and
+     * controllers use the canonical namespace.
+     *
+     * @return list<string>
+     */
+    private function permissionLookupKeys(string $permissionKey): array
+    {
+        $aliases = [
+            'timesheets.viewAny' => ['hr.time.viewAny'],
+            'hr.time.viewAny' => ['timesheets.viewAny'],
+            'timesheets.manageAny' => ['hr.time.manage'],
+            'hr.time.manage' => ['timesheets.manageAny'],
+            'timesheets.approve' => ['hr.time.approveTeam'],
+            'hr.time.approveTeam' => ['timesheets.approve'],
+            'hr.vetting.view' => ['vetting.viewAny'],
+            'vetting.viewAny' => ['hr.vetting.view'],
+            'hr.vetting.manage' => ['vetting.manage', 'vetting.verify', 'vetting.assessRisk'],
+            'vetting.manage' => ['hr.vetting.manage'],
+            'vetting.verify' => ['hr.vetting.manage'],
+            'vetting.assessRisk' => ['hr.vetting.manage'],
+        ];
+
+        return array_values(array_unique([
+            $permissionKey,
+            ...($aliases[$permissionKey] ?? []),
+        ]));
     }
 
     public function medicationCompetencyAssessments()
@@ -404,6 +433,6 @@ class User extends Authenticatable
 
     public function canBeImpersonated(): bool
     {
-        return !$this->hasRole('admin');
+        return ! $this->hasRole('admin');
     }
 }

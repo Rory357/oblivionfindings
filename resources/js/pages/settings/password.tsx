@@ -8,11 +8,17 @@ import { Form, Head } from '@inertiajs/react';
 import { useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Check, X } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -34,13 +40,41 @@ const requirements: PasswordRequirement[] = [
     { label: 'One special character', test: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
 
-function getStrength(password: string): { level: number; label: string; color: string; bgColor: string } {
+function getStrength(password: string): {
+    level: number;
+    label: string;
+    color: string;
+    bgColor: string;
+} {
     if (!password) return { level: 0, label: '', color: '', bgColor: '' };
     const passed = requirements.filter((r) => r.test(password)).length;
-    if (passed <= 1) return { level: 1, label: 'Weak', color: 'bg-status-critical', bgColor: 'text-status-critical' };
-    if (passed <= 2) return { level: 2, label: 'Fair', color: 'bg-status-warning', bgColor: 'text-status-warning' };
-    if (passed <= 4) return { level: 3, label: 'Strong', color: 'bg-status-success', bgColor: 'text-status-success' };
-    return { level: 4, label: 'Excellent', color: 'bg-status-success', bgColor: 'text-status-success' };
+    if (passed <= 1)
+        return {
+            level: 1,
+            label: 'Weak',
+            color: 'bg-status-critical',
+            bgColor: 'text-status-critical',
+        };
+    if (passed <= 2)
+        return {
+            level: 2,
+            label: 'Fair',
+            color: 'bg-status-warning',
+            bgColor: 'text-status-warning',
+        };
+    if (passed <= 4)
+        return {
+            level: 3,
+            label: 'Strong',
+            color: 'bg-status-success',
+            bgColor: 'text-status-success',
+        };
+    return {
+        level: 4,
+        label: 'Excellent',
+        color: 'bg-status-success',
+        bgColor: 'text-status-success',
+    };
 }
 
 export default function Password() {
@@ -59,12 +93,13 @@ export default function Password() {
                     <CardHeader>
                         <CardTitle>Update Password</CardTitle>
                         <CardDescription>
-                            Ensure your account stays secure with a strong password
+                            Ensure your account stays secure with a strong
+                            password
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Form
-                            {...update.form()}
+                            action={update()}
                             options={{
                                 preserveScroll: true,
                             }}
@@ -88,7 +123,9 @@ export default function Password() {
                             {({ errors, processing, recentlySuccessful }) => (
                                 <>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="current_password">Current password</Label>
+                                        <Label htmlFor="current_password">
+                                            Current password
+                                        </Label>
                                         <Input
                                             id="current_password"
                                             ref={currentPasswordInput}
@@ -98,11 +135,15 @@ export default function Password() {
                                             autoComplete="current-password"
                                             placeholder="Current password"
                                         />
-                                        <InputError message={errors.current_password} />
+                                        <InputError
+                                            message={errors.current_password}
+                                        />
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="password">New password</Label>
+                                        <Label htmlFor="password">
+                                            New password
+                                        </Label>
                                         <Input
                                             id="password"
                                             ref={passwordInput}
@@ -111,7 +152,9 @@ export default function Password() {
                                             className="max-w-md"
                                             autoComplete="new-password"
                                             placeholder="New password"
-                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            onChange={(e) =>
+                                                setNewPassword(e.target.value)
+                                            }
                                         />
 
                                         {/* Strength meter */}
@@ -119,17 +162,20 @@ export default function Password() {
                                             <div className="max-w-md space-y-2">
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex flex-1 gap-1">
-                                                        {[1, 2, 3, 4].map((i) => (
-                                                            <div
-                                                                key={i}
-                                                                className={cn(
-                                                                    'h-1.5 flex-1 rounded-full transition-colors',
-                                                                    i <= strength.level
-                                                                        ? strength.color
-                                                                        : 'bg-muted',
-                                                                )}
-                                                            />
-                                                        ))}
+                                                        {[1, 2, 3, 4].map(
+                                                            (i) => (
+                                                                <div
+                                                                    key={i}
+                                                                    className={cn(
+                                                                        'h-1.5 flex-1 rounded-full transition-colors',
+                                                                        i <=
+                                                                            strength.level
+                                                                            ? strength.color
+                                                                            : 'bg-muted',
+                                                                    )}
+                                                                />
+                                                            ),
+                                                        )}
                                                     </div>
                                                     <span
                                                         className={cn(
@@ -158,18 +204,23 @@ export default function Password() {
                                             autoComplete="new-password"
                                             placeholder="Confirm password"
                                         />
-                                        <InputError message={errors.password_confirmation} />
+                                        <InputError
+                                            message={
+                                                errors.password_confirmation
+                                            }
+                                        />
                                     </div>
 
                                     {/* Requirements checklist */}
                                     {newPassword && (
                                         <div className="max-w-md rounded-lg border bg-muted/30 p-4">
-                                            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 Password requirements
                                             </p>
                                             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                                                 {requirements.map((req) => {
-                                                    const met = req.test(newPassword);
+                                                    const met =
+                                                        req.test(newPassword);
                                                     return (
                                                         <div
                                                             key={req.label}

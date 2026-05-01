@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Timesheet;
@@ -139,7 +139,7 @@ class TimesheetController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned') || $auth->canDo('hr.time.viewAny')), 403);
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
 
         $canApprove = $this->canReviewTimesheets($auth);
         $approvalMode = $request->query('mode') === 'approvals' && $canApprove;
@@ -369,7 +369,7 @@ class TimesheetController extends Controller
     public function edit(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned') || $auth->canDo('hr.time.viewAny')), 403);
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
 
         if (! $auth->canDo('timesheets.manageAny') && ! $this->canReviewTimesheets($auth) && $timesheet->user_id !== $auth->id) {
             abort(403);
@@ -872,9 +872,7 @@ class TimesheetController extends Controller
         }
 
         return $user->canDo('timesheets.approve')
-            || $user->canDo('timesheets.manageAny')
-            || $user->canDo('hr.time.manage')
-            || $user->canDo('hr.time.approveTeam');
+            || $user->canDo('timesheets.manageAny');
     }
 
     protected function timesheetApprovals(): TimesheetApprovalService

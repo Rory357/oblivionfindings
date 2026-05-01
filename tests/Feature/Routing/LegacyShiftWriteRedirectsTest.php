@@ -69,6 +69,8 @@ class LegacyShiftWriteRedirectsTest extends TestCase
             ['POST', '/timesheets/bulk-approve', '/operations/timesheets/bulk-approve'],
             ['POST', '/timesheets/bulk-return', '/operations/timesheets/bulk-return'],
             ['POST', '/timesheets/bulk-reject', '/operations/timesheets/bulk-reject'],
+            ['POST', '/rostering/time-off', '/operations/rostering/time-off'],
+            ['DELETE', '/rostering/time-off/123', '/operations/rostering/time-off/123'],
         ];
     }
 }

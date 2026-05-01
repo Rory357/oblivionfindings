@@ -24,7 +24,7 @@ class StaffTimeOffController extends Controller
         ]);
 
         $userId = $data['user_id'] ?? $auth->id;
-        if ($userId !== $auth->id && !$auth->canDo('staff.availability.updateAny')) {
+        if ($userId !== $auth->id && ! $auth->canDo('staff.availability.updateAny')) {
             abort(403);
         }
 
@@ -40,7 +40,7 @@ class StaffTimeOffController extends Controller
             'created_by' => $auth->id,
         ]);
 
-        return redirect($data['return_to'] ?? url('/rostering'))
+        return redirect($data['return_to'] ?? route('operations.rostering.index'))
             ->with('success', 'Time off saved.');
     }
 
@@ -49,11 +49,11 @@ class StaffTimeOffController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('staff.availability.updateAny') || $auth->canDo('staff.availability.updateSelf')), 403);
 
-        if ($staffTimeOff->user_id !== $auth->id && !$auth->canDo('staff.availability.updateAny')) {
+        if ($staffTimeOff->user_id !== $auth->id && ! $auth->canDo('staff.availability.updateAny')) {
             abort(403);
         }
 
-        $returnTo = $request->input('return_to') ?: url('/rostering');
+        $returnTo = $request->input('return_to') ?: route('operations.rostering.index');
         $staffTimeOff->delete();
 
         return redirect($returnTo)->with('success', 'Time off deleted.');

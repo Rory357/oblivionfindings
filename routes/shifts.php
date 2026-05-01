@@ -90,6 +90,11 @@ Route::middleware(['auth'])->group(function () {
     $legacyWriteRedirect(['POST'], '/timesheets/bulk-return', 'operations.timesheets.bulkReturn');
     $legacyWriteRedirect(['POST'], '/timesheets/bulk-reject', 'operations.timesheets.bulkReject');
 
+    // Legacy Rostering write URLs (308 redirects to operations).
+    $legacyWriteRedirect(['POST'], '/rostering/time-off', 'operations.rostering.time_off.store');
+    $legacyWriteRedirect(['DELETE'], '/rostering/time-off/{staffTimeOff}', 'operations.rostering.time_off.destroy')
+        ->whereNumber('staffTimeOff');
+
     Route::get('/attendance', [AttendanceController::class, 'index'])
         ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.index');

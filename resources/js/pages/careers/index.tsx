@@ -1,35 +1,51 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, Briefcase, MapPin, Clock, Wifi, DollarSign } from 'lucide-react';
+import { Search, Briefcase, MapPin, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { employmentTypeLabels } from '@/lib/job-posting-constants';
-import type { PublicJobListing } from '@/types/job-postings';
+
+type JobListing = {
+    id: number;
+    title: string;
+    slug: string;
+    position_role: string | null;
+    employment_type: string;
+    summary: string | null;
+    site: { id: number; name: string } | null;
+    published_at: string | null;
+    closing_at: string | null;
+};
+
+type SiteOption = { id: number; name: string };
 
 type Props = {
-    postings: PublicJobListing[];
-    departments: string[];
-    locations: string[];
+    jobs: JobListing[];
+    options: {
+        position_roles: string[];
+        employment_types: string[];
+        sites: SiteOption[];
+    };
     filters: {
-        department: string | null;
-        location: string | null;
         search: string | null;
+        position_role: string | null;
         employment_type: string | null;
+        site: number | null;
     };
 };
 
-export default function CareersIndex({ postings, departments, locations, filters }: Props) {
+export default function CareersIndex({ jobs, options, filters }: Props) {
     const [searchValue, setSearchValue] = useState(filters.search || '');
 
-    function submitFilters(next: Partial<typeof filters>) {
+    function submitFilters(next: Partial<Props['filters']>) {
         const merged = { ...filters, ...next };
         router.get('/careers', {
             ...(merged.search ? { search: merged.search } : {}),
-            ...(merged.department ? { department: merged.department } : {}),
-            ...(merged.location ? { location: merged.location } : {}),
+            ...(merged.position_role ? { position_role: merged.position_role } : {}),
             ...(merged.employment_type ? { employment_type: merged.employment_type } : {}),
+            ...(merged.site ? { site: merged.site } : {}),
         }, { preserveState: true, replace: true });
     }
 
@@ -55,19 +71,19 @@ export default function CareersIndex({ postings, departments, locations, filters
                     </div>
                     <select
                         className="h-10 rounded-md border bg-background px-3 text-sm"
-                        value={filters.department || ''}
-                        onChange={e => submitFilters({ department: e.target.value || null })}
+                        value={filters.position_role || ''}
+                        onChange={e => submitFilters({ position_role: e.target.value || null })}
                     >
-                        <option value="">All departments</option>
-                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                        <option value="">All roles</option>
+                        {options.position_roles.map(role => <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>)}
                     </select>
                     <select
                         className="h-10 rounded-md border bg-background px-3 text-sm"
-                        value={filters.location || ''}
-                        onChange={e => submitFilters({ location: e.target.value || null })}
+                        value={filters.site ?? ''}
+                        onChange={e => submitFilters({ site: e.target.value ? Number(e.target.value) : null })}
                     >
-                        <option value="">All locations</option>
-                        {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                        <option value="">All sites</option>
+                        {options.sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
                     </select>
                     <select
                         className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -75,59 +91,48 @@ export default function CareersIndex({ postings, departments, locations, filters
                         onChange={e => submitFilters({ employment_type: e.target.value || null })}
                     >
                         <option value="">All types</option>
-                        <option value="full_time">Full Time</option>
-                        <option value="part_time">Part Time</option>
-                        <option value="casual">Casual</option>
-                        <option value="fixed_term">Fixed Term</option>
+                        {options.employment_types.map(type => (
+                            <option key={type} value={type}>{employmentTypeLabels[type] || type}</option>
+                        ))}
                     </select>
                 </div>
 
                 <div className="grid gap-4">
-                    {postings.map(posting => (
-                        <Card key={posting.id} className="hover:bg-accent/30 transition-colors">
+                    {jobs.map(job => (
+                        <Card key={job.id} className="hover:bg-accent/30 transition-colors">
                             <CardContent className="p-6">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
-                                        <Link href={`/careers/${posting.slug}`} className="text-lg font-semibold hover:underline">
-                                            {posting.title}
+                                        <Link href={`/careers/jobs/${job.slug}/apply`} className="text-lg font-semibold hover:underline">
+                                            {job.title}
                                         </Link>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                             <Badge variant="secondary" className="text-xs">
                                                 <Briefcase className="mr-1 h-3 w-3" />
-                                                {employmentTypeLabels[posting.employment_type] || posting.employment_type}
+                                                {employmentTypeLabels[job.employment_type] || job.employment_type}
                                             </Badge>
-                                            {posting.department && (
+                                            {job.position_role && (
                                                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    {posting.department}
+                                                    {job.position_role.replace(/_/g, ' ')}
                                                 </span>
                                             )}
-                                            {posting.location && (
+                                            {job.site && (
                                                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    <MapPin className="h-3 w-3" /> {posting.location}
-                                                </span>
-                                            )}
-                                            {posting.is_remote && (
-                                                <Badge variant="outline" className="text-xs gap-1 border-status-info/30 text-status-info bg-status-info">
-                                                    <Wifi className="h-3 w-3" /> Remote
-                                                </Badge>
-                                            )}
-                                            {posting.salary_range && (
-                                                <span className="text-xs text-status-success flex items-center gap-1">
-                                                    <DollarSign className="h-3 w-3" /> {posting.salary_range}
+                                                    <MapPin className="h-3 w-3" /> {job.site.name}
                                                 </span>
                                             )}
                                         </div>
-                                        {posting.summary && (
-                                            <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{posting.summary}</p>
+                                        {job.summary && (
+                                            <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{job.summary}</p>
                                         )}
                                     </div>
                                     <div className="flex flex-col items-end gap-2 shrink-0">
                                         <Button asChild>
-                                            <Link href={`/careers/${posting.slug}/apply`}>Apply</Link>
+                                            <Link href={`/careers/jobs/${job.slug}/apply`}>Apply</Link>
                                         </Button>
                                         <p className="text-xs text-muted-foreground">
-                                            {posting.closes_at ? (
-                                                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Closes {posting.closes_at}</span>
+                                            {job.closing_at ? (
+                                                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Closes {job.closing_at}</span>
                                             ) : 'Open until filled'}
                                         </p>
                                     </div>
@@ -136,7 +141,7 @@ export default function CareersIndex({ postings, departments, locations, filters
                         </Card>
                     ))}
 
-                    {postings.length === 0 && (
+                    {jobs.length === 0 && (
                         <Card>
                             <CardContent className="py-16 text-center">
                                 <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/40 mb-4" />

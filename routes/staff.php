@@ -1,20 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffAssignmentController;
-use App\Http\Controllers\StaffCredentialController;
 use App\Http\Controllers\StaffAvailabilityController;
-use App\Http\Controllers\RosteringController;
-use App\Http\Controllers\StaffTimeOffController;
+use App\Http\Controllers\StaffController;
+use App\Http\Controllers\StaffCredentialController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Staff Management Routes
  *
- * Handles staff profiles, assignments, credentials, availability,
- * and rostering.
+ * Handles staff profiles, assignments, credentials, and availability.
  */
-
 Route::middleware(['auth'])->group(function () {
     // Staff listing
     Route::get('/staff', [StaffController::class, 'index'])
@@ -71,16 +67,4 @@ Route::middleware(['auth'])->group(function () {
             ->name('staff.availability.destroy');
     });
 
-    // Rostering
-    Route::middleware('permission:rostering.viewAny')->group(function () {
-        Route::get('/rostering', [RosteringController::class, 'index'])->name('rostering.index');
-
-        // Time-off/unavailability blocks
-        Route::post('/rostering/time-off', [StaffTimeOffController::class, 'store'])
-            ->middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')
-            ->name('rostering.time_off.store');
-        Route::delete('/rostering/time-off/{staffTimeOff}', [StaffTimeOffController::class, 'destroy'])
-            ->middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')
-            ->name('rostering.time_off.destroy');
-    });
 });

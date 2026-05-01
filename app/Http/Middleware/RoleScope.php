@@ -44,9 +44,7 @@ class RoleScope
             $user->canDo('timesheets.manageAny') ||
             $user->canDo('timesheets.approve') ||
             $user->canDo('rostering.viewAny') ||
-            $user->canDo('hr.analytics.view') ||
-            $user->canDo('hr.time.manage') ||
-            $user->canDo('hr.time.approveTeam');
+            $user->canDo('hr.analytics.view');
 
         if ($hasManagerCap) {
             return $next($request);

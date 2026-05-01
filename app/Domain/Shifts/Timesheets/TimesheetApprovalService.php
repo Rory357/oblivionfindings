@@ -24,19 +24,25 @@ class TimesheetApprovalService
 
     public function submit(Timesheet $timesheet, User $actor): TimesheetWorkflowResult
     {
-        return DB::transaction(function () use ($timesheet, $actor): TimesheetWorkflowResult {
-            $locked = $this->lock($timesheet);
+        try {
+            return DB::transaction(function () use ($timesheet, $actor): TimesheetWorkflowResult {
+                $locked = $this->lock($timesheet);
 
-            $this->assertSubmittable($locked, 'submitted');
-            $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
+                $this->assertSubmittable($locked, 'submitted');
+                $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
 
-            $locked->forceFill($this->submittedFields($actor))->save();
+                $locked->forceFill($this->submittedFields($actor))->save();
 
-            return new TimesheetWorkflowResult(
-                $locked->fresh(['shift.client']) ?? $locked,
-                true,
-            );
-        });
+                return new TimesheetWorkflowResult(
+                    $locked->fresh(['shift.client']) ?? $locked,
+                    true,
+                );
+            });
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
+
+            throw $exception;
+        }
     }
 
     /**
@@ -44,121 +50,145 @@ class TimesheetApprovalService
      */
     public function resubmit(Timesheet $timesheet, User $actor, array $updates): TimesheetWorkflowResult
     {
-        return DB::transaction(function () use ($timesheet, $actor, $updates): TimesheetWorkflowResult {
-            $locked = $this->lock($timesheet);
+        try {
+            return DB::transaction(function () use ($timesheet, $actor, $updates): TimesheetWorkflowResult {
+                $locked = $this->lock($timesheet);
 
-            $this->assertSubmittable($locked, 'resubmitted');
+                $this->assertSubmittable($locked, 'resubmitted');
 
-            $locked->fill($updates);
-            $locked->save();
+                $locked->fill($updates);
+                $locked->save();
 
-            $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
+                $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
 
-            $locked->forceFill($this->submittedFields($actor));
-            $locked->save();
+                $locked->forceFill($this->submittedFields($actor));
+                $locked->save();
 
-            return new TimesheetWorkflowResult(
-                $locked->fresh(['shift.client']) ?? $locked,
-                true,
-            );
-        });
+                return new TimesheetWorkflowResult(
+                    $locked->fresh(['shift.client']) ?? $locked,
+                    true,
+                );
+            });
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
+
+            throw $exception;
+        }
     }
 
     public function approve(Timesheet $timesheet, User $actor, ?string $decisionNotes = null): TimesheetWorkflowResult
     {
-        return DB::transaction(function () use ($timesheet, $actor, $decisionNotes): TimesheetWorkflowResult {
-            $locked = $this->lock($timesheet);
+        try {
+            return DB::transaction(function () use ($timesheet, $actor, $decisionNotes): TimesheetWorkflowResult {
+                $locked = $this->lock($timesheet);
 
-            if ($locked->status === 'approved') {
+                if ($locked->status === 'approved') {
+                    return new TimesheetWorkflowResult(
+                        $locked->fresh(['shift.client']) ?? $locked,
+                        false,
+                    );
+                }
+
+                if ($locked->status !== 'submitted') {
+                    throw ValidationException::withMessages([
+                        'timesheet' => 'Only submitted timesheets can be approved.',
+                    ]);
+                }
+
+                $this->assertApprovalAllowed($locked, $actor);
+
+                $locked->forceFill([
+                    'status' => 'approved',
+                    'approved_by' => $actor->id,
+                    'approved_at' => now(),
+                    'decision_notes' => $decisionNotes,
+                ])->save();
+
+                $this->syncApprovedTimesheet($locked);
+
                 return new TimesheetWorkflowResult(
                     $locked->fresh(['shift.client']) ?? $locked,
-                    false,
+                    true,
                 );
-            }
+            });
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
-            if ($locked->status !== 'submitted') {
-                throw ValidationException::withMessages([
-                    'timesheet' => 'Only submitted timesheets can be approved.',
-                ]);
-            }
-
-            $this->assertApprovalAllowed($locked, $actor);
-
-            $locked->forceFill([
-                'status' => 'approved',
-                'approved_by' => $actor->id,
-                'approved_at' => now(),
-                'decision_notes' => $decisionNotes,
-            ])->save();
-
-            $this->syncApprovedTimesheet($locked);
-
-            return new TimesheetWorkflowResult(
-                $locked->fresh(['shift.client']) ?? $locked,
-                true,
-            );
-        });
+            throw $exception;
+        }
     }
 
     public function returnForChanges(Timesheet $timesheet, User $actor, string $notes): TimesheetWorkflowResult
     {
-        return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
-            $locked = $this->lock($timesheet);
+        try {
+            return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
+                $locked = $this->lock($timesheet);
 
-            if ($locked->status !== 'submitted') {
+                if ($locked->status !== 'submitted') {
+                    return new TimesheetWorkflowResult(
+                        $locked->fresh(['shift.client']) ?? $locked,
+                        false,
+                    );
+                }
+
+                $this->assertNotPayrollLinked($locked, 'returned after export preparation');
+                $this->reconciliation->assertWorkflowAllowed($locked, 'returned');
+
+                $locked->forceFill([
+                    'status' => 'returned',
+                    'returned_by' => $actor->id,
+                    'returned_at' => now(),
+                    'returned_notes' => $notes,
+                    'approved_by' => null,
+                    'approved_at' => null,
+                    'decision_notes' => null,
+                ])->save();
+
                 return new TimesheetWorkflowResult(
                     $locked->fresh(['shift.client']) ?? $locked,
-                    false,
+                    true,
                 );
-            }
+            });
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
-            $this->assertNotPayrollLinked($locked, 'returned after export preparation');
-            $this->reconciliation->assertWorkflowAllowed($locked, 'returned');
-
-            $locked->forceFill([
-                'status' => 'returned',
-                'returned_by' => $actor->id,
-                'returned_at' => now(),
-                'returned_notes' => $notes,
-                'approved_by' => null,
-                'approved_at' => null,
-                'decision_notes' => null,
-            ])->save();
-
-            return new TimesheetWorkflowResult(
-                $locked->fresh(['shift.client']) ?? $locked,
-                true,
-            );
-        });
+            throw $exception;
+        }
     }
 
     public function reject(Timesheet $timesheet, User $actor, string $notes): TimesheetWorkflowResult
     {
-        return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
-            $locked = $this->lock($timesheet);
+        try {
+            return DB::transaction(function () use ($timesheet, $actor, $notes): TimesheetWorkflowResult {
+                $locked = $this->lock($timesheet);
 
-            if ($locked->status !== 'submitted') {
+                if ($locked->status !== 'submitted') {
+                    return new TimesheetWorkflowResult(
+                        $locked->fresh(['shift.client']) ?? $locked,
+                        false,
+                    );
+                }
+
+                $this->assertNotPayrollLinked($locked, 'rejected after export preparation');
+                $this->reconciliation->assertWorkflowAllowed($locked, 'rejected');
+
+                $locked->forceFill([
+                    'status' => 'rejected',
+                    'approved_by' => $actor->id,
+                    'approved_at' => now(),
+                    'decision_notes' => $notes,
+                ])->save();
+
                 return new TimesheetWorkflowResult(
                     $locked->fresh(['shift.client']) ?? $locked,
-                    false,
+                    true,
                 );
-            }
+            });
+        } catch (ValidationException $exception) {
+            $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
-            $this->assertNotPayrollLinked($locked, 'rejected after export preparation');
-            $this->reconciliation->assertWorkflowAllowed($locked, 'rejected');
-
-            $locked->forceFill([
-                'status' => 'rejected',
-                'approved_by' => $actor->id,
-                'approved_at' => now(),
-                'decision_notes' => $notes,
-            ])->save();
-
-            return new TimesheetWorkflowResult(
-                $locked->fresh(['shift.client']) ?? $locked,
-                true,
-            );
-        });
+            throw $exception;
+        }
     }
 
     /**
@@ -346,5 +376,20 @@ class TimesheetApprovalService
 
         $this->hrSync->syncToHr($freshTimesheet);
         $this->billing->generateFromTimesheet($freshTimesheet);
+    }
+
+    protected function persistReconciliationBlockAfterRollback(Timesheet $timesheet, ValidationException $exception): void
+    {
+        $messages = collect($exception->errors())->flatten()->implode(' ');
+
+        if (! str_contains($messages, 'reconciliation found blocking issues')) {
+            return;
+        }
+
+        $freshTimesheet = $timesheet->fresh();
+
+        if ($freshTimesheet) {
+            $this->reconciliation->reconcile($freshTimesheet);
+        }
     }
 }

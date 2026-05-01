@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrAnnouncement;
-use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrKudos;
-use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicy;
@@ -23,6 +21,8 @@ use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -431,7 +431,7 @@ class MyHrController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Performance Reviews                                                */
+    /*  Performance Reviews */
     /* ------------------------------------------------------------------ */
 
     public function reviews(Request $request)
@@ -498,7 +498,7 @@ class MyHrController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Development Goals                                                  */
+    /*  Development Goals */
     /* ------------------------------------------------------------------ */
 
     public function goals(Request $request)
@@ -564,7 +564,7 @@ class MyHrController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Engagement Surveys                                                 */
+    /*  Engagement Surveys */
     /* ------------------------------------------------------------------ */
 
     public function surveys(Request $request)
@@ -577,7 +577,7 @@ class MyHrController extends Controller
             ->with('questions')
             ->get()
             ->map(function (HrEngagementSurvey $survey) use ($user) {
-                $respondentHash = hash_hmac('sha256', $survey->id . ':' . $user->id, (string) config('app.key'));
+                $respondentHash = hash_hmac('sha256', $survey->id.':'.$user->id, (string) config('app.key'));
 
                 $hasResponded = $survey->responses()
                     ->where(function ($query) use ($survey, $user, $respondentHash) {
@@ -635,7 +635,7 @@ class MyHrController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Timekeeping (Self-Service)                                         */
+    /*  Timekeeping (Self-Service) */
     /* ------------------------------------------------------------------ */
 
     public function time(Request $request)
@@ -685,10 +685,10 @@ class MyHrController extends Controller
                     'expected_break_minutes' => $entry->shift->expected_break_minutes,
                     'location' => $entry->shift->location,
                     'service_context_name' => $entry->shift->serviceContext?->name,
-                    'client_name' => trim(($entry->shift->client?->first_name ?? '') . ' ' . ($entry->shift->client?->last_name ?? '')),
+                    'client_name' => trim(($entry->shift->client?->first_name ?? '').' '.($entry->shift->client?->last_name ?? '')),
                 ] : null,
                 'client_name' => $entry->client
-                    ? trim(($entry->client->first_name ?? '') . ' ' . ($entry->client->last_name ?? ''))
+                    ? trim(($entry->client->first_name ?? '').' '.($entry->client->last_name ?? ''))
                     : null,
             ]);
 
@@ -712,7 +712,7 @@ class MyHrController extends Controller
                 'is_sleepover' => (bool) $shift->is_sleepover,
                 'is_on_call' => (bool) $shift->is_on_call,
                 'expected_break_minutes' => $shift->expected_break_minutes,
-                'client_name' => trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? '')),
+                'client_name' => trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? '')),
                 'location' => $shift->location,
                 'service_context_name' => $shift->serviceContext?->name,
                 'status' => $shift->status,
@@ -733,7 +733,7 @@ class MyHrController extends Controller
                     'expected_break_minutes' => $activeClock->shift->expected_break_minutes,
                     'location' => $activeClock->shift->location,
                     'service_context_name' => $activeClock->shift->serviceContext?->name,
-                    'client_name' => trim(($activeClock->shift->client?->first_name ?? '') . ' ' . ($activeClock->shift->client?->last_name ?? '')),
+                    'client_name' => trim(($activeClock->shift->client?->first_name ?? '').' '.($activeClock->shift->client?->last_name ?? '')),
                 ] : null,
             ] : null,
             'todayEntries' => $todayEntries,
@@ -745,6 +745,7 @@ class MyHrController extends Controller
     public function clockIn(Request $request)
     {
         $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
@@ -753,6 +754,7 @@ class MyHrController extends Controller
 
         try {
             $session = $this->attendanceService->clockIn($user, [
+                'tenant_id' => $tenantId,
                 'shift_id' => $validated['shift_id'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'source' => 'self_service',
@@ -760,7 +762,7 @@ class MyHrController extends Controller
 
             // Create corresponding HrTimeEntry
             HrTimeEntry::create([
-                'tenant_id' => $user->tenant_id,
+                'tenant_id' => $tenantId,
                 'user_id' => $user->id,
                 'shift_id' => $session->shift_id,
                 'attendance_session_id' => $session->id,
@@ -837,6 +839,7 @@ class MyHrController extends Controller
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
     }
+
     public function documents(Request $request)
     {
         $user = $request->user();
@@ -882,7 +885,7 @@ class MyHrController extends Controller
 
         abort_unless($profile, 404);
         abort_unless($document->employee_profile_id === $profile->id, 403);
-        abort_unless(!$document->is_restricted, 403, 'This document is restricted.');
+        abort_unless(! $document->is_restricted, 403, 'This document is restricted.');
 
         abort_unless(
             Storage::disk($document->storage_disk)->exists($document->storage_path),

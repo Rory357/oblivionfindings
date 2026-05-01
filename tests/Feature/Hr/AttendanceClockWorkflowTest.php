@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -96,6 +97,46 @@ test('staff cannot start a second open attendance session', function () {
         ->post('/attendance/clock-in')
         ->assertSessionHasErrors(['clock_in']);
 });
+
+test('clock-in endpoints share the single open attendance session guard', function (string $initialEndpoint) {
+    $hrTimePermission = Permission::query()->where('key', 'hr.time.viewAny')->firstOrFail();
+    $this->staff->permissionOverrides()->syncWithoutDetaching([
+        $hrTimePermission->id => ['allowed' => true],
+    ]);
+
+    $endpoints = [
+        'attendance' => '/attendance/clock-in',
+        'hr_self_service' => '/hr/my/time/clock-in',
+        'hr_time' => '/hr/time/clock-in',
+    ];
+
+    $this->actingAs($this->staff)
+        ->post($endpoints[$initialEndpoint])
+        ->assertSessionHas('success');
+
+    foreach ($endpoints as $name => $endpoint) {
+        if ($name === $initialEndpoint) {
+            continue;
+        }
+
+        $response = $this->actingAs($this->staff)->post($endpoint);
+
+        if ($name === 'attendance') {
+            $response->assertSessionHasErrors(['clock_in']);
+        } else {
+            $response->assertSessionHas('error');
+        }
+    }
+
+    expect(HrAttendanceSession::query()
+        ->where('user_id', $this->staff->id)
+        ->open()
+        ->count())->toBe(1);
+})->with([
+    'attendance',
+    'hr_self_service',
+    'hr_time',
+]);
 
 test('clock out reuses an existing draft timesheet for the same shift and staff member', function () {
     $serviceContext = ServiceContext::factory()->create();

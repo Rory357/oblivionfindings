@@ -130,7 +130,7 @@ Adjacent non-operations shift routes remain intentionally separate today:
 
 | Method | URI | Name | Controller | Permission / scope |
 | --- | --- | --- | --- | --- |
-| GET | `/operations/timesheets` | `operations.timesheets.index` | `TimesheetController@index` | `timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny` |
+| GET | `/operations/timesheets` | `operations.timesheets.index` | `TimesheetController@index` | `timesheets.viewAny|timesheets.viewAssigned` |
 | GET | `/operations/timesheets/approvals` | `operations.timesheets.approvals` | `TimesheetController@approvals` | `role_scope:my-day`, review permissions |
 | GET | `/operations/timesheets/payroll-adjustments` | `operations.timesheets.payrollAdjustments` | `TimesheetController@payrollAdjustmentsPending` | `role_scope:my-day`, review permissions |
 | POST | `/operations/timesheets/amendments/{amendment}/mark-processed` | `operations.timesheets.markPayrollProcessed` | `TimesheetController@markPayrollAdjustmentProcessed` | `role_scope:my-day`, review permissions |
@@ -139,16 +139,16 @@ Adjacent non-operations shift routes remain intentionally separate today:
 | POST | `/operations/timesheets/bulk-reject` | `operations.timesheets.bulkReject` | `TimesheetController@bulkReject` | `role_scope:my-day`, review permissions |
 | GET | `/operations/timesheets/create` | `operations.timesheets.create` | `TimesheetController@create` | `timesheets.create` |
 | POST | `/operations/timesheets` | `operations.timesheets.store` | `TimesheetController@store` | `timesheets.create` |
-| GET | `/operations/timesheets/{timesheet}` | `operations.timesheets.show` | `TimesheetController@show` | `timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny` |
-| GET | `/operations/timesheets/{timesheet}/edit` | `operations.timesheets.edit` | `TimesheetController@edit` | `timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny` |
+| GET | `/operations/timesheets/{timesheet}` | `operations.timesheets.show` | `TimesheetController@show` | `timesheets.viewAny|timesheets.viewAssigned` |
+| GET | `/operations/timesheets/{timesheet}/edit` | `operations.timesheets.edit` | `TimesheetController@edit` | `timesheets.viewAny|timesheets.viewAssigned` |
 | PUT | `/operations/timesheets/{timesheet}` | `operations.timesheets.update` | `TimesheetController@update` | `timesheets.update` |
 | POST | `/operations/timesheets/{timesheet}/submit` | `operations.timesheets.submit` | `TimesheetController@submit` | `timesheets.submit|timesheets.manageAny` |
 | POST | `/operations/timesheets/{timesheet}/resubmit` | `operations.timesheets.resubmit` | `TimesheetController@resubmit` | `timesheets.update|timesheets.manageAny` |
-| POST | `/operations/timesheets/{timesheet}/approve` | `operations.timesheets.approve` | `TimesheetController@approve` | `timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam` |
-| POST | `/operations/timesheets/{timesheet}/reject` | `operations.timesheets.reject` | `TimesheetController@reject` | `timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam` |
-| POST | `/operations/timesheets/{timesheet}/return` | `operations.timesheets.return` | `TimesheetController@returnForChanges` | `timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam` |
+| POST | `/operations/timesheets/{timesheet}/approve` | `operations.timesheets.approve` | `TimesheetController@approve` | `timesheets.approve|timesheets.manageAny` |
+| POST | `/operations/timesheets/{timesheet}/reject` | `operations.timesheets.reject` | `TimesheetController@reject` | `timesheets.approve|timesheets.manageAny` |
+| POST | `/operations/timesheets/{timesheet}/return` | `operations.timesheets.return` | `TimesheetController@returnForChanges` | `timesheets.approve|timesheets.manageAny` |
 
-`review permissions` means `timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam`.
+`review permissions` means `timesheets.approve|timesheets.manageAny`. Legacy `hr.time.*` keys are policy-layer aliases only.
 
 ## Removed Legacy Timesheet Route Inventory
 
@@ -210,7 +210,7 @@ Legacy Timesheet route names have been removed. The GET URLs remain only as unna
 | POST | `/hr/time/timesheets/bulk-reject` | `hr.time.timesheets.bulk-reject` | `Hr\TimeTrackingController@bulkRejectTimesheets` | `HrTimesheetApprovalService::bulkReject()`. |
 | POST | `/hr/time/timesheets/bulk-return` | `hr.time.timesheets.bulk-return` | `Hr\TimeTrackingController@bulkReturnTimesheets` | `HrTimesheetApprovalService::bulkReturn()`. |
 
-The HR time routes are permission-scoped under `hr.time.viewAny`, with management actions under `hr.time.manage|hr.time.approveTeam`. Team approval actions are additionally scoped in the controller before calling the service.
+The HR time routes keep their `hr.time.*` route names, but permissions are canonical `timesheets.*`. Legacy `hr.time.*` permission keys are policy-layer aliases only. Team approval actions are additionally scoped in the controller before calling the service.
 
 ## Control Room Shift Route Inventory
 

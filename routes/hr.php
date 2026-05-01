@@ -18,7 +18,6 @@ use App\Http\Controllers\Hr\CustomFieldController;
 use App\Http\Controllers\Hr\DepartmentController;
 use App\Http\Controllers\Hr\DevelopmentGoalController;
 use App\Http\Controllers\Hr\DirectoryController;
-use App\Http\Controllers\Hr\TrainingController;
 use App\Http\Controllers\Hr\DisciplinaryController;
 use App\Http\Controllers\Hr\DriverEligibilityController;
 use App\Http\Controllers\Hr\EmployeeProfileController;
@@ -62,6 +61,7 @@ use App\Http\Controllers\Hr\SupervisionController;
 use App\Http\Controllers\Hr\SurveyController;
 use App\Http\Controllers\Hr\TimeOffCalendarController;
 use App\Http\Controllers\Hr\TimeTrackingController;
+use App\Http\Controllers\Hr\TrainingController;
 use App\Http\Controllers\Hr\TrainingDashboardController;
 use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\WebhookController;
@@ -954,7 +954,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Time Tracking
     |--------------------------------------------------------------------------
     */
-    Route::prefix('time')->name('time.')->middleware('permission:hr.time.viewAny')->group(function () {
+    Route::prefix('time')->name('time.')->middleware('permission:timesheets.viewAny')->group(function () {
         Route::get('/', [TimeTrackingController::class, 'index'])->name('index');
         Route::post('/clock-in', [TimeTrackingController::class, 'clockIn'])->name('clock-in');
         Route::post('/clock-out', [TimeTrackingController::class, 'clockOut'])->name('clock-out');
@@ -965,7 +965,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/timesheets/{timesheet}/submit', [TimeTrackingController::class, 'submitTimesheet'])->name('timesheets.submit');
 
         // Manager / Team Leader actions
-        Route::middleware('permission:hr.time.manage|hr.time.approveTeam')->group(function () {
+        Route::middleware('permission:timesheets.manageAny|timesheets.approve')->group(function () {
             Route::post('/timesheets/{timesheet}/approve', [TimeTrackingController::class, 'approveTimesheet'])->name('timesheets.approve');
             Route::post('/timesheets/{timesheet}/reject', [TimeTrackingController::class, 'rejectTimesheet'])->name('timesheets.reject');
             Route::post('/timesheets/{timesheet}/return', [TimeTrackingController::class, 'returnTimesheet'])->name('timesheets.return');

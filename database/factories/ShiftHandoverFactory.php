@@ -19,7 +19,11 @@ class ShiftHandoverFactory extends Factory
         $incomingStaff = User::factory();
 
         return [
-            'organization_id' => null,
+            // Default to organization 1 to match `User::getOrganizationIdAttribute`,
+            // which returns 1 when the user has no `organization_id` attribute. The
+            // handover controllers scope queries by the auth user's organization_id,
+            // so a null factory default left handovers invisible to test users.
+            'organization_id' => 1,
             'outgoing_shift_id' => Shift::factory(),
             'incoming_shift_id' => Shift::factory(),
             'client_id' => Client::factory(),

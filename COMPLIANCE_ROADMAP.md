@@ -98,31 +98,32 @@ This document outlines the systematic implementation plan for enhancing the appl
 **Components to Build**:
 - ✅ Database schema:
   - `staff_background_checks` table (type, status, verified_at, expires_at, reference)
-  - `training_courses` table (name, category, validity_period, mandatory)
-  - `staff_training_records` table (completed_at, expires_at, certificate_path, score)
-  - `staff_competency_assessments` table (assessor, assessment_date, outcome, next_review)
+  - `hr_courses` table (name, category, validity_period, mandatory)
+  - `hr_course_enrollments` table (completed_at, expires_at, certificate_path, score)
+  - `hr_competency_frameworks` / `hr_competency_assessments` tables (assessor, assessment_date, outcome, next_review)
   - `staff_inductions` table (start_date, completed_date, checklist_data)
 
 - ✅ Models:
   - `StaffBackgroundCheck` (DBS/police check, reference check, employment history)
-  - `TrainingCourse` (course catalog)
-  - `StaffTrainingRecord` (completion tracking)
-  - `StaffCompetencyAssessment` (competency framework)
+  - `HrCourse` (course catalog)
+  - `HrCourseEnrollment` (completion tracking)
+  - `HrCompetencyFramework` / `HrCompetencyAssessment` (competency framework)
   - `StaffInduction` (onboarding tracking)
 
 - ✅ Controllers:
-  - `StaffBackgroundCheckController`
-  - `TrainingCourseController`
-  - `StaffTrainingRecordController`
-  - `StaffCompetencyAssessmentController`
-  - `StaffInductionController`
+  - `Staff\StaffBackgroundCheckController`
+  - `Hr\TrainingController` (canonical training catalog and enrolments)
+  - `Training\CompetencyFrameworkController`
+  - `Training\StaffInductionController`
 
 - ✅ Permissions:
-  - `staff.vetting.view` - View background checks
-  - `staff.vetting.manage` - Manage background checks
-  - `staff.training.viewAny` - View all training records
-  - `staff.training.manage` - Manage training
-  - `staff.competency.assess` - Conduct competency assessments
+  - `hr.vetting.view` - View background checks (canonical; `vetting.viewAny` is a policy alias)
+  - `hr.vetting.manage` - Manage background checks (canonical; `vetting.manage|verify|assessRisk` are aliases)
+  - `hr.training.view` / `training.viewAny` - View training catalog and matrix
+  - `hr.training.manage` / `training.manageCourses` - Manage training courses
+  - `training.enrol` - Enrol staff in training
+  - `training.record` - Record completion of training and induction milestones
+  - `competency.viewAny` / `competency.manage` - Competency frameworks
   - `staff.induction.manage` - Manage induction process
 
 - ✅ Frontend Pages:

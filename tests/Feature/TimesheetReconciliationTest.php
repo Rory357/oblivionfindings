@@ -110,10 +110,12 @@ class TimesheetReconciliationTest extends TestCase
             'created_by' => $this->staff->id,
         ]);
 
-        $this->from("/timesheets/{$timesheet->id}/edit")
+        $editUrl = route('operations.timesheets.edit', $timesheet);
+
+        $this->from($editUrl)
             ->actingAs($this->staff)
-            ->post("/timesheets/{$timesheet->id}/submit")
-            ->assertRedirect("/timesheets/{$timesheet->id}/edit")
+            ->post(route('operations.timesheets.submit', $timesheet))
+            ->assertRedirect($editUrl)
             ->assertSessionHasErrors(['timesheet']);
 
         $timesheet->refresh();
@@ -152,10 +154,12 @@ class TimesheetReconciliationTest extends TestCase
             'created_by' => $this->staff->id,
         ]);
 
-        $this->from("/timesheets/{$timesheet->id}/edit")
+        $editUrl = route('operations.timesheets.edit', $timesheet);
+
+        $this->from($editUrl)
             ->actingAs($this->staff)
-            ->post("/timesheets/{$timesheet->id}/submit")
-            ->assertRedirect("/timesheets/{$timesheet->id}/edit")
+            ->post(route('operations.timesheets.submit', $timesheet))
+            ->assertRedirect($editUrl)
             ->assertSessionHasErrors(['timesheet']);
 
         $timesheet->refresh();
@@ -197,10 +201,12 @@ class TimesheetReconciliationTest extends TestCase
 
         app(TimesheetReconciliationService::class)->reconcile($timesheet->fresh(), $attendance->fresh());
 
-        $this->from("/timesheets/{$timesheet->id}/edit")
+        $editUrl = route('operations.timesheets.edit', $timesheet);
+
+        $this->from($editUrl)
             ->actingAs($this->admin)
-            ->post("/timesheets/{$timesheet->id}/approve")
-            ->assertRedirect("/timesheets/{$timesheet->id}/edit")
+            ->post(route('operations.timesheets.approve', $timesheet))
+            ->assertRedirect($editUrl)
             ->assertSessionHasErrors(['timesheet']);
 
         $timesheet->refresh();
@@ -271,6 +277,8 @@ class TimesheetReconciliationTest extends TestCase
             ->post('/attendance/clock-out', [
                 'session_id' => $session->id,
                 'break_minutes' => 0,
+                'force' => true,
+                'override_reason' => 'Reconciliation sync regression test.',
             ])
             ->assertSessionHas('success');
 

@@ -120,7 +120,7 @@ class HrApiController extends Controller
     public function timeEntries(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user?->canDo('hr.time.viewAny'), 403);
+        abort_unless($user?->canDo('timesheets.viewAny'), 403);
 
         $entries = HrTimeEntry::forTenant($user->tenant_id)
             ->with(['user:id,name,email'])

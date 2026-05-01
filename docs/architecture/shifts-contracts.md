@@ -62,9 +62,9 @@ Operations scheduler routes that are not intended for frontline staff must keep 
 
 ## 10. Permission Strings Are Stable
 
-Permission keys must be reused, not renamed, during consolidation:
+Permission keys must be reused, not renamed, during consolidation. `timesheets.*` is canonical for timesheet access; legacy `hr.time.*` keys remain policy-layer aliases only:
 
-`shifts.viewAny`, `shifts.viewAssigned`, `shifts.create`, `shifts.update`, `shifts.delete`, `shifts.manageAny`, `shifts.tasks.updateSelf`, `timesheets.viewAny`, `timesheets.viewAssigned`, `timesheets.create`, `timesheets.update`, `timesheets.submit`, `timesheets.approve`, `timesheets.manageAny`, `rostering.viewAny`, `rostering.autoSchedule`, `roster_templates.*`, `handovers.*`, `hr.time.viewAny`, `hr.time.manage`, `hr.time.approveTeam`, `controlRoom.*`, `incidents.create`.
+`shifts.viewAny`, `shifts.viewAssigned`, `shifts.create`, `shifts.update`, `shifts.delete`, `shifts.manageAny`, `shifts.tasks.updateSelf`, `timesheets.viewAny`, `timesheets.viewAssigned`, `timesheets.create`, `timesheets.update`, `timesheets.submit`, `timesheets.approve`, `timesheets.manageAny`, `rostering.viewAny`, `rostering.autoSchedule`, `roster_templates.*`, `handovers.*`, `controlRoom.*`, `incidents.create`.
 
 ## Related Immutable Data Rule
 

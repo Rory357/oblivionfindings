@@ -9,8 +9,8 @@ class ClockOnBehalfRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->canDo('hr.time.manage')
-            || $this->user()?->canDo('hr.time.approveTeam');
+        return $this->user()?->canDo('timesheets.manageAny')
+            || $this->user()?->canDo('timesheets.approve');
     }
 
     public function rules(): array

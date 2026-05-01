@@ -32,22 +32,28 @@ class AttendanceService
      */
     public function clockIn(User $user, array $data = []): HrAttendanceSession
     {
-        $openSession = HrAttendanceSession::query()
-            ->where('user_id', $user->id)
-            ->open()
-            ->first();
-
-        if ($openSession) {
-            throw new \LogicException('You are already clocked in. Please clock out before starting another session.');
-        }
-
         $clockInAt = isset($data['clock_in_at']) ? Carbon::parse($data['clock_in_at']) : now();
         $shift = $this->resolveShift($user, $data, $clockInAt);
         $siteId = $data['site_id'] ?? $shift?->site_id ?? $shift?->client?->site_id;
 
         $session = DB::transaction(function () use ($user, $data, $clockInAt, $shift, $siteId) {
+            User::query()
+                ->whereKey($user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $openSession = HrAttendanceSession::query()
+                ->where('user_id', $user->id)
+                ->open()
+                ->lockForUpdate()
+                ->first();
+
+            if ($openSession) {
+                throw new \LogicException('You are already clocked in. Please clock out before starting another session.');
+            }
+
             $session = HrAttendanceSession::create([
-                'tenant_id' => $user->tenant_id ?? null,
+                'tenant_id' => $data['tenant_id'] ?? $user->tenant_id ?? $user->organization_id ?? null,
                 'user_id' => $user->id,
                 'shift_id' => $shift?->id,
                 'site_id' => $siteId,

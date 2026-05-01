@@ -324,16 +324,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/staff/{user}/availability', [StaffAvailabilityController::class, 'store'])->name('staff.availability.store');
     Route::delete('/staff/{user}/availability/{availability}', [StaffAvailabilityController::class, 'destroy'])->name('staff.availability.destroy');
 
-    Route::middleware('permission:rostering.viewAny')->group(function () {
-        Route::get('/rostering', [\App\Http\Controllers\RosteringController::class, 'index'])->name('rostering.index');
-        // One-off leave/unavailability blocks shown in roster planning
-        Route::post('/rostering/time-off', [\App\Http\Controllers\StaffTimeOffController::class, 'store'])
-            ->middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')
-            ->name('rostering.time_off.store');
-        Route::delete('/rostering/time-off/{staffTimeOff}', [\App\Http\Controllers\StaffTimeOffController::class, 'destroy'])
-            ->middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')
-            ->name('rostering.time_off.destroy');
-    });
+    // Rostering is canonical under /operations/rostering.
 
     Route::middleware('permission:fleet.viewAny')->group(function () {
         Route::get('/fleet-management', fn() => inertia('fleet-management/index'))->name('fleet.index');

@@ -19,10 +19,10 @@ class SeedHrPermissionsSeeder extends Seeder
             'hr.positions.view' => 'View positions/jobs',
             'hr.positions.manage' => 'Create and edit positions',
 
-            // Time Tracking
-            'hr.time.viewAny' => 'View the HR time dashboard and time entries',
-            'hr.time.manage' => 'Manage all HR time entries and timesheets',
-            'hr.time.approveTeam' => 'Approve or return team HR timesheets',
+            // Time Tracking legacy aliases; canonical permissions are timesheets.*.
+            'hr.time.viewAny' => 'Legacy alias for timesheets.viewAny',
+            'hr.time.manage' => 'Legacy alias for timesheets.manageAny',
+            'hr.time.approveTeam' => 'Legacy alias for timesheets.approve',
 
             // Compensation
             'hr.compensation.view' => 'View compensation data',

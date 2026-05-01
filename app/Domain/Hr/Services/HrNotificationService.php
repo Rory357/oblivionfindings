@@ -229,8 +229,8 @@ class HrNotificationService
         $timesheet->loadMissing('user');
 
         $approvers = $this->getUsersWithPermission([
-            'hr.time.manage',
-            'hr.time.approveTeam',
+            'timesheets.manageAny',
+            'timesheets.approve',
         ], $timesheet->tenant_id);
 
         foreach ($approvers as $approver) {

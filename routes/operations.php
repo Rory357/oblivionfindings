@@ -59,6 +59,7 @@ use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
+use App\Http\Controllers\StaffTimeOffController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\TimesheetController;
@@ -587,6 +588,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:rostering.autoSchedule')
         ->name('operations.rostering.auto_schedule');
 
+    // Time-off/unavailability blocks shown on the rostering board.
+    Route::middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')->group(function () {
+        Route::post('/rostering/time-off', [StaffTimeOffController::class, 'store'])
+            ->name('operations.rostering.time_off.store');
+        Route::delete('/rostering/time-off/{staffTimeOff}', [StaffTimeOffController::class, 'destroy'])
+            ->name('operations.rostering.time_off.destroy');
+    });
+
     Route::middleware('permission:rostering.publish')->group(function () {
         Route::get('/rostering/periods/{period}/review', [RosteringController::class, 'viewPublishReview'])
             ->name('operations.rostering.periods.review.show');
@@ -630,14 +639,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     Route::get('/timesheets', [TimesheetController::class, 'index'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('operations.timesheets.index');
 
     // Manager/Admin approval queue
     // PR 18 — role_scope redirects frontline staff to `/my-day` (their own
     // timesheet list stays on `operations.timesheets.index`, which is not
     // gated here because workers legitimately review their own sheets).
-    Route::middleware(['role_scope:my-day', 'permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam'])->group(function () {
+    Route::middleware(['role_scope:my-day', 'permission:timesheets.approve|timesheets.manageAny'])->group(function () {
         Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])->name('operations.timesheets.approvals');
         Route::get('/timesheets/payroll-adjustments', [TimesheetController::class, 'payrollAdjustmentsPending'])->name('operations.timesheets.payrollAdjustments');
         Route::post('/timesheets/amendments/{amendment}/mark-processed', [TimesheetController::class, 'markPayrollAdjustmentProcessed'])->name('operations.timesheets.markPayrollProcessed');
@@ -656,10 +665,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // Timesheet viewing and editing
     Route::get('/timesheets/{timesheet}', [TimesheetController::class, 'show'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('operations.timesheets.show');
     Route::get('/timesheets/{timesheet}/edit', [TimesheetController::class, 'edit'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('operations.timesheets.edit');
     Route::put('/timesheets/{timesheet}', [TimesheetController::class, 'update'])
         ->middleware('permission:timesheets.update')
@@ -676,13 +685,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:timesheets.update|timesheets.manageAny')
         ->name('operations.timesheets.resubmit');
     Route::post('/timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
         ->name('operations.timesheets.approve');
     Route::post('/timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
         ->name('operations.timesheets.reject');
     Route::post('/timesheets/{timesheet}/return', [TimesheetController::class, 'returnForChanges'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
         ->name('operations.timesheets.return');
 
     // -------------------------------------------------------------------------

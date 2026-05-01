@@ -90,14 +90,17 @@ Route::get('/smart-monitoring', function () {
 
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store']);
-// Career Portal — Job Postings based
-Route::get('/careers', [App\Http\Controllers\CareerPortalController::class, 'index'])->name('careers.index');
+// Career Portal — public surface lives on the requisition-backed Careers
+// controller; legacy posting-backed routes (`show`, `applicationStatus`) stay
+// on the original controller until the HrJobPosting → HrJobRequisition
+// migration is complete.
+Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.index');
 Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->name('careers.application.status');
 Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->name('careers.offer.show');
 Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->name('careers.offer.respond');
+Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
+Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
 Route::get('/careers/{slug}', [App\Http\Controllers\CareerPortalController::class, 'show'])->name('careers.show');
-Route::get('/careers/{slug}/apply', [App\Http\Controllers\CareerPortalController::class, 'apply'])->name('careers.apply');
-Route::post('/careers/{slug}/apply', [App\Http\Controllers\CareerPortalController::class, 'storeApplication'])->name('careers.apply.store');
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {

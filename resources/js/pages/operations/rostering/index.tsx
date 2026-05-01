@@ -31,7 +31,7 @@ import { index as rosteringIndex } from '@/routes/operations/rostering';
 import {
     destroy as destroyTimeOff,
     store as storeTimeOff,
-} from '@/routes/rostering/time_off';
+} from '@/routes/operations/rostering/time_off';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -645,7 +645,9 @@ export default function RosteringIndex(props: Props) {
             const payload = (await response.json()) as {
                 token?: string | null;
             };
-            router.visit(buildCoverageCreateHref(alert, options, payload.token));
+            router.visit(
+                buildCoverageCreateHref(alert, options, payload.token),
+            );
         } catch {
             router.reload({
                 only: ['coverageAlerts', 'coverageSites'],

@@ -24,7 +24,7 @@ export default function Register() {
         >
             <Head title={t('app.auth.register.head', 'Register')} />
             <Form
-                {...store.form()}
+                action={store()}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
                 className="flex flex-col gap-6"

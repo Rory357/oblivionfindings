@@ -10,7 +10,7 @@ use Tests\TestCase;
 class LegacyShiftNamesRemovedTest extends TestCase
 {
     #[DataProvider('legacyRouteNames')]
-    public function test_legacy_shift_and_timesheet_route_names_are_removed(string $legacyName): void
+    public function test_legacy_shift_timesheet_and_rostering_route_names_are_removed(string $legacyName): void
     {
         $this->assertNull(
             Route::getRoutes()->getByName($legacyName),
@@ -64,7 +64,7 @@ class LegacyShiftNamesRemovedTest extends TestCase
         );
     }
 
-    public function test_legacy_shift_file_only_keeps_redirects_and_attendance_routes(): void
+    public function test_legacy_shift_file_only_keeps_redirects_rostering_bridge_and_attendance_routes(): void
     {
         $legacyRedirectUris = [
             // GET-only deep-link redirects
@@ -96,6 +96,8 @@ class LegacyShiftNamesRemovedTest extends TestCase
             'timesheets/bulk-approve',
             'timesheets/bulk-return',
             'timesheets/bulk-reject',
+            'rostering/time-off',
+            'rostering/time-off/{staffTimeOff}',
         ];
 
         $routes = collect(Route::getRoutes())->filter(function ($route) use ($legacyRedirectUris) {
@@ -117,7 +119,7 @@ class LegacyShiftNamesRemovedTest extends TestCase
 
         $this->assertTrue(
             $unexpectedLegacyMounts->isEmpty(),
-            'Legacy /shifts or /timesheets routes must only exist as unnamed LegacyRouteRedirectController mounts: '
+            'Legacy /shifts, /timesheets, or rostering write routes must only exist as unnamed LegacyRouteRedirectController mounts: '
             .$unexpectedLegacyMounts->map(fn ($route) => implode('|', $route->methods()).' '.$route->uri().' ['.($route->getName() ?? 'unnamed').' → '.$route->getActionName().']')->join(', ')
         );
     }
@@ -156,6 +158,9 @@ class LegacyShiftNamesRemovedTest extends TestCase
             ['timesheets.bulkApprove'],
             ['timesheets.bulkReturn'],
             ['timesheets.bulkReject'],
+            ['rostering.index'],
+            ['rostering.time_off.store'],
+            ['rostering.time_off.destroy'],
         ];
     }
 
@@ -193,6 +198,9 @@ class LegacyShiftNamesRemovedTest extends TestCase
             ['operations.timesheets.bulkApprove'],
             ['operations.timesheets.bulkReturn'],
             ['operations.timesheets.bulkReject'],
+            ['operations.rostering.index'],
+            ['operations.rostering.time_off.store'],
+            ['operations.rostering.time_off.destroy'],
         ];
     }
 
@@ -221,6 +229,8 @@ class LegacyShiftNamesRemovedTest extends TestCase
             ['POST', 'timesheets/bulk-approve', 'operations.timesheets.bulkApprove'],
             ['POST', 'timesheets/bulk-return', 'operations.timesheets.bulkReturn'],
             ['POST', 'timesheets/bulk-reject', 'operations.timesheets.bulkReject'],
+            ['POST', 'rostering/time-off', 'operations.rostering.time_off.store'],
+            ['DELETE', 'rostering/time-off/{staffTimeOff}', 'operations.rostering.time_off.destroy'],
         ];
     }
 }

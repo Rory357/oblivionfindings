@@ -40,5 +40,5 @@ HR period timekeeping remains under `hr.time.*`, but the HR page links to the op
 ## Intentional Exceptions
 
 - `resources/js/routes/shifts/clinical/*` still points at `/shifts/{shift}/clinical/*`. Those clinical endpoints are outside the duplicated operations migration map and should be treated separately.
-- Staff time-off writes use `@/routes/rostering/time_off` (`/rostering/time-off`) because those endpoints are currently registered by `routes/staff.php`, not `routes/operations.php`.
+- Staff time-off writes use `@/routes/operations/rostering/time_off` (`/operations/rostering/time-off`). Legacy `/rostering/time-off` writes are 308 redirects only.
 - Deprecated page files under `resources/js/pages/shifts`, `resources/js/pages/timesheets`, and `resources/js/pages/rostering` are reference-only. Active controllers render the `operations/*` pages above.

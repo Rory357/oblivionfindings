@@ -113,7 +113,7 @@ export default function TwoFactor({
 
                                 {/* Disable button */}
                                 <div className="pt-2">
-                                    <Form {...disable.form()}>
+                                    <Form action={disable()}>
                                         {({ processing }) => (
                                             <Button
                                                 variant="destructive"
@@ -152,7 +152,7 @@ export default function TwoFactor({
                                     </Button>
                                 ) : (
                                     <Form
-                                        {...enable.form()}
+                                        action={enable()}
                                         onSuccess={() =>
                                             setShowSetupModal(true)
                                         }
