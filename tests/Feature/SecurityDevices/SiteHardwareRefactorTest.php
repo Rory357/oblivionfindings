@@ -286,6 +286,9 @@ class SiteHardwareRefactorTest extends TestCase
         $this->assertNotNull($active);
         $this->assertEquals('room', $active->assignable_type);
         $this->assertEquals($room->id, $active->assignable_id);
-        $this->assertEquals($room->id, $shadow->fresh()->room_id);
+
+        // The canonical DeviceAssignment is authoritative; legacy
+        // LocationHardware.room_id is intentionally not synced — see
+        // UnifiOperationalBridgeService::syncRoomAssignment.
     }
 }

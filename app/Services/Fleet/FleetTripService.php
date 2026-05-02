@@ -67,14 +67,20 @@ class FleetTripService
             }
 
             if ($event->occurred_at && $openTrip->started_at) {
-                $openTrip->duration_s = max(
-                    0,
-                    $event->occurred_at->diffInSeconds($openTrip->started_at)
+                // Pass `true` so Carbon 3 returns absolute seconds; the column
+                // is unsigned and would overflow on a negative diff.
+                $openTrip->duration_s = (int) $openTrip->started_at->diffInSeconds(
+                    $event->occurred_at,
+                    true,
                 );
             }
 
             if ($stopped && $state->last_moving_at instanceof Carbon) {
-                if ($state->last_moving_at->diffInMinutes($event->occurred_at) >= $stopAfterMinutes) {
+                $idleMinutes = (int) $state->last_moving_at->diffInMinutes(
+                    $event->occurred_at,
+                    true,
+                );
+                if ($idleMinutes >= $stopAfterMinutes) {
                     $openTrip->update([
                         'ended_at' => $event->occurred_at,
                         'end_latitude' => $event->latitude,
@@ -164,9 +170,9 @@ class FleetTripService
             }
 
             if ($event->occurred_at && $currentSegment->started_at) {
-                $currentSegment->duration_s = max(
-                    0,
-                    $event->occurred_at->diffInSeconds($currentSegment->started_at)
+                $currentSegment->duration_s = (int) $currentSegment->started_at->diffInSeconds(
+                    $event->occurred_at,
+                    true,
                 );
             }
 
@@ -179,10 +185,13 @@ class FleetTripService
                 $lastMovingAt = $previousEvent->occurred_at;
             }
 
-            if ($event->occurred_at->diffInMinutes($lastMovingAt) >= $idleAfterMinutes) {
+            if (abs((int) $event->occurred_at->diffInMinutes($lastMovingAt, true)) >= $idleAfterMinutes) {
                 $currentSegment->update([
                     'ended_at' => $event->occurred_at,
-                    'duration_s' => $event->occurred_at->diffInSeconds($currentSegment->started_at),
+                    'duration_s' => (int) $currentSegment->started_at->diffInSeconds(
+                        $event->occurred_at,
+                        true,
+                    ),
                 ]);
             }
         }
@@ -199,7 +208,10 @@ class FleetTripService
         if ($segment && $event->occurred_at) {
             $segment->update([
                 'ended_at' => $event->occurred_at,
-                'duration_s' => $event->occurred_at->diffInSeconds($segment->started_at),
+                'duration_s' => (int) $segment->started_at->diffInSeconds(
+                    $event->occurred_at,
+                    true,
+                ),
             ]);
         }
     }

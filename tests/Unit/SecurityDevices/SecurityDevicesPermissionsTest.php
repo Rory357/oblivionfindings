@@ -48,7 +48,9 @@ class SecurityDevicesPermissionsTest extends TestCase
     public function test_all_permission_keys_are_created(): void
     {
         foreach (self::ALL_KEYS as $key) {
-            $this->assertDatabaseHas('permissions', ['key' => $key], "Permission '{$key}' missing.");
+            // Third arg is the connection name in modern Laravel; just rely on
+            // the default assertion failure message instead.
+            $this->assertDatabaseHas('permissions', ['key' => $key]);
         }
     }
 

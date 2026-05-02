@@ -310,7 +310,10 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     });
 });
 
-// Redirects from old URLs
-Route::middleware(['auth'])->group(function () {
-    Route::redirect('/fleet-management', '/fleet-assets');
-});
+// NOTE: a `/fleet-management → /fleet-assets` redirect lived here previously
+// but was removed because it shadowed the legacy fleet dashboard route in
+// `routes/fleet.php` (which still owns `FleetDashboardController` and the
+// `fleet-management/index` Inertia page). Consolidation is tracked under
+// `docs/fleet-assets-security-devices-production-readiness-plan.md` PR FA6;
+// when the legacy dashboard is retired, reinstate the redirect or delete the
+// route + page together.

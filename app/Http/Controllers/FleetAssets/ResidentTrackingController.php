@@ -308,9 +308,22 @@ class ResidentTrackingController extends Controller
         $data = $request->validate([
             'tracker_id' => ['required', 'integer', 'exists:devices,id'],
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            // Optional: an explicit consent record gathered alongside the
+            // assign form. When omitted we look up any existing valid Fleet
+            // Tracking consent for the client. The service still rejects
+            // client+tracking assignments with no resolvable consent.
+            'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
         ]);
 
         $device = Device::findOrFail($data['tracker_id']);
+
+        $consentId = $data['consent_id']
+            ?? \App\Models\ClientConsent::query()
+                ->where('client_id', $data['client_id'])
+                ->where('status', 'given')
+                ->whereNull('withdrawn_at')
+                ->latest('given_at')
+                ->value('id');
 
         try {
             $this->assignmentService->assign(
@@ -318,6 +331,7 @@ class ResidentTrackingController extends Controller
                 assignableType: 'client',
                 assignableId: $data['client_id'],
                 assignedByUserId: $request->user()->id,
+                consentId: $consentId,
             );
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['tracker_id' => $e->getMessage()]);

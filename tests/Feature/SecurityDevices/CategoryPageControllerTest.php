@@ -8,6 +8,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CategoryPageControllerTest extends TestCase
@@ -32,17 +33,13 @@ class CategoryPageControllerTest extends TestCase
 
     // ── Authentication & Authorization ────────────────────────────
 
-    /**
-     * @dataProvider categoryRouteProvider
-     */
+    #[DataProvider('categoryRouteProvider')]
     public function test_category_page_requires_authentication(string $route): void
     {
         $this->get($route)->assertRedirect('/login');
     }
 
-    /**
-     * @dataProvider categoryRouteProvider
-     */
+    #[DataProvider('categoryRouteProvider')]
     public function test_category_page_requires_permission(string $route): void
     {
         $this->actingAs($this->noPerms)
@@ -50,9 +47,7 @@ class CategoryPageControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    /**
-     * @dataProvider categoryRouteProvider
-     */
+    #[DataProvider('categoryRouteProvider')]
     public function test_category_page_accessible_with_permission(string $route): void
     {
         $this->actingAs($this->admin)
@@ -75,9 +70,7 @@ class CategoryPageControllerTest extends TestCase
 
     // ── Correct Inertia component ─────────────────────────────────
 
-    /**
-     * @dataProvider categoryRouteProvider
-     */
+    #[DataProvider('categoryRouteProvider')]
     public function test_category_page_renders_correct_component(string $route): void
     {
         $this->actingAs($this->admin)

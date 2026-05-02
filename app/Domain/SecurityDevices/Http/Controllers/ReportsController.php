@@ -40,7 +40,9 @@ class ReportsController extends Controller
                 ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
                 ->count(),
             'events_90d' => DeviceEvent::query()
-                ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+                // device_events has no tenant_id column; scope through the
+                // canonical Device row, which does.
+                ->whereHas('device', fn ($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q)
                 ->where('occurred_at', '>=', now()->subDays(self::EVENTS_WINDOW_DAYS))
                 ->count(),
             'maintenance' => DeviceMaintenanceRecord::query()
@@ -127,9 +129,10 @@ class ReportsController extends Controller
         ];
 
         $query = DeviceEvent::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+            // device_events has no tenant_id column; scope through device.
+            ->whereHas('device', fn ($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q)
             ->where('occurred_at', '>=', $since)
-            ->with(['device:id,name'])
+            ->with(['device:id,name,tenant_id'])
             ->orderBy('occurred_at', 'desc');
 
         return $this->streamCsv($filename, $columns, $query->cursor(), function (DeviceEvent $e) {

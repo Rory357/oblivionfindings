@@ -168,7 +168,7 @@ class UnifiSettingsRefactorTest extends TestCase
         });
     }
 
-    public function test_room_assignment_updates_canonical_device_assignment_and_legacy_shadow(): void
+    public function test_room_assignment_updates_canonical_device_assignment(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Main Office']);
         $room = SiteRoom::create([
@@ -213,10 +213,14 @@ class UnifiSettingsRefactorTest extends TestCase
         $this->assertNotNull($active);
         $this->assertEquals('room', $active->assignable_type);
         $this->assertEquals($room->id, $active->assignable_id);
-        $this->assertEquals($room->id, $shadow->fresh()->room_id);
+
+        // Phase 1 (PR P) explicitly disabled the LocationHardware shadow
+        // placement sync — DeviceAssignment is the authoritative source.
+        // See UnifiOperationalBridgeService::syncRoomAssignment for the
+        // rationale; the shadow row is retained only for provenance.
     }
 
-    public function test_clearing_room_restores_site_assignment_and_clears_legacy_shadow_room(): void
+    public function test_clearing_room_restores_site_assignment(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Branch Office']);
         $room = SiteRoom::create([
@@ -262,7 +266,9 @@ class UnifiSettingsRefactorTest extends TestCase
         $this->assertNotNull($active);
         $this->assertEquals('site', $active->assignable_type);
         $this->assertEquals($site->id, $active->assignable_id);
-        $this->assertNull($shadow->fresh()->room_id);
+
+        // See note above — shadow LocationHardware.room_id is intentionally
+        // not cleared; the canonical DeviceAssignment carries the truth.
     }
 
     // ── Canonical fields present ──────────────────────────────────

@@ -9,6 +9,7 @@ use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
+use Database\Seeders\SecurityDevicesSignalSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,6 +29,16 @@ use Tests\TestCase;
 class DeviceEventSignalPipelineTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The schema dump (database/schema/mysql-schema.sql) records the
+        // PR H seed migrations as run but does not preserve their inserted
+        // rows. Seed them explicitly so the pipeline assertions hold.
+        $this->seed(SecurityDevicesSignalSeeder::class);
+    }
 
     public function test_signal_types_and_source_are_seeded(): void
     {

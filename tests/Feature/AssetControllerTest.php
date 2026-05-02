@@ -354,8 +354,10 @@ class AssetControllerTest extends TestCase
                 ->has('inspections')
                 ->has('maintenance')
                 ->has('documents')
-                ->has('trackers')
-                ->has('alerts')
+                // The legacy `alerts` prop was renamed to `archived_alerts`
+                // when ControlRoomAlert became the canonical operational alert
+                // surface — see AssetAlertArchiveTest for the contract.
+                ->has('archived_alerts')
                 ->has('scan_events')
                 ->has('geofences')
                 ->has('can')

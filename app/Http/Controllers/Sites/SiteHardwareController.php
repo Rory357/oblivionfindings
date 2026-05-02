@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Sites;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
+use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Integration\UnifiOperationalBridgeService;
@@ -67,6 +68,25 @@ class SiteHardwareController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        // UniFi context for the site — surfaced as a separate prop so the
+        // front-end can show "UniFi connected / N devices / last synced at"
+        // independently of the canonical device list. Always present (even
+        // when no UniFi site config exists) so callers don't have to guard.
+        $unifiConfig = IntegrationSiteConfig::query()
+            ->where('site_id', $site->id)
+            ->where('provider', 'unifi')
+            ->first();
+
+        $unifiDevices = $devices->filter(fn (array $d) => $d['provider'] === 'unifi')->values();
+
+        $unifi = [
+            'is_configured' => $unifiConfig !== null,
+            'mapped_external_site_id' => $unifiConfig?->mapped_external_site_id,
+            'mapped_external_site_name' => $unifiConfig?->mapped_external_site_name,
+            'status' => $unifiConfig?->status,
+            'device_count' => $unifiDevices->count(),
+        ];
+
         return inertia('sites/hardware/index', [
             'site' => [
                 'id' => $site->id,
@@ -75,6 +95,7 @@ class SiteHardwareController extends Controller
             ],
             'devices' => $devices,
             'rooms' => $rooms,
+            'unifi' => $unifi,
             'can' => [
                 'manage_hardware' => $user?->canDo('siteHardware.manage') ?? false,
             ],

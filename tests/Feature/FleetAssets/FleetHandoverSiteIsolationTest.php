@@ -108,10 +108,14 @@ class FleetHandoverSiteIsolationTest extends TestCase
     public function test_user_cannot_view_fleet_handover_from_another_site(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['fleet.viewAny']);
+        $stranger = User::factory()->create();
 
+        // The user must NOT be a handover participant — HandoverController
+        // intentionally allows participants to read handovers regardless of
+        // site (see test_home_site_id_grants_access_when_site_id_is_null).
         $foreignHandover = FleetShiftHandover::create([
             'asset_id' => $this->vehicleB->id,
-            'outgoing_user_id' => $user->id,
+            'outgoing_user_id' => $stranger->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
@@ -127,10 +131,12 @@ class FleetHandoverSiteIsolationTest extends TestCase
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['fleet.viewAny', 'assets.viewAny']);
 
+        // Same rationale as above: keep the requesting user out of both
+        // outgoing/incoming columns so the site scope is what gates access.
         $foreignHandover = FleetShiftHandover::create([
             'asset_id' => $this->vehicleB->id,
             'outgoing_user_id' => User::factory()->create()->id,
-            'incoming_user_id' => $user->id,
+            'incoming_user_id' => User::factory()->create()->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',

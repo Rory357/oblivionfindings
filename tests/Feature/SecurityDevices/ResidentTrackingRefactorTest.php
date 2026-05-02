@@ -5,6 +5,9 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -134,6 +137,12 @@ class ResidentTrackingRefactorTest extends TestCase
     {
         $device = Device::factory()->tracking()->create();
 
+        // The DeviceAssignmentService rejects client + tracking assignments
+        // that have no consent record (NZ privacy). The controller resolves
+        // any active Fleet Tracking consent for the client when one isn't
+        // passed explicitly — seed one to exercise that resolution path.
+        $consent = $this->createFleetTrackingConsent($this->clientA);
+
         $response = $this->actingAs($this->admin)
             ->post('/fleet-assets/resident-tracking/assign', [
                 'tracker_id' => $device->id,
@@ -146,7 +155,48 @@ class ResidentTrackingRefactorTest extends TestCase
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
+            'consent_id' => $consent->id,
         ]);
+    }
+
+    private function createFleetTrackingConsent(Client $client, array $overrides = []): ClientConsent
+    {
+        $type = ConsentType::firstOrCreate(
+            ['name' => 'Fleet Tracking'],
+            [
+                'category' => 'operational',
+                'description' => 'Vehicle / tracker GPS consent',
+                'purpose' => 'Tracker location collection',
+                'legal_basis' => 'consent',
+                'is_mandatory' => false,
+                'requires_capacity_assessment' => false,
+                'allows_withdrawal' => true,
+                'renewal_required' => false,
+                'active' => true,
+            ],
+        );
+
+        $version = ConsentTypeVersion::firstOrCreate(
+            ['consent_type_id' => $type->id, 'version' => 1],
+            [
+                'description' => 'Fleet tracking v1',
+                'purpose' => 'Tracker location collection',
+                'legal_basis' => 'consent',
+                'effective_from' => now()->subDay(),
+            ],
+        );
+
+        return ClientConsent::create(array_merge([
+            'client_id' => $client->id,
+            'consent_type_id' => $type->id,
+            'consent_type_version_id' => $version->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'given_by_user_id' => $this->admin->id,
+            'given_method' => 'electronic',
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ], $overrides));
     }
 
     // ── Unassign: releases canonical device assignment ─────────────

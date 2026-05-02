@@ -108,7 +108,9 @@ class MaintenanceHealthControllerTest extends TestCase
 
         $response->assertInertia(fn ($page) => $page
             ->where('stats.overdue', 1)
-            ->where('stats.upcoming', 2) // both within 14 days (overdue one still has status=scheduled)
+            // `scopeUpcoming` is "scheduled, in the future, within N days" — the
+            // overdue record falls under `scopeOverdue`, not `scopeUpcoming`.
+            ->where('stats.upcoming', 1)
             ->where('stats.offline', 1)
             ->where('stats.lowBattery', 1)
         );

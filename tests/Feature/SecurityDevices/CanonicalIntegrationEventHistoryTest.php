@@ -37,10 +37,10 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
 
         $this->portalUser = User::factory()->create();
         $this->site = Site::factory()->create();
+        // Note: `clients` has no tenant_id column — use `organization_id`.
         $this->client = Client::factory()->create([
             'status' => 'active',
             'site_id' => $this->site->id,
-            'tenant_id' => 1,
         ]);
 
         $this->portalUser->portalClients()->attach($this->client->id, [

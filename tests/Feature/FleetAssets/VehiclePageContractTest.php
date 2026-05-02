@@ -4,7 +4,6 @@ namespace Tests\Feature\FleetAssets;
 
 use App\Models\Asset;
 use App\Models\Permission;
-use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,15 +18,12 @@ class VehiclePageContractTest extends TestCase
     {
         $this->seed(\Database\Seeders\RbacSeeder::class);
 
+        // Intentionally no role attachment: the admin role is synced with the
+        // full permission catalog by RbacSeeder, which would mask the per-test
+        // permission overrides we set below.
         $user = User::factory()->create([
-            'role' => 'admin',
             'approved_at' => now(),
         ]);
-
-        $adminRole = Role::query()->where('name', 'admin')->first();
-        if ($adminRole) {
-            $user->roles()->syncWithoutDetaching([$adminRole->id]);
-        }
 
         foreach ($permissionKeys as $permissionKey) {
             $permission = Permission::query()->firstOrCreate(

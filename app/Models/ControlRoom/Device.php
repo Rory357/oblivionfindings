@@ -56,6 +56,11 @@ class Device extends Model
         'battery_level',
         'battery_updated_at',
         'low_battery_alert_sent',
+        // Bridge FK to the canonical Security & Devices registry (PR3).
+        // Mass-assigned by the migration command and consumed by the
+        // canonicalDevice() relationship plus the CR device controller's
+        // canonical-enrichment payload.
+        'canonical_device_id',
     ];
 
     protected $casts = [
