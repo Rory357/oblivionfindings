@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DataSubjectRequest;
 use App\Models\DataBreachLog;
 use App\Models\DataRetentionPolicy;
+use App\Models\DataSubjectRequest;
 use App\Models\LegalHold;
 use App\Models\PrivacyImpactAssessment;
 use Illuminate\Http\Request;
@@ -13,8 +13,10 @@ use Inertia\Response;
 
 class PrivacyDashboardController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        abort_unless($request->user()?->canDo('privacy.viewRequests'), 403);
+
         // Data Subject Requests stats
         $dsrStats = [
             'total' => DataSubjectRequest::count(),

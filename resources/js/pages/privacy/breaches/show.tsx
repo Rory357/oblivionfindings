@@ -1,9 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, Clock, CheckCircle, User, Calendar, Shield } from 'lucide-react';
+import {
+    AlertTriangle,
+    Calendar,
+    CheckCircle,
+    Clock,
+    Shield,
+    User,
+} from 'lucide-react';
 
 type Props = {
     breach: any;
@@ -49,59 +56,92 @@ export default function ShowDataBreach({ breach }: Props) {
     const hoursFromDiscovery = () => {
         const discovered = new Date(breach.discovered_at);
         const now = new Date();
-        return Math.floor((now.getTime() - discovered.getTime()) / (1000 * 60 * 60));
+        return Math.floor(
+            (now.getTime() - discovered.getTime()) / (1000 * 60 * 60),
+        );
     };
 
     const hours = hoursFromDiscovery();
-    const icoDeadlineApproaching = breach.requires_authority_notification && !breach.authority_notified_at && hours < 72;
-    const icoDeadlinePassed = breach.requires_authority_notification && !breach.authority_notified_at && hours >= 72;
+    const icoDeadlineApproaching =
+        breach.requires_authority_notification &&
+        !breach.authority_notified_at &&
+        hours < 72;
+    const icoDeadlinePassed =
+        breach.requires_authority_notification &&
+        !breach.authority_notified_at &&
+        hours >= 72;
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
-            { title: 'Data Breaches', href: '/privacy/breaches' },
-            { title: breach.breach_reference, href: `/privacy/breaches/${breach.id}` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+                { title: 'Data Breaches', href: '/privacy/breaches' },
+                {
+                    title: breach.breach_reference,
+                    href: `/privacy/breaches/${breach.id}`,
+                },
+            ]}
+        >
             <Head title={`Breach ${breach.breach_reference}`} />
 
-            <div className="space-y-4">
+            <div className="space-y-4" data-test="privacy-breach-show">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
+                        <h1 className="flex items-center gap-2 text-lg font-semibold">
                             <AlertTriangle className="h-5 w-5 text-status-critical" />
                             {breach.breach_reference}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={getStatusColor(breach.status)}>
+                            <Badge
+                                className={getStatusColor(breach.status)}
+                                data-test="privacy-breach-status"
+                            >
                                 {statusLabels[breach.status] ?? breach.status}
                             </Badge>
                             {icoDeadlinePassed && (
-                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-critical/30 bg-status-critical-bg text-status-critical"
+                                >
                                     <AlertTriangle className="mr-1 h-3 w-3" />
-                                    ICO deadline exceeded ({hours}h since discovery)
+                                    ICO deadline exceeded ({hours}h since
+                                    discovery)
                                 </Badge>
                             )}
                             {icoDeadlineApproaching && (
-                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                    data-test="privacy-breach-ico-countdown"
+                                >
                                     <Clock className="mr-1 h-3 w-3" />
                                     {72 - hours}h until ICO deadline
                                 </Badge>
                             )}
                             {breach.authority_notified_at && (
-                                <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-success/30 bg-status-success-bg text-status-success"
+                                >
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     ICO Notified
                                 </Badge>
                             )}
                             {breach.subjects_notified_at && (
-                                <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
+                                <Badge
+                                    variant="outline"
+                                    className="border-status-info/30 bg-status-info-bg text-status-info"
+                                >
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Subjects Notified
                                 </Badge>
                             )}
                         </div>
                     </div>
-                    <Link href="/privacy/breaches" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                    <Link
+                        href="/privacy/breaches"
+                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                    >
                         Back to List
                     </Link>
                 </div>
@@ -116,35 +156,63 @@ export default function ShowDataBreach({ breach }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <span className="text-xs text-muted-foreground">Discovered</span>
-                                <p className="font-medium">{formatDate(breach.discovered_at)}</p>
+                                <span className="text-xs text-muted-foreground">
+                                    Discovered
+                                </span>
+                                <p className="font-medium">
+                                    {formatDate(breach.discovered_at)}
+                                </p>
                             </div>
                             {breach.discovered_by && (
                                 <div>
-                                    <span className="text-xs text-muted-foreground">Discovered By</span>
-                                    <p className="font-medium">{breach.discovered_by.name}</p>
+                                    <span className="text-xs text-muted-foreground">
+                                        Discovered By
+                                    </span>
+                                    <p className="font-medium">
+                                        {breach.discovered_by.name}
+                                    </p>
                                 </div>
                             )}
                             {breach.authority_notified_at && (
                                 <div>
-                                    <span className="text-xs text-muted-foreground">ICO Notified</span>
-                                    <p className="font-medium">{formatDate(breach.authority_notified_at)}</p>
+                                    <span className="text-xs text-muted-foreground">
+                                        ICO Notified
+                                    </span>
+                                    <p className="font-medium">
+                                        {formatDate(
+                                            breach.authority_notified_at,
+                                        )}
+                                    </p>
                                     {breach.authority_reference && (
-                                        <p className="text-xs text-muted-foreground">Ref: {breach.authority_reference}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Ref: {breach.authority_reference}
+                                        </p>
                                     )}
                                 </div>
                             )}
                             {breach.subjects_notified_at && (
                                 <div>
-                                    <span className="text-xs text-muted-foreground">Subjects Notified</span>
-                                    <p className="font-medium">{formatDate(breach.subjects_notified_at)}</p>
-                                    <p className="text-xs text-muted-foreground">Method: {breach.notification_method}</p>
+                                    <span className="text-xs text-muted-foreground">
+                                        Subjects Notified
+                                    </span>
+                                    <p className="font-medium">
+                                        {formatDate(
+                                            breach.subjects_notified_at,
+                                        )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Method: {breach.notification_method}
+                                    </p>
                                 </div>
                             )}
                             {breach.resolved_at && (
                                 <div>
-                                    <span className="text-xs text-muted-foreground">Resolved</span>
-                                    <p className="font-medium">{formatDate(breach.resolved_at)}</p>
+                                    <span className="text-xs text-muted-foreground">
+                                        Resolved
+                                    </span>
+                                    <p className="font-medium">
+                                        {formatDate(breach.resolved_at)}
+                                    </p>
                                 </div>
                             )}
                         </CardContent>
@@ -159,7 +227,9 @@ export default function ShowDataBreach({ breach }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <span className="text-xs text-muted-foreground">Individuals Affected</span>
+                                <span className="text-xs text-muted-foreground">
+                                    Individuals Affected
+                                </span>
                                 <p className="font-medium">
                                     {breach.approximate_individuals_affected
                                         ? `~${breach.approximate_individuals_affected.toLocaleString()}`
@@ -167,12 +237,24 @@ export default function ShowDataBreach({ breach }: Props) {
                                 </p>
                             </div>
                             <div>
-                                <span className="text-xs text-muted-foreground">ICO Notification Required</span>
-                                <p className="font-medium">{breach.requires_authority_notification ? 'Yes' : 'No'}</p>
+                                <span className="text-xs text-muted-foreground">
+                                    ICO Notification Required
+                                </span>
+                                <p className="font-medium">
+                                    {breach.requires_authority_notification
+                                        ? 'Yes'
+                                        : 'No'}
+                                </p>
                             </div>
                             <div>
-                                <span className="text-xs text-muted-foreground">Subject Notification Required</span>
-                                <p className="font-medium">{breach.requires_subject_notification ? 'Yes' : 'No'}</p>
+                                <span className="text-xs text-muted-foreground">
+                                    Subject Notification Required
+                                </span>
+                                <p className="font-medium">
+                                    {breach.requires_subject_notification
+                                        ? 'Yes'
+                                        : 'No'}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -187,31 +269,39 @@ export default function ShowDataBreach({ breach }: Props) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div>
-                            <span className="text-xs text-muted-foreground">Nature of Breach</span>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
+                            <span className="text-xs text-muted-foreground">
+                                Nature of Breach
+                            </span>
+                            <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
                                 {breach.nature_of_breach}
                             </p>
                         </div>
                         {breach.likely_consequences && (
                             <div>
-                                <span className="text-xs text-muted-foreground">Likely Consequences</span>
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                    Likely Consequences
+                                </span>
+                                <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
                                     {breach.likely_consequences}
                                 </p>
                             </div>
                         )}
                         {breach.measures_taken && (
                             <div>
-                                <span className="text-xs text-muted-foreground">Measures Taken</span>
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                    Measures Taken
+                                </span>
+                                <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
                                     {breach.measures_taken}
                                 </p>
                             </div>
                         )}
                         {breach.resolution_notes && (
                             <div>
-                                <span className="text-xs text-muted-foreground">Resolution Notes</span>
-                                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                    Resolution Notes
+                                </span>
+                                <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
                                     {breach.resolution_notes}
                                 </p>
                             </div>
@@ -225,44 +315,66 @@ export default function ShowDataBreach({ breach }: Props) {
                             <CardTitle className="text-base">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
-                            {breach.requires_authority_notification && !breach.authority_notified_at && (
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => {
-                                        const reference = prompt('Enter ICO reference number (if available):');
-                                        router.post(`/privacy/breaches/${breach.id}/notify-ico`, {
-                                            authority_reference: reference || '',
-                                        });
-                                    }}
-                                >
-                                    Record ICO Notification
-                                </Button>
-                            )}
-                            {breach.requires_subject_notification && !breach.subjects_notified_at && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        const method = prompt('Enter notification method (e.g., email, letter):');
-                                        if (method) {
-                                            router.post(`/privacy/breaches/${breach.id}/notify-subjects`, {
-                                                notification_method: method,
-                                            });
-                                        }
-                                    }}
-                                >
-                                    Record Subject Notification
-                                </Button>
-                            )}
+                            {breach.requires_authority_notification &&
+                                !breach.authority_notified_at && (
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        data-test="privacy-breach-notify-ico"
+                                        onClick={() => {
+                                            const reference = prompt(
+                                                'Enter ICO reference number (if available):',
+                                            );
+                                            router.post(
+                                                `/privacy/breaches/${breach.id}/notify-ico`,
+                                                {
+                                                    authority_reference:
+                                                        reference || '',
+                                                },
+                                            );
+                                        }}
+                                    >
+                                        Record ICO Notification
+                                    </Button>
+                                )}
+                            {breach.requires_subject_notification &&
+                                !breach.subjects_notified_at && (
+                                    <Button
+                                        size="sm"
+                                        data-test="privacy-breach-notify-subjects"
+                                        onClick={() => {
+                                            const method = prompt(
+                                                'Enter notification method (e.g., email, letter):',
+                                            );
+                                            if (method) {
+                                                router.post(
+                                                    `/privacy/breaches/${breach.id}/notify-subjects`,
+                                                    {
+                                                        notification_method:
+                                                            method,
+                                                    },
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        Record Subject Notification
+                                    </Button>
+                                )}
                             <Button
                                 size="sm"
                                 variant="outline"
+                                data-test="privacy-breach-resolve"
                                 onClick={() => {
-                                    const notes = prompt('Enter resolution notes:');
+                                    const notes = prompt(
+                                        'Enter resolution notes:',
+                                    );
                                     if (notes) {
-                                        router.post(`/privacy/breaches/${breach.id}/resolve`, {
-                                            resolution_notes: notes,
-                                        });
+                                        router.post(
+                                            `/privacy/breaches/${breach.id}/resolve`,
+                                            {
+                                                resolution_notes: notes,
+                                            },
+                                        );
                                     }
                                 }}
                             >

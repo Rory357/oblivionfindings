@@ -17,6 +17,8 @@ class DataSubjectRequestController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorizePermission($request, 'privacy.viewRequests');
+
         $query = DataSubjectRequest::query()
             ->with(['assignedTo', 'client', 'user']);
 
@@ -61,8 +63,10 @@ class DataSubjectRequestController extends Controller
     /**
      * Show the form for creating a new request.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         return Inertia::render('privacy/requests/create', [
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
@@ -73,6 +77,8 @@ class DataSubjectRequestController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         $validated = $request->validate([
             'request_type' => 'required|in:access,rectification,erasure,restriction,portability,objection,automated_decision',
             'subject_name' => 'required|string|max:255',
@@ -89,14 +95,16 @@ class DataSubjectRequestController extends Controller
 
         return redirect()
             ->route('privacy.requests.show', $dsr)
-            ->with('success', 'Data subject request created with reference: ' . $dsr->reference_number);
+            ->with('success', 'Data subject request created with reference: '.$dsr->reference_number);
     }
 
     /**
      * Display the specified request.
      */
-    public function show(DataSubjectRequest $dsRequest): Response
+    public function show(Request $request, DataSubjectRequest $dsRequest): Response
     {
+        $this->authorizePermission($request, 'privacy.viewRequests');
+
         $dsRequest->load([
             'client',
             'user',
@@ -116,6 +124,8 @@ class DataSubjectRequestController extends Controller
      */
     public function update(Request $request, DataSubjectRequest $dsRequest): RedirectResponse
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         $validated = $request->validate([
             'status' => 'sometimes|in:received,under_review,identity_verification,in_progress,completed,rejected,withdrawn',
             'assigned_to_user_id' => 'nullable|exists:users,id',
@@ -124,7 +134,7 @@ class DataSubjectRequestController extends Controller
 
         $validated['updated_by'] = auth()->id();
 
-        if (isset($validated['assigned_to_user_id']) && !$dsRequest->assigned_at) {
+        if (isset($validated['assigned_to_user_id']) && ! $dsRequest->assigned_at) {
             $validated['assigned_at'] = now();
         }
 
@@ -138,6 +148,8 @@ class DataSubjectRequestController extends Controller
      */
     public function verifyIdentity(Request $request, DataSubjectRequest $dsRequest): RedirectResponse
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         $request->validate([
             'verification_method' => 'required|string|max:255',
         ]);
@@ -159,6 +171,8 @@ class DataSubjectRequestController extends Controller
      */
     public function extend(Request $request, DataSubjectRequest $dsRequest): RedirectResponse
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         $request->validate([
             'extension_reason' => 'required|string',
             'extended_due_date' => 'required|date|after:today',
@@ -179,6 +193,8 @@ class DataSubjectRequestController extends Controller
      */
     public function complete(Request $request, DataSubjectRequest $dsRequest): RedirectResponse
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         $request->validate([
             'completion_notes' => 'nullable|string',
         ]);
@@ -199,6 +215,8 @@ class DataSubjectRequestController extends Controller
      */
     public function refuse(Request $request, DataSubjectRequest $dsRequest): RedirectResponse
     {
+        $this->authorizePermission($request, 'privacy.processRequests');
+
         $request->validate([
             'rejection_reason' => 'required|string',
             'rejection_legal_basis' => 'required|string',
@@ -217,8 +235,10 @@ class DataSubjectRequestController extends Controller
     /**
      * Export the request data.
      */
-    public function export(DataSubjectRequest $dsRequest)
+    public function export(Request $request, DataSubjectRequest $dsRequest)
     {
+        $this->authorizePermission($request, 'privacy.viewRequests');
+
         $dsRequest->load(['client', 'user']);
 
         $data = [
@@ -235,7 +255,7 @@ class DataSubjectRequestController extends Controller
             $client = $dsRequest->client;
 
             $data['personal_information'] = [
-                'name' => $client->first_name . ' ' . $client->last_name,
+                'name' => $client->first_name.' '.$client->last_name,
                 'preferred_name' => $client->preferred_name,
                 'date_of_birth' => $client->date_of_birth?->format('Y-m-d'),
                 'gender' => $client->gender,
@@ -335,8 +355,8 @@ class DataSubjectRequestController extends Controller
             'due_date' => $dsRequest->due_date?->format('Y-m-d'),
         ];
 
-        $filename = 'dsr-' . $dsRequest->reference_number . '-' . now()->format('Y-m-d') . '.json';
-        $path = 'private/dsr-exports/' . $filename;
+        $filename = 'dsr-'.$dsRequest->reference_number.'-'.now()->format('Y-m-d').'.json';
+        $path = 'private/dsr-exports/'.$filename;
         Storage::disk('local')->put($path, json_encode($data, JSON_PRETTY_PRINT));
 
         $dsRequest->update([
@@ -345,5 +365,10 @@ class DataSubjectRequestController extends Controller
         ]);
 
         return back()->with('success', 'Data export generated successfully.');
+    }
+
+    private function authorizePermission(Request $request, string $permission): void
+    {
+        abort_unless($request->user()?->canDo($permission), 403);
     }
 }

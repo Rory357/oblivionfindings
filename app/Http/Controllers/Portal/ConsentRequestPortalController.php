@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ConsentRequest;
 use App\Services\ConsentRequestService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Family-portal side of the consent-request workflow.
@@ -68,6 +69,7 @@ class ConsentRequestPortalController extends Controller
     public function approve(Request $request, Client $client, ConsentRequest $consentRequest)
     {
         $this->authoriseRespondent($request, $client, $consentRequest);
+        abort_unless($consentRequest->isActionable(), 409);
 
         $data = $request->validate([
             'response_notes' => ['nullable', 'string', 'max:2000'],
@@ -89,6 +91,7 @@ class ConsentRequestPortalController extends Controller
     public function decline(Request $request, Client $client, ConsentRequest $consentRequest)
     {
         $this->authoriseRespondent($request, $client, $consentRequest);
+        abort_unless($consentRequest->isActionable(), 409);
 
         $data = $request->validate([
             'response_notes' => ['required', 'string', 'min:5', 'max:2000'],
@@ -111,7 +114,6 @@ class ConsentRequestPortalController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($consentRequest->client_id === $client->id, 404);
-        abort_unless($user->canAccessClientPortal($client), 403);
-        abort_unless($consentRequest->recipient_user_id === $user->id, 403);
+        Gate::forUser($user)->authorize('respond', $consentRequest);
     }
 }

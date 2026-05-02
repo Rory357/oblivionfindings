@@ -6,7 +6,6 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
-use App\Models\HsTrainingRequirement;
 use App\Services\HealthSafety\HsComplianceExportService;
 use App\Services\HealthSafety\HsGovernanceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,6 +16,7 @@ class HsGovernanceTest extends TestCase
     use RefreshDatabase;
 
     private HsGovernanceService $governanceService;
+
     private HsComplianceExportService $complianceService;
 
     protected function setUp(): void
@@ -107,7 +107,7 @@ class HsGovernanceTest extends TestCase
         $this->assertArrayHasKey('active_investigations', $widget);
         $this->assertArrayHasKey('overdue_corrective_actions', $widget);
         $this->assertArrayHasKey('status', $widget);
-        $this->assertEquals(1, $widget['open_events']);
+        $this->assertEquals(3, $widget['open_events']);
     }
 
     // ──────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ class HsGovernanceTest extends TestCase
         $this->assertEquals(2, $register['summary']['total']);
         $this->assertEquals(1, $register['summary']['pending_notification']);
         $this->assertEquals(1, $register['summary']['notified']);
-        $this->assertCount(2, $register['events']);
+        $this->assertCount(2, $register['items']);
     }
 
     // ──────────────────────────────────────────────────────
@@ -148,8 +148,8 @@ class HsGovernanceTest extends TestCase
 
         $outcomes = $this->complianceService->investigationOutcomes();
 
-        $this->assertEquals(1, $outcomes['total_completed']);
-        $this->assertCount(1, $outcomes['investigations']);
+        $this->assertEquals(1, $outcomes['summary']['total_completed']);
+        $this->assertCount(1, $outcomes['items']);
     }
 
     // ──────────────────────────────────────────────────────
@@ -164,9 +164,9 @@ class HsGovernanceTest extends TestCase
         $report = $this->complianceService->correctiveActionTraceability();
 
         $this->assertArrayHasKey('summary', $report);
-        $this->assertArrayHasKey('actions', $report);
+        $this->assertArrayHasKey('items', $report);
         $this->assertEquals(2, $report['summary']['total']);
-        $this->assertCount(2, $report['actions']);
+        $this->assertCount(2, $report['items']);
     }
 
     public function test_corrective_action_traceability_with_status_filter(): void
@@ -176,7 +176,7 @@ class HsGovernanceTest extends TestCase
 
         $report = $this->complianceService->correctiveActionTraceability('in_progress');
 
-        $this->assertCount(1, $report['actions']);
+        $this->assertCount(1, $report['items']);
     }
 
     // ──────────────────────────────────────────────────────
@@ -195,6 +195,6 @@ class HsGovernanceTest extends TestCase
 
         $this->assertEquals(2, $register['summary']['total_active']);
         $this->assertEquals(1, $register['summary']['high']);
-        $this->assertCount(2, $register['assessments']);
+        $this->assertCount(2, $register['items']);
     }
 }

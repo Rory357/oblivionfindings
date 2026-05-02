@@ -4,6 +4,7 @@ use App\Domain\Finance\Jobs\CalculateGstReturnJob;
 use App\Domain\Finance\Jobs\CheckBillDueDatesJob;
 use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
 use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
+use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
 use App\Domain\Finance\Jobs\RunDepreciationJob;
@@ -459,5 +460,11 @@ app(Schedule::class)
 // Enforce data retention policies: daily at 03:00
 app(Schedule::class)
     ->job(new EnforceDataRetentionJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('03:00');
+
+// Finance audit export retention: daily at 03:00, alongside privacy retention.
+app(Schedule::class)
+    ->job(new PruneFinanceAuditExportsJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('03:00');

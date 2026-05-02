@@ -393,10 +393,9 @@ class RbacSeeder extends Seeder
 
             // Consent Management
             ['key' => 'consents.viewAny', 'description' => 'View consent records', 'group' => 'consents', 'module' => 'Compliance'],
-            ['key' => 'consents.manage', 'description' => 'Manage consent types', 'group' => 'consents', 'module' => 'Compliance'],
+            ['key' => 'consents.manage', 'description' => 'Manage consent records', 'group' => 'consents', 'module' => 'Compliance'],
             ['key' => 'consents.record', 'description' => 'Record client consent', 'group' => 'consents', 'module' => 'Compliance'],
             ['key' => 'consents.withdraw', 'description' => 'Process consent withdrawal', 'group' => 'consents', 'module' => 'Compliance'],
-            ['key' => 'consents.export', 'description' => 'Export consent reports', 'group' => 'consents', 'module' => 'Compliance'],
             ['key' => 'consents.request', 'description' => 'Request consent via family portal', 'group' => 'consents', 'module' => 'Compliance'],
 
             // Data Privacy & GDPR
@@ -538,7 +537,7 @@ class RbacSeeder extends Seeder
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update',
             'safeguarding.investigate', 'safeguarding.report.external', 'safeguarding.viewSensitive',
-            'consents.viewAny', 'consents.manage', 'consents.record', 'consents.withdraw', 'consents.export', 'consents.request',
+            'consents.viewAny', 'consents.manage', 'consents.record', 'consents.withdraw', 'consents.request',
             'staff.vetting.view', 'staff.vetting.manage', 'staff.induction.manage',
             'privacy.viewRequests', 'privacy.processRequests', 'privacy.manageRetention',
             'privacy.manageLegalHolds', 'privacy.reportBreaches', 'privacy.conductDPIA',

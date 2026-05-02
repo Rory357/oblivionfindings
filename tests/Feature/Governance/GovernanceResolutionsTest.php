@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Governance;
 
-use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\ConflictDeclaration;
 use App\Domain\Governance\Models\Vote;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,8 +10,8 @@ use Tests\TestCase;
 
 class GovernanceResolutionsTest extends TestCase
 {
-    use RefreshDatabase;
     use GovernanceTestHelpers;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -41,10 +40,12 @@ class GovernanceResolutionsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $boardMember = $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
 
         $resolution = $this->createResolution($admin, [
             'status' => 'draft',
             'deadline' => now()->addDays(2),
+            'governance_meeting_id' => $meeting->id,
         ]);
 
         $openResponse = $this->actingAs($admin)->post("/governance/resolutions/{$resolution->id}/open", [
@@ -79,9 +80,11 @@ class GovernanceResolutionsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $boardMember = $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
         $resolution = $this->createResolution($admin, [
             'status' => 'draft',
             'deadline' => now()->addDays(5),
+            'governance_meeting_id' => $meeting->id,
         ]);
 
         $this->actingAs($admin)->post("/governance/resolutions/{$resolution->id}/open", []);

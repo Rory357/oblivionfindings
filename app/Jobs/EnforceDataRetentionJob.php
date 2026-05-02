@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Domain\Finance\Models\FinAuditExport;
 use App\Models\DataRetentionPolicy;
 use App\Models\LegalHold;
 use App\Services\AuditLogger;
@@ -14,7 +13,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class EnforceDataRetentionJob implements ShouldQueue
 {
@@ -34,50 +32,6 @@ class EnforceDataRetentionJob implements ShouldQueue
                     'exception' => $e,
                 ]);
             }
-        }
-
-        $this->pruneFinanceAuditExports();
-    }
-
-    private function pruneFinanceAuditExports(): void
-    {
-        $retentionYears = (int) config('finance.audit_exports.retention_years', 7);
-
-        if ($retentionYears <= 0) {
-            return;
-        }
-
-        $cutoff = now()->subYears($retentionYears);
-        $disk = Storage::disk((string) config('finance.audit_exports.disk', 'local'));
-
-        $exports = FinAuditExport::query()
-            ->where('status', 'completed')
-            ->where(function ($query) use ($cutoff) {
-                $query->where('generated_at', '<', $cutoff)
-                    ->orWhere(function ($query) use ($cutoff) {
-                        $query->whereNull('generated_at')
-                            ->where('created_at', '<', $cutoff);
-                    });
-            })
-            ->get();
-
-        foreach ($exports as $export) {
-            DB::transaction(function () use ($export, $disk, $retentionYears) {
-                if ($export->file_path && $disk->exists($export->file_path)) {
-                    $disk->delete($export->file_path);
-                }
-
-                AuditLogger::log('data_retention.finance_audit_export_pruned', $export, [
-                    'retention_period_years' => $retentionYears,
-                    'file_path' => $export->file_path,
-                ]);
-
-                $export->delete();
-            });
-        }
-
-        if ($exports->isNotEmpty()) {
-            Log::info("Data retention: pruned {$exports->count()} finance audit export(s).");
         }
     }
 
@@ -244,7 +198,9 @@ class EnforceDataRetentionJob implements ShouldQueue
         foreach ($fillable as $field) {
             foreach ($personalFieldPatterns as $pattern) {
                 if (str_contains(strtolower($field), $pattern)) {
-                    $anonymizedData[$field] = '[REDACTED]';
+                    $anonymizedData[$field] = str_contains($pattern, 'date') || str_contains($pattern, 'dob')
+                        ? null
+                        : '[REDACTED]';
                     break;
                 }
             }

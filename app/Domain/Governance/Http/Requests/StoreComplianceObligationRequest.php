@@ -2,14 +2,13 @@
 
 namespace App\Domain\Governance\Http\Requests;
 
-use App\Domain\Governance\Models\ComplianceObligation;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreComplianceObligationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', ComplianceObligation::class);
+        return $this->user()?->canDo('governance.compliance.manage') ?? false;
     }
 
     public function rules(): array

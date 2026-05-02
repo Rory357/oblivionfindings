@@ -30,6 +30,7 @@ use App\Http\Controllers\Operations\CarePlanGoalController;
 use App\Http\Controllers\Operations\ClientConsentController;
 use App\Http\Controllers\Operations\ClientFundController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
+use App\Http\Controllers\Operations\ConsentRequestController;
 use App\Http\Controllers\Operations\CustomFormController;
 use App\Http\Controllers\Operations\DashboardController;
 use App\Http\Controllers\Operations\EvvController;
@@ -132,6 +133,28 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/clients/{client}/consents', [ClientConsentController::class, 'index'])
             ->whereNumber('client')
             ->name('operations.clients.consents.index');
+
+        Route::prefix('/clients/{client}/consent-requests')
+            ->whereNumber('client')
+            ->group(function () {
+                Route::get('/', [ConsentRequestController::class, 'index'])
+                    ->middleware('permission:consents.viewAny')
+                    ->name('operations.clients.consent-requests.index');
+                Route::get('/create', [ConsentRequestController::class, 'create'])
+                    ->middleware('permission:consents.request')
+                    ->name('operations.clients.consent-requests.create');
+                Route::post('/', [ConsentRequestController::class, 'store'])
+                    ->middleware('permission:consents.request')
+                    ->name('operations.clients.consent-requests.store');
+                Route::get('/{consentRequest}', [ConsentRequestController::class, 'show'])
+                    ->whereNumber('consentRequest')
+                    ->middleware('permission:consents.viewAny')
+                    ->name('operations.clients.consent-requests.show');
+                Route::post('/{consentRequest}/cancel', [ConsentRequestController::class, 'cancel'])
+                    ->whereNumber('consentRequest')
+                    ->middleware('permission:consents.request')
+                    ->name('operations.clients.consent-requests.cancel');
+            });
 
         // PR 14 — Consolidated frontline client care page
         // Worker-facing landing for a single client. Uses StaffPageShell,

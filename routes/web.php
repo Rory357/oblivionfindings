@@ -180,7 +180,6 @@ require __DIR__.'/respite.php';
 
 // Compliance module routes
 require __DIR__.'/safeguarding.php';
-// require __DIR__.'/consents.php'; // TODO: Controllers not yet implemented
 require __DIR__.'/training.php';
 require __DIR__.'/privacy.php';
 
@@ -228,5 +227,4 @@ Route::middleware(['auth'])->group(function () {
         ->defaults('status', 301);
     Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
     Route::redirect('/emergency-access', '/emar/emergency-access');
-    Route::redirect('/consents', '/operations/clients');
 });

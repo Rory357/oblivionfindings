@@ -4,9 +4,7 @@ namespace App\Domain\Governance\Http\Controllers;
 
 use App\Domain\Governance\Http\Requests\StoreRiskRegisterRequest;
 use App\Domain\Governance\Http\Requests\UpdateRiskRegisterRequest;
-use App\Domain\Governance\Models\RiskAcceptance;
 use App\Domain\Governance\Models\RiskRegisterEntry;
-use App\Domain\Governance\Models\RiskTreatment;
 use App\Domain\Governance\Services\RiskScoringService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -40,7 +38,7 @@ class RiskRegisterController extends Controller
         }
 
         if ($request->has('severity')) {
-            match($request->severity) {
+            match ($request->severity) {
                 'critical' => $query->critical(),
                 'high' => $query->high(),
                 default => $query,
@@ -111,7 +109,7 @@ class RiskRegisterController extends Controller
             'identified_at' => now(),
             'identified_by' => auth()->id(),
             'next_review_date' => now()->addMonths(
-                match($validated['review_frequency'] ?? 'quarterly') {
+                match ($validated['review_frequency'] ?? 'quarterly') {
                     'monthly' => 1,
                     'quarterly' => 3,
                     'annual' => 12,
@@ -130,8 +128,8 @@ class RiskRegisterController extends Controller
         $risk->update($validated);
 
         // Recalculate scores if necessary
-        if (isset($validated['likelihood_score']) || 
-            isset($validated['impact_score']) || 
+        if (isset($validated['likelihood_score']) ||
+            isset($validated['impact_score']) ||
             isset($validated['control_effectiveness'])) {
             $this->riskService->recalculateRisk($risk);
         }
@@ -150,16 +148,18 @@ class RiskRegisterController extends Controller
             'resolution_id' => 'nullable|exists:resolutions,id',
         ]);
 
-        if (!$risk->within_appetite && empty($validated['resolution_id'])) {
+        $resolutionId = $validated['resolution_id'] ?? null;
+
+        if (! $risk->within_appetite && empty($resolutionId)) {
             return redirect()->back()->with('error', 'Above-appetite risks require a Board resolution for acceptance. Please create and link a resolution first.');
         }
 
         $acceptance = $this->riskService->acceptRisk(
             $risk,
-            $validated['resolution_id'] ? 'board_resolution' : 'delegated_authority',
+            $resolutionId ? 'board_resolution' : 'delegated_authority',
             $validated['justification'],
             auth()->user(),
-            $validated['resolution_id'] ?? null,
+            $resolutionId,
             null,
             $validated['expiry_months'],
             $validated['conditions'] ?? []
@@ -256,7 +256,7 @@ class RiskRegisterController extends Controller
     public function committeeView(string $committee)
     {
         $validCommittees = ['audit_risk', 'people', 'finance'];
-        if (!in_array($committee, $validCommittees)) {
+        if (! in_array($committee, $validCommittees)) {
             abort(404);
         }
 

@@ -543,6 +543,7 @@ export default function ClientShow({
               )
             : 0;
     const respiteCan = auth?.can?.respite ?? {};
+    const consentsCan = auth?.can?.consents ?? {};
     const consents = pageProps.consents ?? [];
     const familyNotesOpenCount = pageProps.family_notes_open_count ?? 0;
     const pendingVisitCount = pageProps.pending_visit_count ?? 0;
@@ -636,12 +637,17 @@ export default function ClientShow({
                     (transport?.stats?.transports_30d ?? 0) +
                         (transport?.stats?.outings_30d ?? 0) || undefined,
             },
-            { key: 'consents', label: 'Consents', icon: Shield, show: true },
+            {
+                key: 'consents',
+                label: 'Consents',
+                icon: Shield,
+                show: Boolean(consentsCan?.viewAny),
+            },
             {
                 key: 'consent-requests',
                 label: 'Consent Requests',
                 icon: Send,
-                show: true,
+                show: Boolean(consentsCan?.viewAny),
                 count: pendingConsentRequestsCount || undefined,
                 href: `/operations/clients/${client.id}/consent-requests`,
             },

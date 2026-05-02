@@ -1,6 +1,8 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function resolvePhpBinary(): string {
     const explicit = process.env.PHP_BINARY;
@@ -24,18 +26,66 @@ function resolvePhpBinary(): string {
 }
 
 export function resetMedicationReadinessFixtures() {
+    runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
+}
+
+export function seedGovernancePrivacyConsentsReadinessFixtures() {
+    runArtisan([
+        'db:seed',
+        '--class=GovernancePrivacyConsentsReadinessSeeder',
+        '--force',
+    ]);
+
+    const output = runLaravelPhp(
+        "echo json_encode(['clientId' => \\App\\Models\\Client::where('first_name', 'Playwright')->where('last_name', 'Consent')->value('id'), 'portalEmail' => 'portal.consent.readiness@demo.test']);",
+    );
+
+    return JSON.parse(output) as {
+        clientId: number;
+        portalEmail: string;
+    };
+}
+
+export function runArtisan(args: string[]) {
     const phpBin = resolvePhpBinary();
     const useShell = phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
 
-    execFileSync(
-        phpBin,
-        ['artisan', 'db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force'],
-        {
+    return execFileSync(phpBin, ['artisan', ...args], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: useShell,
+    });
+}
+
+export function runLaravelPhp(code: string) {
+    const phpBin = resolvePhpBinary();
+    const useShell = phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
+    const tempDir = mkdtempSync(join(tmpdir(), 'of-laravel-'));
+    const scriptPath = join(tempDir, 'run.php');
+
+    writeFileSync(
+        scriptPath,
+        [
+            '<?php',
+            "require getcwd() . '/vendor/autoload.php';",
+            "$app = require getcwd() . '/bootstrap/app.php';",
+            '$app->make(\\Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();',
+            code,
+        ].join('\n'),
+        'utf8',
+    );
+
+    try {
+        return execFileSync(phpBin, [scriptPath], {
             cwd: process.cwd(),
+            encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
             shell: useShell,
-        },
-    );
+        });
+    } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+    }
 }
 
 export async function loginAs(
@@ -43,8 +93,7 @@ export async function loginAs(
     email: string,
     password = 'password',
 ) {
-    await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await page.locator('#email').fill(email);
     await page.locator('#password').fill(password);
     const loginButton = page.getByTestId('login-button');

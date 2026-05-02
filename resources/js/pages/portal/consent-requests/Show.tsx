@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle2, ShieldAlert, XCircle } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -44,19 +44,28 @@ type Props = {
 };
 
 export default function PortalConsentRequestShow({ client, request }: Props) {
-    const [mode, setMode] = useState<'review' | 'approve' | 'decline'>('review');
+    const [mode, setMode] = useState<'review' | 'approve' | 'decline'>(
+        'review',
+    );
 
-    const approveForm = useForm({ response_notes: '', acknowledge_authority: false });
+    const approveForm = useForm({
+        response_notes: '',
+        acknowledge_authority: false,
+    });
     const declineForm = useForm({ response_notes: '' });
 
     const submitApprove = (e: FormEvent) => {
         e.preventDefault();
-        approveForm.post(`/portal/clients/${client.id}/consent-requests/${request.id}/approve`);
+        approveForm.post(
+            `/portal/clients/${client.id}/consent-requests/${request.id}/approve`,
+        );
     };
 
     const submitDecline = (e: FormEvent) => {
         e.preventDefault();
-        declineForm.post(`/portal/clients/${client.id}/consent-requests/${request.id}/decline`);
+        declineForm.post(
+            `/portal/clients/${client.id}/consent-requests/${request.id}/decline`,
+        );
     };
 
     const authorityText =
@@ -67,7 +76,10 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
               : 'I am providing this response for information only; I understand my response does not by itself authorise the care action.';
 
     return (
-        <div className="min-h-screen bg-muted">
+        <div
+            className="min-h-screen bg-muted"
+            data-test="portal-consent-request-show"
+        >
             <Head title={`Consent request — ${client.full_name}`} />
 
             <div className="mx-auto max-w-3xl px-4 py-8">
@@ -93,33 +105,42 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                     )}
                 </div>
 
-                {!request.is_actionable && request.status === 'pending' && request.is_expired && (
-                    <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
-                        <CardContent className="flex items-start gap-3 p-4">
-                            <ShieldAlert className="mt-0.5 h-5 w-5 text-status-warning" />
-                            <div>
-                                <div className="font-medium">This request has expired.</div>
-                                <p className="text-sm text-muted-foreground">
-                                    Please contact the care team if you still want to respond — they can re-issue the
-                                    request.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                {!request.is_actionable &&
+                    request.status === 'pending' &&
+                    request.is_expired && (
+                        <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
+                            <CardContent className="flex items-start gap-3 p-4">
+                                <ShieldAlert className="mt-0.5 h-5 w-5 text-status-warning" />
+                                <div>
+                                    <div className="font-medium">
+                                        This request has expired.
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Please contact the care team if you
+                                        still want to respond — they can
+                                        re-issue the request.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                 {!request.is_actionable && request.status !== 'pending' && (
                     <Card className="mb-6">
                         <CardContent className="p-4 text-sm text-muted-foreground">
                             You already responded to this request on{' '}
-                            {formatDate(request.responded_at ?? '') || 'an earlier date'}.
+                            {formatDate(request.responded_at ?? '') ||
+                                'an earlier date'}
+                            .
                         </CardContent>
                     </Card>
                 )}
 
                 <Card className="mb-6">
                     <CardHeader>
-                        <CardTitle>{request.consent_type?.name ?? 'Consent'}</CardTitle>
+                        <CardTitle>
+                            {request.consent_type?.name ?? 'Consent'}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-5 text-sm">
                         {request.consent_type?.description && (
@@ -128,7 +149,9 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                             </Section>
                         )}
 
-                        <Section label="Why we are asking">{request.purpose}</Section>
+                        <Section label="Why we are asking">
+                            {request.purpose}
+                        </Section>
 
                         {request.least_restrictive_justification && (
                             <Section label="Why this is the least-restrictive option">
@@ -136,7 +159,11 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                             </Section>
                         )}
 
-                        {request.data_scope && <Section label="Who will see this data">{request.data_scope}</Section>}
+                        {request.data_scope && (
+                            <Section label="Who will see this data">
+                                {request.data_scope}
+                            </Section>
+                        )}
 
                         {request.retention_period_days !== null && (
                             <Section label="How long we keep the data">
@@ -145,28 +172,42 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                         )}
 
                         {request.withdrawal_method_text && (
-                            <Section label="How you can withdraw later">{request.withdrawal_method_text}</Section>
+                            <Section label="How you can withdraw later">
+                                {request.withdrawal_method_text}
+                            </Section>
                         )}
 
                         {request.consent_type?.legal_basis && (
-                            <Section label="Legal basis">{request.consent_type.legal_basis}</Section>
+                            <Section label="Legal basis">
+                                {request.consent_type.legal_basis}
+                            </Section>
                         )}
 
                         <Section label="Your rights">
-                            You can ask questions, take time, decline, or withdraw later. If you decline, the care
-                            team will find another path forward. This does not affect {client.full_name}'s care
-                            entitlement.
+                            You can ask questions, take time, decline, or
+                            withdraw later. If you decline, the care team will
+                            find another path forward. This does not affect{' '}
+                            {client.full_name}'s care entitlement.
                         </Section>
                     </CardContent>
                 </Card>
 
                 {request.is_actionable && mode === 'review' && (
                     <div className="flex gap-3">
-                        <Button className="flex-1" onClick={() => setMode('approve')}>
+                        <Button
+                            className="flex-1"
+                            onClick={() => setMode('approve')}
+                            data-test="portal-consent-approve-open"
+                        >
                             <CheckCircle2 className="mr-2 h-4 w-4" />
                             Approve
                         </Button>
-                        <Button className="flex-1" variant="outline" onClick={() => setMode('decline')}>
+                        <Button
+                            className="flex-1"
+                            variant="outline"
+                            onClick={() => setMode('decline')}
+                            data-test="portal-consent-decline-open"
+                        >
                             <XCircle className="mr-2 h-4 w-4" />
                             Decline
                         </Button>
@@ -179,14 +220,25 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                             <CardTitle>Approve this consent</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={submitApprove} className="space-y-4">
+                            <form
+                                onSubmit={submitApprove}
+                                className="space-y-4"
+                            >
                                 <div>
-                                    <Label htmlFor="response_notes_a">Notes (optional)</Label>
+                                    <Label htmlFor="response_notes_a">
+                                        Notes (optional)
+                                    </Label>
                                     <Textarea
                                         id="response_notes_a"
+                                        data-test="portal-consent-approve-notes"
                                         rows={3}
                                         value={approveForm.data.response_notes}
-                                        onChange={(e) => approveForm.setData('response_notes', e.target.value)}
+                                        onChange={(e) =>
+                                            approveForm.setData(
+                                                'response_notes',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Any conditions, context, or follow-up requests."
                                     />
                                 </div>
@@ -194,9 +246,16 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                                 <div className="flex items-start gap-2 rounded border border-status-success/30 bg-status-success-bg p-3">
                                     <Checkbox
                                         id="ack"
-                                        checked={approveForm.data.acknowledge_authority}
+                                        data-test="portal-consent-authority-checkbox"
+                                        checked={
+                                            approveForm.data
+                                                .acknowledge_authority
+                                        }
                                         onCheckedChange={(checked) =>
-                                            approveForm.setData('acknowledge_authority', checked === true)
+                                            approveForm.setData(
+                                                'acknowledge_authority',
+                                                checked === true,
+                                            )
                                         }
                                     />
                                     <label htmlFor="ack" className="text-sm">
@@ -206,7 +265,8 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
 
                                 {approveForm.errors.acknowledge_authority && (
                                     <p className="text-xs text-status-critical">
-                                        You must confirm your authority to give consent.
+                                        You must confirm your authority to give
+                                        consent.
                                     </p>
                                 )}
 
@@ -219,8 +279,14 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                                     >
                                         Back
                                     </Button>
-                                    <Button type="submit" disabled={approveForm.processing}>
-                                        {approveForm.processing ? 'Recording…' : 'Confirm approval'}
+                                    <Button
+                                        type="submit"
+                                        disabled={approveForm.processing}
+                                        data-test="portal-consent-approve-submit"
+                                    >
+                                        {approveForm.processing
+                                            ? 'Recording…'
+                                            : 'Confirm approval'}
                                     </Button>
                                 </div>
                             </form>
@@ -234,16 +300,26 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                             <CardTitle>Decline this consent</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={submitDecline} className="space-y-4">
+                            <form
+                                onSubmit={submitDecline}
+                                className="space-y-4"
+                            >
                                 <div>
                                     <Label htmlFor="response_notes_d">
-                                        Reason for declining (required, min 5 chars)
+                                        Reason for declining (required, min 5
+                                        chars)
                                     </Label>
                                     <Textarea
                                         id="response_notes_d"
+                                        data-test="portal-consent-decline-notes"
                                         rows={4}
                                         value={declineForm.data.response_notes}
-                                        onChange={(e) => declineForm.setData('response_notes', e.target.value)}
+                                        onChange={(e) =>
+                                            declineForm.setData(
+                                                'response_notes',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Tell the care team why you're declining. They'll work with you on alternatives."
                                     />
                                     {declineForm.errors.response_notes && (
@@ -265,9 +341,15 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                                     <Button
                                         type="submit"
                                         variant="destructive"
-                                        disabled={declineForm.processing || declineForm.data.response_notes.length < 5}
+                                        disabled={
+                                            declineForm.processing ||
+                                            declineForm.data.response_notes
+                                                .length < 5
+                                        }
                                     >
-                                        {declineForm.processing ? 'Submitting…' : 'Decline'}
+                                        {declineForm.processing
+                                            ? 'Submitting…'
+                                            : 'Decline'}
                                     </Button>
                                 </div>
                             </form>
@@ -279,10 +361,18 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
     );
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
     return (
         <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+            <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                {label}
+            </div>
             <p className="mt-1 whitespace-pre-wrap">{children}</p>
         </div>
     );
@@ -290,7 +380,11 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 function formatDate(iso: string): string {
     try {
-        return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+        return new Date(iso).toLocaleDateString('en-NZ', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
     } catch {
         return iso;
     }

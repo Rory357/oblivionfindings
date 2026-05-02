@@ -15,6 +15,8 @@ class DataRetentionPolicyController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorizePermission($request);
+
         $query = DataRetentionPolicy::query()
             ->with(['creator', 'updater']);
 
@@ -46,8 +48,10 @@ class DataRetentionPolicyController extends Controller
     /**
      * Show the form for creating a new policy.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $this->authorizePermission($request);
+
         return Inertia::render('privacy/retention/create');
     }
 
@@ -56,6 +60,8 @@ class DataRetentionPolicyController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $validated = $request->validate([
             'model_type' => 'required|string|max:255',
             'policy_name' => 'required|string|max:255',
@@ -84,8 +90,10 @@ class DataRetentionPolicyController extends Controller
     /**
      * Show the form for editing the policy.
      */
-    public function edit(DataRetentionPolicy $policy): Response
+    public function edit(Request $request, DataRetentionPolicy $policy): Response
     {
+        $this->authorizePermission($request);
+
         return Inertia::render('privacy/retention/edit', [
             'policy' => $policy,
         ]);
@@ -96,6 +104,8 @@ class DataRetentionPolicyController extends Controller
      */
     public function update(Request $request, DataRetentionPolicy $policy): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $validated = $request->validate([
             'policy_name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',
@@ -123,12 +133,19 @@ class DataRetentionPolicyController extends Controller
     /**
      * Review data for retention.
      */
-    public function review(): Response
+    public function review(Request $request): Response
     {
+        $this->authorizePermission($request);
+
         $policies = DataRetentionPolicy::where('active', true)->get();
 
         return Inertia::render('privacy/retention/review', [
             'policies' => $policies,
         ]);
+    }
+
+    private function authorizePermission(Request $request): void
+    {
+        abort_unless($request->user()?->canDo('privacy.manageRetention'), 403);
     }
 }

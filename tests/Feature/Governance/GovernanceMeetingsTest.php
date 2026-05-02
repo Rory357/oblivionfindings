@@ -10,8 +10,8 @@ use Tests\TestCase;
 
 class GovernanceMeetingsTest extends TestCase
 {
-    use RefreshDatabase;
     use GovernanceTestHelpers;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -181,7 +181,7 @@ class GovernanceMeetingsTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('Governance/Meetings/Show')
             ->has('workflowChecklist')
-            ->has('workflowChecklist.items', 8)
+            ->has('workflowChecklist.items', 10)
             ->where('workflowChecklist.items.0.key', 'agenda')
         );
     }

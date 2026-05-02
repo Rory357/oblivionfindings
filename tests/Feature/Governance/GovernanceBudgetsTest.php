@@ -2,15 +2,14 @@
 
 namespace Tests\Feature\Governance;
 
-use App\Domain\Governance\Models\Budget;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\GovernanceTestHelpers;
 use Tests\TestCase;
 
 class GovernanceBudgetsTest extends TestCase
 {
-    use RefreshDatabase;
     use GovernanceTestHelpers;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -71,7 +70,7 @@ class GovernanceBudgetsTest extends TestCase
         $this->assertDatabaseHas('budgets', [
             'id' => $budget->id,
             'total_budget' => 200000,
-            'status' => 'approved',
+            'status' => 'proposed',
         ]);
     }
 

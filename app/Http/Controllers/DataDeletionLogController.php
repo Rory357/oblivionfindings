@@ -18,6 +18,8 @@ class DataDeletionLogController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorizePermission($request);
+
         $query = AnonymizationLog::query()
             ->with('anonymizedBy');
 
@@ -58,6 +60,8 @@ class DataDeletionLogController extends Controller
      */
     public function execute(Request $request): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $request->validate([
             'policy_id' => 'required|exists:data_retention_policies,id',
             'confirm' => 'required|accepted',
@@ -105,7 +109,7 @@ class DataDeletionLogController extends Controller
                 $subQ->select(DB::raw(1))
                     ->from('legal_holds')
                     ->where('holdable_type', $modelClass)
-                    ->whereColumn('holdable_id', (new $modelClass)->getTable() . '.id')
+                    ->whereColumn('holdable_id', (new $modelClass)->getTable().'.id')
                     ->where('status', 'active');
             });
         }
@@ -165,7 +169,7 @@ class DataDeletionLogController extends Controller
                 AnonymizationLog::create([
                     'model_type' => $modelClass,
                     'model_id' => $record->id,
-                    'reason' => 'retention_period_expired - Policy: ' . $policy->policy_name,
+                    'reason' => 'retention_period_expired - Policy: '.$policy->policy_name,
                     'fields_anonymized' => $fieldsAnonymized,
                     'anonymization_methods' => $methods,
                     'anonymized_at' => now(),
@@ -189,7 +193,12 @@ class DataDeletionLogController extends Controller
             $summary[] = "{$anonymizedCount} record(s) anonymized";
         }
 
-        return back()->with('success', 'Data deletion executed successfully. ' . implode(', ', $summary) . '.');
+        return back()->with('success', 'Data deletion executed successfully. '.implode(', ', $summary).'.');
+    }
+
+    private function authorizePermission(Request $request): void
+    {
+        abort_unless($request->user()?->canDo('privacy.manageRetention'), 403);
     }
 
     /**

@@ -14,7 +14,10 @@ class ClientConsentController extends Controller
     public function index(Request $request, $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('clients.viewAny'), 403);
+        abort_unless(
+            $auth && ($auth->canDo('clients.viewAny') || $auth->canDo('clients.viewAssigned')),
+            403,
+        );
 
         $client = Client::findOrFail($client);
 

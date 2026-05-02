@@ -2,13 +2,14 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Http\Requests\StoreResolutionRequest;
+use App\Domain\Governance\Http\Requests\UpdateResolutionRequest;
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\VotingService;
-use App\Domain\Governance\Http\Requests\StoreResolutionRequest;
-use App\Domain\Governance\Http\Requests\UpdateResolutionRequest;
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -67,7 +68,7 @@ class ResolutionController extends Controller
             'results' => $results,
             'my_vote' => $myVote,
             'can_vote' => auth()->user()->can('vote', $resolution),
-            'quorum' => $resolution->governance_meeting_id 
+            'quorum' => $resolution->governance_meeting_id
                 ? $this->votingService->calculateQuorum($resolution->governance_meeting_id)
                 : null,
         ]);
@@ -121,7 +122,7 @@ class ResolutionController extends Controller
             ->where('user_id', auth()->id())
             ->first();
 
-        if (!$boardMember) {
+        if (! $boardMember) {
             return redirect()->back()->with('error', 'You must be an active board member to vote.');
         }
 
@@ -149,7 +150,7 @@ class ResolutionController extends Controller
             ->where('user_id', auth()->id())
             ->first();
 
-        if (!$boardMember) {
+        if (! $boardMember) {
             return redirect()->back()->with('error', 'You must be an active board member to declare a conflict.');
         }
 
@@ -174,7 +175,11 @@ class ResolutionController extends Controller
             'deadline' => 'nullable|date|after:now',
         ]);
 
-        $this->votingService->openVoting($resolution, $validated['deadline'] ?? null);
+        $deadline = isset($validated['deadline'])
+            ? Carbon::parse($validated['deadline'])
+            : null;
+
+        $this->votingService->openVoting($resolution, $deadline);
 
         return redirect()->back()->with('success', 'Voting opened.');
     }
@@ -189,7 +194,7 @@ class ResolutionController extends Controller
 
         $this->votingService->closeVoting($resolution, $validated['notes'] ?? null);
 
-        return redirect()->back()->with('success', 'Voting closed. Outcome: ' . $resolution->outcome);
+        return redirect()->back()->with('success', 'Voting closed. Outcome: '.$resolution->outcome);
     }
 
     public function finalize(Request $request, Resolution $resolution)
@@ -220,7 +225,7 @@ class ResolutionController extends Controller
             ->where('user_id', auth()->id())
             ->first();
 
-        if (!$boardMember) {
+        if (! $boardMember) {
             return [];
         }
 

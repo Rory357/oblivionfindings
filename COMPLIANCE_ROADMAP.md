@@ -62,24 +62,25 @@ This document outlines the systematic implementation plan for enhancing the appl
 - ✅ Models:
   - `ConsentType` (service, data_sharing, portal_access, photography, etc.)
   - `ClientConsent` (status: pending|given|withdrawn|expired)
-  - `ConsentVersion` (version tracking)
-  - `ConsentDocument` (signed forms)
+  - `ConsentTypeVersion` (version tracking)
+  - `ConsentRequest` (staff-created portal request workflow)
 
 - ✅ Controllers:
-  - `ConsentTypeController` (manage consent types)
-  - `ClientConsentController` (record consent/withdrawal)
-  - `ConsentReportController` (compliance reporting)
+  - `Operations\ClientConsentController` (record consent/withdrawal)
+  - `Operations\ConsentRequestController` (staff request workflow)
+  - `Portal\ConsentRequestPortalController` (portal response workflow)
 
 - ✅ Permissions:
-  - `consents.manage` - Manage consent types
+  - `consents.manage` - Manage consent records
   - `consents.record` - Record client consent
   - `consents.withdraw` - Process consent withdrawal
   - `consents.viewAny` - View consent records
-  - `consents.export` - Export consent reports
+  - `consents.request` - Request consent via family portal
 
 - ✅ Frontend Pages:
-  - Consent type management
-  - Client consent dashboard
+  - Client consent register on the client profile
+  - Staff consent-request index/create/show pages
+  - Portal consent-request review and response page
   - Consent recording form
   - Consent withdrawal form
   - Consent expiry alerts

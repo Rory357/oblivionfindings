@@ -55,7 +55,7 @@ class DuskDatabaseSeeder extends Seeder
             'client_funds.manage', 'clients.assignments.update', 'clients.create', 'clients.onboarding.manage',
             'clients.update', 'clients.viewAny', 'clients.viewAssigned',
             'competency.assess', 'competency.manage', 'competency.viewAny',
-            'compliance.view', 'consents.export', 'consents.manage', 'consents.record', 'consents.viewAny', 'consents.withdraw',
+            'compliance.view', 'consents.manage', 'consents.record', 'consents.viewAny', 'consents.withdraw',
             'controlRoom.alerts.assign', 'controlRoom.alerts.create', 'controlRoom.alerts.escalate',
             'controlRoom.alerts.manage', 'controlRoom.alerts.view', 'controlRoom.viewAny',
             'credentials.manage', 'credentials.reveal', 'credentials.view',

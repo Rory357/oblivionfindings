@@ -8,8 +8,8 @@ use Tests\TestCase;
 
 class GovernanceStrategyTest extends TestCase
 {
-    use RefreshDatabase;
     use GovernanceTestHelpers;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -55,11 +55,19 @@ class GovernanceStrategyTest extends TestCase
             'title' => 'Improve quality',
         ]);
 
-        $approveResponse = $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/approve");
+        $resolution = $this->createResolution($admin, [
+            'status' => 'closed',
+            'outcome' => 'carried',
+        ]);
+
+        $approveResponse = $this->actingAs($admin)->post("/governance/strategy/{$plan->id}/approve", [
+            'resolution_id' => $resolution->id,
+        ]);
         $approveResponse->assertRedirect();
 
         $plan->refresh();
-        $this->assertEquals('active', $plan->status);
-        $this->assertEquals($admin->id, $plan->approved_by);
+        $this->assertEquals('approved', $plan->status);
+        $this->assertEquals($resolution->id, $plan->approval_resolution_id);
+        $this->assertNotNull($plan->approved_by_board_at);
     }
 }

@@ -519,7 +519,7 @@ class HandleInertiaRequests extends Middleware
                 'manage' => $user->canDo('consents.manage'),
                 'record' => $user->canDo('consents.record'),
                 'withdraw' => $user->canDo('consents.withdraw'),
-                'export' => $user->canDo('consents.export'),
+                'request' => $user->canDo('consents.request'),
             ],
 
             'hr' => [

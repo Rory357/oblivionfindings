@@ -27,17 +27,8 @@ class ConsentRequestPolicy
         return $user->canDo('consents.request') && $request->isPending();
     }
 
-    /**
-     * Gate for family-portal respondents. Doesn't use a role permission — the
-     * user must be the designated recipient AND have portal access to the
-     * client. Checked in the portal controller.
-     */
     public function respond(User $user, ConsentRequest $request): bool
     {
-        if (! $request->isActionable()) {
-            return false;
-        }
-
         if ($request->recipient_user_id !== $user->id) {
             return false;
         }

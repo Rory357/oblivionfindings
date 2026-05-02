@@ -147,14 +147,16 @@
     --sidebar-border: oklch(0.92 0.010 277);
     --sidebar-ring: var(--color-purple-400);
 
-    /* Status tokens — semantic meaning, not brand-tied */
-    --status-success: oklch(60% 0.15 150);
+    /* Status tokens — semantic meaning, not brand-tied. Foreground L values
+       are tuned to clear WCAG 2.1 AA (4.5:1) contrast against the matching
+       *-bg token; verified via axe-core in tests/e2e/my-day-a11y.spec.ts. */
+    --status-success: oklch(45% 0.15 150);
     --status-success-bg: oklch(94% 0.05 150);
     --status-success-foreground: oklch(28% 0.10 150);
-    --status-warning: oklch(52% 0.13 85);
+    --status-warning: oklch(42% 0.13 85);
     --status-warning-bg: oklch(95% 0.06 85);
     --status-warning-foreground: oklch(30% 0.11 85);
-    --status-critical: oklch(55% 0.22 25);
+    --status-critical: oklch(45% 0.22 25);
     --status-critical-bg: oklch(94% 0.06 25);
     --status-critical-foreground: oklch(30% 0.15 25);
     --status-info: var(--primary);
@@ -217,14 +219,15 @@
     --sidebar-border: oklch(0.22 0.015 277);
     --sidebar-ring: var(--color-purple-400);
 
-    /* Status tokens — dark variants */
+    /* Status tokens — dark variants. Foreground L values verified ≥4.5:1
+       contrast against the matching *-bg token. */
     --status-success: oklch(70% 0.16 150);
     --status-success-bg: oklch(22% 0.08 150);
     --status-success-foreground: oklch(92% 0.05 150);
     --status-warning: oklch(75% 0.15 85);
     --status-warning-bg: oklch(24% 0.08 85);
     --status-warning-foreground: oklch(92% 0.06 85);
-    --status-critical: oklch(65% 0.20 25);
+    --status-critical: oklch(70% 0.20 25);
     --status-critical-bg: oklch(24% 0.10 25);
     --status-critical-foreground: oklch(92% 0.06 25);
     --status-info: var(--primary);

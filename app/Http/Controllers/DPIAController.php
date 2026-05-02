@@ -16,6 +16,8 @@ class DPIAController extends Controller
      */
     public function index(Request $request): Response
     {
+        $this->authorizePermission($request);
+
         $query = PrivacyImpactAssessment::query()
             ->with(['assessor', 'approvedBy']);
 
@@ -53,8 +55,10 @@ class DPIAController extends Controller
     /**
      * Show the form for creating a new DPIA.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $this->authorizePermission($request);
+
         return Inertia::render('privacy/dpia/create', [
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
@@ -65,6 +69,8 @@ class DPIAController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $validated = $request->validate([
             'assessment_name' => 'required|string|max:255',
             'project_or_process' => 'required|string|max:255',
@@ -94,8 +100,10 @@ class DPIAController extends Controller
     /**
      * Display the specified DPIA.
      */
-    public function show(PrivacyImpactAssessment $dpia): Response
+    public function show(Request $request, PrivacyImpactAssessment $dpia): Response
     {
+        $this->authorizePermission($request);
+
         $dpia->load(['assessor', 'approvedBy']);
 
         return Inertia::render('privacy/dpia/show', [
@@ -106,8 +114,10 @@ class DPIAController extends Controller
     /**
      * Show the form for editing the DPIA.
      */
-    public function edit(PrivacyImpactAssessment $dpia): Response
+    public function edit(Request $request, PrivacyImpactAssessment $dpia): Response
     {
+        $this->authorizePermission($request);
+
         return Inertia::render('privacy/dpia/edit', [
             'dpia' => $dpia,
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
@@ -119,6 +129,8 @@ class DPIAController extends Controller
      */
     public function update(Request $request, PrivacyImpactAssessment $dpia): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $validated = $request->validate([
             'assessment_name' => 'sometimes|string|max:255',
             'project_or_process' => 'sometimes|string|max:255',
@@ -142,8 +154,10 @@ class DPIAController extends Controller
     /**
      * Approve the DPIA.
      */
-    public function approve(PrivacyImpactAssessment $dpia): RedirectResponse
+    public function approve(Request $request, PrivacyImpactAssessment $dpia): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $dpia->update([
             'outcome' => 'approved',
             'approved_by_user_id' => auth()->id(),
@@ -158,6 +172,8 @@ class DPIAController extends Controller
      */
     public function review(Request $request, PrivacyImpactAssessment $dpia): RedirectResponse
     {
+        $this->authorizePermission($request);
+
         $request->validate([
             'review_notes' => 'required|string',
         ]);
@@ -167,5 +183,10 @@ class DPIAController extends Controller
         ]);
 
         return back()->with('success', 'DPIA sent for review.');
+    }
+
+    private function authorizePermission(Request $request): void
+    {
+        abort_unless($request->user()?->canDo('privacy.conductDPIA'), 403);
     }
 }

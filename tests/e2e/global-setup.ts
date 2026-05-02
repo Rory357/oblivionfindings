@@ -59,6 +59,18 @@ async function globalSetup(): Promise<void> {
             phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
         const seederClasses = [
             'RbacSeeder',
+            // Module permission seeders define keys (e.g. `rostering.publish`)
+            // that RbacSeeder doesn't know about. Without these, controllers
+            // gating by `rostering.publish` / `governance.*` / etc. silently
+            // return 403/null and Playwright specs fail with element-not-found
+            // because the gated UI never renders.
+            'OperationsPermissionsSeeder',
+            'GovernancePermissionsSeeder',
+            'SecurityDevicesPermissionsSeeder',
+            'RoadmapPermissionsSeeder',
+            // Map every permission row to the admin role so loginAsStaff
+            // (admin@demo.test) can exercise every gated UI surface.
+            'SeedAllPermissionsToAdminSeeder',
             'SystemCatalogSeeder',
             'SystemUsersSeeder',
             'SystemClientsSeeder',

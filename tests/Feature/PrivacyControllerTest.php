@@ -18,10 +18,15 @@ class PrivacyControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
+
     protected User $hr;
+
     protected User $auditor;
+
     protected User $finance;
 
     protected function setUp(): void
@@ -60,7 +65,7 @@ class PrivacyControllerTest extends TestCase
             'subject_name' => 'Jane Doe',
             'subject_email' => 'jane@example.com',
             'request_details' => 'I would like a copy of all my personal data.',
-            'status' => 'pending_verification',
+            'status' => 'identity_verification',
             'created_by' => $this->admin->id,
         ], $overrides));
     }
@@ -68,7 +73,7 @@ class PrivacyControllerTest extends TestCase
     private function createBreach(array $overrides = []): DataBreachLog
     {
         return DataBreachLog::create(array_merge([
-            'breach_reference' => 'BR-' . now()->year . '-' . str_pad(
+            'breach_reference' => 'BR-'.now()->year.'-'.str_pad(
                 DataBreachLog::whereYear('created_at', now()->year)->count() + 1,
                 4, '0', STR_PAD_LEFT
             ),
@@ -80,7 +85,7 @@ class PrivacyControllerTest extends TestCase
             'approximate_individuals_affected' => 15,
             'requires_authority_notification' => true,
             'requires_subject_notification' => false,
-            'status' => 'reported',
+            'status' => 'discovered',
             'discovered_by_user_id' => $this->admin->id,
             'created_by' => $this->admin->id,
         ], $overrides));
@@ -110,7 +115,7 @@ class PrivacyControllerTest extends TestCase
         $client = Client::factory()->create();
 
         return LegalHold::create(array_merge([
-            'hold_reference' => 'LH-' . now()->year . '-' . str_pad(
+            'hold_reference' => 'LH-'.now()->year.'-'.str_pad(
                 LegalHold::whereYear('created_at', now()->year)->count() + 1,
                 4, '0', STR_PAD_LEFT
             ),
@@ -131,7 +136,7 @@ class PrivacyControllerTest extends TestCase
             'assessment_name' => 'New Client Portal Assessment',
             'project_or_process' => 'Client Portal Launch',
             'description' => 'Assessment of data protection impact for the new client portal.',
-            'assessment_type' => 'new_processing',
+            'assessment_type' => 'new_project',
             'assessor_id' => $this->admin->id,
             'assessment_date' => now(),
             'personal_data_types' => ['name', 'email', 'health_records'],
@@ -394,7 +399,7 @@ class PrivacyControllerTest extends TestCase
     //  SECTION 2: Permission-Based Access Control
     // ══════════════════════════════════════════════════
 
-    public function test_dsr_index_forbidden_without_viewRequests_permission(): void
+    public function test_dsr_index_forbidden_without_view_requests_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/requests')
@@ -408,14 +413,14 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_dsr_index_accessible_by_auditor_with_viewRequests(): void
+    public function test_dsr_index_accessible_by_auditor_with_view_requests(): void
     {
         $this->actingAs($this->auditor)
             ->get('/privacy/requests')
             ->assertOk();
     }
 
-    public function test_dsr_create_forbidden_without_processRequests_permission(): void
+    public function test_dsr_create_forbidden_without_process_requests_permission(): void
     {
         $this->actingAs($this->auditor)
             ->get('/privacy/requests/create')
@@ -429,7 +434,7 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_dsr_store_forbidden_without_processRequests_permission(): void
+    public function test_dsr_store_forbidden_without_process_requests_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->post('/privacy/requests', [
@@ -441,7 +446,7 @@ class PrivacyControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_retention_index_forbidden_without_manageRetention_permission(): void
+    public function test_retention_index_forbidden_without_manage_retention_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/retention')
@@ -455,7 +460,7 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_legal_holds_index_forbidden_without_manageLegalHolds_permission(): void
+    public function test_legal_holds_index_forbidden_without_manage_legal_holds_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/legal-holds')
@@ -469,7 +474,7 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_breaches_index_forbidden_without_reportBreaches_permission(): void
+    public function test_breaches_index_forbidden_without_report_breaches_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/breaches')
@@ -483,7 +488,7 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_dpia_index_forbidden_without_conductDPIA_permission(): void
+    public function test_dpia_index_forbidden_without_conduct_dpi_a_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/dpia')
@@ -497,7 +502,7 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_dashboard_forbidden_without_viewRequests_permission(): void
+    public function test_dashboard_forbidden_without_view_requests_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/dashboard')
@@ -511,7 +516,7 @@ class PrivacyControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_compliance_report_forbidden_without_viewRequests_permission(): void
+    public function test_compliance_report_forbidden_without_view_requests_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/reports/compliance')
@@ -529,7 +534,7 @@ class PrivacyControllerTest extends TestCase
     //  SECTION 3: DataSubjectRequest Full Lifecycle
     // ══════════════════════════════════════════════════
 
-    public function test_dsr_store_creates_request_with_pending_verification_status(): void
+    public function test_dsr_store_creates_request_with_identity_verification_status(): void
     {
         $this->actingAs($this->admin)
             ->post('/privacy/requests', [
@@ -545,7 +550,7 @@ class PrivacyControllerTest extends TestCase
             'request_type' => 'access',
             'subject_name' => 'Jane Doe',
             'subject_email' => 'jane@example.com',
-            'status' => 'pending_verification',
+            'status' => 'identity_verification',
             'created_by' => $this->admin->id,
         ]);
     }
@@ -615,7 +620,7 @@ class PrivacyControllerTest extends TestCase
 
         $dsr = DataSubjectRequest::where('subject_email', 'alice@example.com')->first();
         $this->assertNotNull($dsr);
-        $this->assertEquals('pending_verification', $dsr->status);
+        $this->assertEquals('identity_verification', $dsr->status);
 
         // Step 2: Verify identity
         $this->actingAs($this->admin)
@@ -735,7 +740,7 @@ class PrivacyControllerTest extends TestCase
         $dsr = $this->createDSR();
 
         $this->assertNotNull($dsr->reference_number);
-        $this->assertStringStartsWith('DSR-' . now()->year . '-', $dsr->reference_number);
+        $this->assertStringStartsWith('DSR-'.now()->year.'-', $dsr->reference_number);
     }
 
     public function test_dsr_reference_numbers_increment_sequentially(): void
@@ -772,7 +777,7 @@ class PrivacyControllerTest extends TestCase
 
         $breach = DataBreachLog::latest()->first();
         $this->assertNotNull($breach->breach_reference);
-        $this->assertStringStartsWith('BR-' . now()->year . '-', $breach->breach_reference);
+        $this->assertStringStartsWith('BR-'.now()->year.'-', $breach->breach_reference);
     }
 
     public function test_legal_hold_auto_generates_reference_number(): void
@@ -790,14 +795,14 @@ class PrivacyControllerTest extends TestCase
 
         $hold = LegalHold::latest()->first();
         $this->assertNotNull($hold->hold_reference);
-        $this->assertStringStartsWith('LH-' . now()->year . '-', $hold->hold_reference);
+        $this->assertStringStartsWith('LH-'.now()->year.'-', $hold->hold_reference);
     }
 
     // ══════════════════════════════════════════════════
     //  SECTION 7: Overdue Request Detection
     // ══════════════════════════════════════════════════
 
-    public function test_dsr_isOverdue_returns_true_when_past_due_date(): void
+    public function test_dsr_is_overdue_returns_true_when_past_due_date(): void
     {
         $dsr = $this->createDSR([
             'status' => 'in_progress',
@@ -807,7 +812,7 @@ class PrivacyControllerTest extends TestCase
         $this->assertTrue($dsr->isOverdue());
     }
 
-    public function test_dsr_isOverdue_returns_false_when_before_due_date(): void
+    public function test_dsr_is_overdue_returns_false_when_before_due_date(): void
     {
         $dsr = $this->createDSR([
             'status' => 'in_progress',
@@ -817,7 +822,7 @@ class PrivacyControllerTest extends TestCase
         $this->assertFalse($dsr->isOverdue());
     }
 
-    public function test_dsr_isOverdue_returns_false_for_completed_requests(): void
+    public function test_dsr_is_overdue_returns_false_for_completed_requests(): void
     {
         $dsr = $this->createDSR([
             'status' => 'completed',
@@ -827,7 +832,7 @@ class PrivacyControllerTest extends TestCase
         $this->assertFalse($dsr->isOverdue());
     }
 
-    public function test_dsr_isOverdue_returns_false_for_rejected_requests(): void
+    public function test_dsr_is_overdue_returns_false_for_rejected_requests(): void
     {
         $dsr = $this->createDSR([
             'status' => 'rejected',
@@ -837,7 +842,7 @@ class PrivacyControllerTest extends TestCase
         $this->assertFalse($dsr->isOverdue());
     }
 
-    public function test_dsr_isOverdue_uses_extended_due_date_when_set(): void
+    public function test_dsr_is_overdue_uses_extended_due_date_when_set(): void
     {
         $dsr = $this->createDSR([
             'status' => 'in_progress',
@@ -862,7 +867,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dsr_open_scope_excludes_terminal_statuses(): void
     {
         $this->createDSR(['status' => 'in_progress']);
-        $this->createDSR(['status' => 'pending_verification']);
+        $this->createDSR(['status' => 'identity_verification']);
         $this->createDSR(['status' => 'completed']);
         $this->createDSR(['status' => 'rejected']);
         $this->createDSR(['status' => 'withdrawn']);
@@ -871,7 +876,7 @@ class PrivacyControllerTest extends TestCase
         $this->assertEquals(2, $openCount);
     }
 
-    public function test_dsr_daysRemaining_calculation(): void
+    public function test_dsr_days_remaining_calculation(): void
     {
         $dsr = $this->createDSR([
             'status' => 'in_progress',
@@ -885,7 +890,7 @@ class PrivacyControllerTest extends TestCase
     //  SECTION 8: Data Breach Lifecycle
     // ══════════════════════════════════════════════════
 
-    public function test_breach_store_creates_record_with_reported_status(): void
+    public function test_breach_store_creates_record_with_discovered_status(): void
     {
         $this->actingAs($this->admin)
             ->post('/privacy/breaches', [
@@ -903,26 +908,26 @@ class PrivacyControllerTest extends TestCase
 
         $this->assertDatabaseHas('data_breach_logs', [
             'nature_of_breach' => 'Phishing email compromised credentials.',
-            'status' => 'reported',
+            'status' => 'discovered',
             'approximate_individuals_affected' => 3,
             'created_by' => $this->admin->id,
         ]);
     }
 
-    public function test_breach_update_changes_status_to_investigating(): void
+    public function test_breach_update_changes_status_to_under_investigation(): void
     {
         $breach = $this->createBreach();
 
         $this->actingAs($this->admin)
             ->put("/privacy/breaches/{$breach->id}", [
-                'status' => 'investigating',
+                'status' => 'under_investigation',
                 'measures_taken' => 'Full security audit underway.',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
         $breach->refresh();
-        $this->assertEquals('investigating', $breach->status);
+        $this->assertEquals('under_investigation', $breach->status);
     }
 
     public function test_breach_notify_ico_records_notification(): void
@@ -959,7 +964,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_breach_resolve_sets_resolved_status(): void
     {
-        $breach = $this->createBreach(['status' => 'investigating']);
+        $breach = $this->createBreach(['status' => 'under_investigation']);
 
         $this->actingAs($this->admin)
             ->post("/privacy/breaches/{$breach->id}/resolve", [
@@ -998,17 +1003,17 @@ class PrivacyControllerTest extends TestCase
             ->assertRedirect();
 
         $breach = DataBreachLog::latest()->first();
-        $this->assertEquals('reported', $breach->status);
+        $this->assertEquals('discovered', $breach->status);
 
-        // Step 2: Update to investigating
+        // Step 2: Update to under investigation
         $this->actingAs($this->admin)
             ->put("/privacy/breaches/{$breach->id}", [
-                'status' => 'investigating',
+                'status' => 'under_investigation',
             ])
             ->assertRedirect();
 
         $breach->refresh();
-        $this->assertEquals('investigating', $breach->status);
+        $this->assertEquals('under_investigation', $breach->status);
 
         // Step 3: Notify ICO
         $this->actingAs($this->admin)
@@ -1202,7 +1207,7 @@ class PrivacyControllerTest extends TestCase
         $client = Client::factory()->create();
 
         $hold = LegalHold::create([
-            'hold_reference' => 'LH-' . now()->year . '-9001',
+            'hold_reference' => 'LH-'.now()->year.'-9001',
             'hold_type' => 'regulatory',
             'reason' => 'CQC investigation.',
             'holdable_type' => 'App\\Models\\Client',
@@ -1222,7 +1227,7 @@ class PrivacyControllerTest extends TestCase
         $user = User::factory()->create(['approved_at' => now()]);
 
         $hold = LegalHold::create([
-            'hold_reference' => 'LH-' . now()->year . '-9002',
+            'hold_reference' => 'LH-'.now()->year.'-9002',
             'hold_type' => 'litigation',
             'reason' => 'Employment tribunal claim.',
             'holdable_type' => 'App\\Models\\User',
@@ -1256,7 +1261,7 @@ class PrivacyControllerTest extends TestCase
                 'assessment_name' => 'Cloud Migration Assessment',
                 'project_or_process' => 'AWS Cloud Migration',
                 'description' => 'Assessment of migrating data to AWS cloud services.',
-                'assessment_type' => 'new_processing',
+                'assessment_type' => 'new_project',
                 'personal_data_types' => ['name', 'address', 'health_data'],
                 'data_subjects' => ['clients', 'staff'],
                 'processing_purpose' => 'Improved data access and redundancy.',
@@ -1341,7 +1346,7 @@ class PrivacyControllerTest extends TestCase
         $this->assertNotNull($dpia->approved_at);
     }
 
-    public function test_dpia_review_sets_outcome_to_requires_changes(): void
+    public function test_dpia_review_sets_outcome_to_requires_dpo_review(): void
     {
         $dpia = $this->createDPIA();
 
@@ -1353,7 +1358,7 @@ class PrivacyControllerTest extends TestCase
             ->assertSessionHas('success');
 
         $dpia->refresh();
-        $this->assertEquals('requires_changes', $dpia->outcome);
+        $this->assertEquals('requires_dpo_review', $dpia->outcome);
     }
 
     public function test_dpia_review_requires_notes(): void
@@ -1403,7 +1408,7 @@ class PrivacyControllerTest extends TestCase
     {
         $this->createDPIA(['outcome' => 'approved']);
         $this->createDPIA(['outcome' => 'approved']);
-        $this->createDPIA(['outcome' => 'requires_changes']);
+        $this->createDPIA(['outcome' => 'requires_dpo_review']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dpia?outcome=approved')
@@ -1419,7 +1424,7 @@ class PrivacyControllerTest extends TestCase
             ->post('/privacy/dpia', [
                 'assessment_name' => 'Test',
                 'project_or_process' => 'Test',
-                'assessment_type' => 'new_processing',
+                'assessment_type' => 'new_project',
                 'processing_purpose' => 'Test',
                 'legal_basis' => 'Test',
                 'overall_risk_level' => 'invalid_level',
@@ -1622,8 +1627,8 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dashboard_reflects_breach_stats(): void
     {
-        $this->createBreach(['status' => 'reported']);
-        $this->createBreach(['status' => 'investigating']);
+        $this->createBreach(['status' => 'discovered']);
+        $this->createBreach(['status' => 'under_investigation']);
         $this->createBreach([
             'status' => 'resolved',
             'resolved_at' => now(),
@@ -1939,7 +1944,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dsr_update_allows_valid_status_values(): void
     {
-        $validStatuses = ['pending_verification', 'in_progress', 'completed', 'rejected', 'withdrawn'];
+        $validStatuses = ['received', 'under_review', 'identity_verification', 'in_progress', 'completed', 'rejected', 'withdrawn'];
 
         foreach ($validStatuses as $status) {
             $dsr = $this->createDSR();
@@ -1954,7 +1959,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_breach_update_allows_valid_status_values(): void
     {
-        $validStatuses = ['reported', 'investigating', 'contained', 'resolved', 'closed'];
+        $validStatuses = ['discovered', 'under_investigation', 'contained', 'notified', 'resolved'];
 
         foreach ($validStatuses as $status) {
             $breach = $this->createBreach();
@@ -1989,7 +1994,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dsr_index_filters_by_status(): void
     {
-        $this->createDSR(['status' => 'pending_verification']);
+        $this->createDSR(['status' => 'identity_verification']);
         $this->createDSR(['status' => 'in_progress']);
         $this->createDSR(['status' => 'completed']);
 
@@ -2043,7 +2048,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dsr_index_returns_stats(): void
     {
-        $this->createDSR(['status' => 'pending_verification']);
+        $this->createDSR(['status' => 'identity_verification']);
         $this->createDSR(['status' => 'in_progress']);
         $this->createDSR(['status' => 'in_progress', 'due_date' => now()->subDay()]);
         $this->createDSR([
@@ -2064,11 +2069,11 @@ class PrivacyControllerTest extends TestCase
 
     public function test_breach_index_filters_by_status(): void
     {
-        $this->createBreach(['status' => 'reported']);
-        $this->createBreach(['status' => 'investigating']);
+        $this->createBreach(['status' => 'discovered']);
+        $this->createBreach(['status' => 'under_investigation']);
 
         $this->actingAs($this->admin)
-            ->get('/privacy/breaches?status=reported')
+            ->get('/privacy/breaches?status=discovered')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('breaches.data', 1)
@@ -2315,7 +2320,7 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_deletion_logs_index_forbidden_without_manageRetention_permission(): void
+    public function test_deletion_logs_index_forbidden_without_manage_retention_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/privacy/deletion-logs')
@@ -2324,8 +2329,17 @@ class PrivacyControllerTest extends TestCase
 
     public function test_deletion_execute_responds(): void
     {
+        $policy = $this->createRetentionPolicy([
+            'model_type' => Client::class,
+            'retention_period_years' => 1,
+            'retention_conditions' => ['status' => 'retired'],
+        ]);
+
         $this->actingAs($this->admin)
-            ->post('/privacy/deletion/execute')
+            ->post('/privacy/deletion/execute', [
+                'policy_id' => $policy->id,
+                'confirm' => '1',
+            ])
             ->assertRedirect()
             ->assertSessionHas('info');
     }
@@ -2342,15 +2356,15 @@ class PrivacyControllerTest extends TestCase
             $this->actingAs($this->admin)
                 ->post('/privacy/requests', [
                     'request_type' => $type,
-                    'subject_name' => 'Test Subject for ' . $type,
-                    'subject_email' => $type . '@example.com',
+                    'subject_name' => 'Test Subject for '.$type,
+                    'subject_email' => $type.'@example.com',
                     'request_details' => "Testing {$type} request.",
                 ])
                 ->assertRedirect();
 
             $this->assertDatabaseHas('data_subject_requests', [
                 'request_type' => $type,
-                'subject_email' => $type . '@example.com',
+                'subject_email' => $type.'@example.com',
             ]);
         }
     }
@@ -2366,10 +2380,12 @@ class PrivacyControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->get("/privacy/requests/{$dsr->id}/export")
             ->assertRedirect()
-            ->assertSessionHas('info');
+            ->assertSessionHas('success');
+
+        $this->assertNotNull($dsr->fresh()->export_path);
     }
 
-    public function test_dsr_export_forbidden_without_viewRequests_permission(): void
+    public function test_dsr_export_forbidden_without_view_requests_permission(): void
     {
         $dsr = $this->createDSR();
 

@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Governance;
 
-use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Services\VotingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\GovernanceTestHelpers;
@@ -10,8 +9,8 @@ use Tests\TestCase;
 
 class VotingServiceTest extends TestCase
 {
-    use RefreshDatabase;
     use GovernanceTestHelpers;
+    use RefreshDatabase;
 
     public function test_open_and_cast_vote(): void
     {
@@ -22,7 +21,7 @@ class VotingServiceTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $service = new VotingService();
+        $service = new VotingService;
         $service->openVoting($resolution, now()->addDays(2));
 
         $resolution->refresh();
@@ -46,7 +45,7 @@ class VotingServiceTest extends TestCase
             'deadline' => now()->addDays(2),
         ]);
 
-        $service = new VotingService();
+        $service = new VotingService;
         $service->castVote($resolution, $boardMember, 'for');
 
         $this->expectException(\InvalidArgumentException::class);
@@ -58,20 +57,22 @@ class VotingServiceTest extends TestCase
         $this->seedGovernance();
         $admin = $this->createAdminUser();
         $boardMember = $this->createBoardMember($admin);
+        $meeting = $this->createMeeting($admin);
         $resolution = $this->createResolution($admin, [
             'status' => 'open',
             'deadline' => now()->addDays(5),
+            'governance_meeting_id' => $meeting->id,
         ]);
 
-        $service = new VotingService();
+        $service = new VotingService;
         $service->declareConflict(
             $resolution,
             $boardMember,
             'material',
             'Conflict note',
+            $admin,
             true,
-            false,
-            $admin
+            false
         );
 
         $this->assertDatabaseHas('conflict_declarations', [
@@ -93,7 +94,7 @@ class VotingServiceTest extends TestCase
         $admin = $this->createAdminUser();
         $this->createBoardMember($admin);
 
-        $service = new VotingService();
+        $service = new VotingService;
         $quorum = $service->calculateQuorum(null);
 
         $this->assertEquals(1, $quorum['total_eligible']);

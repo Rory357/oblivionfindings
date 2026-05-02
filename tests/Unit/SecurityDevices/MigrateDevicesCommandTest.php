@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
@@ -56,7 +57,7 @@ class MigrateDevicesCommandTest extends TestCase
     {
         $defaults = [
             'name' => 'CR Sensor',
-            'device_uid' => 'dev-' . \Illuminate\Support\Str::uuid(),
+            'device_uid' => 'dev-'.\Illuminate\Support\Str::uuid(),
             'type' => 'sensor',
             'vendor' => null,
             'model' => null,
@@ -91,7 +92,7 @@ class MigrateDevicesCommandTest extends TestCase
         $defaults = [
             'asset_id' => Asset::factory()->create()->id,
             'vendor' => 'queclink',
-            'device_uid' => 'TRK-' . fake()->unique()->numerify('####'),
+            'device_uid' => 'TRK-'.fake()->unique()->numerify('####'),
             'imei' => null,
             'serial_number' => null,
             'status' => 'paired',
@@ -418,7 +419,8 @@ class MigrateDevicesCommandTest extends TestCase
         $user = User::factory()->create();
         $consent = ClientConsent::create([
             'client_id' => $client->id,
-            'status' => 'active',
+            'consent_type_id' => ConsentType::factory()->create()->id,
+            'status' => 'given',
             'given_at' => now(),
             'given_by_user_id' => $user->id,
             'given_method' => 'verbal',

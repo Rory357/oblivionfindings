@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +23,7 @@ class DeviceAssignmentServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new DeviceAssignmentService();
+        $this->service = new DeviceAssignmentService;
     }
 
     public function test_assign_device_to_site(): void
@@ -145,7 +146,8 @@ class DeviceAssignmentServiceTest extends TestCase
         $user = User::factory()->create();
         $consent = ClientConsent::create([
             'client_id' => $client->id,
-            'status' => 'active',
+            'consent_type_id' => ConsentType::factory()->create()->id,
+            'status' => 'given',
             'given_at' => now(),
             'given_by_user_id' => $user->id,
             'given_method' => 'verbal',

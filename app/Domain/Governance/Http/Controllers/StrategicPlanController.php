@@ -2,8 +2,8 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Governance\Models\StrategicPlan;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -34,7 +34,7 @@ class StrategicPlanController extends Controller
     {
         abort_unless($request->user()?->canDo('governance.strategy.view'), 403);
 
-        $plan->load(['goals' => fn($q) => $q->orderBy('order')]);
+        $plan->load(['goals' => fn ($q) => $q->orderBy('order')]);
 
         return Inertia::render('Governance/Strategy/Show', [
             'plan' => $plan,
@@ -108,8 +108,17 @@ class StrategicPlanController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'timeframe' => ['nullable', 'string', 'max:255'],
+            'pillar' => ['nullable', 'string', 'max:255'],
+            'lead_executive_id' => ['nullable', 'exists:users,id'],
+            'key_results' => ['nullable', 'array'],
+            'risks' => ['nullable', 'array'],
             'order' => ['integer', 'min:0'],
         ]);
+
+        $data['timeframe'] ??= $plan->period_start?->toDateString().' - '.$plan->period_end?->toDateString();
+        $data['pillar'] ??= 'quality';
+        $data['lead_executive_id'] ??= $request->user()->id;
 
         $plan->goals()->create($data);
 
@@ -125,12 +134,7 @@ class StrategicPlanController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $plan->update([
-            'approval_resolution_id' => $validated['resolution_id'],
-            'approved_at' => now(),
-            'approved_by' => $request->user()->id,
-            'status' => 'active',
-        ]);
+        $plan->approve($validated['resolution_id']);
 
         return redirect()->back()->with('success', 'Strategic plan approved.');
     }
@@ -157,7 +161,7 @@ class StrategicPlanController extends Controller
         $newPlan = $plan->createNewVersion($validated['version_notes'], auth()->id());
 
         return redirect()->route('governance.strategy.show', $newPlan)
-            ->with('success', 'New version created (v' . $newPlan->version_number . ').');
+            ->with('success', 'New version created (v'.$newPlan->version_number.').');
     }
 
     public function changes(StrategicPlan $plan)

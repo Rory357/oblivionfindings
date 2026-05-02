@@ -11,6 +11,7 @@ use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -35,6 +36,9 @@ class ClinicalGovernanceAutomationTest extends TestCase
 
     public function test_governance_clinical_automation_pipeline_syncs_and_surfaces_snapshot_data(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-05-15 12:00:00'));
+        $this->beforeApplicationDestroyed(fn () => Carbon::setTestNow());
+
         $admin = $this->createAdminUser();
         $client = Client::factory()->create();
         $reporter = User::factory()->create();
@@ -122,8 +126,8 @@ class ClinicalGovernanceAutomationTest extends TestCase
 
         $currentValues = collect($response->inertiaProps('latestSnapshot.indicator_values'))->keyBy('indicator_code');
 
-        $this->assertSame('/emar/errors?date_from=' . now()->startOfMonth()->toDateString() . '&date_to=' . now()->toDateString(), $currentValues->get('HCG-001')['source_href']);
-        $this->assertSame('/health-clinical/events?event_type=fall&date_from=' . now()->startOfMonth()->toDateString() . '&date_to=' . now()->toDateString(), $currentValues->get('HCG-002')['source_href']);
+        $this->assertSame('/emar/errors?date_from='.now()->startOfMonth()->toDateString().'&date_to='.now()->toDateString(), $currentValues->get('HCG-001')['source_href']);
+        $this->assertSame('/health-clinical/events?event_type=fall&date_from='.now()->startOfMonth()->toDateString().'&date_to='.now()->toDateString(), $currentValues->get('HCG-002')['source_href']);
         $this->actingAs($admin)->get('/governance/clinical')->assertOk();
 
         $trendsResponse = $this->actingAs($admin)->get('/governance/clinical/trends');

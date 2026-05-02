@@ -13,7 +13,7 @@ class HsEventFactory extends Factory
 
     public function definition(): array
     {
-        $source = ClientIncident::factory()->create();
+        $source = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create());
 
         return [
             'reference_number' => HsEvent::generateReferenceNumber(),

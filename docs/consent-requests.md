@@ -69,7 +69,7 @@ The four `substitute` values are the canonical list at `ConsentRequest::AUTHORIS
 
 ## Routes
 
-### Staff (Operations) — [`routes/consents.php`](../routes/consents.php)
+### Staff (Operations) — [`routes/operations.php`](../routes/operations.php)
 
 | Method | URI | Name | Permission |
 | --- | --- | --- | --- |
@@ -129,6 +129,15 @@ Defined in [`RbacSeeder`](../database/seeders/RbacSeeder.php):
 
 Policy mapping is in [`ConsentRequestPolicy`](../app/Policies/ConsentRequestPolicy.php). Portal `respond` is a non-RBAC gate: it requires recipient match plus `canAccessClientPortal($client)`.
 
+## Current scope boundaries
+
+The production v1 workflow is staff-created consent requests plus the existing client consent register. The deleted legacy `routes/consents.php` file referenced consent reports, withdrawal-request admin, and consent-type admin routes that do not have controllers in this application.
+
+- Consent reports are not a standalone UI in v1; privacy DSR export and the client-profile consent lists are the supported reporting surfaces.
+- Withdrawal is staff-recorded on an existing `ClientConsent` via `operations.clients.consents.withdraw`. In-flight requests are handled by cancel, decline, and expiry states rather than a separate withdrawal-request queue.
+- Consent types are catalogue-backed and selected in the request form. Separate consent-type CRUD is intentionally out of scope until there is an operational owner and approval workflow.
+- HR vetting/PVCB consent is staff employment compliance and remains on `StaffBackgroundCheck` via [`Hr\VettingController::captureConsent`](../app/Http/Controllers/Hr/VettingController.php). It is not written to `ClientConsent` because the data subject, legal basis, retention context, and reporting audience differ from client health/care consent.
+
 ## Open extension points
 
 The polymorphic `triggering_subject` morph and the generic Right-7 disclosure fields make these natural follow-ons — none of them are implemented yet:
@@ -136,7 +145,7 @@ The polymorphic `triggering_subject` morph and the generic Right-7 disclosure fi
 - **Medication-cabinet consent** — gate `medications.administer.record` for high-risk classes (e.g. PRN antipsychotics) on a valid `ClientConsent` of the relevant type.
 - **Photo / media consent** — required for `PortalPhotoController::store` and timeline images that include other clients' faces.
 - **Telehealth consent** — required before initiating a remote appointment that records audio/video.
-- **Withdrawal flow from the portal** — currently withdrawal lives only on the staff side at `consents.withdrawalRequests.*`; a mirror on the portal would let signatories revoke without phoning in.
+- **Withdrawal flow from the portal** — currently withdrawal lives on the staff-side client consent register; a mirror on the portal would let signatories revoke without phoning in.
 - **Capacity reassessment trigger** — when a portal recipient with `RELATION_SELF` declines or repeatedly fails to respond, raise a clinical flag for a fresh capacity assessment under PPPR Act criteria.
 
 Each of these would slot in by (a) adding a `ConsentType`, (b) calling `ConsentRequestService::create()` with the appropriate `triggering_subject_*`, and (c) writing a controller-level enforcement check mirroring `enforceConsentForClientTracker`.

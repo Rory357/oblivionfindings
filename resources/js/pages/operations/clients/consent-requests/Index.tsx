@@ -5,7 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { Clock, CheckCircle2, XCircle, FileText, Plus, Send, UserCheck } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock,
+    FileText,
+    Plus,
+    Send,
+    UserCheck,
+    XCircle,
+} from 'lucide-react';
 
 type RequestSummary = {
     id: number;
@@ -25,7 +33,12 @@ type RequestSummary = {
 type Props = {
     client: { id: number; full_name: string };
     requests: RequestSummary[];
-    stats: { total: number; pending: number; approved: number; declined: number };
+    stats: {
+        total: number;
+        pending: number;
+        approved: number;
+        declined: number;
+    };
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -42,29 +55,57 @@ const AUTHORITY_LABEL: Record<string, string> = {
     informational_only: 'Informational only — not consent authority',
 };
 
-export default function ConsentRequestsIndex({ client, requests = [], stats }: Props) {
+export default function ConsentRequestsIndex({
+    client,
+    requests = [],
+    stats,
+}: Props) {
     return (
         <AppLayout>
             <Head title={`Consent requests — ${client.full_name}`} />
             <PageShell>
-                <PageHeader
-                    title="Consent requests"
-                    description={`Family-portal consent workflow for ${client.full_name}`}
-                    actions={
-                        <Button asChild>
-                            <Link href={`/operations/clients/${client.id}/consent-requests/create`}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                New request
-                            </Link>
-                        </Button>
-                    }
-                />
+                <div data-test="consent-requests-index">
+                    <PageHeader
+                        title="Consent requests"
+                        description={`Family-portal consent workflow for ${client.full_name}`}
+                        actions={
+                            <Button asChild>
+                                <Link
+                                    href={`/operations/clients/${client.id}/consent-requests/create`}
+                                    data-test="consent-request-create-link"
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    New request
+                                </Link>
+                            </Button>
+                        }
+                    />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <StatCard label="Total" value={stats.total} icon={FileText} />
-                    <StatCard label="Pending" value={stats.pending} icon={Clock} tone="amber" />
-                    <StatCard label="Approved" value={stats.approved} icon={CheckCircle2} tone="emerald" />
-                    <StatCard label="Declined" value={stats.declined} icon={XCircle} tone="red" />
+                    <StatCard
+                        label="Total"
+                        value={stats.total}
+                        icon={FileText}
+                    />
+                    <StatCard
+                        label="Pending"
+                        value={stats.pending}
+                        icon={Clock}
+                        tone="amber"
+                    />
+                    <StatCard
+                        label="Approved"
+                        value={stats.approved}
+                        icon={CheckCircle2}
+                        tone="emerald"
+                    />
+                    <StatCard
+                        label="Declined"
+                        value={stats.declined}
+                        icon={XCircle}
+                        tone="red"
+                    />
                 </div>
 
                 <Card>
@@ -77,44 +118,104 @@ export default function ConsentRequestsIndex({ client, requests = [], stats }: P
                                 <Send className="mb-3 h-10 w-10 opacity-40" />
                                 <p>No consent requests yet for this client.</p>
                                 <p className="mt-1">
-                                    Start one from the client profile when you need a family signatory to approve a
-                                    consent (e.g. personal-tracker assignment).
+                                    Start one from the client profile when you
+                                    need a family signatory to approve a consent
+                                    (e.g. personal-tracker assignment).
                                 </p>
                             </div>
                         ) : (
                             <ul className="divide-y">
                                 {requests.map((r) => (
-                                    <li key={r.id} className="flex items-start justify-between gap-4 py-3">
+                                    <li
+                                        key={r.id}
+                                        className="flex items-start justify-between gap-4 py-3"
+                                        data-test="consent-request-row"
+                                    >
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
                                                 <Link
                                                     href={`/operations/clients/${client.id}/consent-requests/${r.id}`}
                                                     className="font-medium hover:underline"
                                                 >
-                                                    {r.consent_type?.name ?? 'Consent'}
+                                                    {r.consent_type?.name ??
+                                                        'Consent'}
                                                 </Link>
-                                                <Badge className={STATUS_STYLES[r.status] ?? 'bg-muted'}>{r.status}</Badge>
-                                                {r.is_expired && r.status === 'pending' && (
-                                                    <Badge className="bg-status-critical-bg text-status-critical">overdue</Badge>
-                                                )}
+                                                <Badge
+                                                    className={
+                                                        STATUS_STYLES[
+                                                            r.status
+                                                        ] ?? 'bg-muted'
+                                                    }
+                                                    data-test="consent-request-status"
+                                                >
+                                                    {r.status}
+                                                </Badge>
+                                                {r.is_expired &&
+                                                    r.status === 'pending' && (
+                                                        <Badge className="bg-status-critical-bg text-status-critical">
+                                                            overdue
+                                                        </Badge>
+                                                    )}
                                             </div>
                                             <div className="mt-1 text-sm text-muted-foreground">
-                                                <span className="font-medium">To:</span>{' '}
-                                                {r.recipient?.name ?? 'Unknown'} ({r.recipient_relationship.replace(/_/g, ' ')})
-                                                <span className="mx-2">·</span>
+                                                <span className="font-medium">
+                                                    To:
+                                                </span>{' '}
+                                                {r.recipient?.name ?? 'Unknown'}{' '}
+                                                (
+                                                {r.recipient_relationship.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
+                                                )<span className="mx-2">·</span>
                                                 <UserCheck className="mr-1 inline h-3 w-3" />
-                                                {AUTHORITY_LABEL[r.authority_to_consent]}
+                                                {
+                                                    AUTHORITY_LABEL[
+                                                        r.authority_to_consent
+                                                    ]
+                                                }
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">
-                                                Requested by {r.requested_by?.name ?? 'staff'}
-                                                {r.sent_at && <> · sent {formatDate(r.sent_at)}</>}
-                                                {r.expires_at && <> · expires {formatDate(r.expires_at)}</>}
-                                                {r.responded_at && <> · responded {formatDate(r.responded_at)}</>}
+                                                Requested by{' '}
+                                                {r.requested_by?.name ??
+                                                    'staff'}
+                                                {r.sent_at && (
+                                                    <>
+                                                        {' '}
+                                                        · sent{' '}
+                                                        {formatDate(r.sent_at)}
+                                                    </>
+                                                )}
+                                                {r.expires_at && (
+                                                    <>
+                                                        {' '}
+                                                        · expires{' '}
+                                                        {formatDate(
+                                                            r.expires_at,
+                                                        )}
+                                                    </>
+                                                )}
+                                                {r.responded_at && (
+                                                    <>
+                                                        {' '}
+                                                        · responded{' '}
+                                                        {formatDate(
+                                                            r.responded_at,
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button asChild variant="outline" size="sm">
-                                                <Link href={`/operations/clients/${client.id}/consent-requests/${r.id}`}>
+                                            <Button
+                                                asChild
+                                                variant="outline"
+                                                size="sm"
+                                            >
+                                                <Link
+                                                    href={`/operations/clients/${client.id}/consent-requests/${r.id}`}
+                                                    data-test="consent-request-view-link"
+                                                >
                                                     View
                                                 </Link>
                                             </Button>
@@ -153,7 +254,9 @@ function StatCard({
                 <Icon className={`h-6 w-6 ${toneClass[tone]}`} />
                 <div>
                     <div className="text-2xl font-semibold">{value}</div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                        {label}
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -162,7 +265,11 @@ function StatCard({
 
 function formatDate(iso: string): string {
     try {
-        return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+        return new Date(iso).toLocaleDateString('en-NZ', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
     } catch {
         return iso;
     }

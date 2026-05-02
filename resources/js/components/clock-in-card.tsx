@@ -232,7 +232,7 @@ export default function ClockInCard({
                     Pick the shift you're starting and we'll clock you in.
                 </p>
 
-                <ul
+                <div
                     role="radiogroup"
                     aria-label="Eligible shifts"
                     className="mt-3 space-y-2"
@@ -244,7 +244,7 @@ export default function ClockInCard({
                                 ? `${formatTime(shift.starts_at)} – ${formatTime(shift.ends_at)}`
                                 : null;
                         return (
-                            <li key={shift.id}>
+                            <div key={shift.id}>
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -294,10 +294,10 @@ export default function ClockInCard({
                                         </span>
                                     </span>
                                 </Button>
-                            </li>
+                            </div>
                         );
                     })}
-                </ul>
+                </div>
 
                 <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <a

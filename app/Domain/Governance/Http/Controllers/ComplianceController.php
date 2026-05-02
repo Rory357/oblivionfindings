@@ -72,7 +72,7 @@ class ComplianceController extends Controller
 
         $owner = $validated['owner_id'] ? \App\Models\User::find($validated['owner_id']) : null;
         $dueDate = $validated['due_date'] ? Carbon::parse($validated['due_date']) : null;
-        
+
         $obligation = $this->complianceService->createObligation(
             $validated['framework'],
             $validated['title'],
@@ -102,6 +102,11 @@ class ComplianceController extends Controller
             'owner_id' => 'sometimes|exists:users,id',
             'notes' => 'nullable|string',
         ]);
+
+        if (array_key_exists('title', $validated)) {
+            $validated['obligation_title'] = $validated['title'];
+            unset($validated['title']);
+        }
 
         $obligation->update($validated);
 
@@ -161,7 +166,7 @@ class ComplianceController extends Controller
             ->get();
 
         return Inertia::render('Governance/Compliance/Calendar', [
-            'events' => $obligations->map(fn($o) => [
+            'events' => $obligations->map(fn ($o) => [
                 'id' => $o->id,
                 'title' => $o->obligation_title,
                 'date' => $o->due_date->toDateString(),
@@ -203,7 +208,7 @@ class ComplianceController extends Controller
         ]);
 
         return redirect()->route('governance.compliance.index')
-            ->with('success', 'Notifiable incident recorded. Ensure timely notification to ' . $validated['notification_authority'] . '.');
+            ->with('success', 'Notifiable incident recorded. Ensure timely notification to '.$validated['notification_authority'].'.');
     }
 
     protected function getFrameworks(): array

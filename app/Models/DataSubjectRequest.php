@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DataSubjectRequest extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'reference_number',
@@ -92,9 +92,9 @@ class DataSubjectRequest extends Model
     public static function generateReferenceNumber(): string
     {
         $year = now()->year;
-        $prefix = 'DSR-' . $year . '-';
+        $prefix = 'DSR-'.$year.'-';
 
-        $lastRequest = static::where('reference_number', 'like', $prefix . '%')
+        $lastRequest = static::where('reference_number', 'like', $prefix.'%')
             ->orderByDesc('reference_number')
             ->first();
 
@@ -105,7 +105,7 @@ class DataSubjectRequest extends Model
             $newNumber = 1;
         }
 
-        return $prefix . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad($newNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -175,10 +175,10 @@ class DataSubjectRequest extends Model
                     $subQ->whereNull('extended_due_date')
                         ->where('due_date', '<', now());
                 })
-                ->orWhere(function ($subQ) {
-                    $subQ->whereNotNull('extended_due_date')
-                        ->where('extended_due_date', '<', now());
-                });
+                    ->orWhere(function ($subQ) {
+                        $subQ->whereNotNull('extended_due_date')
+                            ->where('extended_due_date', '<', now());
+                    });
             });
     }
 
@@ -192,6 +192,7 @@ class DataSubjectRequest extends Model
         }
 
         $deadline = $this->extended_due_date ?: $this->due_date;
+
         return $deadline && $deadline->isPast();
     }
 
@@ -201,6 +202,11 @@ class DataSubjectRequest extends Model
     public function daysRemaining(): int
     {
         $deadline = $this->extended_due_date ?: $this->due_date;
-        return max(0, now()->diffInDays($deadline, false));
+
+        if (! $deadline) {
+            return 0;
+        }
+
+        return max(0, (int) now()->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false));
     }
 }

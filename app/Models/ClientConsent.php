@@ -6,12 +6,11 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientConsent extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'client_id',
@@ -145,30 +144,6 @@ class ClientConsent extends Model
     }
 
     /**
-     * Withdrawal requests.
-     */
-    public function withdrawalRequests(): HasMany
-    {
-        return $this->hasMany(ConsentWithdrawalRequest::class);
-    }
-
-    /**
-     * Audit logs.
-     */
-    public function auditLogs(): HasMany
-    {
-        return $this->hasMany(ConsentAuditLog::class);
-    }
-
-    /**
-     * Reminders.
-     */
-    public function reminders(): HasMany
-    {
-        return $this->hasMany(ConsentReminder::class);
-    }
-
-    /**
      * Scope: Active consents (given and not withdrawn/expired).
      */
     public function scopeActive($query)
@@ -204,7 +179,7 @@ class ClientConsent extends Model
     public function isValid(): bool
     {
         return $this->status === 'given'
-            && (!$this->expires_at || $this->expires_at->isFuture());
+            && (! $this->expires_at || $this->expires_at->isFuture());
     }
 
     /**

@@ -25,7 +25,7 @@ class DeviceAssignmentService
         ?string $notes = null,
     ): DeviceAssignment {
         $this->validateTarget($assignableType);
-        $this->validateConsent($assignableType, $consentId);
+        $this->validateConsent($device, $assignableType, $consentId);
 
         return DB::transaction(function () use (
             $device, $assignableType, $assignableId, $assignedByUserId,
@@ -55,7 +55,7 @@ class DeviceAssignmentService
     {
         $active = $device->assignments()->active()->first();
 
-        if (!$active) {
+        if (! $active) {
             return null;
         }
 
@@ -103,9 +103,9 @@ class DeviceAssignmentService
 
     private function validateTarget(string $assignableType): void
     {
-        if (!in_array($assignableType, DeviceAssignment::VALID_TARGETS, true)) {
+        if (! in_array($assignableType, DeviceAssignment::VALID_TARGETS, true)) {
             throw new \InvalidArgumentException(
-                "Invalid assignable type '{$assignableType}'. Must be one of: " .
+                "Invalid assignable type '{$assignableType}'. Must be one of: ".
                 implode(', ', DeviceAssignment::VALID_TARGETS)
             );
         }
@@ -114,11 +114,15 @@ class DeviceAssignmentService
     /**
      * Client-assigned tracking devices require a consent record (NZ privacy).
      */
-    private function validateConsent(string $assignableType, ?int $consentId): void
+    private function validateConsent(Device $device, string $assignableType, ?int $consentId): void
     {
-        if ($assignableType === DeviceAssignment::TARGET_CLIENT && $consentId === null) {
+        if (
+            $assignableType === DeviceAssignment::TARGET_CLIENT
+            && $device->domain === 'tracking'
+            && $consentId === null
+        ) {
             throw new \InvalidArgumentException(
-                'Client device assignments require a consent_id (NZ privacy requirement).'
+                'Client tracker assignments require a consent_id (NZ privacy requirement).'
             );
         }
     }

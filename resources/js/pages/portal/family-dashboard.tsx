@@ -1291,7 +1291,10 @@ export default function FamilyDashboard({
 
                         {/* Consent Requests */}
                         {pendingConsentRequests.length > 0 && (
-                            <Card className="border-status-warning/30 bg-status-warning-bg">
+                            <Card
+                                className="border-status-warning/30 bg-status-warning-bg"
+                                data-test="portal-consent-requests-card"
+                            >
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span>🔏</span>
@@ -1305,6 +1308,7 @@ export default function FamilyDashboard({
                                             <div
                                                 key={cr.id}
                                                 className="flex items-start justify-between gap-3 rounded-lg border bg-white p-3"
+                                                data-test="portal-consent-request-row"
                                             >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-sm font-medium">
