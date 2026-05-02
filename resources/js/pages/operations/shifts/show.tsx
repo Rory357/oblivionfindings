@@ -1015,15 +1015,15 @@ export default function ShiftShow({
                         </CardContent>
                     </Card>
 
-                    <Card className="transition-shadow hover:shadow-md">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                <CalendarDays className="h-3.5 w-3.5" />
-                                Linked Respite Booking
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {shift.respite_booking ? (
+                    {shift.respite_booking ? (
+                        <Card className="transition-shadow hover:shadow-md">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                                    <CalendarDays className="h-3.5 w-3.5" />
+                                    Linked Respite Booking
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <Link
@@ -1074,13 +1074,9 @@ export default function ShiftShow({
                                         </p>
                                     ) : null}
                                 </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    No respite booking linked.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
                     <Card className="transition-shadow hover:shadow-md">
                         <CardHeader className="pb-2">

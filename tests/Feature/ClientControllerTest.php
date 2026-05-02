@@ -132,7 +132,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 2)
         );
     }
@@ -145,7 +145,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 2)
         );
     }
@@ -158,7 +158,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 2)
         );
     }
@@ -172,7 +172,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 1)
         );
     }
@@ -185,7 +185,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 2)
         );
     }
@@ -217,7 +217,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 1)
             ->where('clients.0.id', $assignedClient->id)
             ->where('clients.0.first_name', 'Assigned')
@@ -232,7 +232,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 0)
         );
     }
@@ -247,7 +247,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 2)
         );
     }
@@ -269,7 +269,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 1)
             ->has('clients.0', fn ($client) => $client
                 ->has('id')
@@ -281,6 +281,7 @@ class ClientControllerTest extends TestCase
                 ->has('site')
                 ->has('onboarding')
                 ->has('has_respite')
+                ->etc()
             )
         );
     }
@@ -407,7 +408,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/show')
+            ->component('operations/clients/show')
             ->where('client.id', $client->id)
         );
     }
@@ -420,7 +421,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/show')
+            ->component('operations/clients/show')
             ->where('client.id', $client->id)
         );
     }
@@ -433,7 +434,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/show')
+            ->component('operations/clients/show')
             ->where('client.id', $client->id)
         );
     }
@@ -447,7 +448,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/show')
+            ->component('operations/clients/show')
             ->where('client.id', $client->id)
         );
     }
@@ -469,7 +470,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/show')
+            ->component('operations/clients/show')
             ->where('client.id', $client->id)
         );
     }
@@ -554,7 +555,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/show')
+            ->component('operations/clients/show')
             ->has('client', fn ($c) => $c
                 ->where('id', $client->id)
                 ->where('first_name', 'John')
@@ -577,6 +578,7 @@ class ClientControllerTest extends TestCase
                 ->has('site')
                 ->has('service_context')
                 ->has('support_workers')
+                ->etc()
             )
         );
     }
@@ -607,7 +609,7 @@ class ClientControllerTest extends TestCase
             'title' => 'Care Plan',
             'category' => 'care_plan',
             'original_name' => 'care-plan.pdf',
-            'path' => 'documents/care-plan.pdf',
+            'storage_path' => 'documents/care-plan.pdf',
             'mime_type' => 'application/pdf',
             'size_bytes' => 1024,
         ]);
@@ -652,6 +654,8 @@ class ClientControllerTest extends TestCase
                 ->has('source_id')
                 ->has('source_type')
                 ->has('shift_id')
+                ->has('comments')
+                ->has('reactions')
             )
         );
     }
@@ -714,12 +718,11 @@ class ClientControllerTest extends TestCase
         ]);
 
         // Past shift
-        Shift::factory()->create([
+        Shift::factory()->completed()->create([
             'client_id' => $client->id,
             'user_id' => $this->supportWorker->id,
             'starts_at' => now()->subDay(),
             'ends_at' => now()->subDay()->addHours(4),
-            'status' => 'completed',
         ]);
 
         $response = $this->actingAs($this->admin)->get("/clients/{$client->id}");
@@ -729,6 +732,7 @@ class ClientControllerTest extends TestCase
             ->has('shifts_summary', fn ($ss) => $ss
                 ->has('next')
                 ->has('last')
+                ->etc()
             )
         );
     }
@@ -780,7 +784,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('onboarding', fn ($ob) => $ob
+            ->has('onboarding.checklist', fn ($ob) => $ob
                 ->has('items')
                 ->has('completed')
                 ->has('total')
@@ -804,8 +808,8 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('onboarding.items', 7)
-            ->has('onboarding.items.0', fn ($item) => $item
+            ->has('onboarding.checklist.items', 8)
+            ->has('onboarding.checklist.items.0', fn ($item) => $item
                 ->has('key')
                 ->has('label')
                 ->has('has_data')
@@ -882,6 +886,7 @@ class ClientControllerTest extends TestCase
                 ->where('pin_handover', true)
                 ->where('manage_onboarding', true)
                 ->where('create_shift', true)
+                ->etc()
             )
         );
     }
@@ -902,6 +907,7 @@ class ClientControllerTest extends TestCase
                 ->where('pin_handover', false)
                 ->where('manage_onboarding', false)
                 ->where('create_shift', false)
+                ->etc()
             )
         );
     }
@@ -921,6 +927,7 @@ class ClientControllerTest extends TestCase
                 ->where('pin_handover', true)
                 ->where('manage_onboarding', true)
                 ->where('create_shift', true)
+                ->etc()
             )
         );
     }
@@ -1042,7 +1049,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/create')
+            ->component('operations/clients/create')
             ->has('sites')
             ->has('serviceContexts')
             ->has('defaultServiceContextId')
@@ -1054,7 +1061,7 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->providerManager)->get('/clients/create');
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('clients/create'));
+        $response->assertInertia(fn ($page) => $page->component('operations/clients/create'));
     }
 
     public function test_coordinator_cannot_access_create_form(): void
@@ -1101,7 +1108,10 @@ class ClientControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->has('sites', fn ($sites) => $sites
-                ->each(fn ($site) => $site->where('name', fn ($name) => $name !== 'Inactive Site'))
+                ->each(fn ($site) => $site
+                    ->where('name', fn ($name) => $name !== 'Inactive Site')
+                    ->etc()
+                )
             )
         );
     }
@@ -1144,8 +1154,11 @@ class ClientControllerTest extends TestCase
         $this->assertDatabaseHas('clients', [
             'first_name' => 'Test',
             'last_name' => 'Client',
-            'email' => 'test.client@example.com',
         ]);
+
+        $client = $this->findClientByEmail('test.client@example.com');
+        $this->assertSame('Test', $client->first_name);
+        $this->assertSame('Client', $client->last_name);
     }
 
     public function test_provider_manager_can_store_client(): void
@@ -1155,7 +1168,7 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->providerManager)->post('/clients', $data);
 
         $response->assertRedirect(route('clients.index'));
-        $this->assertDatabaseHas('clients', ['email' => 'pm-client@example.com']);
+        $this->findClientByEmail('pm-client@example.com');
     }
 
     public function test_coordinator_cannot_store_client(): void
@@ -1332,10 +1345,13 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
         $response->assertRedirect(route('clients.index'));
+        // The controller defaults newly-created clients to 'onboarding' status so an
+        // onboarding workflow can be initialised; only inactive submissions are
+        // preserved as-is. The minimal payload is therefore stored as 'onboarding'.
         $this->assertDatabaseHas('clients', [
             'first_name' => 'Minimal',
             'last_name' => 'Client',
-            'status' => 'active',
+            'status' => 'onboarding',
         ]);
     }
 
@@ -1351,9 +1367,8 @@ class ClientControllerTest extends TestCase
             'last_name' => 'Client',
             'date_of_birth' => '1990-01-15',
             'gender' => 'female',
-            'status' => 'active',
-            'phone' => '0211234567',
-            'email' => 'test.client@example.com',
+            // Newly-created clients default to 'onboarding' status; see ClientController::store.
+            'status' => 'onboarding',
             'address_line_1' => '123 Test Street',
             'address_line_2' => 'Unit 4',
             'suburb' => 'Testville',
@@ -1364,6 +1379,11 @@ class ClientControllerTest extends TestCase
             'funding_type' => 'ndis',
             'funding_notes' => 'Test funding notes',
         ]);
+
+        // phone, email, and nhi_number are encrypted at rest, so verify the
+        // decrypted values via the model accessors instead.
+        $client = $this->findClientByEmail('test.client@example.com');
+        $this->assertSame('0211234567', $client->phone);
     }
 
     public function test_store_returns_validation_errors_for_empty_payload(): void
@@ -1565,27 +1585,33 @@ class ClientControllerTest extends TestCase
             'service_context_id' => $this->serviceContext->id,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}/edit");
+        // The edit endpoint serves an inline modal: JSON when requested as such,
+        // otherwise it redirects to the canonical client show route.
+        $jsonResponse = $this->actingAs($this->admin)
+            ->getJson("/clients/{$client->id}/edit");
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('clients/edit')
-            ->has('client')
-            ->has('sites')
-            ->has('serviceContexts')
-            ->has('defaultServiceContextId')
-            ->where('client.id', $client->id)
-        );
+        $jsonResponse->assertOk();
+        $jsonResponse->assertJsonPath('client.id', $client->id);
+        $jsonResponse->assertJsonStructure([
+            'client',
+            'sites',
+            'serviceContexts',
+            'defaultServiceContextId',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/clients/{$client->id}/edit")
+            ->assertRedirect(route('operations.clients.show', $client));
     }
 
     public function test_provider_manager_can_access_edit_form(): void
     {
         $client = Client::factory()->create();
 
-        $response = $this->actingAs($this->providerManager)->get("/clients/{$client->id}/edit");
-
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('clients/edit'));
+        $this->actingAs($this->providerManager)
+            ->getJson("/clients/{$client->id}/edit")
+            ->assertOk()
+            ->assertJsonPath('client.id', $client->id);
     }
 
     public function test_coordinator_cannot_access_edit_form(): void
@@ -1628,15 +1654,14 @@ class ClientControllerTest extends TestCase
             'service_context_id' => $this->serviceContext->id,
         ]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}/edit");
+        $response = $this->actingAs($this->admin)
+            ->getJson("/clients/{$client->id}/edit");
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->where('client.first_name', 'EditMe')
-            ->where('client.last_name', 'Client')
-            ->where('client.site_id', $this->site->id)
-            ->where('client.service_context_id', $this->serviceContext->id)
-        );
+        $response->assertJsonPath('client.first_name', 'EditMe');
+        $response->assertJsonPath('client.last_name', 'Client');
+        $response->assertJsonPath('client.site_id', $this->site->id);
+        $response->assertJsonPath('client.service_context_id', $this->serviceContext->id);
     }
 
     public function test_edit_form_includes_inactive_site_if_client_assigned_to_it(): void
@@ -1644,11 +1669,13 @@ class ClientControllerTest extends TestCase
         $inactiveSite = Site::factory()->create(['is_active' => false, 'name' => 'Old Site']);
         $client = Client::factory()->create(['site_id' => $inactiveSite->id]);
 
-        $response = $this->actingAs($this->admin)->get("/clients/{$client->id}/edit");
+        $response = $this->actingAs($this->admin)
+            ->getJson("/clients/{$client->id}/edit");
 
         $response->assertOk();
-        // The sites list should contain the inactive site because the client is assigned to it
-        $response->assertInertia(fn ($page) => $page->has('sites'));
+        // The sites list must contain the inactive site because the client is assigned to it.
+        $siteIds = collect($response->json('sites'))->pluck('id')->all();
+        $this->assertContains($inactiveSite->id, $siteIds);
     }
 
     // =========================================================================
@@ -1854,7 +1881,15 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->put("/clients/{$client->id}", $data);
 
         $response->assertRedirect(route('clients.index'));
-        $this->assertDatabaseHas('clients', array_merge(['id' => $client->id], $data));
+
+        // phone and email are encrypted at rest; assert plaintext fields against the row
+        // and verify the encrypted attributes via decrypted model accessors.
+        $plaintextChecks = collect($data)->except(['phone', 'email'])->all();
+        $this->assertDatabaseHas('clients', array_merge(['id' => $client->id], $plaintextChecks));
+
+        $client->refresh();
+        $this->assertSame('0229999999', $client->phone);
+        $this->assertSame('updated@example.com', $client->email);
     }
 
     public function test_update_returns_404_for_nonexistent_client(): void
@@ -2090,7 +2125,9 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
         $response->assertRedirect(route('clients.index'));
-        $this->assertDatabaseHas('clients', ['status' => 'active', 'first_name' => 'Test']);
+        // Newly-created clients with 'active' status are stored as 'onboarding'
+        // so an onboarding workflow can be initialised — see ClientController::store.
+        $this->assertDatabaseHas('clients', ['status' => 'onboarding', 'first_name' => 'Test']);
     }
 
     public function test_store_accepts_inactive_status(): void
@@ -2100,7 +2137,9 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
         $response->assertRedirect(route('clients.index'));
-        $this->assertDatabaseHas('clients', ['status' => 'inactive', 'email' => 'inactive@example.com']);
+        // 'inactive' status is preserved verbatim; only 'active' is rerouted to 'onboarding'.
+        $client = $this->findClientByEmail('inactive@example.com');
+        $this->assertSame('inactive', $client->status);
     }
 
     public function test_store_rejects_archived_status(): void
@@ -2154,7 +2193,8 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
         $response->assertRedirect(route('clients.index'));
-        $this->assertDatabaseHas('clients', ['email' => 'nosite@example.com', 'site_id' => null]);
+        $client = $this->findClientByEmail('nosite@example.com');
+        $this->assertNull($client->site_id);
     }
 
     public function test_store_with_nullable_email(): void
@@ -2358,7 +2398,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('clients/index')
+            ->component('operations/clients/index')
             ->has('clients', 0)
         );
     }
@@ -2492,9 +2532,9 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->where('onboarding.items.0.key', 'profile')
-            ->where('onboarding.items.0.has_data', true)
-            ->where('onboarding.items.0.complete', true)
+            ->where('onboarding.checklist.items.0.key', 'profile')
+            ->where('onboarding.checklist.items.0.has_data', true)
+            ->where('onboarding.checklist.items.0.complete', true)
         );
     }
 
@@ -2515,9 +2555,9 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->where('onboarding.items.0.key', 'profile')
-            ->where('onboarding.items.0.has_data', false)
-            ->where('onboarding.items.0.complete', false)
+            ->where('onboarding.checklist.items.0.key', 'profile')
+            ->where('onboarding.checklist.items.0.has_data', false)
+            ->where('onboarding.checklist.items.0.complete', false)
         );
     }
 
