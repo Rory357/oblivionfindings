@@ -2,32 +2,32 @@
 
 namespace App\Domain\Roadmap\Http\Controllers;
 
+use App\Domain\Roadmap\Http\Controllers\Concerns\ProvidesRoadmapInertiaProps;
 use App\Domain\Roadmap\Models\Initiative;
 use App\Domain\Roadmap\Models\InitiativeCategory;
+use App\Domain\Roadmap\Http\Requests\StoreInitiativeRequest;
+use App\Domain\Roadmap\Http\Requests\UpdateInitiativeRequest;
 use App\Domain\Roadmap\Services\RoadmapChangeLogService;
 use App\Domain\Roadmap\Services\RoadmapDecisionService;
 use App\Domain\Roadmap\Services\RoadmapScoringService;
-use App\Domain\Roadmap\Http\Requests\StoreInitiativeRequest;
-use App\Domain\Roadmap\Http\Requests\UpdateInitiativeRequest;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class InitiativeController extends Controller
 {
+    use ProvidesRoadmapInertiaProps;
+
     public function __construct(
         protected RoadmapScoringService $scoringService,
         protected RoadmapDecisionService $decisionService,
         protected RoadmapChangeLogService $changeLogService,
     ) {}
 
-    public function index(Request $request): JsonResponse|RedirectResponse
+    public function index(Request $request): JsonResponse|Response
     {
-        if (! $this->shouldReturnJson($request)) {
-            return redirect()->route('roadmap.dashboard');
-        }
-
         $tenantId = $this->tenantId($request);
 
         $query = Initiative::query()
@@ -46,11 +46,25 @@ class InitiativeController extends Controller
             $query->forQuarter($request->integer('fiscal_year'), $request->integer('quarter'));
         }
 
-        return response()->json([
-            'items' => $query
-                ->orderByDesc('priority_score')
-                ->orderBy('title')
-                ->paginate(30),
+        $items = $query
+            ->orderByDesc('priority_score')
+            ->orderBy('title')
+            ->paginate($this->paginationPerPage($request, 30, 100))
+            ->withQueryString();
+
+        if ($this->shouldReturnJson($request)) {
+            return response()->json(['items' => $items]);
+        }
+
+        return Inertia::render('Roadmap/Initiatives/Index', [
+            'items' => $items,
+            'filters' => [
+                'status' => $request->input('status'),
+                'stream' => $request->input('stream'),
+                'fiscal_year' => $request->input('fiscal_year'),
+                'quarter' => $request->input('quarter'),
+            ],
+            'can' => $this->roadmapCan($request),
         ]);
     }
 

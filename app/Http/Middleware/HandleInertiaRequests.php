@@ -180,6 +180,7 @@ class HandleInertiaRequests extends Middleware
                 'warning' => session('warning'),
                 'info' => session('info'),
                 'clock_out_blockers' => session('clock_out_blockers'),
+                'rostering_report_link' => session('rostering_report_link'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

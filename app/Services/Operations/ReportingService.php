@@ -22,8 +22,13 @@ class ReportingService
         $query = Shift::query()
             ->whereHas('client', fn ($q) => $q->where('organization_id', $orgId))
             ->whereBetween('starts_at', [$dateFrom, $dateTo . ' 23:59:59'])
-            ->when(!empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']))
-            ->when(!empty($filters['staff_id']), fn ($q) => $q->where('user_id', $filters['staff_id']));
+            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $q->where(function ($siteQuery) use ($filters) {
+                $siteIds = $filters['allowed_site_ids'];
+                $siteQuery->whereIn('shifts.site_id', $siteIds)
+                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->whereIn('clients.site_id', $siteIds));
+            }))
+            ->when(!empty($filters['client_id']), fn ($q) => $q->where('shifts.client_id', $filters['client_id']))
+            ->when(!empty($filters['staff_id']), fn ($q) => $q->where('shifts.user_id', $filters['staff_id']));
 
         $total = (clone $query)->count();
         $completed = (clone $query)->where('status', 'completed')->count();
@@ -156,6 +161,34 @@ class ReportingService
     public function complianceReport(int $orgId, array $filters): array
     {
         $staffQuery = User::where('organization_id', $orgId)->staff();
+
+        if (!empty($filters['allowed_site_ids'])) {
+            $siteIds = array_values(array_map('intval', $filters['allowed_site_ids']));
+
+            $staffQuery->where(function ($query) use ($siteIds) {
+                $query->whereHas('hrEmployeeProfile', function ($profileQuery) use ($siteIds) {
+                    $profileQuery->where(function ($siteProfileQuery) use ($siteIds) {
+                        $siteProfileQuery->whereIn('primary_site_id', $siteIds);
+
+                        foreach ($siteIds as $siteId) {
+                            $siteProfileQuery->orWhereJsonContains('secondary_site_ids', $siteId);
+                        }
+                    });
+                })->orWhereHas('shifts', fn ($shiftQuery) => $shiftQuery->whereIn('shifts.site_id', $siteIds));
+            });
+        }
+
+        if (!empty($filters['client_id'])) {
+            $staffQuery->whereHas('shifts', function ($shiftQuery) use ($filters) {
+                $shiftQuery->where('shifts.client_id', $filters['client_id'])
+                    ->when(!empty($filters['date_from']), fn ($query) => $query->where('starts_at', '>=', $filters['date_from']))
+                    ->when(!empty($filters['date_to']), fn ($query) => $query->where('starts_at', '<=', $filters['date_to'] . ' 23:59:59'));
+            });
+        }
+
+        if (!empty($filters['staff_id'])) {
+            $staffQuery->whereKey((int) $filters['staff_id']);
+        }
 
         $totalStaff = (clone $staffQuery)->count();
 

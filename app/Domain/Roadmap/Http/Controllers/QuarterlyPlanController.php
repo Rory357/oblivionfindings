@@ -2,37 +2,54 @@
 
 namespace App\Domain\Roadmap\Http\Controllers;
 
+use App\Domain\Roadmap\Http\Controllers\Concerns\ProvidesRoadmapInertiaProps;
+use App\Domain\Roadmap\Http\Requests\StoreQuarterlyPlanRequest;
 use App\Domain\Roadmap\Models\QuarterlyRoadmapPlan;
 use App\Domain\Roadmap\Services\QuarterlyRoadmapPlannerService;
-use App\Domain\Roadmap\Http\Requests\StoreQuarterlyPlanRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class QuarterlyPlanController extends Controller
 {
+    use ProvidesRoadmapInertiaProps;
+
     public function __construct(
         protected QuarterlyRoadmapPlannerService $plannerService,
     ) {}
 
-    public function index(Request $request): JsonResponse|RedirectResponse
+    public function index(Request $request): JsonResponse|Response
     {
-        if (! $this->shouldReturnJson($request)) {
-            return redirect()->route('roadmap.dashboard');
-        }
-
         $tenantId = $this->tenantId($request);
 
         $query = QuarterlyRoadmapPlan::query()
             ->forTenant($tenantId)
             ->withCount('items')
+            ->when($request->filled('fiscal_year'), fn ($q) => $q->where('fiscal_year', $request->integer('fiscal_year')))
+            ->when($request->filled('quarter'), fn ($q) => $q->where('quarter', $request->integer('quarter')))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->value()))
             ->orderByDesc('fiscal_year')
             ->orderByDesc('quarter')
             ->orderByDesc('revision_no');
 
-        return response()->json([
-            'items' => $query->paginate(20),
+        $items = $query
+            ->paginate($this->paginationPerPage($request, 20, 100))
+            ->withQueryString();
+
+        if ($this->shouldReturnJson($request)) {
+            return response()->json(['items' => $items]);
+        }
+
+        return Inertia::render('Roadmap/QuarterlyPlans/Index', [
+            'items' => $items,
+            'filters' => [
+                'fiscal_year' => $request->input('fiscal_year'),
+                'quarter' => $request->input('quarter'),
+                'status' => $request->input('status'),
+            ],
+            'can' => $this->roadmapCan($request),
         ]);
     }
 
@@ -54,9 +71,15 @@ class QuarterlyPlanController extends Controller
     public function show(Request $request, QuarterlyRoadmapPlan $plan)
     {
         $this->assertTenant($request, $plan->tenant_id);
+        $item = $plan->load('items.initiative');
 
-        return response()->json([
-            'item' => $plan->load('items.initiative'),
+        if ($this->shouldReturnJson($request)) {
+            return response()->json(['item' => $item]);
+        }
+
+        return Inertia::render('Roadmap/QuarterlyPlans/Show', [
+            'item' => $item,
+            'can' => $this->roadmapCan($request),
         ]);
     }
 

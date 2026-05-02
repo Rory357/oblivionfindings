@@ -35,6 +35,12 @@ test.describe('operations rostering — publish flow', () => {
         await expect(page.getByTestId('rostering-publish-panel')).toContainText(
             /published/i,
         );
+        await expect(
+            page.getByTestId('rostering-published-report-link'),
+        ).toBeVisible();
+        await page.getByTestId('rostering-published-report-link').getByRole('link').click();
+        await expect(page).toHaveURL(/\/operations\/reports\/shifts/);
+        await expect(page.getByRole('heading', { name: /Shift Operations Reports/i })).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });

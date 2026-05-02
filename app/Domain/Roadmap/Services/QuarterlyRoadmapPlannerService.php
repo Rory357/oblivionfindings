@@ -102,20 +102,50 @@ class QuarterlyRoadmapPlannerService
         });
     }
 
-    /**
-     * @deprecated Use approve() directly. Kept for backward compatibility.
-     */
     public function submitForManagerReview(QuarterlyRoadmapPlan $plan, int $userId): QuarterlyRoadmapPlan
     {
-        return $this->approve($plan, $userId);
+        if ($plan->status !== QuarterlyRoadmapPlan::STATUS_DRAFT) {
+            throw new \RuntimeException('Only draft plans can be submitted for manager review.');
+        }
+
+        $plan->update([
+            'status' => QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW,
+        ]);
+
+        $this->changeLogService->log(
+            $plan->tenant_id,
+            QuarterlyRoadmapPlan::class,
+            $plan->id,
+            'plan.submitted_manager_review',
+            ['status' => QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW],
+            null,
+            $userId,
+        );
+
+        return $plan->fresh('items.initiative');
     }
 
-    /**
-     * @deprecated Use approve() directly. Kept for backward compatibility.
-     */
     public function submitForExecutiveReview(QuarterlyRoadmapPlan $plan, int $userId): QuarterlyRoadmapPlan
     {
-        return $this->approve($plan, $userId);
+        if ($plan->status !== QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW) {
+            throw new \RuntimeException('Only plans in manager review can be submitted for executive review.');
+        }
+
+        $plan->update([
+            'status' => QuarterlyRoadmapPlan::STATUS_EXEC_REVIEW,
+        ]);
+
+        $this->changeLogService->log(
+            $plan->tenant_id,
+            QuarterlyRoadmapPlan::class,
+            $plan->id,
+            'plan.submitted_executive_review',
+            ['status' => QuarterlyRoadmapPlan::STATUS_EXEC_REVIEW],
+            null,
+            $userId,
+        );
+
+        return $plan->fresh('items.initiative');
     }
 
     public function approve(QuarterlyRoadmapPlan $plan, int $userId): QuarterlyRoadmapPlan

@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\BillingEntry;
 use App\Models\Client;
-use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\ReportingService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -67,6 +68,29 @@ class ReportController extends Controller
         $orgId = $auth->organization_id;
         $dateFrom = $data['date_from'] ?? now()->startOfMonth()->toDateString();
         $dateTo = $data['date_to'] ?? now()->endOfMonth()->toDateString();
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = ['reports.viewAny'];
+
+        if (! empty($data['client_id'])) {
+            $siteAccess->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                $bypassPermissions,
+                'You are not authorized to view reports for that client.',
+            );
+        }
+
+        if (! empty($data['staff_id'])) {
+            $staffExists = $siteAccess->applyStaffScope(
+                User::query()->staff()->whereKey((int) $data['staff_id']),
+                $auth,
+                $bypassPermissions,
+            )->exists();
+
+            abort_unless($staffExists, 403, 'You are not authorized to view reports for that staff member.');
+        }
+
+        $data['allowed_site_ids'] = $siteAccess->accessibleSiteIds($auth, $bypassPermissions);
 
         $reportData = match ($type) {
             'client-summary' => $this->clientSummary($orgId, $dateFrom, $dateTo, $data),
@@ -85,9 +109,15 @@ class ReportController extends Controller
             'filters' => [
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
-                'client_id' => $data['client_id'] ?? null,
-                'staff_id' => $data['staff_id'] ?? null,
+                'client_id' => $request->input('client_id'),
+                'staff_id' => $request->input('staff_id'),
             ],
+            'clients' => $this->usesClientFilter($type)
+                ? $this->clientOptions($siteAccess, $auth, $orgId, $bypassPermissions)
+                : [],
+            'staff' => $this->usesStaffFilter($type)
+                ? $this->staffOptions($siteAccess, $auth, $orgId, $bypassPermissions)
+                : [],
         ]);
     }
 
@@ -96,6 +126,7 @@ class ReportController extends Controller
         $query = BillingEntry::query()
             ->where('organization_id', $orgId)
             ->whereBetween('service_date', [$dateFrom, $dateTo])
+            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyBillingSiteScope($q, $filters['allowed_site_ids']))
             ->when(!empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']));
 
         return [
@@ -115,6 +146,7 @@ class ReportController extends Controller
         $query = Timesheet::query()
             ->whereHas('client', fn ($q) => $q->where('organization_id', $orgId))
             ->whereBetween('work_date', [$dateFrom, $dateTo])
+            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyTimesheetSiteScope($q, $filters['allowed_site_ids']))
             ->when(!empty($filters['staff_id']), fn ($q) => $q->where('user_id', $filters['staff_id']));
 
         $timesheets = (clone $query)->with('user:id,name')->get();
@@ -148,7 +180,8 @@ class ReportController extends Controller
     {
         $query = BillingEntry::query()
             ->where('organization_id', $orgId)
-            ->whereBetween('service_date', [$dateFrom, $dateTo]);
+            ->whereBetween('service_date', [$dateFrom, $dateTo])
+            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyBillingSiteScope($q, $filters['allowed_site_ids']));
 
         return [
             'total_entries' => (clone $query)->count(),
@@ -174,6 +207,7 @@ class ReportController extends Controller
         $query = BillingEntry::query()
             ->where('organization_id', $orgId)
             ->whereBetween('service_date', [$dateFrom, $dateTo])
+            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $this->applyBillingSiteScope($q, $filters['allowed_site_ids']))
             ->when(!empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']));
 
         return [
@@ -196,5 +230,81 @@ class ReportController extends Controller
                 ])
                 ->values(),
         ];
+    }
+
+    private function usesClientFilter(string $type): bool
+    {
+        return in_array($type, ['client-summary', 'service-hours', 'compliance'], true);
+    }
+
+    private function usesStaffFilter(string $type): bool
+    {
+        return in_array($type, ['staff-utilisation', 'shift-analytics'], true);
+    }
+
+    private function clientOptions(UserSiteAccessService $siteAccess, User $user, ?int $orgId, array $bypassPermissions): array
+    {
+        return $siteAccess->applyClientScope(
+            Client::query()
+                ->when($orgId !== null, fn ($query) => $query->where('organization_id', $orgId))
+                ->orderBy('first_name')
+                ->orderBy('last_name'),
+            $user,
+            $bypassPermissions,
+        )
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn (Client $client) => [
+                'id' => $client->id,
+                'name' => trim($client->first_name.' '.$client->last_name),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function staffOptions(UserSiteAccessService $siteAccess, User $user, ?int $orgId, array $bypassPermissions): array
+    {
+        return $siteAccess->applyStaffScope(
+            User::query()
+                ->staff()
+                ->when($orgId !== null, fn ($query) => $query->where(function ($nested) use ($orgId) {
+                    $nested->where('organization_id', $orgId)
+                        ->orWhereNull('organization_id');
+                }))
+                ->orderBy('name'),
+            $user,
+            $bypassPermissions,
+        )
+            ->get(['id', 'name'])
+            ->map(fn (User $staff) => [
+                'id' => $staff->id,
+                'name' => $staff->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $siteIds
+     */
+    private function applyBillingSiteScope(Builder $query, array $siteIds): Builder
+    {
+        return $query->where(function (Builder $nested) use ($siteIds) {
+            $nested->whereIn('site_id', $siteIds)
+                ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds));
+        });
+    }
+
+    /**
+     * @param  array<int, int>  $siteIds
+     */
+    private function applyTimesheetSiteScope(Builder $query, array $siteIds): Builder
+    {
+        return $query->where(function (Builder $nested) use ($siteIds) {
+            $nested->whereIn('shift_site_id', $siteIds)
+                ->orWhereHas('shift', fn (Builder $shiftQuery) => $shiftQuery
+                    ->whereIn('site_id', $siteIds)
+                    ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds)))
+                ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds));
+        });
     }
 }

@@ -42,6 +42,20 @@ class RoadmapDashboardPageTest extends TestCase
         );
     }
 
+    public function test_permissioned_roadmap_roles_receive_sidebar_capability(): void
+    {
+        foreach (['roadmap_manager', 'board_member', 'ceo', 'cfo'] as $roleName) {
+            $user = $this->createUserWithRole($roleName);
+
+            $this->actingAs($user)
+                ->get('/roadmap/dashboard')
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->where('auth.can.roadmap.view', true)
+                );
+        }
+    }
+
     public function test_dashboard_still_returns_json_for_api_calls(): void
     {
         $boardMember = $this->createUserWithRole('board_member');

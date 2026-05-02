@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\AssetReportController;
-use App\Http\Controllers\ShiftReportsController;
 use App\Http\Controllers\ModuleReportController;
 use App\Http\Controllers\CombinedReportController;
 use App\Http\Controllers\AuditLogController;
@@ -17,11 +16,14 @@ use App\Support\ReportCatalog;
  */
 
 Route::middleware(['auth'])->group(function () {
+    Route::redirect('/reports/shifts', '/operations/reports/shifts', 301)
+        ->middleware('permission:operations.reports.view|reports.viewAny|shifts.viewAny')
+        ->name('reports.shifts');
+
     // Reports dashboard
     Route::middleware('permission:reports.viewAny')->group(function () {
         Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
         Route::get('/reports/assets', [AssetReportController::class, 'index'])->name('reports.assets');
-        Route::get('/reports/shifts', [ShiftReportsController::class, 'index'])->name('reports.shifts');
         Route::get('/reports/modules/{module}', [ModuleReportController::class, 'show'])
             ->whereIn('module', ReportCatalog::keys())
             ->name('reports.modules.show');

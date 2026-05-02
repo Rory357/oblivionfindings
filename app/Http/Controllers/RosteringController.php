@@ -848,13 +848,15 @@ class RosteringController extends Controller
         abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
 
         $published = $this->publishing->publish($period, $auth);
+        $reportLink = $this->shiftOperationsReportLink($published);
 
         return redirect()
             ->route('operations.rostering.index', [
                 'week' => $published->week_start->toDateString(),
                 'site_id' => $published->site_id,
             ])
-            ->with('success', __('rostering.publish.published_message'));
+            ->with('success', __('rostering.publish.published_message'))
+            ->with('rostering_report_link', $reportLink);
     }
 
     public function viewDiff(Request $request, RosterPeriod $period)
@@ -892,13 +894,15 @@ class RosteringController extends Controller
         abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
 
         $published = $this->publishing->republish($period, $auth);
+        $reportLink = $this->shiftOperationsReportLink($published);
 
         return redirect()
             ->route('operations.rostering.index', [
                 'week' => $published->week_start->toDateString(),
                 'site_id' => $published->site_id,
             ])
-            ->with('success', __('rostering.publish.republished_message', ['version' => $published->version]));
+            ->with('success', __('rostering.publish.republished_message', ['version' => $published->version]))
+            ->with('rostering_report_link', $reportLink);
     }
 
     public function unpublish(Request $request, RosterPeriod $period)
@@ -916,6 +920,20 @@ class RosteringController extends Controller
                 'site_id' => $draft->site_id,
             ])
             ->with('warning', __('rostering.publish.unpublished_message'));
+    }
+
+    private function shiftOperationsReportLink(RosterPeriod $period): string
+    {
+        $reportDateTo = ($period->week_end
+            ? $period->week_end->copy()->subDay()
+            : $period->week_start->copy()->addDays(6)
+        )->toDateString();
+
+        return '/operations/reports/shifts?'.http_build_query([
+            'date_from' => $period->week_start->toDateString(),
+            'date_to' => $reportDateTo,
+            'site_id' => $period->site_id,
+        ]);
     }
 
     /**

@@ -143,6 +143,14 @@ class ShiftReportControllerTest extends TestCase
         $this->assertStringContainsString('Jordan Staff', $content);
     }
 
+    public function test_legacy_shift_report_url_redirects_to_operations_report(): void
+    {
+        $this->actingAs($this->manager)
+            ->get('/reports/shifts')
+            ->assertRedirect('/operations/reports/shifts')
+            ->assertStatus(301);
+    }
+
     protected function makeSiteContext(): array
     {
         $site = Site::factory()->create();

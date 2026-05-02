@@ -511,7 +511,14 @@ function isActionableConflictShift(shift: ShiftLite) {
 }
 
 export default function RosteringIndex(props: Props) {
-    const { labels } = usePage().props as any;
+    const { labels, auth, flash } = usePage().props as any;
+    const canViewOperationsReports = Boolean(
+        auth?.can?.operations?.reports?.view || auth?.can?.reports?.viewAny,
+    );
+    const publishedReportLink =
+        typeof flash?.rostering_report_link === 'string'
+            ? flash.rostering_report_link
+            : null;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
     const timeOffForm = useForm({
@@ -1109,6 +1116,22 @@ export default function RosteringIndex(props: Props) {
         props.rosterPeriod?.validation_summary?.blocks?.length ?? 0;
     const publishWarningCount =
         props.rosterPeriod?.validation_summary?.warnings?.length ?? 0;
+    const reportDateTo = useMemo(() => {
+        if (!props.weekEnd) return ymd(addDays(startDate, 6));
+
+        return ymd(addDays(new Date(`${props.weekEnd}T00:00:00`), -1));
+    }, [props.weekEnd, startDate]);
+    const operationsReportHref = useMemo(() => {
+        const params = new URLSearchParams({
+            date_from: props.weekStart,
+            date_to: reportDateTo,
+        });
+        if (props.filters.site_id) {
+            params.set('site_id', String(props.filters.site_id));
+        }
+
+        return `/operations/reports/shifts?${params.toString()}`;
+    }, [props.filters.site_id, props.weekStart, reportDateTo]);
 
     const isPreviouslyPublished = Boolean(props.rosterPeriod?.published_at);
     const canRepublish = Boolean(
@@ -1179,6 +1202,18 @@ export default function RosteringIndex(props: Props) {
                             className="mx-1 hidden h-8 md:block"
                         />
 
+                        {canViewOperationsReports ? (
+                            <Link
+                                href={operationsReportHref}
+                                data-test="rostering-operations-report-link"
+                                data-testid="rostering-operations-report-link"
+                            >
+                                <Button size="sm" variant="outline">
+                                    <BarChart3 className="mr-1 h-4 w-4" />
+                                    View Operations Reports
+                                </Button>
+                            </Link>
+                        ) : null}
                         <Link href="/operations/shifts/create">
                             <Button size="sm">
                                 <Plus className="mr-1 h-4 w-4" /> New shift
@@ -1208,6 +1243,30 @@ export default function RosteringIndex(props: Props) {
                         ) : null}
                     </div>
                 </div>
+
+                {publishedReportLink && canViewOperationsReports ? (
+                    <Card
+                        className="border-status-success/30 bg-status-success-bg"
+                        data-test="rostering-published-report-link"
+                        data-testid="rostering-published-report-link"
+                    >
+                        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <div className="font-medium text-status-success">
+                                    Published roster reporting is ready.
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Review coverage, reconciliation, and variance for this period.
+                                </div>
+                            </div>
+                            <Link href={publishedReportLink}>
+                                <Button size="sm" variant="outline">
+                                    View Shift Operations Report
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 {/* KPI Cards — 3 critical always visible, rest collapsible */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">

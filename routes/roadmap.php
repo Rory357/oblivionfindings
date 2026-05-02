@@ -58,6 +58,12 @@ Route::middleware(['auth'])->prefix('roadmap')->name('roadmap.')->group(function
     Route::get('/quarterly-plans/{plan}', [QuarterlyPlanController::class, 'show'])
         ->name('plans.show')
         ->middleware('permission:roadmap.view');
+    Route::post('/quarterly-plans/{plan}/submit-manager', [QuarterlyPlanController::class, 'submitManagerReview'])
+        ->name('plans.submit_manager')
+        ->middleware('permission:roadmap.manage');
+    Route::post('/quarterly-plans/{plan}/submit-executive', [QuarterlyPlanController::class, 'submitExecutiveReview'])
+        ->name('plans.submit_executive')
+        ->middleware('permission:roadmap.manage');
     Route::post('/quarterly-plans/{plan}/approve', [QuarterlyPlanController::class, 'approve'])
         ->name('plans.approve')
         ->middleware('permission:roadmap.approve');

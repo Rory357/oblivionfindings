@@ -538,7 +538,7 @@ function buildIconNavItems({
     }
 
     // Governance
-    if (can?.governance?.view) {
+    if (can?.governance?.view || can?.roadmap?.view) {
         items.push({
             id: 'governance',
             icon: Landmark,
@@ -1484,52 +1484,71 @@ function buildGovernanceSubPanelGroups({
 }: {
     can?: any;
 }): SubPanelGroup[] {
-    const items: NavItem[] = [
-        { title: 'Dashboard', href: '/governance/dashboard', icon: Landmark },
-        { title: 'Meetings', href: '/governance/meetings', icon: CalendarDays },
-    ];
+    const items: NavItem[] = [];
+
+    if (can?.governance?.view) {
+        items.push({
+            title: 'Dashboard',
+            href: '/governance/dashboard',
+            icon: Landmark,
+        });
+        items.push({
+            title: 'Meetings',
+            href: '/governance/meetings',
+            icon: CalendarDays,
+        });
+    }
     if (can?.governance?.meetings?.manage)
         items.push({
             title: 'Admin',
             href: '/governance/admin/board-members',
             icon: Users,
         });
-    items.push({ title: 'Risks', href: '/governance/risks', icon: Target });
-    items.push({
-        title: 'Resolutions',
-        href: '/governance/resolutions',
-        icon: ClipboardCheck,
-    });
-    items.push({
-        title: 'Compliance',
-        href: '/governance/compliance',
-        icon: Shield,
-    });
-    items.push({
-        title: 'Strategy',
-        href: '/governance/strategy',
-        icon: Target,
-    });
-    items.push({
-        title: 'Performance',
-        href: '/governance/performance',
-        icon: ClipboardCheck,
-    });
-    items.push({
-        title: 'Budgets',
-        href: '/governance/budgets',
-        icon: DollarSign,
-    });
-    items.push({
-        title: 'Board Packs',
-        href: '/governance/packs',
-        icon: FileText,
-    });
-    items.push({
-        title: 'Action Items',
-        href: '/governance/actions',
-        icon: ClipboardList,
-    });
+    if (can?.governance?.view) {
+        items.push({ title: 'Risks', href: '/governance/risks', icon: Target });
+        items.push({
+            title: 'Resolutions',
+            href: '/governance/resolutions',
+            icon: ClipboardCheck,
+        });
+        items.push({
+            title: 'Compliance',
+            href: '/governance/compliance',
+            icon: Shield,
+        });
+        items.push({
+            title: 'Strategy',
+            href: '/governance/strategy',
+            icon: Target,
+        });
+        items.push({
+            title: 'Performance',
+            href: '/governance/performance',
+            icon: ClipboardCheck,
+        });
+        items.push({
+            title: 'Budgets',
+            href: '/governance/budgets',
+            icon: DollarSign,
+        });
+        items.push({
+            title: 'Board Packs',
+            href: '/governance/packs',
+            icon: FileText,
+        });
+        items.push({
+            title: 'Action Items',
+            href: '/governance/actions',
+            icon: ClipboardList,
+        });
+    }
+    if (can?.roadmap?.view) {
+        items.push({
+            title: 'Roadmap',
+            href: '/roadmap/dashboard',
+            icon: Map,
+        });
+    }
     return [{ label: 'Governance', items }];
 }
 
@@ -1794,12 +1813,6 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Operations Reports',
             href: '/operations/reports',
             icon: ClipboardList,
-        });
-    if (can?.reports?.viewAny || can?.shifts?.viewAny)
-        ops.push({
-            title: 'Shift Reports',
-            href: '/reports/shifts',
-            icon: Clock,
         });
     if (ops.length) groups.push({ label: 'Operations', items: ops });
 

@@ -18,8 +18,8 @@ test('roadmap initiatives page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/roadmap/initiatives')
-            ->waitForText('Initiative', 10)
-            ->assertSee('Initiative');
+            ->waitFor('[data-testid="initiative-register-table"]', 10)
+            ->assertPresent('[data-testid="initiative-register-table"]');
     });
 });
 
@@ -28,8 +28,8 @@ test('roadmap decisions page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/roadmap/decisions')
-            ->waitForText('Decision', 10)
-            ->assertSee('Decision');
+            ->waitFor('[data-testid="roadmap-decisions-table"]', 10)
+            ->assertPresent('[data-testid="roadmap-decisions-table"]');
     });
 });
 
@@ -38,8 +38,8 @@ test('roadmap suggestions page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/roadmap/suggestions')
-            ->waitForText('Suggestion', 10)
-            ->assertSee('Suggestion');
+            ->waitFor('[data-testid="suggestion-backlog-table"]', 10)
+            ->assertPresent('[data-testid="suggestion-backlog-table"]');
     });
 });
 
@@ -48,7 +48,7 @@ test('roadmap quarterly plans page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/roadmap/quarterly-plans')
-            ->waitForText('Quarterly', 10)
-            ->assertSee('Quarterly');
+            ->waitFor('[data-testid="quarterly-plan-history-table"]', 10)
+            ->assertPresent('[data-testid="quarterly-plan-history-table"]');
     });
 });

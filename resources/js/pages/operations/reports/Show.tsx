@@ -8,6 +8,20 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { FileBarChart } from 'lucide-react';
 import { useState } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+
+type Option = {
+    id: number;
+    name: string;
+};
 
 type Props = {
     report_type: string;
@@ -19,6 +33,8 @@ type Props = {
         client_id?: string | null;
         staff_id?: string | null;
     };
+    clients: Option[];
+    staff: Option[];
 };
 
 export default function ReportShow({
@@ -26,16 +42,27 @@ export default function ReportShow({
     report_meta,
     data,
     filters,
+    clients,
+    staff,
 }: Props) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const [dateFrom, setDateFrom] = useState(filters?.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters?.date_to ?? '');
+    const [clientId, setClientId] = useState(filters?.client_id ?? '');
+    const [staffId, setStaffId] = useState(filters?.staff_id ?? '');
+    const usesClientFilter = clients.length > 0;
+    const usesStaffFilter = staff.length > 0;
 
     const handleFilter = () => {
         router.get(
             `/operations/reports/${report_type}`,
-            { date_from: dateFrom, date_to: dateTo },
+            {
+                date_from: dateFrom,
+                date_to: dateTo,
+                client_id: usesClientFilter ? clientId || undefined : undefined,
+                staff_id: usesStaffFilter ? staffId || undefined : undefined,
+            },
             { preserveState: true },
         );
     };
@@ -104,6 +131,9 @@ export default function ReportShow({
                 <CardContent>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
+                            <caption className="sr-only">
+                                {report_meta.name} {label.replace(/_/g, ' ')}
+                            </caption>
                             <thead>
                                 <tr className="border-b text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                     {columns.map((col) => (
@@ -165,6 +195,9 @@ export default function ReportShow({
                     <CardContent>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
+                                <caption className="sr-only">
+                                    {report_meta.name} {label.replace(/_/g, ' ')}
+                                </caption>
                                 <thead>
                                     <tr className="border-b text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                         <th className="pr-4 pb-2">Type</th>
@@ -250,6 +283,80 @@ export default function ReportShow({
         });
     };
 
+    const reportChart = () => {
+        let chartData: Array<Record<string, string | number>> = [];
+        const xKey = 'name';
+        const yKey = 'value';
+        let title = '';
+
+        if (report_type === 'billing' && Array.isArray(data.by_status)) {
+            title = 'Billing by Status';
+            chartData = data.by_status.map((row: any) => ({
+                name: row.status ?? 'Unknown',
+                value: Number(row.total_amount ?? 0),
+            }));
+        }
+
+        if (
+            report_type === 'staff-utilisation' &&
+            Array.isArray(data.by_staff)
+        ) {
+            title = 'Hours by Staff';
+            chartData = data.by_staff.map((row: any) => ({
+                name: row.staff_name ?? `Staff ${row.user_id}`,
+                value: Number(row.total_hours ?? 0),
+            }));
+        }
+
+        if (
+            report_type === 'shift-analytics' &&
+            data.by_day_of_week &&
+            typeof data.by_day_of_week === 'object'
+        ) {
+            title = 'Shifts by Day of Week';
+            chartData = Object.entries(data.by_day_of_week).map(
+                ([day, count]) => ({
+                    name: day,
+                    value: Number(count ?? 0),
+                }),
+            );
+        }
+
+        chartData = chartData.filter((row) => Number(row[yKey]) > 0);
+        if (chartData.length === 0) return null;
+
+        return (
+            <Card
+                className="mb-4"
+                data-test="operations-report-chart"
+                data-testid="operations-report-chart"
+            >
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">
+                        {title}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis
+                                    dataKey={xKey}
+                                    tick={{ fontSize: 12 }}
+                                    interval={0}
+                                />
+                                <YAxis tick={{ fontSize: 12 }} />
+                                <Tooltip />
+                                <Bar dataKey={yKey} fill="hsl(var(--primary))" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
+
     const hasData = data && Object.keys(data).length > 0;
 
     return (
@@ -278,6 +385,36 @@ export default function ReportShow({
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}
                     />
+                    {usesClientFilter && (
+                        <select
+                            className="h-9 rounded-md border bg-background px-3 text-xs"
+                            value={clientId ?? ''}
+                            onChange={(e) => setClientId(e.target.value)}
+                            aria-label={`${clientSingular} filter`}
+                        >
+                            <option value="">All {clientSingular}s</option>
+                            {clients.map((client) => (
+                                <option key={client.id} value={client.id}>
+                                    {client.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    {usesStaffFilter && (
+                        <select
+                            className="h-9 rounded-md border bg-background px-3 text-xs"
+                            value={staffId ?? ''}
+                            onChange={(e) => setStaffId(e.target.value)}
+                            aria-label="Staff filter"
+                        >
+                            <option value="">All staff</option>
+                            {staff.map((staffMember) => (
+                                <option key={staffMember.id} value={staffMember.id}>
+                                    {staffMember.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                     <Button
                         size="sm"
                         variant="default"
@@ -291,6 +428,7 @@ export default function ReportShow({
                 {hasData ? (
                     <>
                         {renderSummaryCards()}
+                        {reportChart()}
                         {renderDataSections()}
                     </>
                 ) : (
@@ -298,7 +436,7 @@ export default function ReportShow({
                         <CardContent className="flex flex-col items-center justify-center py-12">
                             <FileBarChart className="mb-4 h-12 w-12 text-muted-foreground/30" />
                             <h2 className="text-lg font-semibold text-muted-foreground">
-                                No Data Available
+                                No {report_meta?.name ?? 'Report'} Data Available
                             </h2>
                             <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground/80">
                                 Select a date range and filters to generate this

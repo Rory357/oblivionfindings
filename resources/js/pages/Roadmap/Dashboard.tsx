@@ -218,6 +218,8 @@ type Props = {
 };
 
 type PlanWorkflowAction =
+    | 'submit-manager'
+    | 'submit-executive'
     | 'approve'
     | 'publish'
     | 'revise';
@@ -277,6 +279,8 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 
 function actionLabel(action: PlanWorkflowAction): string {
     return {
+        'submit-manager': 'Submit Manager',
+        'submit-executive': 'Submit Executive',
         approve: 'Approve',
         publish: 'Publish',
         revise: 'Revise',
@@ -556,7 +560,20 @@ export default function RoadmapDashboard({
         (plan: PlanRow): PlanWorkflowAction[] => {
             const actions: PlanWorkflowAction[] = [];
 
-            if (plan.status === 'draft' && can.approveRoadmap) {
+            if (plan.status === 'draft' && can.manageRoadmap) {
+                actions.push('submit-manager');
+            }
+
+            if (plan.status === 'manager_review' && can.manageRoadmap) {
+                actions.push('submit-executive');
+            }
+
+            if (
+                ['draft', 'manager_review', 'exec_review'].includes(
+                    plan.status,
+                ) &&
+                can.approveRoadmap
+            ) {
                 actions.push('approve');
             }
 
@@ -570,7 +587,7 @@ export default function RoadmapDashboard({
 
             return actions;
         },
-        [can.approveRoadmap],
+        [can.approveRoadmap, can.manageRoadmap],
     );
 
     const loadDashboardSummary = useCallback(async () => {
@@ -596,14 +613,14 @@ export default function RoadmapDashboard({
 
         const [initiativeResponse, planResponse, suggestionResponse] =
             await Promise.all([
-                axios.get('/roadmap/initiatives?per_page=8', {
+                axios.get('/roadmap/initiatives?per_page=5', {
                     headers: { Accept: 'application/json' },
                 }),
                 axios.get('/roadmap/quarterly-plans?per_page=5', {
                     headers: { Accept: 'application/json' },
                 }),
                 axios.get(
-                    '/roadmap/suggestions?status=triage_pending&per_page=8',
+                    '/roadmap/suggestions?status=triage_pending&per_page=5',
                     { headers: { Accept: 'application/json' } },
                 ),
             ]);
@@ -637,14 +654,13 @@ export default function RoadmapDashboard({
             return;
         }
 
-        const stillExists =
-            selectedPlanId !== null &&
-            planRows.some((plan: PlanRow) => plan.id === selectedPlanId);
-
-        if (!stillExists) {
-            setSelectedPlanId(planRows[0].id);
-        }
-    }, [can.viewRoadmap, selectedPlanId]);
+        setSelectedPlanId((current) =>
+            current !== null &&
+            planRows.some((plan: PlanRow) => plan.id === current)
+                ? current
+                : planRows[0].id,
+        );
+    }, [can.viewRoadmap]);
 
     useEffect(() => {
         if (initiativeForm.ownerUserId === null && managers.length > 0) {
@@ -1049,6 +1065,8 @@ export default function RoadmapDashboard({
     const runPlanAction = useCallback(
         async (planId: number, action: PlanWorkflowAction) => {
             const endpoint = {
+                'submit-manager': `/roadmap/quarterly-plans/${planId}/submit-manager`,
+                'submit-executive': `/roadmap/quarterly-plans/${planId}/submit-executive`,
                 approve: `/roadmap/quarterly-plans/${planId}/approve`,
                 publish: `/roadmap/quarterly-plans/${planId}/publish`,
                 revise: `/roadmap/quarterly-plans/${planId}/revise`,
@@ -1699,10 +1717,16 @@ export default function RoadmapDashboard({
 
                 <div className="grid gap-4 xl:grid-cols-2">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between gap-3">
                             <CardTitle className="text-base">
                                 Top Ranked Initiatives
                             </CardTitle>
+                            <Link
+                                href="/roadmap/initiatives"
+                                className="text-sm font-medium text-primary hover:underline"
+                            >
+                                View all initiatives
+                            </Link>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {summary.initiatives.top.length === 0 && (
@@ -1835,10 +1859,16 @@ export default function RoadmapDashboard({
                 </div>
 
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between gap-3">
                         <CardTitle className="text-base">
                             Initiative Register (Recent)
                         </CardTitle>
+                        <Link
+                            href="/roadmap/initiatives"
+                            className="text-sm font-medium text-primary hover:underline"
+                        >
+                            View all initiatives
+                        </Link>
                     </CardHeader>
                     <CardContent>
                         {can.viewRoadmap ? (
@@ -1908,10 +1938,16 @@ export default function RoadmapDashboard({
 
                 <div className="grid gap-4 xl:grid-cols-2">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between gap-3">
                             <CardTitle className="text-base">
                                 Quarterly Plans
                             </CardTitle>
+                            <Link
+                                href="/roadmap/quarterly-plans"
+                                className="text-sm font-medium text-primary hover:underline"
+                            >
+                                Quarterly plan history
+                            </Link>
                         </CardHeader>
                         <CardContent>
                             {can.viewRoadmap ? (
@@ -2017,10 +2053,16 @@ export default function RoadmapDashboard({
                     </Card>
 
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between gap-3">
                             <CardTitle className="text-base">
                                 Triage Inbox
                             </CardTitle>
+                            <Link
+                                href="/roadmap/suggestions"
+                                className="text-sm font-medium text-primary hover:underline"
+                            >
+                                Open triage backlog
+                            </Link>
                         </CardHeader>
                         <CardContent>
                             {can.viewRoadmap ? (
@@ -2107,10 +2149,16 @@ export default function RoadmapDashboard({
                 </div>
 
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between gap-3">
                         <CardTitle className="text-base">
                             Decision Requests
                         </CardTitle>
+                        <Link
+                            href="/roadmap/decisions"
+                            className="text-sm font-medium text-primary hover:underline"
+                        >
+                            All pending decisions
+                        </Link>
                     </CardHeader>
                     <CardContent>
                         {can.viewDecisions ? (

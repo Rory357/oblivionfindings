@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 
 type Option = {
     id: number;
@@ -26,6 +26,8 @@ type Props = {
 };
 
 export default function ShiftReports({ filters, sites, staff, export_url, report }: Props) {
+    const page = usePage();
+    const canManageRoadmap = Boolean((page.props as any)?.auth?.can?.roadmap?.manage);
     const requestValue = (formData: FormData, key: string) => {
         const value = formData.get(key);
 
@@ -293,9 +295,18 @@ export default function ShiftReports({ filters, sites, staff, export_url, report
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Coverage / Gap Report</CardTitle>
-                            <Button variant="outline" onClick={() => exportDataset('coverage-gaps')}>
-                                Export CSV
-                            </Button>
+                            <div className="flex flex-wrap gap-2">
+                                {canManageRoadmap && (coverage.chronic_shortage_count ?? 0) > 0 ? (
+                                    <Link href="/roadmap/dashboard#quick-add">
+                                        <Button variant="outline">
+                                            Raise Roadmap Initiative
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                                <Button variant="outline" onClick={() => exportDataset('coverage-gaps')}>
+                                    Export CSV
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {renderSummaryCards([

@@ -2,39 +2,55 @@
 
 namespace App\Domain\Roadmap\Http\Controllers;
 
+use App\Domain\Roadmap\Http\Controllers\Concerns\ProvidesRoadmapInertiaProps;
+use App\Domain\Roadmap\Http\Requests\UpdateDecisionRequestRequest;
 use App\Domain\Roadmap\Models\DecisionRequest;
 use App\Domain\Roadmap\Services\RoadmapDecisionService;
-use App\Domain\Roadmap\Http\Requests\UpdateDecisionRequestRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class DecisionRequestController extends Controller
 {
+    use ProvidesRoadmapInertiaProps;
+
     public function __construct(
         protected RoadmapDecisionService $decisionService,
     ) {}
 
-    public function index(Request $request): JsonResponse|RedirectResponse
+    public function index(Request $request): JsonResponse|Response
     {
-        if (! $this->shouldReturnJson($request)) {
-            return redirect()->route('roadmap.dashboard');
-        }
-
         $tenantId = $this->tenantId($request);
+        $status = $request->filled('status')
+            ? $request->string('status')->value()
+            : ($this->shouldReturnJson($request) ? null : 'pending');
 
-        $query = DecisionRequest::query();
+        $query = DecisionRequest::query()->with(['requester:id,name']);
         if ($tenantId !== null) {
             $query->where('tenant_id', $tenantId);
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->string('status')->value());
+        if ($status) {
+            $query->where('status', $status);
         }
 
-        return response()->json([
-            'items' => $query->orderBy('due_date')->paginate(30),
+        $items = $query
+            ->orderBy('due_date')
+            ->paginate($this->paginationPerPage($request, 30, 100))
+            ->withQueryString();
+
+        if ($this->shouldReturnJson($request)) {
+            return response()->json(['items' => $items]);
+        }
+
+        return Inertia::render('Roadmap/Decisions/Index', [
+            'items' => $items,
+            'filters' => [
+                'status' => $status,
+            ],
+            'can' => $this->roadmapCan($request),
         ]);
     }
 

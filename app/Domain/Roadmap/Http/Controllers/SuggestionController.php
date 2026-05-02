@@ -2,46 +2,64 @@
 
 namespace App\Domain\Roadmap\Http\Controllers;
 
+use App\Domain\Roadmap\Http\Controllers\Concerns\ProvidesRoadmapInertiaProps;
+use App\Domain\Roadmap\Http\Requests\StoreSuggestionRequest;
 use App\Domain\Roadmap\Models\InitiativeSuggestion;
 use App\Domain\Roadmap\Services\RoadmapChangeLogService;
 use App\Domain\Roadmap\Services\RoadmapScoringService;
 use App\Domain\Roadmap\Services\RoadmapSuggestionService;
-use App\Domain\Roadmap\Http\Requests\StoreSuggestionRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class SuggestionController extends Controller
 {
+    use ProvidesRoadmapInertiaProps;
+
     public function __construct(
         protected RoadmapSuggestionService $suggestionService,
         protected RoadmapScoringService $scoringService,
         protected RoadmapChangeLogService $changeLogService,
     ) {}
 
-    public function index(Request $request): JsonResponse|RedirectResponse
+    public function index(Request $request): JsonResponse|Response
     {
-        if (! $this->shouldReturnJson($request)) {
-            return redirect()->route('roadmap.dashboard');
-        }
-
         $tenantId = $this->tenantId($request);
+        $status = $request->filled('status')
+            ? $request->string('status')->value()
+            : ($this->shouldReturnJson($request) ? null : InitiativeSuggestion::STATUS_TRIAGE_PENDING);
 
         $query = InitiativeSuggestion::query()
             ->forTenant($tenantId)
             ->with(['triageOwner:id,name,email']);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->string('status')->value());
+        if ($status) {
+            $query->where('status', $status);
         }
 
         if ($request->filled('source')) {
             $query->where('source', $request->string('source')->value());
         }
 
-        return response()->json([
-            'items' => $query->orderByDesc('last_seen_at')->paginate(50),
+        $items = $query
+            ->orderByDesc('last_seen_at')
+            ->paginate($this->paginationPerPage($request, 50, 100))
+            ->withQueryString();
+
+        if ($this->shouldReturnJson($request)) {
+            return response()->json(['items' => $items]);
+        }
+
+        return Inertia::render('Roadmap/Suggestions/Index', [
+            'items' => $items,
+            'filters' => [
+                'status' => $status,
+                'source' => $request->input('source'),
+            ],
+            'managers' => $this->roadmapManagerOptions($request),
+            'can' => $this->roadmapCan($request),
         ]);
     }
 
