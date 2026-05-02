@@ -1832,16 +1832,19 @@ CREATE TABLE `client_onboarding_workflows` (
   `completed_by` bigint unsigned DEFAULT NULL,
   `assigned_to` bigint unsigned DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `client_onboarding_workflows_client_id_foreign` (`client_id`),
   KEY `client_onboarding_workflows_completed_by_foreign` (`completed_by`),
   KEY `client_onboarding_workflows_assigned_to_foreign` (`assigned_to`),
+  KEY `client_onboarding_workflows_created_by_foreign` (`created_by`),
   KEY `client_onboarding_workflows_organization_id_index` (`organization_id`),
   CONSTRAINT `client_onboarding_workflows_assigned_to_foreign` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `client_onboarding_workflows_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `client_onboarding_workflows_completed_by_foreign` FOREIGN KEY (`completed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `client_onboarding_workflows_completed_by_foreign` FOREIGN KEY (`completed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `client_onboarding_workflows_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `client_personal_assets`;
@@ -4035,6 +4038,7 @@ CREATE TABLE `family_portal_settings` (
   `organization_id` bigint unsigned DEFAULT NULL,
   `client_id` bigint unsigned NOT NULL,
   `show_shift_schedule` tinyint(1) NOT NULL DEFAULT '1',
+  `show_respite` tinyint(1) NOT NULL DEFAULT '1',
   `show_care_notes` tinyint(1) NOT NULL DEFAULT '1',
   `show_care_plans` tinyint(1) NOT NULL DEFAULT '0',
   `show_medication_status` tinyint(1) NOT NULL DEFAULT '0',
@@ -16562,7 +16566,7 @@ CREATE TABLE `users` (
   `desktop_notifications_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `notification_sounds_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `email_digest_frequency` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'instant',
-  `role` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'support_worker',
+  `role` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT 'support_worker',
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `approved_at` timestamp NULL DEFAULT NULL,
   `approved_by` bigint unsigned DEFAULT NULL,
@@ -17188,7 +17192,10 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
     (501, '2026_05_01_100000_reconcile_finance_chart_config_accounts', 1),
     (502, '2026_05_01_211000_add_posted_payroll_journal_source_uniqueness', 1),
     (503, '2026_05_01_212000_add_eftpos_settlement_journal_support', 1),
-    (504, '2026_05_02_100000_add_operations_metadata_to_fin_invoices', 1);
+    (504, '2026_05_02_100000_add_operations_metadata_to_fin_invoices', 1),
+    (505, '2026_05_03_000001_add_show_respite_to_family_portal_settings_table', 1),
+    (506, '2026_05_03_000002_add_created_by_to_client_onboarding_workflows_table', 1),
+    (507, '2026_05_03_000003_allow_nullable_user_role_for_pending_portal_users', 1);
 
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE,'system') */;

@@ -31,6 +31,7 @@ class FamilyPortalController extends Controller
                 'portal_enabled' => $setting !== null,
                 'notifications' => [
                     'shift_updates' => $setting?->show_shift_schedule ?? false,
+                    'respite' => $setting?->show_respite ?? false,
                     'care_notes' => $setting?->show_care_notes ?? false,
                     'incident_alerts' => $setting?->show_incidents ?? false,
                     'billing_updates' => false,
@@ -86,6 +87,7 @@ class FamilyPortalController extends Controller
 
         $data = $request->validate([
             'show_shift_schedule' => ['nullable', 'boolean'],
+            'show_respite' => ['nullable', 'boolean'],
             'show_care_notes' => ['nullable', 'boolean'],
             'show_care_plans' => ['nullable', 'boolean'],
             'show_medication_status' => ['nullable', 'boolean'],
@@ -100,6 +102,7 @@ class FamilyPortalController extends Controller
             [
                 'organization_id' => $auth->organization_id,
                 'show_shift_schedule' => $data['show_shift_schedule'] ?? true,
+                'show_respite' => $data['show_respite'] ?? true,
                 'show_care_notes' => $data['show_care_notes'] ?? true,
                 'show_care_plans' => $data['show_care_plans'] ?? false,
                 'show_medication_status' => $data['show_medication_status'] ?? false,

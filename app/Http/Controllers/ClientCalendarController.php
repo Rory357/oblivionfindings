@@ -31,16 +31,20 @@ class ClientCalendarController extends Controller
             ->get();
 
         foreach ($shifts as $s) {
+            $isRespite = (bool) $s->respite_booking_id;
+
             $events->push([
                 'id' => 'shift-' . $s->id,
                 'title' => ($s->staff?->name ?? 'Staff TBC') . ' — Shift',
                 'start' => $s->starts_at?->toIso8601String(),
                 'end' => $s->ends_at?->toIso8601String(),
-                'backgroundColor' => $s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6'),
+                'backgroundColor' => $isRespite ? '#7c3aed' : ($s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6')),
                 'borderColor' => 'transparent',
                 'extendedProps' => [
                     'type' => 'shift',
                     'status' => $s->status,
+                    'is_respite' => $isRespite,
+                    'respite_booking_id' => $s->respite_booking_id,
                     'staff_name' => $s->staff?->name,
                     'notes' => $s->notes,
                     'location' => $s->location,

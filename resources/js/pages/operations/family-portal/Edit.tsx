@@ -10,6 +10,7 @@ import { useState } from 'react';
 
 type FamilyPortalSetting = {
     show_shift_schedule: boolean;
+    show_respite: boolean;
     show_care_notes: boolean;
     show_care_plans: boolean;
     show_medication_status: boolean;
@@ -35,6 +36,7 @@ export default function FamilyPortalEdit({ client }: Props) {
 
     const [form, setForm] = useState({
         show_shift_schedule: setting?.show_shift_schedule ?? true,
+        show_respite: setting?.show_respite ?? true,
         show_care_notes: setting?.show_care_notes ?? true,
         show_care_plans: setting?.show_care_plans ?? false,
         show_medication_status: setting?.show_medication_status ?? false,
@@ -74,6 +76,7 @@ export default function FamilyPortalEdit({ client }: Props) {
                         <CardContent className="space-y-4">
                             {([
                                 ['show_shift_schedule', 'Shift Schedule'],
+                                ['show_respite', 'Respite Stays'],
                                 ['show_care_notes', 'Care Notes'],
                                 ['show_care_plans', 'Care Plans'],
                                 ['show_medication_status', 'Medication Status'],

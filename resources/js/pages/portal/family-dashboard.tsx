@@ -121,6 +121,14 @@ type VisitRequest = {
     status: string;
     review_notes?: string | null;
 };
+type UpcomingRespite = {
+    id: number;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    status: string;
+    stay_status?: string | null;
+    date?: string | null;
+};
 
 type Props = {
     client: {
@@ -155,6 +163,7 @@ type Props = {
     recentEvents: EventItem[];
     recentIncidents: IncidentItem[];
     visitRequests: VisitRequest[];
+    upcomingRespite?: UpcomingRespite[];
     pendingConsentRequests?: Array<{
         id: number;
         consent_type: { id: number; name: string; category: string } | null;
@@ -297,6 +306,7 @@ const statusColors: Record<string, string> = {
     in_progress: 'bg-status-warning-bg text-status-warning',
     completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
+    confirmed: 'bg-primary/10 text-primary',
     pending: 'bg-status-warning-bg text-status-warning',
     approved: 'bg-status-success-bg text-status-success',
     declined: 'bg-status-critical-bg text-status-critical',
@@ -340,6 +350,7 @@ export default function FamilyDashboard({
     recentEvents,
     recentIncidents,
     visitRequests,
+    upcomingRespite = [],
     pendingConsentRequests = [],
     stats,
     relation,
@@ -955,6 +966,66 @@ export default function FamilyDashboard({
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Respite Stays */}
+                        {upcomingRespite.length > 0 && (
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Home className="h-4 w-4 text-primary" />
+                                        Respite Stays
+                                    </CardTitle>
+                                    <span className="text-sm text-muted-foreground">
+                                        Next 30 days
+                                    </span>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {upcomingRespite.map((stay) => (
+                                            <div
+                                                key={stay.id}
+                                                className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                            >
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium">
+                                                        {stay.starts_at
+                                                            ? formatFullDate(
+                                                                  stay.starts_at,
+                                                              )
+                                                            : 'Respite stay'}
+                                                    </p>
+                                                    {stay.ends_at && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Until{' '}
+                                                            {formatFullDate(
+                                                                stay.ends_at,
+                                                            )}
+                                                        </p>
+                                                    )}
+                                                    {stay.stay_status && (
+                                                        <p className="text-xs text-muted-foreground capitalize">
+                                                            Stay:{' '}
+                                                            {stay.stay_status.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <Badge
+                                                    className={`border-0 capitalize ${statusColors[stay.status] ?? ''}`}
+                                                >
+                                                    {stay.status.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {/* Today's Snapshot */}
                         <Card>

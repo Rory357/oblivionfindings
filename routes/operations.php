@@ -937,9 +937,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Family Portal Settings (Phase 9)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:clients.update')->group(function () {
+    Route::middleware('permission:family_portal.viewAny|clients.update')->group(function () {
         Route::get('/family-portal', [FamilyPortalController::class, 'index'])->name('operations.family_portal.index');
         Route::get('/family-portal/{client}', [FamilyPortalController::class, 'show'])->name('operations.family_portal.show');
+    });
+
+    Route::middleware('permission:family_portal.manage|clients.update')->group(function () {
         Route::get('/family-portal/{client}/edit', [FamilyPortalController::class, 'edit'])->name('operations.family_portal.edit');
         Route::put('/family-portal/{client}', [FamilyPortalController::class, 'update'])->name('operations.family_portal.update');
     });

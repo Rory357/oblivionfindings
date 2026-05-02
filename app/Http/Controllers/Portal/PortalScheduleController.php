@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\FamilyPortalSetting;
 use App\Models\FamilyVisitRequest;
+use App\Models\RespiteBooking;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 
@@ -19,13 +20,14 @@ class PortalScheduleController extends Controller
 
         $portalSettings = FamilyPortalSetting::where('client_id', $client->id)->first();
         $showShifts = $portalSettings?->show_shift_schedule ?? true;
+        $showRespite = $portalSettings?->show_respite ?? true;
+        $rangeStart = now()->startOfDay();
+        $rangeEnd = now()->addDays(30);
 
         $shifts = collect();
+        $respiteStays = collect();
 
         if ($showShifts) {
-            $rangeStart = now()->startOfDay();
-            $rangeEnd = now()->addDays(30);
-
             $shifts = Shift::where('client_id', $client->id)
                 ->where('starts_at', '<', $rangeEnd)
                 ->where('ends_at', '>', $rangeStart)
@@ -56,6 +58,26 @@ class PortalScheduleController extends Controller
                 ]);
         }
 
+        if ($showRespite) {
+            $respiteStays = RespiteBooking::query()
+                ->where('client_id', $client->id)
+                ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
+                ->where('start_at', '<', $rangeEnd)
+                ->where('end_at', '>', $rangeStart)
+                ->with(['stays' => fn ($query) => $query->latest('actual_start')])
+                ->orderBy('start_at')
+                ->get()
+                ->map(fn (RespiteBooking $booking) => [
+                    'id' => $booking->id,
+                    'starts_at' => $booking->start_at?->toISOString(),
+                    'ends_at' => $booking->end_at?->toISOString(),
+                    'status' => $booking->status,
+                    'stay_status' => $booking->stays->first()?->status,
+                    'date' => $booking->start_at?->format('Y-m-d'),
+                    'cancellation_reason' => $booking->cancellation_reason,
+                ]);
+        }
+
         $visitRequests = FamilyVisitRequest::where('user_id', $user->id)
             ->where('client_id', $client->id)
             ->upcoming()
@@ -81,8 +103,10 @@ class PortalScheduleController extends Controller
                 'profile_photo_url' => $client->profile_photo_url,
             ],
             'shifts' => $shifts->values(),
+            'respiteStays' => $respiteStays->values(),
             'visitRequests' => $visitRequests->values(),
             'showShifts' => $showShifts,
+            'showRespite' => $showRespite,
         ]);
     }
 }

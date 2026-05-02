@@ -9,6 +9,7 @@ import { Bell, CalendarDays, FileText, Pencil, Pill, Shield } from 'lucide-react
 
 type FamilyPortalSetting = {
     show_shift_schedule: boolean;
+    show_respite: boolean;
     show_care_notes: boolean;
     show_care_plans: boolean;
     show_medication_status: boolean;
@@ -31,6 +32,7 @@ type Props = {
 
 const VISIBILITY_SETTINGS = [
     { key: 'show_shift_schedule', label: 'Shift Schedule', icon: CalendarDays },
+    { key: 'show_respite', label: 'Respite Stays', icon: CalendarDays },
     { key: 'show_care_notes', label: 'Care Notes', icon: FileText },
     { key: 'show_care_plans', label: 'Care Plans', icon: FileText },
     { key: 'show_medication_status', label: 'Medication Status', icon: Pill },

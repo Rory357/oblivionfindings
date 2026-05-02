@@ -26,6 +26,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Heart,
+    Home,
     MapPin,
     Stethoscope,
     Users,
@@ -66,6 +67,12 @@ const categories = [
         label: 'Support Visits',
         icon: CalendarDays,
         bg: 'bg-status-info-bg dark:bg-status-info',
+    },
+    {
+        dot: 'bg-primary',
+        label: 'Respite Stays',
+        icon: Home,
+        bg: 'bg-primary/10 dark:bg-primary/40',
     },
     {
         dot: 'bg-status-success',
@@ -724,6 +731,21 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                                     Service:{' '}
                                                     {detail.service_context}
+                                                </p>
+                                            )}
+                                            {(detail.booking_status ||
+                                                detail.stay_status ||
+                                                detail.is_respite) && (
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    Respite:{' '}
+                                                    {detail.booking_status
+                                                        ? String(
+                                                              detail.booking_status,
+                                                          ).replace(/_/g, ' ')
+                                                        : 'linked shift'}
+                                                    {detail.stay_status
+                                                        ? ` · stay ${String(detail.stay_status).replace(/_/g, ' ')}`
+                                                        : ''}
                                                 </p>
                                             )}
                                             {detail.location && (

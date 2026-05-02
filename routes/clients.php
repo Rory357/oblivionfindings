@@ -28,9 +28,6 @@ Route::middleware(['auth'])->group(function () {
     // Client listing and viewing
     Route::middleware('permission:clients.viewAny|clients.viewAssigned')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
-        Route::get('/clients/{client}', [ClientController::class, 'show'])
-            ->whereNumber('client')
-            ->name('clients.show');
 
         // Documents
         Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])
@@ -53,6 +50,11 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('client')
             ->name('clients.mar.export_csv');
     });
+
+    Route::get('/clients/{client}', [ClientController::class, 'show'])
+        ->middleware('permission:clients.viewAny|clients.viewAssigned|clients.viewPortal')
+        ->whereNumber('client')
+        ->name('clients.show');
 
     // Client creation
     Route::middleware('permission:clients.create')->group(function () {

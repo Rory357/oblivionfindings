@@ -7068,6 +7068,10 @@ export default function ClientShow({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Respite</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                Bookings and requests shown here follow the
+                                respite permission scope for this client.
+                            </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex flex-wrap items-center gap-2">

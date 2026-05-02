@@ -13,6 +13,7 @@ class FamilyPortalSetting extends Model
         'organization_id',
         'client_id',
         'show_shift_schedule',
+        'show_respite',
         'show_care_notes',
         'show_care_plans',
         'show_medication_status',
@@ -24,6 +25,7 @@ class FamilyPortalSetting extends Model
 
     protected $casts = [
         'show_shift_schedule' => 'boolean',
+        'show_respite' => 'boolean',
         'show_care_notes' => 'boolean',
         'show_care_plans' => 'boolean',
         'show_medication_status' => 'boolean',

@@ -9,6 +9,7 @@ use App\Models\ConsentRequest;
 use App\Models\FamilyPortalSetting;
 use App\Models\FamilyVisitRequest;
 use App\Models\ProgressNote;
+use App\Models\RespiteBooking;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Services\ShiftTimelineService;
@@ -31,6 +32,7 @@ class FamilyDashboardController extends Controller
         $monthEnd = (clone $today)->addDays(30);
         $portalSettings = FamilyPortalSetting::query()->where('client_id', $client->id)->first();
         $showShiftSchedule = $portalSettings?->show_shift_schedule ?? true;
+        $showRespite = $portalSettings?->show_respite ?? true;
 
         // Load client with key relationships
         $client->load(['keyWorker:id,name,email,profile_photo_path,last_seen_at,presence_status', 'supportWorkers:id,name,email,profile_photo_path,last_seen_at,presence_status', 'site:id,name,address_line_1,city', 'medicalProfile']);
@@ -141,6 +143,26 @@ class FamilyDashboardController extends Controller
                     ->values()
                     ->all(),
             ]);
+
+        $upcomingRespite = $showRespite
+            ? RespiteBooking::query()
+                ->where('client_id', $client->id)
+                ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
+                ->where('start_at', '<', $monthEnd)
+                ->where('end_at', '>', $today)
+                ->with(['stays' => fn ($query) => $query->latest('actual_start')])
+                ->orderBy('start_at')
+                ->limit(5)
+                ->get()
+                ->map(fn (RespiteBooking $booking) => [
+                    'id' => $booking->id,
+                    'starts_at' => $booking->start_at?->toISOString(),
+                    'ends_at' => $booking->end_at?->toISOString(),
+                    'status' => $booking->status,
+                    'stay_status' => $booking->stays->first()?->status,
+                    'date' => $booking->start_at?->toDateString(),
+                ])
+            : collect();
 
         // Recent incidents (portal-visible, reviewed only)
         $recentIncidents = ClientIncident::where('client_id', $client->id)
@@ -359,6 +381,7 @@ class FamilyDashboardController extends Controller
             'todayShifts' => $todayShifts->values(),
             'weekShifts' => $weekShifts->values(),
             'monthShifts' => $monthShifts->values(),
+            'upcomingRespite' => $upcomingRespite->values(),
             'recentEvents' => $recentEvents->values(),
             'recentIncidents' => $recentIncidents->values(),
             'visitRequests' => $visitRequests->values(),

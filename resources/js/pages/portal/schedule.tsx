@@ -19,6 +19,7 @@ import {
     Calendar,
     CalendarPlus,
     Clock,
+    Home,
     MapPin,
     Users,
     Video,
@@ -55,11 +56,23 @@ type VisitRequest = {
     review_notes?: string | null;
 };
 
+type RespiteStay = {
+    id: number;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    status: string;
+    stay_status?: string | null;
+    date?: string | null;
+    cancellation_reason?: string | null;
+};
+
 type Props = {
     client: { id: number; first_name: string; last_name: string };
     shifts: Shift[];
+    respiteStays: RespiteStay[];
     visitRequests: VisitRequest[];
     showShifts: boolean;
+    showRespite: boolean;
 };
 
 function formatTime(iso: string): string {
@@ -82,6 +95,7 @@ const statusColors: Record<string, string> = {
     in_progress: 'bg-status-warning-bg text-status-warning',
     completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
+    confirmed: 'bg-primary/10 text-primary',
     pending: 'bg-status-warning-bg text-status-warning',
     approved: 'bg-status-success-bg text-status-success',
     declined: 'bg-status-critical-bg text-status-critical',
@@ -126,17 +140,39 @@ function groupShiftsByDate(shifts: Shift[]): Map<string, Shift[]> {
     return grouped;
 }
 
+function groupRespiteByDate(stays: RespiteStay[]): Map<string, RespiteStay[]> {
+    const grouped = new Map<string, RespiteStay[]>();
+    for (const stay of stays) {
+        const date = stay.date ?? stay.starts_at?.slice(0, 10) ?? '';
+        if (!date) continue;
+
+        const existing = grouped.get(date);
+        if (existing) {
+            existing.push(stay);
+        } else {
+            grouped.set(date, [stay]);
+        }
+    }
+    return grouped;
+}
+
 export default function Schedule({
     client,
     shifts,
+    respiteStays,
     visitRequests,
     showShifts,
+    showRespite,
 }: Props) {
     const clientName = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
     const [bookingOpen, setBookingOpen] = useState(false);
 
     const groupedShifts = useMemo(() => groupShiftsByDate(shifts), [shifts]);
+    const groupedRespite = useMemo(
+        () => groupRespiteByDate(respiteStays),
+        [respiteStays],
+    );
 
     const form = useForm({
         requested_date: '',
@@ -330,6 +366,100 @@ export default function Schedule({
                                 <p className="mt-1 text-xs text-muted-foreground/70">
                                     Contact the care team if you need access to
                                     shift information.
+                                </p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* ── Respite Section ─────────────────────────── */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Home className="h-4 w-4 text-primary" />
+                            Respite Stays
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {showRespite ? (
+                            groupedRespite.size > 0 ? (
+                                <div className="space-y-6">
+                                    {Array.from(groupedRespite.entries()).map(
+                                        ([date, stays]) => (
+                                            <div key={date}>
+                                                <h3 className="mb-3 text-sm font-semibold text-foreground">
+                                                    {formatDate(date)}
+                                                </h3>
+                                                <div className="space-y-3">
+                                                    {stays.map((stay) => (
+                                                        <div
+                                                            key={stay.id}
+                                                            className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                                                                    <Home className="h-4 w-4 text-primary" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium">
+                                                                        Respite stay
+                                                                    </p>
+                                                                    {stay.starts_at &&
+                                                                        stay.ends_at && (
+                                                                            <p className="text-xs text-muted-foreground">
+                                                                                {formatTime(
+                                                                                    stay.starts_at,
+                                                                                )}{' '}
+                                                                                -{' '}
+                                                                                {formatTime(
+                                                                                    stay.ends_at,
+                                                                                )}
+                                                                            </p>
+                                                                        )}
+                                                                    {stay.stay_status && (
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            Stay:{' '}
+                                                                            {stay.stay_status.replace(
+                                                                                '_',
+                                                                                ' ',
+                                                                            )}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <Badge
+                                                                className={`${statusColors[stay.status] ?? ''} border-0 capitalize`}
+                                                            >
+                                                                {stay.status.replace(
+                                                                    '_',
+                                                                    ' ',
+                                                                )}
+                                                            </Badge>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <Home className="mb-2 h-8 w-8 text-muted-foreground/40" />
+                                    <p className="text-sm text-muted-foreground">
+                                        No respite stays scheduled
+                                    </p>
+                                </div>
+                            )
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                <Home className="mb-2 h-8 w-8 text-muted-foreground/40" />
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    Respite stays are not enabled for your
+                                    portal access
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground/70">
+                                    Contact the care team if you need access to
+                                    respite information.
                                 </p>
                             </div>
                         )}

@@ -6,11 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
-use App\Models\Shift;
-use App\Models\ServiceContext;
 use App\Models\User;
 use App\Events\Respite\RespiteEvent;
 use App\Services\Respite\RespiteCalendarProjector;
+use App\Services\Respite\RespiteShiftSync;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -55,32 +54,16 @@ class RespiteBookingController extends Controller
             'assigned_coordinator_id' => 'nullable|exists:users,id',
         ]);
 
+        $client = Client::findOrFail($validated['client_id']);
+        $this->authorize('view', $client);
+
         $validated['status'] = 'pending';
         $validated['created_by'] = auth()->id();
 
         $booking = DB::transaction(function () use ($validated) {
             $booking = RespiteBooking::create($validated);
 
-            $serviceContextId = Client::query()
-                ->whereKey($booking->client_id)
-                ->value('service_context_id');
-
-            if (empty($serviceContextId)) {
-                $serviceContextId = ServiceContext::defaultId();
-            }
-
-            Shift::firstOrCreate(
-                ['respite_booking_id' => $booking->id],
-                [
-                    'client_id' => $booking->client_id,
-                    'service_context_id' => $serviceContextId,
-                    'user_id' => null,
-                    'starts_at' => $booking->start_at,
-                    'ends_at' => $booking->end_at,
-                    'status' => 'scheduled',
-                    'created_by' => auth()->id(),
-                ]
-            );
+            app(RespiteShiftSync::class)->ensureShiftForBooking($booking, auth()->id());
 
             return $booking;
         });
@@ -99,6 +82,7 @@ class RespiteBookingController extends Controller
     public function show(RespiteBooking $booking): Response
     {
         $booking->load(['client', 'coordinator', 'request', 'allocations', 'shift']);
+        $this->authorize('view', $booking->client);
 
         return Inertia::render('respite/bookings/show', [
             'booking' => $booking,
@@ -107,6 +91,9 @@ class RespiteBookingController extends Controller
 
     public function update(Request $request, RespiteBooking $booking): RedirectResponse
     {
+        $booking->loadMissing('client');
+        $this->authorize('view', $booking->client);
+
         $validated = $request->validate([
             'start_at' => 'sometimes|date',
             'end_at' => 'sometimes|date|after:start_at',
@@ -118,14 +105,7 @@ class RespiteBookingController extends Controller
         $validated['updated_by'] = auth()->id();
         $booking->update($validated);
 
-        $booking->loadMissing('shift');
-        if ($booking->shift && $booking->shift->status !== 'completed') {
-            $booking->shift->update([
-                'client_id' => $booking->client_id,
-                'starts_at' => $booking->start_at,
-                'ends_at' => $booking->end_at,
-            ]);
-        }
+        app(RespiteShiftSync::class)->syncBooking($booking->fresh(['shift']));
 
         event(new RespiteEvent('respite.booking.updated', [
             'id' => $booking->id,
@@ -138,6 +118,9 @@ class RespiteBookingController extends Controller
 
     public function confirm(RespiteBooking $booking): RedirectResponse
     {
+        $booking->loadMissing('client');
+        $this->authorize('view', $booking->client);
+
         $booking->update([
             'status' => 'confirmed',
             'updated_by' => auth()->id(),

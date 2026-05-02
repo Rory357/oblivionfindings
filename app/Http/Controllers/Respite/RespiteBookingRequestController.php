@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RespiteBookingRequest;
 use App\Models\RespiteBooking;
-use App\Models\Shift;
 use App\Models\ServiceContext;
 use App\Events\Respite\RespiteEvent;
+use App\Services\Respite\RespiteShiftSync;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +68,9 @@ class RespiteBookingRequestController extends Controller
             'funding_reference' => 'nullable|string|max:255',
         ]);
 
+        $client = Client::findOrFail($validated['client_id']);
+        $this->authorize('view', $client);
+
         $validated['status'] = 'submitted';
         $validated['created_by'] = auth()->id();
 
@@ -87,6 +90,8 @@ class RespiteBookingRequestController extends Controller
     public function show(RespiteBookingRequest $request): Response
     {
         $request->load(['client', 'serviceContext', 'approvedBy']);
+        $this->authorize('view', $request->client);
+
         $booking = RespiteBooking::where('booking_request_id', $request->id)->first();
 
         return Inertia::render('respite/requests/show', [
@@ -97,6 +102,9 @@ class RespiteBookingRequestController extends Controller
 
     public function update(Request $httpRequest, RespiteBookingRequest $request): RedirectResponse
     {
+        $request->loadMissing('client');
+        $this->authorize('view', $request->client);
+
         $validated = $httpRequest->validate([
             'requested_start' => 'sometimes|date',
             'requested_end' => 'sometimes|date|after:requested_start',
@@ -121,6 +129,9 @@ class RespiteBookingRequestController extends Controller
 
     public function approve(RespiteBookingRequest $request): RedirectResponse
     {
+        $request->loadMissing('client');
+        $this->authorize('view', $request->client);
+
         $booking = DB::transaction(function () use ($request) {
             $request->update([
                 'status' => 'approved',
@@ -147,18 +158,7 @@ class RespiteBookingRequestController extends Controller
                 $serviceContextId = ServiceContext::defaultId();
             }
 
-            Shift::firstOrCreate(
-                ['respite_booking_id' => $booking->id],
-                [
-                    'client_id' => $booking->client_id,
-                    'service_context_id' => $serviceContextId,
-                    'user_id' => null,
-                    'starts_at' => $booking->start_at,
-                    'ends_at' => $booking->end_at,
-                    'status' => 'scheduled',
-                    'created_by' => auth()->id(),
-                ]
-            );
+            app(RespiteShiftSync::class)->ensureShiftForBooking($booking, auth()->id(), $serviceContextId);
 
             return $booking;
         });

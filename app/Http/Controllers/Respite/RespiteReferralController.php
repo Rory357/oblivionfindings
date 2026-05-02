@@ -65,6 +65,9 @@ class RespiteReferralController extends Controller
             'risk_level' => 'nullable|in:low,medium,high,critical',
         ]);
 
+        $client = Client::findOrFail($validated['client_id']);
+        $this->authorize('view', $client);
+
         $validated['received_at'] = $validated['received_at'] ?? now();
         $validated['created_by'] = auth()->id();
 
@@ -84,6 +87,7 @@ class RespiteReferralController extends Controller
     public function show(RespiteReferral $referral): Response
     {
         $referral->load('client');
+        $this->authorize('view', $referral->client);
 
         return Inertia::render('respite/referrals/show', [
             'referral' => $referral,
@@ -92,6 +96,9 @@ class RespiteReferralController extends Controller
 
     public function update(Request $request, RespiteReferral $referral): RedirectResponse
     {
+        $referral->loadMissing('client');
+        $this->authorize('view', $referral->client);
+
         $validated = $request->validate([
             'status' => 'sometimes|in:received,triaged,accepted,declined',
             'triage_notes' => 'nullable|string',

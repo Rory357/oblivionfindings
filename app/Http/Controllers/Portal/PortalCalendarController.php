@@ -8,6 +8,7 @@ use App\Models\ClientAppointment;
 use App\Models\FamilyPortalSetting;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
+use App\Models\RespiteBooking;
 use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -51,10 +52,11 @@ class PortalCalendarController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
-        $showShiftSchedule = FamilyPortalSetting::query()
+        $portalSettings = FamilyPortalSetting::query()
             ->where('client_id', $client->id)
-            ->value('show_shift_schedule');
-        $showShiftSchedule = $showShiftSchedule === null ? true : (bool) $showShiftSchedule;
+            ->first();
+        $showShiftSchedule = $portalSettings?->show_shift_schedule ?? true;
+        $showRespite = $portalSettings?->show_respite ?? true;
 
         $start = $this->parseCalendarBoundary($request->query('start'), now()->startOfMonth());
         $end = $this->parseCalendarBoundary($request->query('end'), now()->endOfMonth());
@@ -71,16 +73,20 @@ class PortalCalendarController extends Controller
                 ->get();
 
             foreach ($shifts as $s) {
+                $isRespite = (bool) $s->respite_booking_id;
+
                 $events->push([
                     'id' => 'shift-' . $s->id,
                     'title' => ($s->staff?->name ?? 'Support Worker') . ' — ' . ucfirst(str_replace('_', ' ', $s->shift_type ?? 'support')),
                     'start' => $s->starts_at?->toIso8601String(),
                     'end' => $s->ends_at?->toIso8601String(),
-                    'backgroundColor' => $s->status === 'completed' ? '#10b981' : '#3b82f6',
+                    'backgroundColor' => $isRespite ? '#7c3aed' : ($s->status === 'completed' ? '#10b981' : '#3b82f6'),
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'shift',
                         'status' => $s->status,
+                        'is_respite' => $isRespite,
+                        'respite_booking_id' => $s->respite_booking_id,
                         'staff_name' => $s->staff?->name,
                         'shift_type' => $s->shift_type ?? 'standard',
                         'service_context' => $s->serviceContext?->name,
@@ -88,6 +94,33 @@ class PortalCalendarController extends Controller
                         'is_sleepover' => (bool) $s->is_sleepover,
                         'is_on_call' => (bool) $s->is_on_call,
                         'expected_break_minutes' => $s->expected_break_minutes,
+                    ],
+                ]);
+            }
+        }
+
+        if ($showRespite) {
+            $respiteBookings = RespiteBooking::query()
+                ->where('client_id', $client->id)
+                ->whereIn('status', ['confirmed', 'in_progress', 'completed'])
+                ->where('start_at', '<', $end)
+                ->where('end_at', '>', $start)
+                ->with(['stays' => fn ($query) => $query->latest('actual_start')])
+                ->get();
+
+            foreach ($respiteBookings as $booking) {
+                $events->push([
+                    'id' => 'respite-' . $booking->id,
+                    'title' => 'Respite stay',
+                    'start' => $booking->start_at?->toIso8601String(),
+                    'end' => $booking->end_at?->toIso8601String(),
+                    'backgroundColor' => '#7c3aed',
+                    'borderColor' => 'transparent',
+                    'extendedProps' => [
+                        'type' => 'respite_stay',
+                        'booking_status' => $booking->status,
+                        'stay_status' => $booking->stays->first()?->status,
+                        'respite_booking_id' => $booking->id,
                     ],
                 ]);
             }

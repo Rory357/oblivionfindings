@@ -180,6 +180,7 @@ class ShiftController extends Controller
             'site:id,name,type',
             'tasks',
             'serviceContext:id,name,type,is_active',
+            'respiteBooking:id,start_at,end_at,status,cancellation_reason',
         ]);
 
         $canViewMedications = $auth->canDo('medications.view')

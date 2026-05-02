@@ -81,6 +81,7 @@ type Props = {
         id: number;
         client_id: number;
         service_context_id?: number | null;
+        respite_booking_id?: number | null;
         user_id: number | null;
         shift_series_id?: number | null;
         starts_at: string;
@@ -101,6 +102,13 @@ type Props = {
             name: string;
             type: string;
             is_active: boolean;
+        } | null;
+        respite_booking?: {
+            id: number;
+            start_at?: string | null;
+            end_at?: string | null;
+            status: string;
+            cancellation_reason?: string | null;
         } | null;
         tasks: Task[];
     };
@@ -1002,6 +1010,73 @@ export default function ShiftShow({
                             ) : (
                                 <p className="text-sm text-muted-foreground">
                                     No timesheet linked yet.
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="transition-shadow hover:shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                                <CalendarDays className="h-3.5 w-3.5" />
+                                Linked Respite Booking
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {shift.respite_booking ? (
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <Link
+                                            href={`/respite/bookings/${shift.respite_booking.id}`}
+                                            className="text-sm font-medium underline"
+                                        >
+                                            Booking #
+                                            {shift.respite_booking.id}
+                                        </Link>
+                                        <Badge
+                                            variant="outline"
+                                            className="capitalize"
+                                        >
+                                            {shift.respite_booking.status.replace(
+                                                '_',
+                                                ' ',
+                                            )}
+                                        </Badge>
+                                    </div>
+                                    {shift.respite_booking.start_at &&
+                                    shift.respite_booking.end_at ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            {new Date(
+                                                shift.respite_booking.start_at,
+                                            ).toLocaleString([], {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                            {' – '}
+                                            {new Date(
+                                                shift.respite_booking.end_at,
+                                            ).toLocaleString([], {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                        </p>
+                                    ) : null}
+                                    {shift.respite_booking.cancellation_reason ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            {
+                                                shift.respite_booking
+                                                    .cancellation_reason
+                                            }
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    No respite booking linked.
                                 </p>
                             )}
                         </CardContent>

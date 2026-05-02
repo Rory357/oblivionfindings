@@ -143,6 +143,7 @@ class CalendarController extends Controller
                 $clientName = $shift->client ? ($shift->client->first_name . ' ' . $shift->client->last_name) : 'Client';
                 $staffName = $shift->staff ? $shift->staff->name : 'Staff';
                 $coverage = $shiftCoverageById->get($shift->id);
+                $isRespite = (bool) $shift->respite_booking_id;
 
                 $title = $canManageAny ? ($clientName . ' · ' . $staffName) : $clientName;
 
@@ -152,10 +153,14 @@ class CalendarController extends Controller
                     // Send ISO-8601 strings so FullCalendar parses reliably.
                     'start' => optional($shift->starts_at)->toIso8601String(),
                     'end' => optional($shift->ends_at)->toIso8601String(),
+                    'backgroundColor' => $isRespite ? '#7c3aed' : null,
+                    'borderColor' => $isRespite ? 'transparent' : null,
                     'extendedProps' => [
                         'client_id' => $shift->client_id,
                         'service_context_id' => $shift->service_context_id,
                         'service_context' => $shift->serviceContext ? $shift->serviceContext->name : null,
+                        'is_respite' => $isRespite,
+                        'respite_booking_id' => $shift->respite_booking_id,
                         'user_id' => $shift->user_id,
                         'location' => $shift->location,
                         'notes' => $shift->notes,

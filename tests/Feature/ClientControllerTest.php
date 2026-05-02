@@ -101,6 +101,15 @@ class ClientControllerTest extends TestCase
         ], $overrides);
     }
 
+    private function findClientByEmail(string $email): Client
+    {
+        $client = Client::all()->firstWhere('email', $email);
+
+        $this->assertInstanceOf(Client::class, $client);
+
+        return $client;
+    }
+
     // =========================================================================
     // INDEX - Authentication
     // =========================================================================
@@ -1381,7 +1390,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertRedirect(route('clients.index'));
 
-        $client = Client::where('email', 'portal@example.com')->firstOrFail();
+        $client = $this->findClientByEmail('portal@example.com');
         $user = User::where('email', 'portal@example.com')->firstOrFail();
 
         // Verify portal user was created
@@ -1468,7 +1477,7 @@ class ClientControllerTest extends TestCase
         $existingUser->refresh();
         $this->assertNotNull($existingUser->approved_at);
 
-        $client = Client::where('email', 'existing@example.com')->firstOrFail();
+        $client = $this->findClientByEmail('existing@example.com');
         $this->assertTrue($client->portalUsers()->whereKey($existingUser->id)->exists());
     }
 
@@ -1497,8 +1506,8 @@ class ClientControllerTest extends TestCase
         $this->post('/reset-password', [
             'token' => $token,
             'email' => $user->email,
-            'password' => 'password',
-            'password_confirmation' => 'password',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ])
             ->assertSessionHasNoErrors()
             ->assertSessionHas('status');
@@ -2114,7 +2123,7 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->post('/clients', $data);
 
         $response->assertRedirect(route('clients.index'));
-        $client = Client::where('email', 'nocontext@example.com')->firstOrFail();
+        $client = $this->findClientByEmail('nocontext@example.com');
         // The service_context_id should be set to the default (or null if none configured)
         $this->assertEquals(ServiceContext::defaultId(), $client->service_context_id);
     }
@@ -2311,7 +2320,7 @@ class ClientControllerTest extends TestCase
 
         $this->actingAs($this->admin)->post('/clients', $data);
 
-        $client = Client::where('email', 'flag-test@example.com')->firstOrFail();
+        $client = $this->findClientByEmail('flag-test@example.com');
 
         // The create_client_portal_user flag should not be stored on the client model
         $this->assertArrayNotHasKey('create_client_portal_user', $client->getAttributes());
