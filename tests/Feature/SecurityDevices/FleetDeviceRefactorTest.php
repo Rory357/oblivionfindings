@@ -103,7 +103,7 @@ class FleetDeviceRefactorTest extends TestCase
 
         $response->assertInertia(fn ($page) => $page
             ->where('stats.total', 4)
-            ->where('stats.online', 3) // 2 active + 1 unpaired active + 1 paired active... wait, let me count
+            ->where('stats.online', 3)
         );
     }
 

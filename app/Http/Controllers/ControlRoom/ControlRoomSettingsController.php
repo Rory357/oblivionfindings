@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\DispatchFleetSignalOutbox;
 use App\Models\ControlRoom\ConfigOption;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Playbook;
@@ -10,6 +11,7 @@ use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\TriageQueue;
+use App\Models\FleetSignalOutbox;
 use App\Models\Site;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -154,6 +156,32 @@ class ControlRoomSettingsController extends Controller
                 'is_active' => $o->is_active,
             ])->values());
 
+        $signalOutbox = FleetSignalOutbox::query()
+            ->with('signal:id,asset_id,device_id,signal_type,severity_hint,occurred_at')
+            ->whereIn('status', ['failed', 'dead_letter'])
+            ->latest('last_attempt_at')
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (FleetSignalOutbox $outbox) => [
+                'id' => $outbox->id,
+                'status' => $outbox->status,
+                'attempts' => $outbox->attempts,
+                'last_attempt_at' => $outbox->last_attempt_at?->toISOString(),
+                'last_error' => $outbox->last_error,
+                'created_at' => $outbox->created_at?->toISOString(),
+                'updated_at' => $outbox->updated_at?->toISOString(),
+                'can_retry' => ! $outbox->last_attempt_at || $outbox->last_attempt_at->lte(now()->subMinutes(5)),
+                'signal' => $outbox->signal ? [
+                    'id' => $outbox->signal->id,
+                    'asset_id' => $outbox->signal->asset_id,
+                    'device_id' => $outbox->signal->device_id,
+                    'signal_type' => $outbox->signal->signal_type,
+                    'severity_hint' => $outbox->signal->severity_hint,
+                    'occurred_at' => $outbox->signal->occurred_at?->toISOString(),
+                ] : null,
+            ]);
+
         return Inertia::render('control-room/settings', [
             'activeTab' => $activeTab,
             'signalRules' => $signalRules,
@@ -164,7 +192,39 @@ class ControlRoomSettingsController extends Controller
             'playbooks' => $playbooks,
             'sites' => $sites,
             'configOptions' => $configOptions,
+            'signalOutbox' => $signalOutbox,
         ]);
+    }
+
+    public function retrySignalOutbox(Request $request, FleetSignalOutbox $outbox)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        abort_unless(in_array($outbox->status, ['failed', 'dead_letter'], true), 422, 'Only failed signal deliveries can be retried.');
+        abort_if(
+            $outbox->last_attempt_at && $outbox->last_attempt_at->gt(now()->subMinutes(5)),
+            429,
+            'This signal delivery was retried recently. Please wait before retrying it again.',
+        );
+
+        $previousStatus = $outbox->status;
+        $outbox->update([
+            'status' => 'pending',
+            'last_error' => null,
+        ]);
+
+        DispatchFleetSignalOutbox::dispatch($outbox->id);
+
+        AuditLogger::log('controlRoom.signalOutbox.retry', $outbox, [
+            'outbox_id' => $outbox->id,
+            'fleet_signal_id' => $outbox->fleet_signal_id,
+            'previous_status' => $previousStatus,
+            'retried_by' => $user->id,
+        ]);
+
+        return redirect()
+            ->route('control-room.settings.index', ['tab' => 'signal-outbox'])
+            ->with('success', 'Signal outbox retry queued.');
     }
 
     /**

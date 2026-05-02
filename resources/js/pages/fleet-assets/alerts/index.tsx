@@ -7,12 +7,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
 import { Head, Link, router } from '@inertiajs/react';
@@ -137,6 +146,9 @@ export default function AlertsIndex({
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [bulkAction, setBulkAction] = useState<string | null>(null);
+    const [resolveAlertId, setResolveAlertId] = useState<number | null>(null);
+    const [resolveBulkOpen, setResolveBulkOpen] = useState(false);
+    const [resolutionNotes, setResolutionNotes] = useState('');
     const [sortField, setSortField] = useState<string>('');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -253,6 +265,60 @@ export default function AlertsIndex({
         },
         [selectedIds],
     );
+
+    const openSingleResolve = useCallback((alertId: number) => {
+        setResolveAlertId(alertId);
+        setResolveBulkOpen(false);
+        setResolutionNotes('');
+    }, []);
+
+    const openBulkResolve = useCallback(() => {
+        setResolveAlertId(null);
+        setResolveBulkOpen(true);
+        setResolutionNotes('');
+    }, []);
+
+    const closeResolveDialog = useCallback(() => {
+        setResolveAlertId(null);
+        setResolveBulkOpen(false);
+        setResolutionNotes('');
+    }, []);
+
+    const submitResolve = useCallback(() => {
+        const notes = resolutionNotes.trim();
+        if (!notes) return;
+
+        if (resolveAlertId) {
+            router.post(
+                `/fleet-assets/alerts/${resolveAlertId}/resolve`,
+                { resolution_notes: notes },
+                {
+                    preserveState: true,
+                    onSuccess: closeResolveDialog,
+                },
+            );
+
+            return;
+        }
+
+        const numericIds = selectedIds
+            .map((id) => Number(id.replace('cr-', '')))
+            .filter((id) => !isNaN(id));
+
+        router.post(
+            '/fleet-assets/alerts/bulk-action',
+            { action: 'resolve', ids: numericIds, resolution_notes: notes },
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedIds([]);
+                    closeResolveDialog();
+                },
+            },
+        );
+    }, [closeResolveDialog, resolutionNotes, resolveAlertId, selectedIds]);
+
+    const resolveDialogOpen = resolveAlertId !== null || resolveBulkOpen;
 
     return (
         <AppLayout
@@ -527,8 +593,8 @@ export default function AlertsIndex({
                                                             variant="outline"
                                                             size="sm"
                                                             onClick={() =>
-                                                                router.post(
-                                                                    `/fleet-assets/alerts/${alert.id}/resolve`,
+                                                                openSingleResolve(
+                                                                    alert.id,
                                                                 )
                                                             }
                                                         >
@@ -674,7 +740,7 @@ export default function AlertsIndex({
                             <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setBulkAction('resolve')}
+                                onClick={openBulkResolve}
                             >
                                 Resolve Selected
                             </Button>
@@ -704,6 +770,52 @@ export default function AlertsIndex({
                         ))}
                     </div>
                 )}
+                <Dialog
+                    open={canManage && resolveDialogOpen}
+                    onOpenChange={(open) => !open && closeResolveDialog()}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Resolve Alert</DialogTitle>
+                            <DialogDescription>
+                                Add resolution notes before closing the active
+                                alert workflow.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-2">
+                            <label
+                                htmlFor="resolution-notes"
+                                className="text-sm font-medium"
+                            >
+                                Resolution notes
+                            </label>
+                            <Textarea
+                                id="resolution-notes"
+                                value={resolutionNotes}
+                                onChange={(event) =>
+                                    setResolutionNotes(event.target.value)
+                                }
+                                rows={5}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeResolveDialog}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={submitResolve}
+                                disabled={!resolutionNotes.trim()}
+                            >
+                                Resolve
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
                 <ConfirmDialog
                     open={canManage && bulkAction !== null}
                     onClose={() => setBulkAction(null)}

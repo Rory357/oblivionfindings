@@ -166,6 +166,24 @@ class DeviceGroupControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_uses_authenticated_users_organization_scope_for_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 77])->save();
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/device-groups', [
+                'name' => 'Scoped Group',
+                'type' => 'location',
+                'description' => 'A scoped group',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('device_groups', [
+            'name' => 'Scoped Group',
+            'tenant_id' => 77,
+        ]);
+    }
+
     public function test_store_validates_required_name(): void
     {
         $this->actingAs($this->admin)

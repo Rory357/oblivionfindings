@@ -255,6 +255,25 @@ class DeviceControllerTest extends TestCase
         $this->assertEquals($this->admin->id, $device->created_by_user_id);
     }
 
+    public function test_store_uses_authenticated_users_organization_scope_for_tenant(): void
+    {
+        $this->admin->forceFill(['organization_id' => 42])->save();
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/devices', [
+                'name' => 'Scoped Camera',
+                'domain' => 'security',
+                'category' => 'cctv',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('devices', [
+            'name' => 'Scoped Camera',
+            'tenant_id' => 42,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+    }
+
     public function test_store_validates_required_fields(): void
     {
         $response = $this->actingAs($this->admin)

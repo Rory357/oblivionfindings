@@ -31,7 +31,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 // --- TypeScript Interfaces ---
@@ -111,6 +111,25 @@ interface MaintenanceWindowData {
     created_by_name: string | null;
 }
 
+interface SignalOutboxRow {
+    id: number;
+    status: 'failed' | 'dead_letter';
+    attempts: number;
+    last_attempt_at: string | null;
+    last_error: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    can_retry: boolean;
+    signal: {
+        id: number;
+        asset_id: number;
+        device_id: number | null;
+        signal_type: string;
+        severity_hint: string;
+        occurred_at: string | null;
+    } | null;
+}
+
 interface PlaybookOption {
     id: number;
     name: string;
@@ -129,6 +148,7 @@ interface Props {
     signalSources: SignalSourceOption[];
     triageQueues: TriageQueueData[];
     maintenanceWindows: MaintenanceWindowData[];
+    signalOutbox: SignalOutboxRow[];
     playbooks: PlaybookOption[];
     sites: SiteOption[];
     configOptions: Record<
@@ -184,6 +204,11 @@ const windowStatusColors: Record<string, string> = {
     active: 'bg-status-success-bg text-status-success',
     completed: 'bg-muted text-muted-foreground',
     cancelled: 'bg-status-critical-bg text-status-critical',
+};
+
+const outboxStatusColors: Record<string, string> = {
+    failed: 'bg-status-warning-bg text-status-warning',
+    dead_letter: 'bg-status-critical-bg text-status-critical',
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -1119,6 +1144,7 @@ export default function ControlRoomSettings({
     signalSources,
     triageQueues,
     maintenanceWindows,
+    signalOutbox,
     playbooks,
     sites,
     configOptions,
@@ -1198,6 +1224,14 @@ export default function ControlRoomSettings({
         );
     }
 
+    function handleRetryOutbox(outboxId: number) {
+        router.post(
+            `/control-room/settings/signal-outbox/${outboxId}/retry`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
     const breadcrumbs = [
         { title: 'Control Room', href: '/control-room' },
         { title: 'Settings', href: '#' },
@@ -1225,6 +1259,9 @@ export default function ControlRoomSettings({
                         </TabsTrigger>
                         <TabsTrigger value="maintenance">
                             Maintenance
+                        </TabsTrigger>
+                        <TabsTrigger value="signal-outbox">
+                            Signal Outbox
                         </TabsTrigger>
                         <TabsTrigger value="ticket-options">
                             Ticket Options
@@ -1668,7 +1705,115 @@ export default function ControlRoomSettings({
                         )}
                     </TabsContent>
 
-                    {/* --- Tab 4: Maintenance Windows --- */}
+                    {/* --- Tab 4: Signal Outbox --- */}
+                    <TabsContent value="signal-outbox" className="mt-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Signal Outbox
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {signalOutbox.length === 0 ? (
+                                    <p className="py-8 text-center text-sm text-muted-foreground">
+                                        No failed signal deliveries.
+                                    </p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b text-left text-muted-foreground">
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Signal
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Status
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Attempts
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Last Attempt
+                                                    </th>
+                                                    <th className="pr-4 pb-2 font-medium">
+                                                        Error
+                                                    </th>
+                                                    <th className="pb-2 font-medium">
+                                                        Action
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {signalOutbox.map((row) => (
+                                                    <tr
+                                                        key={row.id}
+                                                        className="border-b last:border-0"
+                                                    >
+                                                        <td className="py-2.5 pr-4">
+                                                            <div className="font-medium">
+                                                                {row.signal
+                                                                    ?.signal_type ??
+                                                                    `Outbox #${row.id}`}
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {row.signal
+                                                                    ? `Signal #${row.signal.id} - Asset #${row.signal.asset_id}`
+                                                                    : 'Missing source signal'}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2.5 pr-4">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={
+                                                                    outboxStatusColors[
+                                                                        row
+                                                                            .status
+                                                                    ] ?? ''
+                                                                }
+                                                            >
+                                                                {row.status}
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="py-2.5 pr-4">
+                                                            {row.attempts}
+                                                        </td>
+                                                        <td className="py-2.5 pr-4 text-muted-foreground">
+                                                            {formatDateTime(
+                                                                row.last_attempt_at,
+                                                            )}
+                                                        </td>
+                                                        <td className="max-w-[280px] truncate py-2.5 pr-4 text-muted-foreground">
+                                                            {row.last_error ??
+                                                                '-'}
+                                                        </td>
+                                                        <td className="py-2.5">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={
+                                                                    !row.can_retry
+                                                                }
+                                                                onClick={() =>
+                                                                    handleRetryOutbox(
+                                                                        row.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                                                                Retry
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* --- Tab 5: Maintenance Windows --- */}
                     <TabsContent value="maintenance" className="mt-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">

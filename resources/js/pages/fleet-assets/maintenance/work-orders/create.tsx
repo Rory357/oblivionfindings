@@ -10,10 +10,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { AlertTriangle, ArrowDown, ArrowUp, ClipboardCheck, Clock, ImagePlus, Loader2, Save, Search, Zap } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowDown,
+    ArrowUp,
+    ClipboardCheck,
+    Clock,
+    Loader2,
+    Save,
+    Search,
+    Zap,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type ChecklistRun = {
@@ -24,7 +34,12 @@ type ChecklistRun = {
 };
 
 type Props = {
-    assets: Array<{ id: number; name: string; asset_tag: string | null; category: string | null }>;
+    assets: Array<{
+        id: number;
+        name: string;
+        asset_tag: string | null;
+        category: string | null;
+    }>;
     users: Array<{ id: number; name: string }>;
     checklist_runs?: ChecklistRun[];
     prefill_asset_id?: string | null;
@@ -32,13 +47,39 @@ type Props = {
 };
 
 const PRIORITY_OPTIONS = [
-    { value: 'critical', label: 'Critical', icon: Zap, color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30' },
-    { value: 'high', label: 'High', icon: ArrowUp, color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30' },
-    { value: 'medium', label: 'Medium', icon: AlertTriangle, color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30' },
-    { value: 'low', label: 'Low', icon: ArrowDown, color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30' },
+    {
+        value: 'critical',
+        label: 'Critical',
+        icon: Zap,
+        color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30',
+    },
+    {
+        value: 'high',
+        label: 'High',
+        icon: ArrowUp,
+        color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
+    },
+    {
+        value: 'medium',
+        label: 'Medium',
+        icon: AlertTriangle,
+        color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
+    },
+    {
+        value: 'low',
+        label: 'Low',
+        icon: ArrowDown,
+        color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
+    },
 ];
 
-export default function WorkOrderCreate({ assets, users, checklist_runs, prefill_asset_id, prefill_checklist_run_id }: Props) {
+export default function WorkOrderCreate({
+    assets,
+    users,
+    checklist_runs,
+    prefill_asset_id,
+    prefill_checklist_run_id,
+}: Props) {
     const safeAssets = useMemo(() => assets ?? [], [assets]);
     const safeUsers = users ?? [];
     const safeChecklistRuns = checklist_runs ?? [];
@@ -52,7 +93,7 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
             (a) =>
                 a.name.toLowerCase().includes(q) ||
                 (a.asset_tag ?? '').toLowerCase().includes(q) ||
-                (a.category ?? '').toLowerCase().includes(q)
+                (a.category ?? '').toLowerCase().includes(q),
         );
     }, [safeAssets, assetSearch]);
 
@@ -78,7 +119,10 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
         <AppLayout
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Work Orders', href: '/fleet-assets/maintenance/work-orders' },
+                {
+                    title: 'Work Orders',
+                    href: '/fleet-assets/maintenance/work-orders',
+                },
                 { title: 'Create', href: '#' },
             ]}
         >
@@ -106,12 +150,17 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                                             key={opt.value}
                                             type="button"
                                             variant="outline"
-                                            onClick={() => form.setData('priority', opt.value)}
+                                            onClick={() =>
+                                                form.setData(
+                                                    'priority',
+                                                    opt.value,
+                                                )
+                                            }
                                             className={cn(
-                                                "h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all",
+                                                'h-auto flex-col gap-2 rounded-xl border-2 px-4 py-5 whitespace-normal transition-all',
                                                 form.data.priority === opt.value
                                                     ? `${opt.color} shadow-md`
-                                                    : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80'
+                                                    : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80',
                                             )}
                                         >
                                             <IconComp className="h-6 w-6" />
@@ -131,55 +180,97 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                             </CardHeader>
                             <CardContent className="grid gap-4">
                                 <div>
-                                    <label className="text-sm font-medium">Asset *</label>
+                                    <label className="text-sm font-medium">
+                                        Asset *
+                                    </label>
                                     <div className="space-y-2">
                                         <div className="relative">
-                                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                            <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                                             <Input
                                                 value={assetSearch}
-                                                onChange={(e) => setAssetSearch(e.target.value)}
+                                                onChange={(e) =>
+                                                    setAssetSearch(
+                                                        e.target.value,
+                                                    )
+                                                }
                                                 placeholder="Search assets..."
                                                 className="pl-8"
                                             />
                                         </div>
-                                        <Select value={form.data.asset_id} onValueChange={(v) => form.setData('asset_id', v)}>
+                                        <Select
+                                            value={form.data.asset_id}
+                                            onValueChange={(v) =>
+                                                form.setData('asset_id', v)
+                                            }
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select asset" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {filteredAssets.map((a) => (
-                                                    <SelectItem key={a.id} value={String(a.id)}>
+                                                    <SelectItem
+                                                        key={a.id}
+                                                        value={String(a.id)}
+                                                    >
                                                         {a.name}
-                                                        {a.asset_tag ? ` (${a.asset_tag})` : ''}
-                                                        {a.category ? ` - ${a.category}` : ''}
+                                                        {a.asset_tag
+                                                            ? ` (${a.asset_tag})`
+                                                            : ''}
+                                                        {a.category
+                                                            ? ` - ${a.category}`
+                                                            : ''}
                                                     </SelectItem>
                                                 ))}
-                                                {filteredAssets.length === 0 && (
+                                                {filteredAssets.length ===
+                                                    0 && (
                                                     <div className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                        No assets match your search.
+                                                        No assets match your
+                                                        search.
                                                     </div>
                                                 )}
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    {form.errors.asset_id && <p className="mt-1 text-xs text-destructive">{form.errors.asset_id}</p>}
+                                    {form.errors.asset_id && (
+                                        <p className="mt-1 text-xs text-destructive">
+                                            {form.errors.asset_id}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Title *</label>
+                                    <label className="text-sm font-medium">
+                                        Title *
+                                    </label>
                                     <Input
                                         value={form.data.title}
-                                        onChange={(e) => form.setData('title', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'title',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Work order title"
                                     />
-                                    {form.errors.title && <p className="mt-1 text-xs text-destructive">{form.errors.title}</p>}
+                                    {form.errors.title && (
+                                        <p className="mt-1 text-xs text-destructive">
+                                            {form.errors.title}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Description</label>
+                                    <label className="text-sm font-medium">
+                                        Description
+                                    </label>
                                     <textarea
-                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                         rows={3}
                                         value={form.data.description}
-                                        onChange={(e) => form.setData('description', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'description',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Describe the work needed..."
                                     />
                                 </div>
@@ -192,33 +283,62 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                             </CardHeader>
                             <CardContent className="grid gap-4">
                                 <div>
-                                    <label className="text-sm font-medium">Assigned To</label>
-                                    <Select value={form.data.assigned_to_user_id} onValueChange={(v) => form.setData('assigned_to_user_id', v)}>
+                                    <label className="text-sm font-medium">
+                                        Assigned To
+                                    </label>
+                                    <Select
+                                        value={form.data.assigned_to_user_id}
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'assigned_to_user_id',
+                                                v,
+                                            )
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select assignee" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {safeUsers.map((u) => (
-                                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                                                <SelectItem
+                                                    key={u.id}
+                                                    value={String(u.id)}
+                                                >
+                                                    {u.name}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Due Date</label>
+                                    <label className="text-sm font-medium">
+                                        Due Date
+                                    </label>
                                     <Input
                                         type="date"
                                         value={form.data.due_at}
-                                        onChange={(e) => form.setData('due_at', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'due_at',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Estimated Cost ($)</label>
+                                    <label className="text-sm font-medium">
+                                        Estimated Cost ($)
+                                    </label>
                                     <Input
                                         type="number"
                                         step="0.01"
                                         value={form.data.estimated_cost}
-                                        onChange={(e) => form.setData('estimated_cost', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'estimated_cost',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="0.00"
                                     />
                                 </div>
@@ -232,10 +352,19 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                                         step="0.5"
                                         min="0"
                                         value={form.data.estimated_hours}
-                                        onChange={(e) => form.setData('estimated_hours', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'estimated_hours',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="0"
                                     />
-                                    {form.errors.estimated_hours && <p className="mt-1 text-xs text-destructive">{form.errors.estimated_hours}</p>}
+                                    {form.errors.estimated_hours && (
+                                        <p className="mt-1 text-xs text-destructive">
+                                            {form.errors.estimated_hours}
+                                        </p>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -248,10 +377,12 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                         </CardHeader>
                         <CardContent>
                             <textarea
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Additional notes..."
                             />
                         </CardContent>
@@ -268,57 +399,55 @@ export default function WorkOrderCreate({ assets, users, checklist_runs, prefill
                             </CardHeader>
                             <CardContent>
                                 <p className="mb-3 text-xs text-muted-foreground">
-                                    Link this work order to a failed checklist inspection.
+                                    Link this work order to a failed checklist
+                                    inspection.
                                 </p>
                                 <Select
                                     value={form.data.checklist_run_id}
-                                    onValueChange={(v) => form.setData('checklist_run_id', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('checklist_run_id', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select failed inspection (optional)" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {safeChecklistRuns.map((run) => (
-                                            <SelectItem key={run.id} value={String(run.id)}>
-                                                {run.template_name} - {run.asset_name}
-                                                {run.run_at ? ` (${new Date(run.run_at).toLocaleDateString()})` : ''}
+                                            <SelectItem
+                                                key={run.id}
+                                                value={String(run.id)}
+                                            >
+                                                {run.template_name} -{' '}
+                                                {run.asset_name}
+                                                {run.run_at
+                                                    ? ` (${new Date(run.run_at).toLocaleDateString()})`
+                                                    : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.checklist_run_id && <p className="mt-1 text-xs text-destructive">{form.errors.checklist_run_id}</p>}
+                                {form.errors.checklist_run_id && (
+                                    <p className="mt-1 text-xs text-destructive">
+                                        {form.errors.checklist_run_id}
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Attachments Placeholder */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <ImagePlus className="h-4 w-4" />
-                                Attachments
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 py-8">
-                                <ImagePlus className="mb-2 h-8 w-8 text-muted-foreground/40" />
-                                <p className="text-sm text-muted-foreground">
-                                    Drag and drop photos or files here
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground/60">
-                                    File uploads coming soon
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
                     <div className="flex items-center gap-2">
                         <Button type="submit" disabled={form.processing}>
-                            {form.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            {form.processing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                            )}
                             Create Work Order
                         </Button>
                         <Button variant="outline" asChild>
-                            <Link href="/fleet-assets/maintenance/work-orders">Cancel</Link>
+                            <Link href="/fleet-assets/maintenance/work-orders">
+                                Cancel
+                            </Link>
                         </Button>
                     </div>
                 </form>

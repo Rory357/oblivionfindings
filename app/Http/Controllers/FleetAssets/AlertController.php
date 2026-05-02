@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\ControlRoomAlertController as CanonicalAlertController;
 use App\Models\AssetAlert;
 use App\Models\ControlRoomAlert;
+use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,27 +16,21 @@ class AlertController extends Controller
     /**
      * Acknowledge a control room alert from the fleet module.
      */
-    public function acknowledge(ControlRoomAlert $alert)
+    public function acknowledge(Request $request, ControlRoomAlert $alert, CanonicalAlertController $canonical)
     {
-        $alert->update([
-            'status' => 'acknowledged',
-            'acknowledged_at' => now(),
-        ]);
+        $this->assertFleetAlert($alert);
 
-        return back();
+        return $canonical->acknowledge($request, $alert);
     }
 
     /**
      * Resolve a control room alert from the fleet module.
      */
-    public function resolve(ControlRoomAlert $alert)
+    public function resolve(Request $request, ControlRoomAlert $alert, CanonicalAlertController $canonical)
     {
-        $alert->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-        ]);
+        $this->assertFleetAlert($alert);
 
-        return back();
+        return $canonical->resolve($request, $alert);
     }
 
     public function index(Request $request)
@@ -127,33 +124,128 @@ class AlertController extends Controller
             'archived_asset_alerts' => $archivedAssetAlerts,
             'filters' => $request->only(['status', 'severity', 'asset_id']),
             'can' => [
-                'manage' => (bool) ($request->user()?->canDo('fleet.manage') || $request->user()?->canDo('assets.alerts.manage')),
+                'manage' => (bool) $request->user()?->canDo('controlRoom.alerts.manage'),
             ],
         ]);
     }
 
     public function bulkAction(Request $request)
     {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
         $data = $request->validate([
             'action' => ['required', 'string', 'in:acknowledge,resolve'],
-            'ids' => ['required', 'array'],
+            'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
+            'resolution_notes' => ['required_if:action,resolve', 'nullable', 'string', 'max:2000'],
         ]);
 
-        $updateData = [];
-        switch ($data['action']) {
-            case 'acknowledge':
-                $updateData = ['status' => 'acknowledged', 'acknowledged_at' => now()];
-                break;
-            case 'resolve':
-                $updateData = ['status' => 'resolved', 'resolved_at' => now()];
-                break;
+        $ids = collect($data['ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $alerts = ControlRoomAlert::query()
+            ->with('sla')
+            ->whereIn('source', $this->fleetAlertSources())
+            ->whereIn('id', $ids)
+            ->tap(fn ($query) => $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions()))
+            ->get();
+
+        abort_if(
+            $alerts->count() !== $ids->count(),
+            403,
+            'You are not authorized to update one or more selected alerts.',
+        );
+
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($alerts as $alert) {
+            if ($data['action'] === 'acknowledge') {
+                if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $alert->update([
+                    'status' => ControlRoomAlert::STATUS_ACK,
+                    'acknowledged_at' => now(),
+                    'acknowledged_by_user_id' => $user->id,
+                ]);
+
+                $alert->sla?->recordAcknowledge();
+
+                AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
+                    'alert_id' => $alert->id,
+                    'acknowledged_by' => $user->id,
+                    'bulk' => true,
+                    'source_bridge' => 'fleet-assets',
+                ]);
+
+                $count++;
+
+                continue;
+            }
+
+            if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
+                $skipped++;
+
+                continue;
+            }
+
+            $alert->update([
+                'status' => ControlRoomAlert::STATUS_RESOLVED,
+                'resolved_at' => now(),
+                'resolved_by_user_id' => $user->id,
+                'notes' => $data['resolution_notes'],
+            ]);
+
+            $alert->sla?->recordResolution();
+
+            AuditLogger::log('controlRoom.alert.resolve', $alert, [
+                'alert_id' => $alert->id,
+                'resolved_by' => $user->id,
+                'bulk' => true,
+                'source_bridge' => 'fleet-assets',
+            ]);
+
+            $count++;
         }
 
-        if (!empty($updateData)) {
-            ControlRoomAlert::whereIn('id', $data['ids'])->update($updateData);
+        $message = "{$count} alert(s) {$data['action']}d.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} skipped because their current status cannot transition.";
         }
 
-        return back()->with('success', 'Bulk action applied to ' . count($data['ids']) . ' alert(s).');
+        return back()->with('success', $message);
+    }
+
+    protected function assertFleetAlert(ControlRoomAlert $alert): void
+    {
+        abort_unless(in_array($alert->source, $this->fleetAlertSources(), true), 404);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function fleetAlertSources(): array
+    {
+        return ['fleet', 'asset', 'tracker', 'geofence'];
+    }
+
+    protected function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

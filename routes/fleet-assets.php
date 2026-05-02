@@ -82,8 +82,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/alerts', [AlertController::class, 'index'])->name('fleet-assets.alerts.index');
     });
 
-    // Alerts — write (manage or acknowledge/resolve)
-    Route::middleware('permission:fleet.manage|assets.alerts.manage')->group(function () {
+    // Alerts — write through the canonical Control Room lifecycle.
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
         Route::post('/alerts/bulk-action', [AlertController::class, 'bulkAction'])->name('fleet-assets.alerts.bulk-action');
         Route::post('/alerts/{alert}/acknowledge', [AlertController::class, 'acknowledge'])->whereNumber('alert')->name('fleet-assets.alerts.acknowledge');
         Route::post('/alerts/{alert}/resolve', [AlertController::class, 'resolve'])->whereNumber('alert')->name('fleet-assets.alerts.resolve');
@@ -127,6 +127,10 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/devices', [DeviceController::class, 'index'])->name('fleet-assets.devices.index');
         Route::get('/devices/consent', [DeviceController::class, 'consentIndex'])->name('fleet-assets.devices.consent');
         Route::get('/devices/{device}', [DeviceController::class, 'show'])->whereNumber('device')->name('fleet-assets.devices.show');
+    });
+
+    // Devices — write.
+    Route::middleware('permission:fleet.manage|assets.trackers.manage')->group(function () {
         Route::post('/devices/pair', [DeviceController::class, 'pair'])->name('fleet-assets.devices.pair');
         Route::post('/devices/{device}/unpair', [DeviceController::class, 'unpair'])->whereNumber('device')->name('fleet-assets.devices.unpair');
         Route::post('/devices/{device}/consent/grant', [DeviceController::class, 'grantConsent'])->whereNumber('device')->name('fleet-assets.devices.consent.grant');

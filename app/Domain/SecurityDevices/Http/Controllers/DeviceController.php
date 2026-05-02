@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Enums\RelationshipType;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -24,6 +25,7 @@ use Inertia\Inertia;
 class DeviceController extends Controller
 {
     use MapsDevicesForList;
+    use ResolvesDeviceTenant;
 
     public function __construct(
         private readonly DeviceRegistryService $registry,
@@ -424,7 +426,7 @@ class DeviceController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $validated['tenant_id'] = 1;
+        $validated['tenant_id'] = $this->resolveDeviceTenantId($user);
         $validated['created_by_user_id'] = $user->id;
 
         $device = Device::create($validated);

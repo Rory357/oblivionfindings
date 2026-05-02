@@ -296,6 +296,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.settings.maintenance.update');
         Route::post('/control-room/settings/maintenance/{window}/cancel', [ControlRoomSettingsController::class, 'cancelMaintenanceWindow'])
             ->name('control-room.settings.maintenance.cancel');
+        // Signal outbox recovery
+        Route::post('/control-room/settings/signal-outbox/{outbox}/retry', [ControlRoomSettingsController::class, 'retrySignalOutbox'])
+            ->whereNumber('outbox')
+            ->name('control-room.settings.signal-outbox.retry');
         // Config options (ticket settings)
         Route::post('/control-room/settings/options', [ControlRoomSettingsController::class, 'storeConfigOption'])
             ->name('control-room.settings.options.store');

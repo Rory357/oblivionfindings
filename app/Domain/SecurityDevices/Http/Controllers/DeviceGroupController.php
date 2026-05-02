@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
+use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
@@ -13,6 +14,7 @@ use Inertia\Inertia;
 class DeviceGroupController extends Controller
 {
     use MapsDevicesForList;
+    use ResolvesDeviceTenant;
 
     public function __construct(
         private readonly DeviceGroupAutoRuleService $autoRules,
@@ -136,7 +138,7 @@ class DeviceGroupController extends Controller
             'auto_rules' => ['nullable', 'array'],
         ]);
 
-        $validated['tenant_id'] = 1;
+        $validated['tenant_id'] = $this->resolveDeviceTenantId($user);
         $validated['type'] = $validated['type'] ?? 'custom';
 
         $group = DeviceGroup::create($validated);

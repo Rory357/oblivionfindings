@@ -16,7 +16,9 @@ use App\Http\Controllers\Fleet\FleetMapUsageDashboardController;
  * Vehicle tracking, trips, fuel logs, driver sessions, and reporting.
  */
 Route::middleware(['auth'])->group(function () {
-    // Viewing routes
+    // Legacy child/detail routes retained intentionally while `/fleet-assets/*`
+    // remains the unified operator shell for fleet and asset workflows.
+    // These routes still own trip playback, map usage capture, and report links.
     Route::middleware('permission:fleet.viewAny')->group(function () {
         // Dashboard
         Route::get('/fleet-management', FleetDashboardController::class)
