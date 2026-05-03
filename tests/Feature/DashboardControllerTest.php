@@ -47,7 +47,7 @@ class DashboardControllerTest extends TestCase
         $response->assertRedirect('/login');
     }
 
-    public function test_staff_dashboard_shifts(): void
+    public function test_staff_dashboard_redirects_to_my_day(): void
     {
         Shift::factory()->create([
             'user_id' => $this->staff->id,
@@ -57,14 +57,11 @@ class DashboardControllerTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $response = $this->actingAs($this->staff)->get('/dashboard');
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('dashboard')
-            ->where('mode', 'staff')
-            ->has('todayShifts')
-            ->has('upcomingShifts')
-        );
+        // Frontline staff are routed to `/my-day` (the canonical worker home);
+        // the `/dashboard` surface is reserved for managers and HR admins.
+        $this->actingAs($this->staff)
+            ->get('/dashboard')
+            ->assertRedirect(route('my-day'));
     }
 
     public function test_manager_dashboard_shows_summary(): void
@@ -87,13 +84,13 @@ class DashboardControllerTest extends TestCase
     public function test_dashboard_filters_by_range(): void
     {
         Shift::factory()->create([
-            'user_id' => $this->staff->id,
+            'user_id' => $this->manager->id,
             'starts_at' => now()->addDays(2),
         ]);
 
-        $response = $this->actingAs($this->staff)
+        $response = $this->actingAs($this->manager)
             ->get('/dashboard?range=today');
-        
+
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->where('filters.range', 'today')
@@ -102,14 +99,20 @@ class DashboardControllerTest extends TestCase
 
     public function test_dashboard_filters_by_status(): void
     {
+        // Completed shifts require actual start evidence per the safety
+        // invariant; satisfy it before exercising the filter.
         Shift::factory()->create([
-            'user_id' => $this->staff->id,
+            'user_id' => $this->manager->id,
+            'starts_at' => now()->subHours(8),
+            'ends_at' => now()->subHour(),
+            'actual_starts_at' => now()->subHours(8),
+            'actual_ends_at' => now()->subHour(),
             'status' => 'completed',
         ]);
 
-        $response = $this->actingAs($this->staff)
+        $response = $this->actingAs($this->manager)
             ->get('/dashboard?status=completed');
-        
+
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->where('filters.status', 'completed')
@@ -119,13 +122,13 @@ class DashboardControllerTest extends TestCase
     public function test_dashboard_filters_by_client(): void
     {
         Shift::factory()->create([
-            'user_id' => $this->staff->id,
+            'user_id' => $this->manager->id,
             'client_id' => $this->client->id,
         ]);
 
-        $response = $this->actingAs($this->staff)
+        $response = $this->actingAs($this->manager)
             ->get("/dashboard?client_id={$this->client->id}");
-        
+
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->where('filters.client_id', $this->client->id)
@@ -173,11 +176,11 @@ class DashboardControllerTest extends TestCase
     public function test_dashboard_shows_my_day_workstream(): void
     {
         Shift::factory()->create([
-            'user_id' => $this->staff->id,
+            'user_id' => $this->manager->id,
             'starts_at' => now()->addHours(2),
         ]);
 
-        $response = $this->actingAs($this->staff)->get('/dashboard');
+        $response = $this->actingAs($this->manager)->get('/dashboard');
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->has('myDayItems')
@@ -187,11 +190,11 @@ class DashboardControllerTest extends TestCase
     public function test_dashboard_shows_upcoming_events(): void
     {
         TimelineEvent::factory()->create([
-            'actor_user_id' => $this->staff->id,
+            'actor_user_id' => $this->manager->id,
             'occurred_at' => now()->addDays(2),
         ]);
 
-        $response = $this->actingAs($this->staff)->get('/dashboard');
+        $response = $this->actingAs($this->manager)->get('/dashboard');
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->has('upcomingEvents')

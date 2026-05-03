@@ -35,16 +35,24 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
     {
         parent::setUp();
 
+        // The schema dump used by tests captures table structure only; data
+        // inserts from `register_shift_control_room_signal_support` (signal
+        // sources/types/rules) need to be re-applied so the dedupe logic
+        // can match an existing rule.
+        $this->seed(\Database\Seeders\ShiftControlRoomSignalRegistrationSeeder::class);
+
         $notifications = $this->mock(ControlRoomNotificationService::class);
         $notifications->shouldReceive('notifyAlert')->andReturnNull();
     }
 
     public function test_no_show_signal_emits_once_at_threshold_and_dedupes_on_rerun(): void
     {
-        $this->travelTo(Carbon::parse('2026-04-06 10:20:00'));
+        // The no-show detector emits the medium severity signal at the 30-minute
+        // threshold; setting `now` 35 minutes after the planned start crosses it.
+        $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
 
         $shift = $this->makeShift([
-            'starts_at' => now()->subMinutes(20),
+            'starts_at' => now()->subMinutes(35),
             'ends_at' => now()->addHours(4),
             'status' => 'scheduled',
         ]);
@@ -74,10 +82,12 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:20:00'));
+        // First run crosses the 30-minute medium threshold; second crosses the
+        // 60-minute high threshold so the alert escalates without duplicates.
+        $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
         $this->runJob();
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
+        $this->travelTo(Carbon::parse('2026-04-06 11:05:00'));
         $this->runJob();
 
         $this->assertSame(2, ShiftSignal::query()->where('shift_id', $shift->id)->where('signal_type', 'shift_no_show')->count());
@@ -98,15 +108,19 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:20:00'));
+        // First job run is 35 minutes past the planned start so the no-show
+        // medium threshold (30 min) is crossed.
+        $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
         $this->runJob();
 
+        // Actual start is 31 minutes late so the late-start medium threshold
+        // (30 min) fires on the next pass and the alert transitions type.
         $shift->forceFill([
-            'actual_starts_at' => Carbon::parse('2026-04-06 10:22:00'),
+            'actual_starts_at' => Carbon::parse('2026-04-06 10:31:00'),
             'status' => 'in_progress',
         ])->save();
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:25:00'));
+        $this->travelTo(Carbon::parse('2026-04-06 10:40:00'));
         $this->runJob();
 
         $this->assertSame(1, ControlRoomAlert::query()->count());
@@ -132,15 +146,19 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:20:00'));
+        // First run: 35 min late triggers the medium no-show threshold.
+        $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
         $this->runJob();
 
+        // Actual start is 31 min late so the late-start signal fires; the
+        // second run is far enough past actualStart + 15 minutes that the
+        // start-anomaly resolver clears the alert with attendance evidence.
         $shift->forceFill([
-            'actual_starts_at' => Carbon::parse('2026-04-06 10:22:00'),
+            'actual_starts_at' => Carbon::parse('2026-04-06 10:31:00'),
             'status' => 'in_progress',
         ])->save();
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:40:00'));
+        $this->travelTo(Carbon::parse('2026-04-06 10:55:00'));
         $this->runJob();
 
         $alert = ControlRoomAlert::query()->firstOrFail();
@@ -154,12 +172,14 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
 
     public function test_late_start_signal_creates_enriched_control_room_context(): void
     {
-        $this->travelTo(Carbon::parse('2026-04-06 10:40:00'));
+        $this->travelTo(Carbon::parse('2026-04-06 10:45:00'));
 
         $shift = $this->makeShift([
             'starts_at' => Carbon::parse('2026-04-06 10:00:00'),
             'ends_at' => Carbon::parse('2026-04-06 14:00:00'),
-            'actual_starts_at' => Carbon::parse('2026-04-06 10:25:00'),
+            // Actual start 31 minutes late triggers the late-start medium
+            // threshold (30 min) when the job runs.
+            'actual_starts_at' => Carbon::parse('2026-04-06 10:31:00'),
             'status' => 'in_progress',
         ]);
 
@@ -652,15 +672,20 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:20:00'));
+        // First run is past the 30-minute medium threshold so the no-show
+        // alert exists.
+        $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
         $this->runJob();
 
+        // Actual start at 31 minutes late triggers the late-start medium
+        // threshold; the second run is past actualStart + 15 minutes so the
+        // resolver clears the alert with attendance evidence.
         $shift->forceFill([
-            'actual_starts_at' => Carbon::parse('2026-04-06 10:22:00'),
+            'actual_starts_at' => Carbon::parse('2026-04-06 10:31:00'),
             'status' => 'in_progress',
         ])->save();
 
-        $this->travelTo(Carbon::parse('2026-04-06 10:40:00'));
+        $this->travelTo(Carbon::parse('2026-04-06 10:55:00'));
         $this->runJob();
 
         $alert = ControlRoomAlert::query()->firstOrFail();

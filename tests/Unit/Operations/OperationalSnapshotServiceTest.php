@@ -7,54 +7,46 @@ use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\ShiftOperationalSnapshotService;
-use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(Tests\TestCase::class);
+uses(Tests\TestCase::class, RefreshDatabase::class);
 
 it('keeps historical site context after a client moves locations', function () {
-    $originalSite = new Site(['id' => 10, 'name' => 'Kauri House']);
-    $newSite = new Site(['id' => 11, 'name' => 'Rata House']);
-    $serviceContext = new ServiceContext(['id' => 4, 'name' => 'Supported Living']);
-    $staff = new User(['id' => 5, 'name' => 'Morgan Smith']);
-    $client = new Client(['id' => 15, 'first_name' => 'Casey', 'last_name' => 'Jones', 'site_id' => 10, 'service_context_id' => 4]);
-    $client->setRelation('site', $originalSite);
-    $client->setRelation('serviceContext', $serviceContext);
+    $originalSite = Site::factory()->create(['name' => 'Kauri House']);
+    $newSite = Site::factory()->create(['name' => 'Rata House']);
+    $serviceContext = ServiceContext::factory()->create(['name' => 'Supported Living']);
+    $staff = User::factory()->create(['name' => 'Morgan Smith']);
+    $client = Client::factory()->create([
+        'first_name' => 'Casey',
+        'last_name' => 'Jones',
+        'site_id' => $originalSite->id,
+        'service_context_id' => $serviceContext->id,
+    ]);
 
-    $shift = new Shift([
-        'id' => 22,
-        'client_id' => 15,
-        'site_id' => 10,
-        'service_context_id' => 4,
-        'user_id' => 5,
+    $shift = Shift::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $originalSite->id,
+        'service_context_id' => $serviceContext->id,
+        'user_id' => $staff->id,
         'location' => 'Kauri House Lounge',
         'shift_type' => 'standard',
     ]);
-    $shift->setRelation('site', $originalSite);
-    $shift->setRelation('client', $client);
-    $shift->setRelation('serviceContext', $serviceContext);
-    $shift->setRelation('staff', $staff);
 
-    $timesheet = new Timesheet([
-        'id' => 30,
-        'user_id' => 5,
-        'client_id' => 15,
-        'shift_id' => 22,
-        'starts_at' => Carbon::parse('2026-04-03 08:00:00'),
-        'ends_at' => Carbon::parse('2026-04-03 16:00:00'),
-        'break_minutes' => 30,
-        'status' => 'approved',
+    $timesheet = Timesheet::factory()->create([
+        'user_id' => $staff->id,
+        'client_id' => $client->id,
+        'shift_id' => $shift->id,
     ]);
-    $timesheet->setRelation('shift', $shift);
-    $timesheet->setRelation('client', $client);
-    $timesheet->setRelation('staff', $staff);
 
     $service = new ShiftOperationalSnapshotService;
-    $snapshot = $service->snapshotForTimesheet($timesheet);
+    $timesheet->forceFill($service->snapshotForTimesheet($timesheet))->save();
 
-    $timesheet->forceFill($snapshot);
+    // Move the client to a new site after the snapshot is captured.
+    $client->forceFill([
+        'site_id' => $newSite->id,
+    ])->save();
 
-    $client->site_id = 11;
-    $client->setRelation('site', $newSite);
+    $timesheet->refresh();
 
     expect($timesheet->shift_site_name_snapshot)->toBe('Kauri House')
         ->and($timesheet->client_name_snapshot)->toBe('Casey Jones')
@@ -62,47 +54,39 @@ it('keeps historical site context after a client moves locations', function () {
 });
 
 it('keeps the original worker snapshot after a shift is reassigned later', function () {
-    $site = new Site(['id' => 10, 'name' => 'Totara House']);
-    $serviceContext = new ServiceContext(['id' => 4, 'name' => 'Residential Support']);
-    $originalWorker = new User(['id' => 5, 'name' => 'Morgan Smith']);
-    $replacementWorker = new User(['id' => 9, 'name' => 'Jordan Lee']);
-    $client = new Client(['id' => 15, 'first_name' => 'Jamie', 'last_name' => 'Carter', 'site_id' => 10, 'service_context_id' => 4]);
-    $client->setRelation('site', $site);
-    $client->setRelation('serviceContext', $serviceContext);
+    $site = Site::factory()->create(['name' => 'Totara House']);
+    $serviceContext = ServiceContext::factory()->create(['name' => 'Residential Support']);
+    $originalWorker = User::factory()->create(['name' => 'Morgan Smith']);
+    $replacementWorker = User::factory()->create(['name' => 'Jordan Lee']);
+    $client = Client::factory()->create([
+        'first_name' => 'Jamie',
+        'last_name' => 'Carter',
+        'site_id' => $site->id,
+        'service_context_id' => $serviceContext->id,
+    ]);
 
-    $shift = new Shift([
-        'id' => 22,
-        'client_id' => 15,
-        'site_id' => 10,
-        'service_context_id' => 4,
-        'user_id' => 5,
+    $shift = Shift::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'service_context_id' => $serviceContext->id,
+        'user_id' => $originalWorker->id,
         'location' => 'Totara House',
         'shift_type' => 'standard',
     ]);
-    $shift->setRelation('site', $site);
-    $shift->setRelation('client', $client);
-    $shift->setRelation('serviceContext', $serviceContext);
-    $shift->setRelation('staff', $originalWorker);
 
-    $timesheet = new Timesheet([
-        'id' => 30,
-        'user_id' => 5,
-        'client_id' => 15,
-        'shift_id' => 22,
-        'starts_at' => Carbon::parse('2026-04-03 08:00:00'),
-        'ends_at' => Carbon::parse('2026-04-03 16:00:00'),
-        'break_minutes' => 30,
-        'status' => 'approved',
+    $timesheet = Timesheet::factory()->create([
+        'user_id' => $originalWorker->id,
+        'client_id' => $client->id,
+        'shift_id' => $shift->id,
     ]);
-    $timesheet->setRelation('shift', $shift);
-    $timesheet->setRelation('client', $client);
-    $timesheet->setRelation('staff', $originalWorker);
 
     $service = new ShiftOperationalSnapshotService;
-    $timesheet->forceFill($service->snapshotForTimesheet($timesheet));
+    $timesheet->forceFill($service->snapshotForTimesheet($timesheet))->save();
 
-    $shift->user_id = 9;
-    $shift->setRelation('staff', $replacementWorker);
+    // Reassign the shift to a different worker after the snapshot is captured.
+    $shift->forceFill(['user_id' => $replacementWorker->id])->save();
+
+    $timesheet->refresh();
 
     expect($timesheet->staff_name_snapshot)->toBe('Morgan Smith')
         ->and($timesheet->client_name_snapshot)->toBe('Jamie Carter')
