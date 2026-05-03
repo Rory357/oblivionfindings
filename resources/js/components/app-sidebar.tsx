@@ -1781,7 +1781,7 @@ function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.integrations?.view)
         items.push({
             title: 'Integrations',
-            href: '/integrations',
+            href: '/security-devices/integrations',
             icon: Settings,
         });
     if (can?.settings?.manageAccess)
