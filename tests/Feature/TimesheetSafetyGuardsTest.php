@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,6 +20,8 @@ class TimesheetSafetyGuardsTest extends TestCase
     protected User $admin;
 
     protected User $staff;
+
+    protected Site $site;
 
     protected Client $client;
 
@@ -36,9 +41,36 @@ class TimesheetSafetyGuardsTest extends TestCase
             'role' => 'support_worker',
             'approved_at' => now(),
         ]);
-        $this->staff->roles()->attach(Role::where('name', 'support_worker')->first());
+        $supportRole = Role::where('name', 'support_worker')->first();
+        $this->staff->roles()->attach($supportRole);
 
-        $this->client = Client::factory()->create();
+        $supportPermissionIds = Permission::query()
+            ->whereIn('key', ['timesheets.create', 'timesheets.submit'])
+            ->pluck('id')
+            ->all();
+        if ($supportPermissionIds) {
+            $supportRole->permissions()->syncWithoutDetaching($supportPermissionIds);
+        }
+
+        $this->site = Site::factory()->create(['name' => 'Safety Guard House']);
+
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $this->staff->id,
+            'employee_number' => 'EMP-TS-'.$this->staff->id,
+            'work_email' => $this->staff->email,
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+        ]);
     }
 
     public function test_self_approval_is_blocked(): void
@@ -55,7 +87,7 @@ class TimesheetSafetyGuardsTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/timesheets/{$timesheet->id}/approve")
+            ->post("/operations/timesheets/{$timesheet->id}/approve")
             ->assertForbidden();
 
         $this->assertDatabaseHas('timesheets', [
@@ -88,7 +120,7 @@ class TimesheetSafetyGuardsTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post('/timesheets/bulk-approve', [
+            ->post('/operations/timesheets/bulk-approve', [
                 'ids' => [$ownTimesheet->id, $otherTimesheet->id],
             ])
             ->assertForbidden();
@@ -116,9 +148,9 @@ class TimesheetSafetyGuardsTest extends TestCase
             'user_id' => $this->staff->id,
         ]);
 
-        $this->from('/timesheets/create')
+        $this->from('/operations/timesheets/create')
             ->actingAs($this->staff)
-            ->post('/timesheets', $this->timesheetPayload($shift))
+            ->post('/operations/timesheets', $this->timesheetPayload($shift))
             ->assertRedirect();
 
         $this->assertSame(
@@ -146,7 +178,7 @@ class TimesheetSafetyGuardsTest extends TestCase
         ]);
 
         $this->actingAs($this->staff)
-            ->post("/timesheets/{$timesheet->id}/submit")
+            ->post("/operations/timesheets/{$timesheet->id}/submit")
             ->assertStatus(422);
 
         $this->assertDatabaseHas('timesheets', [
@@ -172,7 +204,7 @@ class TimesheetSafetyGuardsTest extends TestCase
         $shift->update(['status' => 'cancelled']);
 
         $this->actingAs($this->admin)
-            ->post("/timesheets/{$timesheet->id}/approve")
+            ->post("/operations/timesheets/{$timesheet->id}/approve")
             ->assertStatus(422);
 
         $this->assertDatabaseHas('timesheets', [
@@ -201,16 +233,16 @@ class TimesheetSafetyGuardsTest extends TestCase
         $newStart = $shift->starts_at->copy()->addHour();
         $newEnd = $shift->ends_at->copy()->addHour();
 
-        $this->from("/shifts/{$shift->id}/edit")
+        $this->from("/operations/shifts/{$shift->id}/edit")
             ->actingAs($this->admin)
-            ->put("/shifts/{$shift->id}", [
+            ->put("/operations/shifts/{$shift->id}", [
                 'client_id' => $this->client->id,
                 'user_id' => $this->staff->id,
                 'starts_at' => $newStart->format('Y-m-d H:i:s'),
                 'ends_at' => $newEnd->format('Y-m-d H:i:s'),
                 'status' => 'scheduled',
             ])
-            ->assertRedirect("/shifts/{$shift->id}/edit")
+            ->assertRedirect("/operations/shifts/{$shift->id}/edit")
             ->assertSessionHasErrors(['shift']);
 
         $shift->refresh();

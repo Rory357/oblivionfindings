@@ -60,24 +60,26 @@ class SecurityAccessControlTest extends TestCase
     public function test_support_worker_cannot_view_other_staff_timesheet(): void
     {
         $timesheet = Timesheet::factory()->create([
+            'shift_id' => null,
             'user_id' => $this->supportWorkerA->id,
         ]);
 
         $this->actingAs($this->supportWorkerB)
-            ->get("/timesheets/{$timesheet->id}")
+            ->get("/operations/timesheets/{$timesheet->id}")
             ->assertForbidden();
     }
 
     public function test_support_worker_cannot_update_other_staff_timesheet(): void
     {
         $timesheet = Timesheet::factory()->create([
+            'shift_id' => null,
             'user_id' => $this->supportWorkerA->id,
             'status' => 'draft',
             'notes' => 'Original note',
         ]);
 
         $this->actingAs($this->supportWorkerB)
-            ->put("/timesheets/{$timesheet->id}", [
+            ->put("/operations/timesheets/{$timesheet->id}", [
                 'client_id' => $timesheet->client_id,
                 'work_date' => $timesheet->work_date->toDateString(),
                 'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),

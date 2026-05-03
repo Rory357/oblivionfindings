@@ -130,11 +130,11 @@ class ShiftSafetyNetTest extends TestCase
         ];
 
         $this->actingAs($this->staff)
-            ->patch("/shifts/{$shift->id}/complete", $payload)
+            ->patch("/operations/shifts/{$shift->id}/complete", $payload)
             ->assertSessionHas('success', 'Shift completed. Draft timesheet created.');
 
         $this->actingAs($this->staff)
-            ->patch("/shifts/{$shift->id}/complete", $payload)
+            ->patch("/operations/shifts/{$shift->id}/complete", $payload)
             ->assertSessionHas('success', 'Shift already completed.');
 
         $this->assertDatabaseCount('client_notes', 1);
@@ -163,7 +163,7 @@ class ShiftSafetyNetTest extends TestCase
         $firstApprovedAt = $timesheet->approved_at;
 
         $this->actingAs($this->admin)
-            ->post("/timesheets/{$timesheet->id}/approve")
+            ->post("/operations/timesheets/{$timesheet->id}/approve")
             ->assertSessionHas('success', 'Timesheet already approved.');
 
         $timesheet->refresh();

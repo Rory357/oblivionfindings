@@ -367,13 +367,19 @@ class ShiftSiteIsolationTest extends TestCase
             'controlRoom.viewAny',
         ]);
 
+        // Index uses worker-timezone (Pacific/Auckland) day boundaries, so create
+        // both shifts inside the same NZ day for the 2026-04-06 filter. Convert
+        // to UTC explicitly so Eloquent stores the UTC instant (the cast format
+        // does not auto-convert from a non-UTC Carbon).
+        $tz = 'Pacific/Auckland';
+
         $shiftA = Shift::factory()->create([
             'client_id' => $this->clientA->id,
             'site_id' => $this->siteA->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(9, 0),
-            'ends_at' => now()->copy()->setTime(13, 0),
+            'starts_at' => Carbon::parse('2026-04-06 09:00', $tz)->utc(),
+            'ends_at' => Carbon::parse('2026-04-06 13:00', $tz)->utc(),
             'status' => 'scheduled',
         ]);
 
@@ -382,8 +388,8 @@ class ShiftSiteIsolationTest extends TestCase
             'site_id' => $this->siteB->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(14, 0),
-            'ends_at' => now()->copy()->setTime(18, 0),
+            'starts_at' => Carbon::parse('2026-04-06 14:00', $tz)->utc(),
+            'ends_at' => Carbon::parse('2026-04-06 18:00', $tz)->utc(),
             'status' => 'scheduled',
         ]);
 
@@ -629,106 +635,11 @@ class ShiftSiteIsolationTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
-    // ShiftReportsController site isolation
+    // ShiftReportsController site isolation removed
     // ──────────────────────────────────────────────
-
-    public function test_shift_reports_controller_scopes_to_accessible_sites(): void
-    {
-        $user = $this->makeSiteScopedUser([$this->siteA], ['reports.viewAny']);
-
-        $visibleShift = Shift::factory()->create([
-            'client_id' => $this->clientA->id,
-            'site_id' => $this->siteA->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(9, 0),
-            'ends_at' => now()->copy()->setTime(13, 0),
-            'status' => 'scheduled',
-        ]);
-
-        Shift::factory()->create([
-            'client_id' => $this->clientB->id,
-            'site_id' => $this->siteB->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(14, 0),
-            'ends_at' => now()->copy()->setTime(18, 0),
-            'status' => 'scheduled',
-        ]);
-
-        $response = $this->actingAs($user)
-            ->get('/reports/shifts?from=2026-04-06&to=2026-04-06');
-
-        $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('reports/shifts')
-            ->has('shifts', 1)
-            ->where('shifts.0.id', $visibleShift->id)
-        );
-    }
-
-    public function test_shift_reports_controller_multi_site_user_sees_both(): void
-    {
-        $user = $this->makeSiteScopedUser([$this->siteA, $this->siteB], ['reports.viewAny']);
-
-        Shift::factory()->create([
-            'client_id' => $this->clientA->id,
-            'site_id' => $this->siteA->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(9, 0),
-            'ends_at' => now()->copy()->setTime(13, 0),
-            'status' => 'scheduled',
-        ]);
-
-        Shift::factory()->create([
-            'client_id' => $this->clientB->id,
-            'site_id' => $this->siteB->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(14, 0),
-            'ends_at' => now()->copy()->setTime(18, 0),
-            'status' => 'scheduled',
-        ]);
-
-        $response = $this->actingAs($user)
-            ->get('/reports/shifts?from=2026-04-06&to=2026-04-06');
-
-        $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('reports/shifts')
-            ->has('shifts', 2)
-        );
-    }
-
-    public function test_shift_reports_controller_elevated_user_sees_all_sites(): void
-    {
-        $admin = $this->makeBypassUser(['reports.viewAny', 'shifts.manageAny']);
-
-        Shift::factory()->create([
-            'client_id' => $this->clientA->id,
-            'site_id' => $this->siteA->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(9, 0),
-            'ends_at' => now()->copy()->setTime(13, 0),
-            'status' => 'scheduled',
-        ]);
-
-        Shift::factory()->create([
-            'client_id' => $this->clientB->id,
-            'site_id' => $this->siteB->id,
-            'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
-            'starts_at' => now()->copy()->setTime(14, 0),
-            'ends_at' => now()->copy()->setTime(18, 0),
-            'status' => 'scheduled',
-        ]);
-
-        $response = $this->actingAs($admin)
-            ->get('/reports/shifts?from=2026-04-06&to=2026-04-06');
-
-        $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('reports/shifts')
-            ->has('shifts', 2)
-        );
-    }
+    //
+    // The legacy `/reports/shifts` direct controller was removed; the URL is
+    // now a 301 redirect to `/operations/reports/shifts`. Site-scoped report
+    // coverage now lives in `tests/Feature/Operations/ShiftReportControllerTest.php`
+    // against the canonical surface, including the legacy redirect assertion.
 }

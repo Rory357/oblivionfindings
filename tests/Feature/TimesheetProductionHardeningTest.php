@@ -35,14 +35,16 @@ class TimesheetProductionHardeningTest extends TestCase
     public function test_approved_timesheet_cannot_be_edited_through_http(): void
     {
         $timesheet = Timesheet::factory()->create([
+            'shift_id' => null,
             'user_id' => $this->admin->id,
             'client_id' => $this->client->id,
             'status' => 'approved',
             'notes' => 'Locked note',
         ]);
 
-        $response = $this->actingAs($this->admin)->from("/timesheets/{$timesheet->id}/edit")
-            ->put("/timesheets/{$timesheet->id}", [
+        $response = $this->actingAs($this->admin)
+            ->from("/operations/timesheets/{$timesheet->id}/edit")
+            ->put("/operations/timesheets/{$timesheet->id}", [
                 'client_id' => $timesheet->client_id,
                 'work_date' => $timesheet->work_date->format('Y-m-d'),
                 'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
@@ -51,7 +53,7 @@ class TimesheetProductionHardeningTest extends TestCase
                 'notes' => 'Attempted drift',
             ]);
 
-        $response->assertRedirect("/timesheets/{$timesheet->id}/edit");
+        $response->assertRedirect("/operations/timesheets/{$timesheet->id}/edit");
         $response->assertSessionHas('error');
 
         $this->assertDatabaseHas('timesheets', [
@@ -64,6 +66,7 @@ class TimesheetProductionHardeningTest extends TestCase
     public function test_payroll_linked_timesheet_cannot_be_edited_through_http(): void
     {
         $timesheet = Timesheet::factory()->create([
+            'shift_id' => null,
             'user_id' => $this->admin->id,
             'client_id' => $this->client->id,
             'status' => 'draft',
@@ -71,8 +74,9 @@ class TimesheetProductionHardeningTest extends TestCase
             'notes' => 'Payroll linked',
         ]);
 
-        $response = $this->actingAs($this->admin)->from("/timesheets/{$timesheet->id}/edit")
-            ->put("/timesheets/{$timesheet->id}", [
+        $response = $this->actingAs($this->admin)
+            ->from("/operations/timesheets/{$timesheet->id}/edit")
+            ->put("/operations/timesheets/{$timesheet->id}", [
                 'client_id' => $timesheet->client_id,
                 'work_date' => $timesheet->work_date->format('Y-m-d'),
                 'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
@@ -81,7 +85,7 @@ class TimesheetProductionHardeningTest extends TestCase
                 'notes' => 'Attempted payroll drift',
             ]);
 
-        $response->assertRedirect("/timesheets/{$timesheet->id}/edit");
+        $response->assertRedirect("/operations/timesheets/{$timesheet->id}/edit");
         $response->assertSessionHas('error');
 
         $this->assertDatabaseHas('timesheets', [
