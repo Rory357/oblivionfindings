@@ -270,6 +270,12 @@ class UsersController extends Controller
                 break;
         }
 
+        AuditLogger::log('user.created', $newUser, [
+            'created_by' => $user->id,
+            'user_type' => $data['user_type'],
+            'role_ids' => $data['role_ids'] ?? [],
+        ]);
+
         return redirect()->route('system.users.index')
             ->with('success', 'User created successfully.');
     }
@@ -357,6 +363,12 @@ class UsersController extends Controller
             $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
         }
 
+        AuditLogger::log('user.updated', $target, [
+            'changed_by' => $user->id,
+            'fields' => array_keys($data),
+            'role_ids' => $data['role_ids'] ?? null,
+        ]);
+
         return redirect()->back()->with('success', 'User updated successfully.');
     }
 
@@ -375,6 +387,10 @@ class UsersController extends Controller
         if ($target->staffProfile) {
             $target->staffProfile->delete();
         }
+
+        AuditLogger::log('user.deleted', $target, [
+            'deleted_by' => $user->id,
+        ]);
 
         // Delete user (cascade will handle role_user pivot)
         $target->delete();
@@ -407,6 +423,11 @@ class UsersController extends Controller
             $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
         }
 
+        AuditLogger::log('user.approved', $target, [
+            'approved_by' => $user->id,
+            'role_ids' => $data['role_ids'] ?? [],
+        ]);
+
         return redirect()->back()->with('success', 'User approved successfully.');
     }
 
@@ -427,6 +448,10 @@ class UsersController extends Controller
             $target->staffProfile->update(['status' => 'suspended']);
         }
 
+        AuditLogger::log('user.suspended', $target, [
+            'suspended_by' => $user->id,
+        ]);
+
         return redirect()->back()->with('success', 'User suspended successfully.');
     }
 
@@ -435,12 +460,19 @@ class UsersController extends Controller
      */
     public function terminateSession(Request $request, User $target, string $sessionId)
     {
-        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+        $user = $request->user();
+        abort_unless($user?->canDo('settings.access.manage'), 403);
 
-        DB::table('sessions')
+        $deleted = DB::table('sessions')
             ->where('id', $sessionId)
             ->where('user_id', $target->id)
             ->delete();
+
+        AuditLogger::log('user.session.terminated', $target, [
+            'terminated_by' => $user->id,
+            'session_id' => $sessionId,
+            'deleted' => $deleted,
+        ]);
 
         return back()->with('success', 'Session terminated.');
     }
@@ -450,12 +482,18 @@ class UsersController extends Controller
      */
     public function terminateAllSessions(Request $request, User $target)
     {
-        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+        $user = $request->user();
+        abort_unless($user?->canDo('settings.access.manage'), 403);
 
-        DB::table('sessions')
+        $deleted = DB::table('sessions')
             ->where('user_id', $target->id)
             ->where('id', '!=', session()->getId())
             ->delete();
+
+        AuditLogger::log('user.sessions.terminated', $target, [
+            'terminated_by' => $user->id,
+            'deleted' => $deleted,
+        ]);
 
         return back()->with('success', 'All other sessions terminated.');
     }

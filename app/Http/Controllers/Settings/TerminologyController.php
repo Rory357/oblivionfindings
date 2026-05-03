@@ -40,7 +40,7 @@ class TerminologyController extends Controller
             $dbKey = 'labels.' . $key;
 
             // If blank or same as default, remove override
-            $default = config('labels.' . $key);
+            $default = config('labels')[$key] ?? null;
             if ($value === null || trim($value) === '' || $value === $default) {
                 AppSetting::query()->where('key', $dbKey)->delete();
                 continue;

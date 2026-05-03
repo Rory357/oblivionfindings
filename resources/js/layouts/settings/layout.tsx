@@ -72,8 +72,8 @@ const navSections: NavSection[] = [
         label: 'User Management',
         permission: 'settings.manageAccess',
         items: [
-            { icon: Users, title: 'Users', href: '/settings/users' },
-            { icon: Shield, title: 'Roles', href: '/settings/roles' },
+            { icon: Users, title: 'Users', href: '/system/users' },
+            { icon: Shield, title: 'Roles', href: '/system/access/roles' },
             { icon: UserCog, title: 'Overrides & Governance', href: '/settings/access' },
         ],
     },
@@ -96,10 +96,9 @@ const navSections: NavSection[] = [
     },
     {
         label: 'Integrations',
-        permission: 'integrations.view',
         items: [
-            { icon: Plug, title: 'Integration Hub', href: '/settings/integrations' },
-            { icon: Key, title: 'API & Webhooks', href: '/settings/api' },
+            { icon: Plug, title: 'Device Integrations', href: '/security-devices/integrations', permission: 'securityDevices.integrationsView' },
+            { icon: Key, title: 'Outbound API & Webhooks', href: '/settings/api', permission: 'integrations.view' },
         ],
     },
     {

@@ -479,9 +479,7 @@ class HandleInertiaRequests extends Middleware
                 'manageTerminology' => $user->canDo('settings.terminology.manage'),
                 'manageBranding' => $user->canDo('settings.branding.manage'),
                 'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
-                'sitesManage' => $user->canDo('settings.sites.manage'),
                 'templatesManage' => $user->canDo('settings.templates.manage'),
-                'rbacManage' => $user->canDo('settings.rbac.manage'),
                 'impersonate' => $user->canDo('settings.access.impersonate'),
             ],
 

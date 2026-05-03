@@ -34,7 +34,10 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'site_id', 'occurred_at']);
             $table->index(['severity', 'occurred_at']);
-            $table->unique(['provider', 'source_event_id']);
+            $table->unique(
+                ['tenant_id', 'provider', 'source_event_id'],
+                'integration_events_tenant_provider_source_event_unique'
+            );
         });
         }
 

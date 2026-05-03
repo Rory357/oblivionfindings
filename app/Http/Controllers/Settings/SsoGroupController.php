@@ -9,6 +9,7 @@ use App\Models\SsoGroupMapping;
 use App\Services\AzureAdGroupService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Throwable;
 
 class SsoGroupController extends Controller
 {
@@ -48,7 +49,11 @@ class SsoGroupController extends Controller
             return back()->with('error', 'Microsoft token has expired. Please reconnect your Microsoft account.');
         }
 
-        $groups = $service->getGroups($identity);
+        try {
+            $groups = $service->getGroups($identity);
+        } catch (Throwable) {
+            return back()->with('error', 'Could not fetch Microsoft groups. Please try again or reconnect your Microsoft account.');
+        }
 
         return back()->with('groups', $groups);
     }

@@ -10333,7 +10333,7 @@ CREATE TABLE `integration_events` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `integration_events_provider_source_event_id_unique` (`provider`,`source_event_id`),
+  UNIQUE KEY `integration_events_tenant_provider_source_event_unique` (`tenant_id`,`provider`,`source_event_id`),
   KEY `integration_events_site_id_foreign` (`site_id`),
   KEY `integration_events_room_id_foreign` (`room_id`),
   KEY `integration_events_hardware_id_foreign` (`hardware_id`),

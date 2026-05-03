@@ -23,8 +23,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, usePage } from '@inertiajs/react';
-import { Activity, Check, Copy, Key, Plus, Trash2, Webhook } from 'lucide-react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { Activity, Check, Copy, Key, Plus, ShieldCheck, Trash2, Webhook } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ApiKey = {
@@ -68,7 +68,7 @@ type StatusMessage = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings' },
-    { title: 'API & Webhooks' },
+    { title: 'Outbound API & Webhooks' },
 ];
 
 function csrfToken(): string {
@@ -253,7 +253,7 @@ export default function Api() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="API & Webhooks" />
+            <Head title="Outbound API & Webhooks" />
 
             <SettingsLayout>
                 <div className="space-y-6">
@@ -270,10 +270,29 @@ export default function Api() {
                     {!can.manage && (
                         <Card>
                             <CardContent className="py-4 text-sm text-muted-foreground">
-                                You can view API integrations here, but key and webhook management requires integration-admin access.
+                                You can view outbound API settings here, but key and webhook management requires integration-admin access.
                             </CardContent>
                         </Card>
                     )}
+
+                    <Card>
+                        <CardHeader>
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-center gap-2">
+                                    <ShieldCheck className="h-5 w-5 text-primary" />
+                                    <div>
+                                        <CardTitle>Device Integrations</CardTitle>
+                                        <CardDescription>
+                                            Hardware providers and inbound device webhooks are managed in Security & Devices.
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                                <Button asChild variant="outline">
+                                    <Link href="/security-devices/integrations">Open Security & Devices</Link>
+                                </Button>
+                            </div>
+                        </CardHeader>
+                    </Card>
 
                     <Card>
                         <CardHeader>
@@ -282,7 +301,7 @@ export default function Api() {
                                     <Key className="h-5 w-5 text-primary" />
                                     <div>
                                         <CardTitle>API Keys</CardTitle>
-                                        <CardDescription>Generate API keys for external integrations.</CardDescription>
+                                        <CardDescription>Generate tenant API keys for non-hardware integrations.</CardDescription>
                                     </div>
                                 </div>
                                 {can.manage && (
@@ -353,8 +372,8 @@ export default function Api() {
                                 <div className="flex items-center gap-2">
                                     <Webhook className="h-5 w-5 text-primary" />
                                     <div>
-                                        <CardTitle>Webhooks</CardTitle>
-                                        <CardDescription>Configure webhook endpoints to receive event notifications.</CardDescription>
+                                        <CardTitle>Outbound Webhooks</CardTitle>
+                                        <CardDescription>Configure tenant endpoints that receive application event notifications.</CardDescription>
                                     </div>
                                 </div>
                                 {can.manage && (
@@ -545,8 +564,8 @@ export default function Api() {
                 <Dialog open={showAddWebhook} onOpenChange={(open) => !open && closeWebhookDialog()}>
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>Add Webhook</DialogTitle>
-                            <DialogDescription>Configure a webhook endpoint to receive event notifications.</DialogDescription>
+                            <DialogTitle>Add Outbound Webhook</DialogTitle>
+                            <DialogDescription>Configure a tenant endpoint that receives application event notifications.</DialogDescription>
                         </DialogHeader>
                         {!webhookSecret ? (
                             <div className="space-y-4">

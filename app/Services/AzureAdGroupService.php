@@ -17,7 +17,10 @@ class AzureAdGroupService
                 '$top' => 100,
             ]);
 
-        if ($response->failed()) return [];
+        if ($response->failed()) {
+            throw new \RuntimeException('Microsoft Graph group fetch failed.');
+        }
+
         return $response->json('value', []);
     }
 

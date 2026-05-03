@@ -79,6 +79,12 @@ Route::middleware(['auth', 'verified'])->prefix('system')->group(function () {
     Route::delete('/users/{target}', [UsersController::class, 'destroy'])
         ->middleware('permission:settings.access.manage')
         ->name('system.users.destroy');
+    Route::delete('/users/{target}/sessions/{session}', [UsersController::class, 'terminateSession'])
+        ->middleware('permission:settings.access.manage')
+        ->name('system.users.terminate-session');
+    Route::delete('/users/{target}/sessions', [UsersController::class, 'terminateAllSessions'])
+        ->middleware('permission:settings.access.manage')
+        ->name('system.users.terminate-all-sessions');
     Route::post('/users/{target}/approve', [UsersController::class, 'approve'])
         ->middleware('permission:settings.access.manage')
         ->name('system.users.approve');

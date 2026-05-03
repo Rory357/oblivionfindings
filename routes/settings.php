@@ -13,16 +13,17 @@ use App\Http\Controllers\Settings\AuditLogSettingsController;
 use App\Http\Controllers\Settings\ServiceContextController;
 use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationEscalationsController;
-use App\Http\Controllers\Settings\IntegrationHubController;
 use App\Http\Controllers\Settings\ModuleSettingsController;
 use App\Http\Controllers\Settings\ApiSettingsController;
 use App\Http\Controllers\Settings\DataSettingsController;
 use App\Http\Controllers\Settings\EmailSettingsController;
 use App\Http\Controllers\Settings\NotificationTemplateController;
+use App\Http\Controllers\Settings\SecurityPolicyController;
+use App\Http\Controllers\Settings\SsoConfigController;
 use App\Http\Controllers\Settings\SsoGroupController;
+use App\Http\Controllers\Settings\UserManagementRedirectController;
 use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::middleware('auth')->group(function () {
     Route::redirect('settings', '/settings/profile');
@@ -183,63 +184,10 @@ Route::middleware('auth')->group(function () {
         ->name('settings.email.test');
 
     // Security Settings
-    Route::get('settings/security', fn () => Inertia::render('settings/security', [
-        'settings' => \App\Models\AppSetting::query()
-            ->whereIn('key', [
-                'password_min_length',
-                'password_require_uppercase',
-                'password_require_numbers',
-                'password_require_symbols',
-                'password_expiry_days',
-                'session_timeout_minutes',
-                'max_login_attempts',
-                'lockout_duration_minutes',
-                'force_2fa',
-            ])
-            ->pluck('value', 'key'),
-        'twoFaStats' => [
-            'enabled' => \App\Models\User::query()->whereNotNull('two_factor_confirmed_at')->count(),
-            'total' => \App\Models\User::query()->count(),
-        ],
-    ]))
+    Route::get('settings/security', [SecurityPolicyController::class, 'edit'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.security');
-    Route::put('settings/security', function (\Illuminate\Http\Request $request) {
-        $request->validate([
-            'password_min_length' => ['required', 'integer', 'min:6', 'max:128'],
-            'password_require_uppercase' => ['required', 'boolean'],
-            'password_require_numbers' => ['required', 'boolean'],
-            'password_require_symbols' => ['required', 'boolean'],
-            'password_expiry_days' => ['required', 'integer', 'min:0'],
-            'session_timeout_minutes' => ['required', 'integer', 'min:1'],
-            'max_login_attempts' => ['required', 'integer', 'min:1'],
-            'lockout_duration_minutes' => ['required', 'integer', 'min:1'],
-            'force_2fa' => ['required', 'boolean'],
-        ]);
-
-        $settings = [
-            'password_min_length' => (int) $request->input('password_min_length'),
-            'password_require_uppercase' => $request->boolean('password_require_uppercase'),
-            'password_require_numbers' => $request->boolean('password_require_numbers'),
-            'password_require_symbols' => $request->boolean('password_require_symbols'),
-            'password_expiry_days' => (int) $request->input('password_expiry_days'),
-            'session_timeout_minutes' => (int) $request->input('session_timeout_minutes'),
-            'max_login_attempts' => (int) $request->input('max_login_attempts'),
-            'lockout_duration_minutes' => (int) $request->input('lockout_duration_minutes'),
-            'force_2fa' => $request->boolean('force_2fa'),
-        ];
-
-        collect($settings)->each(
-            fn ($value, $key) => \App\Models\AppSetting::updateOrCreate(['key' => $key], ['value' => $value])
-        );
-
-        \App\Services\AuditLogger::log('settings.security.updated', null, [
-            'changes' => $settings,
-            'changed_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Security settings updated.');
-    })
+    Route::put('settings/security', [SecurityPolicyController::class, 'update'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.security.update');
 
@@ -301,10 +249,10 @@ Route::middleware('auth')->group(function () {
         ->name('settings.modules.update');
 
     // User Management
-    Route::get('settings/users', [UsersController::class, 'index'])
+    Route::get('settings/users', [UserManagementRedirectController::class, 'index'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.users.index');
-    Route::get('settings/users/{target}', [UsersController::class, 'show'])
+    Route::get('settings/users/{target}', [UserManagementRedirectController::class, 'show'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.users.show');
     Route::put('settings/users/{target}', [UsersController::class, 'update'])
@@ -324,15 +272,7 @@ Route::middleware('auth')->group(function () {
         ->name('settings.users.terminate-all-sessions');
 
     // SSO Configuration
-    Route::get('settings/sso', fn () => Inertia::render('settings/sso-config', [
-        'mappings' => \App\Models\SsoGroupMapping::with('role:id,name,label')->orderBy('provider')->get(),
-        'roles' => \App\Models\Role::select('id', 'name', 'label')->orderBy('label')->get(),
-        'stats' => [
-            'total' => \App\Models\SsoGroupMapping::count(),
-            'microsoft' => \App\Models\SsoGroupMapping::where('provider', 'microsoft')->count(),
-            'google' => \App\Models\SsoGroupMapping::where('provider', 'google')->count(),
-        ],
-    ]))
+    Route::get('settings/sso', [SsoConfigController::class, 'index'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.sso');
     Route::get('settings/sso-groups', [SsoGroupController::class, 'index'])
@@ -359,8 +299,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:audit.viewAny|settings.access.manage')
         ->name('settings.audit_logs.export');
 
-    // Integrations hub
-    Route::get('settings/integrations', [IntegrationHubController::class, 'index'])
+    // Hardware integrations now live in Security & Devices. Microsoft and Google stay in Auth/SSO.
+    Route::redirect('settings/integrations', '/security-devices/integrations', 301)
         ->middleware('permission:integrations.view')
         ->name('settings.integrations.index');
 

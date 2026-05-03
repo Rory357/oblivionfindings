@@ -54,7 +54,11 @@ class MicrosoftController extends Controller
 
         // Org-only rule: domain must match
         $orgDomain = strtolower(env('ORG_DOMAIN', ''));
-        abort_unless($orgDomain !== '', 500, 'ORG_DOMAIN is not set.');
+        if ($orgDomain === '') {
+            return redirect()
+                ->route('login')
+                ->withErrors(['microsoft' => 'Microsoft SSO is not configured.']);
+        }
 
         $domain = Str::after($email, '@');
         abort_unless($domain === $orgDomain, 403, 'Microsoft SSO is restricted to the organization.');
@@ -92,6 +96,12 @@ class MicrosoftController extends Controller
                 'token_expires_at' => $m->expiresIn ? now()->addSeconds($m->expiresIn) : null,
             ]
         );
+
+        if (! $user->approved_at) {
+            return redirect()
+                ->route('login')
+                ->with('success', 'Thanks for signing up! Your account is awaiting approval.');
+        }
 
         Auth::login($user, remember: true);
 

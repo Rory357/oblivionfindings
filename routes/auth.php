@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\MicrosoftController;
 use App\Http\Controllers\Auth\GoogleController;
+use App\Http\Controllers\Auth\IdentityDisconnectController;
 
 /**
  * OAuth Authentication Routes
@@ -25,11 +26,7 @@ Route::middleware(['throttle:auth'])->group(function () {
         ->name('auth.microsoft.callback');
 
     // Disconnect a linked provider
-    Route::post('/auth/{provider}/disconnect', function ($provider) {
-        $user = request()->user();
-        if (!$user) abort(401);
-        if (!in_array($provider, ['microsoft', 'google'])) abort(404);
-        $user->identities()->where('provider', $provider)->delete();
-        return back()->with('success', ucfirst($provider) . ' account disconnected.');
-    })->middleware('auth')->name('auth.disconnect');
+    Route::post('/auth/{provider}/disconnect', [IdentityDisconnectController::class, 'destroy'])
+        ->middleware('auth')
+        ->name('auth.disconnect');
 });

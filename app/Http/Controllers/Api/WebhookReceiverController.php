@@ -79,6 +79,7 @@ class WebhookReceiverController extends Controller
             // --- Step 3: Deduplicate ---
             if (! empty($parsed['source_event_id'])) {
                 $existing = IntegrationEvent::where('provider', $provider)
+                    ->where('tenant_id', $tenantId)
                     ->where('source_event_id', $parsed['source_event_id'])
                     ->first();
 

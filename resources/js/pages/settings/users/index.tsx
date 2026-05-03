@@ -29,7 +29,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -159,17 +158,11 @@ export default function UsersIndex({
     const { auth } = page.props;
     const canImpersonate = (auth.can as any)?.settings?.impersonate;
     const currentUserId = auth.user.id;
-    const isSystemView = page.url.startsWith('/system/users');
-    const usersBasePath = isSystemView ? '/system/users' : '/settings/users';
-    const breadcrumbs: BreadcrumbItem[] = isSystemView
-        ? [
-              { title: 'Dashboard', href: '/dashboard' },
-              { title: 'System Users', href: usersBasePath },
-          ]
-        : [
-              { title: 'Settings', href: '/settings/profile' },
-              { title: 'Users', href: usersBasePath },
-          ];
+    const usersBasePath = '/system/users';
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Dashboard', href: '/dashboard' },
+        { title: 'System Users', href: usersBasePath },
+    ];
 
     const allData = users?.data ?? [];
 
@@ -256,7 +249,7 @@ export default function UsersIndex({
     const content = (
         <div className="space-y-6">
                     <PageHeader
-                        title={isSystemView ? 'System Users' : 'User Management'}
+                        title="System Users"
                         description="Manage user accounts, roles, and access across your organisation"
                         actions={
                             <div className="flex items-center gap-2">
@@ -634,8 +627,8 @@ export default function UsersIndex({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={isSystemView ? 'System Users' : 'User Management'} />
-            {isSystemView ? content : <SettingsLayout>{content}</SettingsLayout>}
+            <Head title="System Users" />
+            {content}
         </AppLayout>
     );
 }

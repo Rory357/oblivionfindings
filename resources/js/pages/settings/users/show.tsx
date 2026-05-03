@@ -22,7 +22,6 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -229,8 +228,7 @@ export default function UserShow({
     const u = user ?? ({} as any);
     const roles: Role[] = u.roles ?? [];
     const currentUserId = page.props.auth?.user?.id;
-    const isSystemView = page.url.startsWith('/system/users');
-    const usersBasePath = isSystemView ? '/system/users' : '/settings/users';
+    const usersBasePath = '/system/users';
     const isSelf = currentUserId === u.id;
     const initials = (u.name ?? '?')
         .split(' ')
@@ -255,17 +253,11 @@ export default function UserShow({
                   eventFilterCategories[eventFilter]?.includes(log.event_type),
               );
 
-    const breadcrumbs: BreadcrumbItem[] = isSystemView
-        ? [
-              { title: 'Dashboard', href: '/dashboard' },
-              { title: 'System Users', href: usersBasePath },
-              { title: u.name ?? 'User', href: `${usersBasePath}/${u.id}` },
-          ]
-        : [
-              { title: 'Settings', href: '/settings' },
-              { title: 'Users', href: usersBasePath },
-              { title: u.name ?? 'User', href: `${usersBasePath}/${u.id}` },
-          ];
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Dashboard', href: '/dashboard' },
+        { title: 'System Users', href: usersBasePath },
+        { title: u.name ?? 'User', href: `${usersBasePath}/${u.id}` },
+    ];
 
     const content = (
         <div className="space-y-6">
@@ -1093,14 +1085,8 @@ export default function UserShow({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head
-                title={`${u.name ?? 'User'} — ${isSystemView ? 'System' : 'Settings'}`}
-            />
-            {isSystemView ? (
-                content
-            ) : (
-                <SettingsLayout>{content}</SettingsLayout>
-            )}
+            <Head title={`${u.name ?? 'User'} - System`} />
+            {content}
         </AppLayout>
     );
 }

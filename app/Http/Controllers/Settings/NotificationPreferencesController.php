@@ -7,6 +7,8 @@ use App\Models\Role;
 use App\Models\RoleNotificationPreference;
 use App\Models\UserNotificationPreference;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class NotificationPreferencesController extends Controller
 {
@@ -67,24 +69,21 @@ class NotificationPreferencesController extends Controller
 
         $data = $request->validate([
             'prefs' => ['required', 'array'],
-            'prefs.*.enabled' => ['required', 'boolean'],
-            'prefs.*.inapp' => ['required', 'boolean'],
-            'prefs.*.email' => ['required', 'boolean'],
-            'prefs.*.push' => ['required', 'boolean'],
         ]);
 
         $prefs = (array) $data['prefs'];
 
         foreach ($prefs as $key => $channels) {
-            if (!is_array($channels)) continue;
+            $channels = $this->normalizeChannels($channels, 'prefs.' . $key);
+
             UserNotificationPreference::updateOrCreate([
                 'user_id' => $user->id,
                 'key' => (string) $key,
             ], [
-                'enabled' => (bool) ($channels['enabled'] ?? true),
-                'channel_inapp' => (bool) ($channels['inapp'] ?? true),
-                'channel_email' => (bool) ($channels['email'] ?? false),
-                'channel_push' => (bool) ($channels['push'] ?? false),
+                'enabled' => $channels['enabled'],
+                'channel_inapp' => $channels['inapp'],
+                'channel_email' => $channels['email'],
+                'channel_push' => $channels['push'],
             ]);
         }
 
@@ -175,19 +174,69 @@ class NotificationPreferencesController extends Controller
         foreach ($matrix as $roleId => $prefs) {
             if (!is_array($prefs)) continue;
             foreach ($prefs as $key => $channels) {
-                if (!is_array($channels)) continue;
+                $channels = $this->normalizeChannels($channels, 'matrix.' . $roleId . '.' . $key);
+
                 RoleNotificationPreference::updateOrCreate([
                     'role_id' => (int) $roleId,
                     'key' => (string) $key,
                 ], [
-                    'enabled' => (bool) ($channels['enabled'] ?? true),
-                    'channel_inapp' => (bool) ($channels['inapp'] ?? true),
-                    'channel_email' => (bool) ($channels['email'] ?? false),
-                    'channel_push' => (bool) ($channels['push'] ?? false),
+                    'enabled' => $channels['enabled'],
+                    'channel_inapp' => $channels['inapp'],
+                    'channel_email' => $channels['email'],
+                    'channel_push' => $channels['push'],
                 ]);
             }
         }
 
         return redirect()->back()->with('success', 'Role notification defaults updated.');
+    }
+
+    /**
+     * @return array{enabled: bool, inapp: bool, email: bool, push: bool}
+     */
+    private function normalizeChannels(mixed $channels, string $errorKey): array
+    {
+        if (is_bool($channels)) {
+            return [
+                'enabled' => $channels,
+                'inapp' => $channels,
+                'email' => false,
+                'push' => false,
+            ];
+        }
+
+        if (! is_array($channels)) {
+            throw ValidationException::withMessages([
+                $errorKey => 'The notification preference must be a boolean or channel configuration.',
+            ]);
+        }
+
+        $validator = Validator::make($channels, [
+            'enabled' => ['required', 'boolean'],
+            'inapp' => ['required', 'boolean'],
+            'email' => ['required', 'boolean'],
+            'push' => ['required', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            $messages = [];
+            foreach ($validator->errors()->messages() as $field => $fieldMessages) {
+                $messages[$errorKey . '.' . $field] = $fieldMessages;
+            }
+
+            throw ValidationException::withMessages($messages);
+        }
+
+        return [
+            'enabled' => $this->toBoolean($channels['enabled']),
+            'inapp' => $this->toBoolean($channels['inapp']),
+            'email' => $this->toBoolean($channels['email']),
+            'push' => $this->toBoolean($channels['push']),
+        ];
+    }
+
+    private function toBoolean(mixed $value): bool
+    {
+        return (bool) filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
     }
 }

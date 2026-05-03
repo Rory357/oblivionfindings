@@ -2,7 +2,7 @@
 
 namespace App\Actions\Fortify;
 
-use Illuminate\Validation\Rules\Password;
+use App\Support\SecurityPolicy;
 
 trait PasswordValidationRules
 {
@@ -13,6 +13,6 @@ trait PasswordValidationRules
      */
     protected function passwordRules(): array
     {
-        return ['required', 'string', Password::min(12)->letters()->numbers()->symbols()->mixedCase(), 'confirmed'];
+        return ['required', 'string', SecurityPolicy::passwordRule(), 'confirmed'];
     }
 }

@@ -391,9 +391,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology', 'group' => 'settings', 'module' => 'System'],
             ['key' => 'settings.branding.manage', 'description' => 'Manage organisation branding', 'group' => 'settings', 'module' => 'System'],
             ['key' => 'settings.service_contexts.manage', 'description' => 'Manage service contexts', 'group' => 'settings', 'module' => 'System'],
-            ['key' => 'settings.sites.manage', 'description' => 'Manage site settings', 'group' => 'settings', 'module' => 'System'],
             ['key' => 'settings.templates.manage', 'description' => 'Manage templates', 'group' => 'settings', 'module' => 'System'],
-            ['key' => 'settings.rbac.manage', 'description' => 'Manage RBAC settings', 'group' => 'settings', 'module' => 'System'],
 
             // RAG / AI Query
             ['key' => 'rag.ask.any', 'description' => 'Ask AI about any client', 'group' => 'general', 'module' => 'System'],

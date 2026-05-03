@@ -1786,10 +1786,10 @@ function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.settings?.manageAccess)
         items.push({ title: 'Settings', href: '/settings', icon: Settings });
-    if (can?.settings?.rbacManage)
+    if (can?.settings?.manageAccess)
         items.push({
             title: 'Roles & Permissions',
-            href: '/settings/roles',
+            href: '/system/access/roles',
             icon: Shield,
         });
     return [{ label: 'System', items }];
