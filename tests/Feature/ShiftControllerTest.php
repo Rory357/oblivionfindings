@@ -9,12 +9,13 @@ use App\Models\CoverageGapAcknowledgement;
 use App\Models\CoverageReservation;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
-use App\Models\Shift;
 use App\Models\User;
 use App\Services\ShiftSignalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class ShiftControllerTest extends TestCase
@@ -22,9 +23,13 @@ class ShiftControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $staff;
+
     protected Client $client;
+
     protected Site $site;
+
     protected ServiceContext $serviceContext;
 
     protected function setUp(): void
@@ -46,7 +51,7 @@ class ShiftControllerTest extends TestCase
             'approved_at' => now(),
         ]);
         $this->staff->roles()->attach(Role::where('name', 'support_worker')->first());
-        
+
         // Grant staff additional permissions needed for tests
         $staffRole = Role::where('name', 'support_worker')->first();
         $staffRole->permissions()->syncWithoutDetaching([
@@ -109,7 +114,7 @@ class ShiftControllerTest extends TestCase
     public function test_index_applies_date_filters(): void
     {
         $today = now()->format('Y-m-d');
-        
+
         $response = $this->actingAs($this->admin)->get("/operations/shifts?from={$today}&to={$today}");
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -118,12 +123,50 @@ class ShiftControllerTest extends TestCase
         );
     }
 
+    public function test_index_date_filters_use_worker_timezone_day_boundaries(): void
+    {
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+
+        $visibleShift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => Carbon::parse('2026-05-11 10:00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-05-11 13:00:00', 'Pacific/Auckland')->utc(),
+            'location' => 'Rostering E2E House',
+            'status' => 'scheduled',
+        ]);
+
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => Carbon::parse('2026-05-10 10:00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-05-10 13:00:00', 'Pacific/Auckland')->utc(),
+            'location' => 'Rostering E2E House',
+            'status' => 'scheduled',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get('/operations/shifts?from=2026-05-11&to=2026-05-11&assigned=unassigned&q=Rostering');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('operations/shifts/index')
+            ->where('filters.from', '2026-05-11')
+            ->where('filters.to', '2026-05-11')
+            ->has('shifts.data', 1)
+            ->where('shifts.data.0.id', $visibleShift->id)
+        );
+    }
+
     public function test_index_applies_search_filter_safely(): void
     {
         // This tests that search doesn't cause SQL injection
         $maliciousInput = "test' OR '1'='1";
-        
-        $response = $this->actingAs($this->admin)->get("/operations/shifts?q=" . urlencode($maliciousInput));
+
+        $response = $this->actingAs($this->admin)->get('/operations/shifts?q='.urlencode($maliciousInput));
         $response->assertOk();
         // If SQL injection worked, we'd get all shifts. With parameterized query, we get none.
     }

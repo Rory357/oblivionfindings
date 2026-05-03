@@ -6,6 +6,9 @@ import {
     gotoMyRoster,
     loginAs,
     loginAsStaff,
+    publishCurrentWeek,
+    resetRosteringReadinessFixtures,
+    ROSTERING_DEMO_FRONTLINE_TARGET,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -22,8 +25,11 @@ test.describe('frontline roster — published visibility', () => {
     test('draft assigned shifts stay hidden until the manager publishes', async ({
         page,
     }) => {
+        test.setTimeout(90_000);
+
         const consoleErrors = collectConsoleErrors(page);
 
+        resetRosteringReadinessFixtures();
         await loginAs(page, 'roster-e2e-frontline@demo.test', 'password');
         await gotoMyRoster(page);
         const publishedShift = page.getByRole('button', {
@@ -33,11 +39,7 @@ test.describe('frontline roster — published visibility', () => {
 
         await page.context().clearCookies();
         await loginAsStaff(page);
-        await page.goto('/operations/rostering?week=2026-05-04&site_id=9002');
-        await page.getByTestId('rostering-review-publish').click();
-        await expect(page.getByTestId('publish-review-page')).toBeVisible();
-        await page.getByTestId('publish-review-confirm').click();
-        await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
+        await publishCurrentWeek(page, ROSTERING_DEMO_FRONTLINE_TARGET);
 
         await page.context().clearCookies();
         await loginAs(page, 'roster-e2e-frontline@demo.test', 'password');

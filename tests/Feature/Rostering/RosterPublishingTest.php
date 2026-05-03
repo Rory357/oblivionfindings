@@ -39,6 +39,36 @@ it('publishes a roster period and stamps shifts without mass assigning publish f
     expect($shift->fresh()->roster_period_id)->toBe($period->id);
 });
 
+it('publishes local Monday morning shifts that end on a UTC date boundary', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = User::factory()->create(['organization_id' => 1]);
+    $weekStart = Carbon::parse('2026-05-04', 'Pacific/Auckland')->startOfDay();
+
+    $period = RosterPeriod::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+        'week_start' => $weekStart->toDateString(),
+    ]);
+
+    $shift = Shift::factory()->unassigned()->create([
+        'organization_id' => 1,
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'starts_at' => $weekStart->copy()->setTime(9, 0)->utc(),
+        'ends_at' => $weekStart->copy()->setTime(12, 0)->utc(),
+        'status' => 'draft',
+    ]);
+
+    app(RosterPublishingService::class)->publish($period, $actor);
+
+    expect($shift->fresh()->published_at)->not->toBeNull();
+    expect($shift->fresh()->roster_period_id)->toBe($period->id);
+});
+
 it('marks a published roster period dirty when a roster-relevant shift field changes', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([

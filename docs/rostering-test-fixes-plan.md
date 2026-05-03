@@ -17,6 +17,17 @@ This plan fixes all four in **4 small PRs** so the Playwright suite goes to **10
 
 ---
 
+## Status Snapshot (2026-05-03)
+
+- [x] **T-1 sidebar contrast** — verified by the 2026-05-03 focused Chromium run of `operations-rostering-a11y.spec.ts` inside the rostering Playwright gate.
+- [x] **T-2 environment-aware performance baseline** — applied. `tests/e2e/performance/rostering-dashboard-baseline.json`, `operations-rostering-performance.spec.ts`, and `playwright.config.ts` now use `PLAYWRIGHT_BASELINE_ENV`.
+- [x] **T-3 Playwright feature-flag injection** — applied. `playwright.config.ts` sets and propagates `FEATURE_ROSTERING_PUBLISH` and `FEATURE_ROSTERING_AUTO_SCHEDULE`.
+- [x] **T-4 seeder eligibility for suggestion fixture** — verified by the 2026-05-03 focused Chromium run of `operations-rostering-suggestions.spec.ts`; demo candidate availability is seeded for the deterministic fixture.
+
+Keep this file as the historical fix plan. Use `docs/TEST_SUITE_SUMMARY.md` for the current suite inventory.
+
+---
+
 ## Issue 1 — Sidebar contrast violations (5 tests)
 
 ### Symptom

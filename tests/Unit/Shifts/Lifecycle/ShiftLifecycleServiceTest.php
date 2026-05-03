@@ -82,6 +82,33 @@ class ShiftLifecycleServiceTest extends TestCase
             ->count());
     }
 
+    public function test_assign_records_assignment_timeline_event(): void
+    {
+        $actor = User::factory()->create();
+        $assignee = User::factory()->create();
+        $shift = $this->shiftFor($actor, [
+            'status' => 'draft',
+            'user_id' => null,
+        ]);
+
+        $assigned = app(ShiftLifecycleService::class)->assign($shift, $actor, $assignee);
+
+        $this->assertSame('scheduled', $assigned->status);
+        $this->assertSame($assignee->id, $assigned->user_id);
+
+        $event = TimelineEvent::query()
+            ->where('type', ShiftTimelineService::ASSIGNED_EVENT_TYPE)
+            ->where('source_type', Shift::class)
+            ->where('source_id', $shift->id)
+            ->first();
+
+        $this->assertNotNull($event);
+        $this->assertSame('Shift assigned', $event->subject);
+        $this->assertStringContainsString($assignee->name, $event->body);
+        $this->assertSame($actor->id, $event->actor_user_id);
+        $this->assertSame($assignee->id, $event->meta['assigned_user_id']);
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */

@@ -59,8 +59,13 @@ class RosterPeriodService
 
     public function shiftsQuery(RosterPeriod $period): Builder
     {
-        $weekStart = Carbon::parse($period->week_start)->startOfDay();
-        $weekEnd = $weekStart->copy()->addDays(7);
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $weekStartDate = $period->week_start instanceof CarbonInterface
+            ? $period->week_start->toDateString()
+            : (string) $period->week_start;
+        $localWeekStart = Carbon::parse($weekStartDate, $timezone)->startOfDay();
+        $weekStart = $localWeekStart->copy()->utc();
+        $weekEnd = $localWeekStart->copy()->addDays(7)->utc();
 
         return Shift::query()
             ->where(function (Builder $query) use ($period, $weekStart, $weekEnd) {

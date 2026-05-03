@@ -16,7 +16,6 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftTask;
-use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\CoverageReservationService;
@@ -26,7 +25,6 @@ use App\Services\ServiceContextResolver;
 use App\Services\ShiftAssignmentRecommendationService;
 use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
-use App\Services\ShiftHandoverService;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
@@ -50,22 +48,20 @@ class ShiftController extends Controller
 
         $from = $request->query('from');
         $to = $request->query('to');
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $filterFrom = $from
+            ? Carbon::parse((string) $from, $timezone)->toDateString()
+            : ($to
+                ? Carbon::parse((string) $to, $timezone)->toDateString()
+                : now($timezone)->toDateString());
+        $filterTo = $to
+            ? Carbon::parse((string) $to, $timezone)->toDateString()
+            : ($from
+                ? Carbon::parse((string) $from, $timezone)->toDateString()
+                : now($timezone)->toDateString());
 
-        if ($from) {
-            $start = now()->parse($from)->startOfDay();
-        } elseif ($to) {
-            $start = now()->parse($to)->startOfDay();
-        } else {
-            $start = now()->startOfDay();
-        }
-
-        if ($to) {
-            $end = now()->parse($to)->endOfDay();
-        } elseif ($from) {
-            $end = now()->parse($from)->endOfDay();
-        } else {
-            $end = now()->endOfDay();
-        }
+        $start = Carbon::parse($filterFrom, $timezone)->startOfDay()->utc();
+        $end = Carbon::parse($filterTo, $timezone)->endOfDay()->utc();
 
         $query = Shift::query()
             ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
@@ -136,8 +132,8 @@ class ShiftController extends Controller
         return inertia('operations/shifts/index', [
             'shifts' => $shifts,
             'filters' => [
-                'from' => $start->toDateString(),
-                'to' => $end->toDateString(),
+                'from' => $filterFrom,
+                'to' => $filterTo,
                 'status' => $request->query('status'),
                 'client_id' => $request->query('client_id'),
                 'user_id' => $request->query('user_id'),

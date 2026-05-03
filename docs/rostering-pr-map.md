@@ -1,5 +1,7 @@
 # Rostering Production-Readiness — PR-to-File Map
 
+> Historical snapshot. This document reverse-maps commit `46ee7ba0` and its verification run; it is not the current test-suite inventory. For live counts and current browser-harness guidance, see `docs/TEST_SUITE_SUMMARY.md`.
+
 ## Why this doc exists
 
 The full Rostering production-readiness plan was specified as **9 separate PRs** behind two feature flags (`rostering.publish`, `rostering.auto_schedule`). The intent was per-PR canary deployment and per-PR rollback if a regression surfaced.

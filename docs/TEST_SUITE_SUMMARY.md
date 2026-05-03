@@ -1,221 +1,96 @@
 # Test Suite Summary
 
-**Date:** 2026-02-04  
-**Total Test Files:** 15  
-**Total Tests:** 140+  
-**Passing:** ~100  
-**Status:** Comprehensive coverage of critical paths
+**Last verified:** 2026-05-03
 
----
+This is the current test inventory for the Laravel/Inertia application. Counts are file counts, not assertion counts, because Pest, Dusk, and Playwright all expand tests differently at runtime.
 
-## Test Files Created
+## Current Counts
 
-### 1. ShiftControllerTest.php (21 tests) ✅ ALL PASSING
-**Coverage:**
-- Authentication & authorization
-- Index listing with filters (date, search, status)
-- Store (create) with validations
-- Update with conflict detection
-- Shift lifecycle (start, complete)
-- Task management
-- Service context resolution
+| Area | Location | Count |
+|---|---:|---:|
+| Feature tests | `tests/Feature/**/*.php` | 268 |
+| Unit tests | `tests/Unit/**/*.php` | 65 |
+| Integration tests | `tests/Integration/**/*.php` | 1 |
+| Browser tests (Dusk) | `tests/Browser/**/*.php` | 106 |
+| Playwright e2e specs | `tests/e2e/**/*.spec.ts` | 27 |
+| Playwright visual specs | `tests/visual/**/*.spec.ts` | 1 |
+| Canonical screenshots | `tests/__screenshots__/**/*` | 24 |
+| Legacy visual screenshots | `tests/visual/__screenshots__/**/*` | 22 |
 
-**Key Validations Tested:**
-- SQL injection protection in search
-- Shift duration ≤ 24 hours
-- Start date must be today or future
-- Max 50 tasks per shift
-- Notes max 10,000 characters
+Re-run the inventory in PowerShell:
 
-### 2. ClientControllerTest.php (15 tests)
-**Coverage:**
-- CRUD operations
-- Permission-based access
-- Search functionality
-- Photo upload/delete
-- Filters (onboarding, respite)
-
-### 3. IncidentControllerTest.php (16 tests)
-**Coverage:**
-- Incident CRUD
-- Status workflow (draft → submitted → reviewed → closed)
-- Filters (status, severity, date range, review status)
-- Follow-up management
-- Reopen functionality
-
-### 4. TimesheetControllerTest.php (16 tests)
-**Coverage:**
-- Timesheet CRUD
-- Status workflow (draft → submitted → approved/rejected)
-- Bulk approval
-- Permission-based visibility
-- Break minutes validation
-
-### 5. DashboardControllerTest.php (10 tests)
-**Coverage:**
-- Dashboard view for different roles (staff, manager)
-- Filters (range, status, client)
-- Analytics (shifts, incidents, timesheets)
-- Workstream/My Day
-- Today page
-
-### 6. ServiceContextResolverTest.php (9 tests) ✅ ALL PASSING
-**Coverage:**
-- Resolution priority (provided → client → default)
-- Active/inactive context handling
-- Null safety
-- Edge cases
-
----
-
-## Existing Tests (Pre-existing)
-
-### Auth Tests (Passing)
-- AuthenticationTest (6 tests)
-- EmailVerificationTest (6 tests)
-- PasswordConfirmationTest (2 tests)
-- PasswordResetTest (5 tests)
-- TwoFactorChallengeTest (2 tests)
-- VerificationNotificationTest (2 tests)
-
-### Other Feature Tests
-- AssetTelemetryIngestTest (2 tests)
-- FleetTelemetryIngestTest
-- Settings tests
-
----
-
-## Factories Created
-
-| Factory | Purpose |
-|---------|---------|
-| `ClientFactory.php` | Client test data |
-| `ClientMedicalProfileFactory.php` | Medical profile data |
-| `ClientMedicationFactory.php` | Medication data with PRN support |
-| `ClientIncidentFactory.php` | Incident data with states |
-| `ServiceContextFactory.php` | Service context data |
-| `ShiftFactory.php` | Shift data with lifecycle states |
-| `SiteFactory.php` | Site/location data |
-| `TimesheetFactory.php` | Timesheet data with states |
-
----
-
-## Test Infrastructure
-
-### Traits Used
-- `RefreshDatabase` - Clean database for each test
-- `WithFaker` - Fake data generation
-
-### Assertions
-- Authentication/authorization checks
-- Database state verification
-- Session flash messages
-- Inertia component rendering
-- Validation errors
-
----
-
-## Running the Tests
-
-```bash
-# Run all tests
-php artisan test
-
-# Run specific test file
-php artisan test --filter=ShiftControllerTest
-php artisan test --filter=ClientControllerTest
-php artisan test --filter=IncidentControllerTest
-php artisan test --filter=TimesheetControllerTest
-php artisan test --filter=DashboardControllerTest
-php artisan test --filter=ServiceContextResolverTest
-
-# Run with coverage (if Xdebug enabled)
-php artisan test --coverage
-
-# Run specific test
-php artisan test --filter=test_store_creates_shift_with_valid_data
+```powershell
+(Get-ChildItem tests\Feature -Recurse -Filter *.php).Count
+(Get-ChildItem tests\Unit -Recurse -Filter *.php).Count
+(Get-ChildItem tests\Integration -Recurse -Filter *.php).Count
+(Get-ChildItem tests\Browser -Recurse -Filter *.php).Count
+(Get-ChildItem tests\e2e -Recurse -Filter *.spec.ts).Count
+(Get-ChildItem tests\visual -Recurse -Filter *.spec.ts).Count
+(Get-ChildItem tests\__screenshots__ -Recurse -File).Count
+(Get-ChildItem tests\visual\__screenshots__ -Recurse -File).Count
 ```
 
----
+## Canonical Harnesses
 
-## Critical Paths Covered
+- Backend contracts and domain behavior: Pest/PHPUnit under `tests/Feature`, `tests/Unit`, and `tests/Integration`.
+- New browser and e2e coverage: Playwright under `tests/e2e`.
+- Visual regression coverage: Playwright under `tests/visual`.
+- Legacy browser coverage: Dusk under `tests/Browser`; keep it until parity is inventoried and replacement coverage has proven green.
 
-### Security
-✅ SQL injection protection  
-✅ Authorization checks  
-✅ Authentication requirements  
-✅ Permission-based access control  
+New e2e tests should be Playwright unless a code review calls out a specific Dusk-only reason.
 
-### Business Logic
-✅ Shift scheduling & conflicts  
-✅ Incident workflow  
-✅ Timesheet approval workflow  
-✅ Service context resolution  
+## Rostering And Shifts Coverage
 
-### Validation
-✅ Input length limits  
-✅ Date validations  
-✅ Numeric range validations  
-✅ Required field validations  
+Rostering is covered by backend, Playwright, and legacy Dusk layers:
 
----
+- `tests/Feature/RosterControllerTest.php` covers frontline roster visibility, per-org publish flag behavior, `my-roster.data`, and calendar JSON.
+- `tests/Feature/Rostering/` covers publishing, suggestion application, template application, archive cron, published-shift cancellation/completion/payroll locks, and republish guardrails.
+- `tests/Unit/Rostering/` covers eligibility scoring and suggestion context.
+- `tests/Unit/Shifts/` covers lifecycle and timesheet approval services.
+- `tests/Feature/Routing/` covers legacy route redirects and canonical permission contracts.
+- `tests/e2e/operations-rostering-*.spec.ts`, `template-apply-conflict.spec.ts`, `frontline-published-visibility.spec.ts`, and `operations-shifts-detail.spec.ts` cover the manager/frontline browser seams.
 
-## Known Limitations
+The Dusk files under `tests/Browser/Shifts` are page-load smoke tests. They are retained for parity tracking but are not the canonical proof that rostering publish, suggestions, conflicts, or frontline visibility work.
 
-1. **File Upload Tests:** Some file upload tests may fail in SQLite test environment due to storage mocking differences
+## Common Commands
 
-2. **Relationship Names:** Some tests assume specific relationship names that may differ from actual model implementation
+```powershell
+# Full backend suite
+vendor\bin\pest
 
-3. **Bulk Operations:** Bulk approval/rejection tests may need adjustment based on actual controller implementation
+# Rostering subset
+vendor\bin\pest --filter=Rostering
 
-4. **Email Tests:** Email notification tests not included (would require Mail fake configuration)
+# Route contracts
+vendor\bin\pest tests\Feature\Routing
 
----
+# TypeScript and production build
+npm run types
+npm run build
 
-## Recommended Additional Tests
+# Full Playwright suite
+npm run visual:test
 
-### High Priority
-- [ ] Medication administration (MAR) tests
-- [ ] Asset management tests
-- [ ] Fleet management tests
-- [ ] Control room tests
-- [ ] Safeguarding tests
-- [ ] Privacy/GDPR tests
+# Focused rostering browser suite
+npx playwright test tests/e2e/operations-rostering-publish.spec.ts tests/e2e/operations-rostering-suggestions.spec.ts tests/e2e/operations-rostering-a11y.spec.ts tests/e2e/operations-rostering-performance.spec.ts tests/e2e/template-apply-conflict.spec.ts tests/e2e/frontline-published-visibility.spec.ts tests/e2e/operations-rostering-conflicts.spec.ts tests/e2e/operations-rostering-republish.spec.ts tests/e2e/operations-shifts-detail.spec.ts --project=chromium-desktop --reporter=list
+```
 
-### Medium Priority
-- [ ] Report generation tests
-- [ ] Export functionality tests
-- [ ] Notification delivery tests
-- [ ] RAG/AI query tests
+On Windows/Herd, use the explicit PHP binary when needed:
 
-### Low Priority
-- [ ] Calendar integration tests
-- [ ] Respite booking tests
-- [ ] Procedure template tests
+```powershell
+& C:\Users\steph\.config\herd\bin\php.bat vendor\bin\pest --filter=Rostering
+```
 
----
+## Playwright Notes
+
+`playwright.config.ts` injects `FEATURE_ROSTERING_PUBLISH=true` and `FEATURE_ROSTERING_AUTO_SCHEDULE=true` unless they are already set. It serves the app through the repo-root `server.php` router so Vite assets load correctly under the PHP built-in server.
+
+`tests/e2e/global-setup.ts` temporarily moves `public/hot` aside before browser tests and `global-teardown.ts` restores it. If a run is killed mid-flight, restore `public/.hot.playwright.bak` to `public/hot`.
+
+## Screenshot Baselines
+
+The current canonical snapshot path is configured by `snapshotPathTemplate` and writes to `tests/__screenshots__`. The older `tests/visual/__screenshots__` tree is retained as historical baseline material until a deliberate `npm run visual:update` comparison decides what to remove.
 
 ## Maintenance
 
-To add new tests:
-
-1. Create factory if needed: `database/factories/NewModelFactory.php`
-2. Create test file: `tests/Feature/NewControllerTest.php`
-3. Run tests: `php artisan test --filter=NewControllerTest`
-4. Fix any failures
-5. Add to this summary
-
----
-
-## Summary
-
-The test suite now provides:
-- **21 passing tests** for ShiftController (critical workflow)
-- **9 passing tests** for ServiceContextResolver (core service)
-- **15+ tests** each for Client, Incident, Timesheet controllers
-- **10 tests** for Dashboard
-- **Full auth test coverage** (pre-existing)
-
-**Total: 100+ tests covering critical application paths**
-
-The most important business logic (shift scheduling, incident management, timesheet workflow) now has comprehensive test coverage ensuring the application works correctly and securely.
+Update this file when test directories, canonical commands, or browser harness policy changes. Count drift of a few files is normal; stale harness guidance is not.

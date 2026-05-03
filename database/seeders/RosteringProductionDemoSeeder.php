@@ -13,6 +13,7 @@ use App\Models\RosterTemplate;
 use App\Models\RosterTemplateShift;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\StaffAvailability;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -150,10 +151,27 @@ class RosteringProductionDemoSeeder extends Seeder
     {
         $this->ensureSiteProfile($candidate, $site);
         $this->ensureCompliantStatuses($candidate, $site);
+        $this->ensureAvailability($candidate);
 
         // The suggestion fixture only needs the legacy users.role value.
         // Dropping RBAC pivots avoids unrelated live hard-stop checks seeded elsewhere.
         $candidate->roles()->detach();
+    }
+
+    private function ensureAvailability(User $candidate): void
+    {
+        foreach ([0, 1, 2] as $dayOfWeek) {
+            StaffAvailability::query()->updateOrCreate(
+                [
+                    'user_id' => $candidate->id,
+                    'day_of_week' => $dayOfWeek,
+                ],
+                [
+                    'starts_at' => '00:00:00',
+                    'ends_at' => '23:59:59',
+                ],
+            );
+        }
     }
 
     private function ensureSiteProfile(User $candidate, Site $site): void

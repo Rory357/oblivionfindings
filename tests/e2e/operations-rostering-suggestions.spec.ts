@@ -4,6 +4,8 @@ import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     loginAsStaff,
+    resetRosteringReadinessFixtures,
+    ROSTERING_DEMO_SUGGESTION_TARGET,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -22,8 +24,11 @@ test.describe('operations rostering — suggestions flow', () => {
     }) => {
         const consoleErrors = collectConsoleErrors(page);
 
+        resetRosteringReadinessFixtures();
         await loginAsStaff(page);
-        await page.goto('/operations/rostering?week=2026-05-11&site_id=9001');
+        await page.goto(
+            `/operations/rostering?week=${ROSTERING_DEMO_SUGGESTION_TARGET.week}&site_id=${ROSTERING_DEMO_SUGGESTION_TARGET.siteId}`,
+        );
 
         await expect(
             page.getByTestId('rostering-suggest-assignments'),

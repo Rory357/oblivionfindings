@@ -1,5 +1,8 @@
 <?php
 
+// Superseded by tests/e2e/operations-shifts-detail.spec.ts and tests/Feature/Routing/ShiftLegacyRedirectTest.php.
+// Kept until 2026-08-01 for parity; safe to delete once Playwright suite has 30 consecutive green runs in CI.
+
 use App\Models\User;
 use Laravel\Dusk\Browser;
 

@@ -2,17 +2,19 @@
 
 namespace App\Services;
 
-use BackedEnum;
 use App\Models\FamilyPortalSetting;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use BackedEnum;
 use Carbon\CarbonInterface;
 
 class ShiftTimelineService
 {
     public const SNAPSHOT_EVENT_TYPE = 'shift';
+
+    public const ASSIGNED_EVENT_TYPE = 'shift_assigned';
 
     public const STARTED_EVENT_TYPE = 'shift_started';
 
@@ -37,6 +39,7 @@ class ShiftTimelineService
     {
         return [
             self::SNAPSHOT_EVENT_TYPE,
+            self::ASSIGNED_EVENT_TYPE,
             self::STARTED_EVENT_TYPE,
             self::COMPLETED_EVENT_TYPE,
             self::CANCELLED_EVENT_TYPE,
@@ -80,8 +83,7 @@ class ShiftTimelineService
         ?User $actor = null,
         ?CarbonInterface $occurredAt = null,
         bool $notifyPortal = true
-    ): TimelineEvent
-    {
+    ): TimelineEvent {
         $shift = $this->loadShiftContext($shift);
         $occurredAt = $occurredAt ?? $shift->actual_starts_at ?? now();
 
@@ -172,6 +174,55 @@ class ShiftTimelineService
         }
 
         return $event;
+    }
+
+    public function recordAssigned(
+        Shift $shift,
+        User $assignee,
+        ?User $actor = null,
+        ?int $previousUserId = null,
+        ?CarbonInterface $occurredAt = null
+    ): TimelineEvent {
+        $shift->unsetRelation('staff');
+        $shift = $this->loadShiftContext($shift);
+        $occurredAt = $occurredAt ?? now();
+        $bodyParts = [$assignee->name.' assigned to '.$this->shiftTypeLabel($shift)];
+        $clientName = $this->clientName($shift);
+
+        if ($clientName !== '') {
+            $bodyParts[] = 'Client: '.$clientName;
+        }
+
+        if ($shift->starts_at && $shift->ends_at) {
+            $bodyParts[] = 'Scheduled '.$this->formatWindow($shift->starts_at, $shift->ends_at);
+        }
+
+        return TimelineEvent::query()->updateOrCreate(
+            [
+                'type' => self::ASSIGNED_EVENT_TYPE,
+                'source_type' => Shift::class,
+                'source_id' => $shift->id,
+            ],
+            [
+                'occurred_at' => $occurredAt,
+                'source_type' => Shift::class,
+                'source_id' => $shift->id,
+                'actor_user_id' => $actor?->id,
+                'client_id' => $shift->client_id,
+                'shift_id' => $shift->id,
+                'site_id' => $shift->site_id ?: $shift->client?->site_id,
+                'subject' => 'Shift assigned',
+                'body' => implode(' · ', $bodyParts),
+                'meta' => array_merge($this->baseMeta($shift), array_filter([
+                    'event' => 'assigned',
+                    'assigned_user_id' => $assignee->id,
+                    'assigned_user_name' => $assignee->name,
+                    'previous_user_id' => $previousUserId,
+                ], fn ($value) => $value !== null && $value !== '')),
+                'visibility' => 'internal',
+                'created_by' => $actor?->id ?? $shift->created_by,
+            ]
+        );
     }
 
     public function recordCancelled(Shift $shift, ?User $actor = null, ?CarbonInterface $occurredAt = null): TimelineEvent

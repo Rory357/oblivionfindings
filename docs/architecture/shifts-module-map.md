@@ -1,6 +1,6 @@
 # Shifts Module Map
 
-Last verified from code: 2026-04-28.
+Last verified from code: 2026-05-03.
 
 This document is the architecture map for Shifts consolidation. It captures the current route surface, the completed legacy route cleanup, lifecycle write paths, and integration contracts so future work can refactor against a stable reference.
 

@@ -1,5 +1,8 @@
 <?php
 
+// Superseded by tests/e2e/my-day-lifecycle-smoke.spec.ts, tests/e2e/my-roster-week-grid.spec.ts, and tests/e2e/frontline-published-visibility.spec.ts.
+// Kept until 2026-08-01 for parity; safe to delete once Playwright suite has 30 consecutive green runs in CI.
+
 use App\Models\User;
 use Carbon\Carbon;
 use Laravel\Dusk\Browser;

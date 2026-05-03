@@ -452,6 +452,15 @@ class ShiftLifecycleService
             return $locked->fresh() ?? $locked;
         });
 
+        if ((int) $originalUserId !== (int) $assignee->id) {
+            $this->timelineService->recordAssigned(
+                $assigned,
+                $assignee,
+                $actor,
+                $originalUserId ? (int) $originalUserId : null,
+            );
+        }
+
         if ($originalUserId && (int) $originalUserId !== (int) $assignee->id) {
             $this->replacementService->resolveFromManualAssignment($assigned, (int) $assignee->id, $actor);
         }

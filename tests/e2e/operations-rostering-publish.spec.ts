@@ -4,6 +4,9 @@ import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     loginAsStaff,
+    publishCurrentWeek,
+    resetRosteringReadinessFixtures,
+    ROSTERING_DEMO_PUBLISH_TARGET,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -20,27 +23,21 @@ test.describe('operations rostering — publish flow', () => {
     test('manager reviews and publishes a roster period', async ({ page }) => {
         const consoleErrors = collectConsoleErrors(page);
 
+        resetRosteringReadinessFixtures();
         await loginAsStaff(page);
-        await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
+        await publishCurrentWeek(page, ROSTERING_DEMO_PUBLISH_TARGET);
 
-        await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
-        await page.getByTestId('rostering-review-publish').click();
-
-        await expect(page.getByTestId('publish-review-page')).toBeVisible();
-        await expect(page.getByText(/Publish review/i).first()).toBeVisible();
-        await expect(page.getByTestId('publish-review-confirm')).toBeEnabled();
-
-        await page.getByTestId('publish-review-confirm').click();
-        await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
-        await expect(page.getByTestId('rostering-publish-panel')).toContainText(
-            /published/i,
-        );
         await expect(
             page.getByTestId('rostering-published-report-link'),
         ).toBeVisible();
-        await page.getByTestId('rostering-published-report-link').getByRole('link').click();
+        await page
+            .getByTestId('rostering-published-report-link')
+            .getByRole('link')
+            .click();
         await expect(page).toHaveURL(/\/operations\/reports\/shifts/);
-        await expect(page.getByRole('heading', { name: /Shift Operations Reports/i })).toBeVisible();
+        await expect(
+            page.getByRole('heading', { name: /Shift Operations Reports/i }),
+        ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });

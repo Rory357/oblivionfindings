@@ -4,6 +4,21 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+export const ROSTERING_DEMO_PUBLISH_TARGET = {
+    week: '2026-05-04',
+    siteId: 9001,
+} as const;
+
+export const ROSTERING_DEMO_FRONTLINE_TARGET = {
+    week: '2026-05-04',
+    siteId: 9002,
+} as const;
+
+export const ROSTERING_DEMO_SUGGESTION_TARGET = {
+    week: '2026-05-11',
+    siteId: 9001,
+} as const;
+
 function resolvePhpBinary(): string {
     const explicit = process.env.PHP_BINARY;
     if (explicit && existsSync(explicit)) {
@@ -27,6 +42,109 @@ function resolvePhpBinary(): string {
 
 export function resetMedicationReadinessFixtures() {
     runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
+}
+
+export function resetRosteringReadinessFixtures(
+    options: { assignmentShiftStatus?: 'draft' | 'scheduled' } = {},
+) {
+    runArtisan([
+        'db:seed',
+        '--class=RosteringProductionDemoSeeder',
+        '--force',
+    ]);
+
+    const assignmentShiftStatus = options.assignmentShiftStatus ?? 'scheduled';
+
+    runLaravelPhp(`
+$timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+$at = fn (string $value) => \\Carbon\\Carbon::parse($value, $timezone)->utc();
+$assignmentShiftStatus = ${JSON.stringify(assignmentShiftStatus)};
+
+$publishWorkerId = \\App\\Models\\User::query()->where('email', 'roster-e2e-worker@demo.test')->value('id');
+$candidateId = \\App\\Models\\User::query()->where('email', 'roster-e2e-candidate@demo.test')->value('id');
+$frontlineId = \\App\\Models\\User::query()->where('email', 'roster-e2e-frontline@demo.test')->value('id');
+
+\\App\\Models\\Shift::query()
+    ->whereIn('id', [9101, 9201, 9202, 9301])
+    ->update([
+        'roster_period_id' => null,
+        'published_at' => null,
+        'publish_dirty_at' => null,
+    ]);
+
+\\App\\Models\\RosterPeriod::withTrashed()
+    ->whereIn('site_id', [9001, 9002])
+    ->whereIn('week_start', ['2026-05-04', '2026-05-11'])
+    ->where('version', '>', 1)
+    ->forceDelete();
+
+\\App\\Models\\RosterPeriod::withTrashed()
+    ->whereIn('site_id', [9001, 9002])
+    ->whereIn('week_start', ['2026-05-04', '2026-05-11'])
+    ->where('version', 1)
+    ->get()
+    ->each(function ($period): void {
+        if ($period->trashed()) {
+            $period->restore();
+        }
+
+        $period->forceFill([
+            'status' => \\App\\Models\\RosterPeriod::STATUS_DRAFT,
+            'published_at' => null,
+            'published_by' => null,
+            'locked_at' => null,
+            'ready_at' => null,
+            'validating_at' => null,
+            'archived_at' => null,
+            'archive_reason' => null,
+            'snapshot' => null,
+            'validation_summary' => null,
+            'publish_meta' => null,
+            'last_validated_at' => null,
+        ])->save();
+    });
+
+\\App\\Models\\Shift::query()->whereKey(9101)->update([
+    'user_id' => $publishWorkerId,
+    'starts_at' => $at('2026-05-04 09:00'),
+    'ends_at' => $at('2026-05-04 12:00'),
+    'status' => 'scheduled',
+    'published_at' => null,
+    'publish_dirty_at' => null,
+]);
+
+\\App\\Models\\Shift::query()->whereKey(9201)->update([
+    'user_id' => null,
+    'starts_at' => $at('2026-05-11 10:00'),
+    'ends_at' => $at('2026-05-11 13:00'),
+    'status' => $assignmentShiftStatus,
+    'published_at' => null,
+    'publish_dirty_at' => null,
+]);
+
+\\App\\Models\\Shift::query()->whereKey(9202)->update([
+    'user_id' => $candidateId,
+    'starts_at' => $at('2026-05-12 15:00'),
+    'ends_at' => $at('2026-05-12 18:00'),
+    'status' => 'scheduled',
+    'published_at' => null,
+    'publish_dirty_at' => null,
+]);
+
+\\App\\Models\\Shift::query()->whereKey(9301)->update([
+    'user_id' => $frontlineId,
+    'starts_at' => $at('2026-05-07 09:00'),
+    'ends_at' => $at('2026-05-07 12:00'),
+    'status' => 'scheduled',
+    'published_at' => null,
+    'publish_dirty_at' => null,
+]);
+
+\\App\\Models\\TimelineEvent::query()
+    ->where('shift_id', 9201)
+    ->where('type', \\App\\Services\\ShiftTimelineService::ASSIGNED_EVENT_TYPE)
+    ->delete();
+`);
 }
 
 export function seedGovernancePrivacyConsentsReadinessFixtures() {
@@ -108,6 +226,27 @@ export async function loginAsStaff(page: Page) {
     const email = process.env.VISUAL_EMAIL ?? 'admin@demo.test';
     const password = process.env.VISUAL_PASSWORD ?? 'password';
     await loginAs(page, email, password);
+}
+
+export async function publishCurrentWeek(
+    page: Page,
+    target: { week: string; siteId: number } = ROSTERING_DEMO_PUBLISH_TARGET,
+) {
+    await page.goto(
+        `/operations/rostering?week=${target.week}&site_id=${target.siteId}`,
+    );
+
+    await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
+    await page.getByTestId('rostering-review-publish').click();
+
+    await expect(page.getByTestId('publish-review-page')).toBeVisible();
+    await expect(page.getByTestId('publish-review-confirm')).toBeEnabled();
+    await page.getByTestId('publish-review-confirm').click();
+
+    await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
+    await expect(page.getByTestId('rostering-publish-panel')).toContainText(
+        /published/i,
+    );
 }
 
 /**
