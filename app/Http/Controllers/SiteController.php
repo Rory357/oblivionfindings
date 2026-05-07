@@ -13,11 +13,19 @@ use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\Site;
+use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistTemplate;
+use App\Models\SiteContact;
+use App\Models\SiteDocument;
+use App\Models\SiteFacilityZone;
+use App\Models\SiteHoResource;
+use App\Models\SiteHouseRoom;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class SiteController extends Controller
@@ -273,8 +281,6 @@ class SiteController extends Controller
                     'is_active' => (bool) $context->is_active,
                     'description' => $context->description,
                 ])->values(),
-                'onboarding_completed_at' => $site->onboarding_completed_at?->toDateTimeString(),
-                'onboarding_progress' => $site->onboarding_progress,
             ],
             'typeSpecificData' => $typeSpecificData,
             'clients' => $site->clients->sortBy([['first_name', 'asc'], ['last_name', 'asc']])->values()->map(fn ($c) => [
@@ -392,12 +398,102 @@ class SiteController extends Controller
                 ]),
             'coveragePreview' => app(ShiftCoverageService::class)
                 ->buildSiteSummaries(now()->startOfWeek(), now()->addWeek()->endOfWeek(), $site->id),
+            'checklistsSummary' => $this->buildSiteChecklistsSummary($site, $user),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
             'fleet' => \Inertia\Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
         ]);
+    }
+
+    private function buildSiteChecklistsSummary(Site $site, $user): array
+    {
+        $today = now()->toDateString();
+
+        $assignments = SiteChecklistAssignment::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
+            ->with(['template:id,name,frequency,description', 'assignedTo:id,name'])
+            ->orderBy('start_date', 'desc')
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'frequency' => $a->frequency,
+                'start_date' => $a->start_date?->toDateString(),
+                'template' => $a->template ? [
+                    'id' => $a->template->id,
+                    'name' => $a->template->name,
+                    'description' => $a->template->description,
+                    'frequency' => $a->template->frequency,
+                ] : null,
+                'assigned_to' => $a->assignedTo?->only(['id', 'name']),
+            ])
+            ->all();
+
+        $recentRuns = $site->checklistRuns()
+            ->with(['template:id,name', 'completedBy:id,name'])
+            ->orderByDesc('scheduled_date')
+            ->limit(5)
+            ->get()
+            ->map(fn ($run) => [
+                'id' => $run->id,
+                'status' => $run->status,
+                'scheduled_date' => $run->scheduled_date?->toDateString(),
+                'completed_at' => $run->completed_at?->toDateTimeString(),
+                'completion_percentage' => (float) $run->completion_percentage,
+                'items_passed' => (int) $run->items_passed,
+                'items_failed' => (int) $run->items_failed,
+                'is_overdue' => $run->scheduled_date
+                    && $run->scheduled_date->lt($today)
+                    && in_array($run->status, ['scheduled', 'in_progress']),
+                'template' => $run->template ? [
+                    'id' => $run->template->id,
+                    'name' => $run->template->name,
+                ] : null,
+                'completed_by' => $run->completedBy?->only(['id', 'name']),
+            ])
+            ->all();
+
+        $availableTemplates = SiteChecklistTemplate::active()
+            ->forType($site->type)
+            ->withCount('items')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'description' => $t->description,
+                'frequency' => $t->frequency,
+                'items_count' => (int) $t->items_count,
+            ])
+            ->all();
+
+        $stats = [
+            'active_assignments' => $site->checklistAssignments()->where('is_active', true)->count(),
+            'scheduled' => $site->checklistRuns()->where('status', 'scheduled')->count(),
+            'in_progress' => $site->checklistRuns()->where('status', 'in_progress')->count(),
+            'overdue' => $site->checklistRuns()
+                ->where('scheduled_date', '<', $today)
+                ->whereIn('status', ['scheduled', 'in_progress'])
+                ->count(),
+            'completed_30d' => $site->checklistRuns()
+                ->where('status', 'completed')
+                ->where('completed_at', '>=', now()->subDays(30))
+                ->count(),
+        ];
+
+        return [
+            'stats' => $stats,
+            'assignments' => $assignments,
+            'recentRuns' => $recentRuns,
+            'availableTemplates' => $availableTemplates,
+            'can' => [
+                'view' => (bool) $user?->canDo('checklists.view'),
+                'schedule' => (bool) $user?->canDo('checklists.schedule'),
+                'run' => (bool) $user?->canDo('checklists.run'),
+            ],
+        ];
     }
 
     private function buildSiteFleetData(Site $site): array
@@ -548,6 +644,8 @@ class SiteController extends Controller
 
         return inertia('sites/create', [
             'users' => $users,
+            'checklistTemplates' => $this->checklistTemplatesPayload(),
+            'availableAssets' => $this->availableAssetsPayload(null),
         ]);
     }
 
@@ -557,7 +655,34 @@ class SiteController extends Controller
 
         $validated = $request->validated();
 
+        $contacts = $validated['contacts'] ?? [];
+        $rooms = $validated['rooms'] ?? [];
+        $resources = $validated['resources'] ?? [];
+        $zones = $validated['zones'] ?? [];
+        $assets = $validated['assets'] ?? [];
+        $checklists = $validated['checklists'] ?? [];
+        // Documents come from the multipart request with UploadedFile
+        // instances; saveDocuments() reads them directly from $request.
+
+        unset(
+            $validated['contacts'],
+            $validated['rooms'],
+            $validated['resources'],
+            $validated['zones'],
+            $validated['assets'],
+            $validated['checklists'],
+            $validated['documents'],
+        );
+
         $site = Site::create($validated);
+
+        $this->syncContacts($site, $contacts);
+        $this->syncRooms($site, $rooms);
+        $this->syncResources($site, $resources);
+        $this->syncZones($site, $zones);
+        $this->assignAssets($site, $assets, $request->user()?->id);
+        $this->syncChecklists($site, $checklists);
+        $this->saveDocuments($site, $request, $request->user()?->id);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site', $site, null, [
             'title' => "Site created: {$site->name}",
@@ -565,8 +690,53 @@ class SiteController extends Controller
         ]);
 
         return redirect()
-            ->route('sites.index')
+            ->route('sites.show', $site)
             ->with('success', 'Site created.');
+    }
+
+    private function saveDocuments(Site $site, Request $request, ?int $userId): void
+    {
+        // Files and metadata arrive in different superglobals — collect indices
+        // from both and iterate that union, so a doc with only a file (no
+        // metadata) or only metadata (no file, ignored) is handled cleanly.
+        $files = (array) ($request->file('documents') ?? []);
+        $meta = (array) $request->input('documents', []);
+        $indices = array_unique(array_merge(array_keys($files), array_keys($meta)));
+
+        Log::info('SiteController::saveDocuments', [
+            'site_id' => $site->id,
+            'file_indices' => array_keys($files),
+            'meta_indices' => array_keys($meta),
+            'has_documents_field' => $request->hasFile('documents'),
+        ]);
+
+        foreach ($indices as $index) {
+            $file = $request->file("documents.$index.file");
+            if (! $file instanceof \Illuminate\Http\UploadedFile) {
+                Log::info('saveDocuments: skipped index — no file', [
+                    'index' => $index,
+                    'meta' => $meta[$index] ?? null,
+                ]);
+                continue;
+            }
+
+            $entry = $meta[$index] ?? [];
+            $stored = $file->store("site_documents/{$site->id}", 'local');
+
+            SiteDocument::create([
+                'site_id' => $site->id,
+                'uploaded_by_user_id' => $userId,
+                'title' => $entry['title'] ?? null,
+                'category' => $entry['category'] ?? null,
+                'expiry_date' => $entry['expiry_date'] ?? null,
+                'notes' => $entry['notes'] ?? null,
+                'storage_disk' => 'local',
+                'storage_path' => $stored,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'size_bytes' => $file->getSize(),
+            ]);
+        }
     }
 
     public function edit(Site $site)
@@ -574,6 +744,31 @@ class SiteController extends Controller
         $this->authorize('update', $site);
 
         $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+
+        $site->load('contacts');
+
+        $rooms = SiteHouseRoom::where('site_id', $site->id)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'name', 'notes']);
+
+        $resources = SiteHoResource::where('site_id', $site->id)
+            ->orderBy('id')
+            ->get(['id', 'name', 'resource_type', 'capacity']);
+
+        $zones = SiteFacilityZone::where('site_id', $site->id)
+            ->orderBy('id')
+            ->get(['id', 'name', 'zone_type']);
+
+        $checklistAssignments = SiteChecklistAssignment::where('site_id', $site->id)
+            ->where('is_active', true)
+            ->get(['id', 'template_id', 'frequency', 'assigned_to_user_id']);
+
+        $documents = SiteDocument::where('site_id', $site->id)
+            ->orderByDesc('created_at')
+            ->get(['id', 'title', 'category', 'expiry_date', 'notes', 'original_name', 'size_bytes']);
+
+        $assignedAssetIds = Asset::where('site_id', $site->id)->pluck('id')->all();
 
         return inertia('sites/edit', [
             'site' => [
@@ -604,8 +799,26 @@ class SiteController extends Controller
                 'risk_notes' => $site->risk_notes,
                 'risk_review_date' => $site->risk_review_date?->toDateString(),
                 'primary_contact_user_id' => $site->primary_contact_user_id,
+                'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn ($c) => [
+                    'id' => $c->id,
+                    'type' => $c->type,
+                    'name' => $c->name,
+                    'role' => $c->role,
+                    'phone' => $c->phone,
+                    'email' => $c->email,
+                    'is_primary' => (bool) $c->is_primary,
+                    'notes' => $c->notes,
+                ])->all(),
+                'rooms' => $rooms->all(),
+                'resources' => $resources->all(),
+                'zones' => $zones->all(),
+                'checklist_assignments' => $checklistAssignments->all(),
+                'documents' => $documents->all(),
+                'assigned_asset_ids' => $assignedAssetIds,
             ],
             'users' => $users,
+            'checklistTemplates' => $this->checklistTemplatesPayload(),
+            'availableAssets' => $this->availableAssetsPayload($site->id),
         ]);
     }
 
@@ -613,7 +826,32 @@ class SiteController extends Controller
     {
         $this->authorize('update', $site);
 
-        $site->update($request->validated());
+        $validated = $request->validated();
+
+        $contacts = $validated['contacts'] ?? [];
+        $rooms = $validated['rooms'] ?? [];
+        $resources = $validated['resources'] ?? [];
+        $zones = $validated['zones'] ?? [];
+        $assets = $validated['assets'] ?? [];
+        $checklists = $validated['checklists'] ?? [];
+
+        unset(
+            $validated['contacts'],
+            $validated['rooms'],
+            $validated['resources'],
+            $validated['zones'],
+            $validated['assets'],
+            $validated['checklists'],
+        );
+
+        $site->update($validated);
+
+        $this->syncContacts($site, $contacts);
+        $this->syncRooms($site, $rooms);
+        $this->syncResources($site, $resources);
+        $this->syncZones($site, $zones);
+        $this->assignAssets($site, $assets, $request->user()?->id);
+        $this->syncChecklists($site, $checklists);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site', $site, null, [
             'title' => "Site updated: {$site->name}",
@@ -621,8 +859,284 @@ class SiteController extends Controller
         ]);
 
         return redirect()
-            ->route('sites.index')
+            ->route('sites.show', $site)
             ->with('success', 'Site updated.');
+    }
+
+    private function checklistTemplatesPayload(): array
+    {
+        return SiteChecklistTemplate::active()
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'applicable_to_type', 'frequency'])
+            ->all();
+    }
+
+    private function syncContacts(Site $site, array $contacts): void
+    {
+        $keepIds = [];
+
+        foreach ($contacts as $contact) {
+            $name = trim((string) ($contact['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $payload = [
+                'site_id' => $site->id,
+                'tenant_id' => $site->tenant_id,
+                'type' => $contact['type'] ?? 'general',
+                'name' => $name,
+                'role' => $contact['role'] ?? null,
+                'phone' => $contact['phone'] ?? null,
+                'email' => $contact['email'] ?? null,
+                'is_primary' => (bool) ($contact['is_primary'] ?? false),
+                'notes' => $contact['notes'] ?? null,
+            ];
+
+            if (! empty($contact['id'])) {
+                $existing = SiteContact::where('id', $contact['id'])
+                    ->where('site_id', $site->id)
+                    ->first();
+                if ($existing) {
+                    $existing->update($payload);
+                    $keepIds[] = $existing->id;
+                    continue;
+                }
+            }
+
+            $created = SiteContact::create($payload);
+            $keepIds[] = $created->id;
+        }
+
+        SiteContact::where('site_id', $site->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+    }
+
+    private function syncRooms(Site $site, array $rooms): void
+    {
+        if ($site->type !== 'house') {
+            return;
+        }
+
+        $keepIds = [];
+        foreach ($rooms as $room) {
+            $name = trim((string) ($room['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $payload = [
+                'tenant_id' => $site->tenant_id,
+                'notes' => $room['notes'] ?? null,
+                'is_active' => true,
+            ];
+
+            if (! empty($room['id'])) {
+                $existing = SiteHouseRoom::where('id', $room['id'])
+                    ->where('site_id', $site->id)
+                    ->first();
+                if ($existing) {
+                    $existing->update($payload + ['name' => $name]);
+                    $keepIds[] = $existing->id;
+                    continue;
+                }
+            }
+
+            // Dedupe by (site_id, name) — prevents unique-constraint crashes
+            // when the user submits the same room name twice in one form.
+            $row = SiteHouseRoom::updateOrCreate(
+                ['site_id' => $site->id, 'name' => $name],
+                $payload,
+            );
+            if (! in_array($row->id, $keepIds, true)) {
+                $keepIds[] = $row->id;
+            }
+        }
+
+        SiteHouseRoom::where('site_id', $site->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+    }
+
+    private function syncResources(Site $site, array $resources): void
+    {
+        if ($site->type !== 'head_office') {
+            return;
+        }
+
+        $keepIds = [];
+        foreach ($resources as $resource) {
+            $name = trim((string) ($resource['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $payload = [
+                'tenant_id' => $site->tenant_id,
+                'resource_type' => $resource['resource_type'] ?? 'meeting_room',
+                'capacity' => isset($resource['capacity']) ? (int) $resource['capacity'] : null,
+                'is_active' => true,
+            ];
+
+            if (! empty($resource['id'])) {
+                $existing = SiteHoResource::where('id', $resource['id'])
+                    ->where('site_id', $site->id)
+                    ->first();
+                if ($existing) {
+                    $existing->update($payload + ['name' => $name]);
+                    $keepIds[] = $existing->id;
+                    continue;
+                }
+            }
+
+            $row = SiteHoResource::updateOrCreate(
+                ['site_id' => $site->id, 'name' => $name],
+                $payload,
+            );
+            if (! in_array($row->id, $keepIds, true)) {
+                $keepIds[] = $row->id;
+            }
+        }
+
+        SiteHoResource::where('site_id', $site->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+    }
+
+    private function syncZones(Site $site, array $zones): void
+    {
+        if ($site->type !== 'facility') {
+            return;
+        }
+
+        $keepIds = [];
+        foreach ($zones as $zone) {
+            $name = trim((string) ($zone['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $payload = [
+                'tenant_id' => $site->tenant_id,
+                'zone_type' => $zone['zone_type'] ?? null,
+                'is_active' => true,
+            ];
+
+            if (! empty($zone['id'])) {
+                $existing = SiteFacilityZone::where('id', $zone['id'])
+                    ->where('site_id', $site->id)
+                    ->first();
+                if ($existing) {
+                    $existing->update($payload + ['name' => $name]);
+                    $keepIds[] = $existing->id;
+                    continue;
+                }
+            }
+
+            $row = SiteFacilityZone::updateOrCreate(
+                ['site_id' => $site->id, 'name' => $name],
+                $payload,
+            );
+            if (! in_array($row->id, $keepIds, true)) {
+                $keepIds[] = $row->id;
+            }
+        }
+
+        SiteFacilityZone::where('site_id', $site->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+    }
+
+    /**
+     * Sync the set of assets attached to a site. The wizard sends a list of
+     * asset IDs; each is updated to point at this site, and any asset that
+     * was previously assigned here but is missing from the new list is
+     * released back to the pool (site_id = null).
+     */
+    private function assignAssets(Site $site, array $assetIds, ?int $userId): void
+    {
+        $ids = array_values(array_unique(array_map('intval', $assetIds)));
+
+        // Release previously-assigned assets that were de-selected.
+        Asset::where('site_id', $site->id)
+            ->when(! empty($ids), fn ($q) => $q->whereNotIn('id', $ids))
+            ->update([
+                'site_id' => null,
+                'updated_by_user_id' => $userId,
+            ]);
+
+        // Claim the selected assets that aren't already pointing at another
+        // site (the form only offers unassigned + this-site's assets, but be
+        // defensive in case the pool changed between page-load and submit).
+        if (! empty($ids)) {
+            Asset::whereIn('id', $ids)
+                ->where(function ($q) use ($site) {
+                    $q->whereNull('site_id')->orWhere('site_id', $site->id);
+                })
+                ->update([
+                    'site_id' => $site->id,
+                    'updated_by_user_id' => $userId,
+                ]);
+        }
+    }
+
+    private function availableAssetsPayload(?int $currentSiteId): array
+    {
+        return Asset::query()
+            ->select(['id', 'name', 'asset_tag', 'category', 'serial_number', 'site_id'])
+            ->where(function ($q) use ($currentSiteId) {
+                $q->whereNull('site_id');
+                if ($currentSiteId !== null) {
+                    $q->orWhere('site_id', $currentSiteId);
+                }
+            })
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'asset_tag' => $a->asset_tag,
+                'category' => $a->category,
+                'serial_number' => $a->serial_number,
+                'is_assigned_here' => $currentSiteId !== null && $a->site_id === $currentSiteId,
+            ])
+            ->all();
+    }
+
+    private function syncChecklists(Site $site, array $checklists): void
+    {
+        $keepIds = [];
+
+        foreach ($checklists as $assignment) {
+            if (! ($assignment['enabled'] ?? false)) {
+                continue;
+            }
+
+            $templateId = (int) ($assignment['template_id'] ?? 0);
+            if ($templateId <= 0) {
+                continue;
+            }
+
+            $row = SiteChecklistAssignment::updateOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'template_id' => $templateId,
+                ],
+                [
+                    'tenant_id' => $site->tenant_id,
+                    'frequency' => $assignment['frequency'] ?? 'monthly',
+                    'start_date' => now()->toDateString(),
+                    'assigned_to_user_id' => $assignment['assigned_to_user_id'] ?? null,
+                    'is_active' => true,
+                ]
+            );
+            $keepIds[] = $row->id;
+        }
+
+        SiteChecklistAssignment::where('site_id', $site->id)
+            ->whereNotIn('id', $keepIds)
+            ->update(['is_active' => false]);
     }
 
     private function allowedSiteTypes(Request $request): array

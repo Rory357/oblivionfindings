@@ -50,11 +50,26 @@ class SiteDocumentController extends Controller
             'original_name' => $doc->original_name,
         ]);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site_document', $doc, $site, [
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site_document', $doc, null, [
             'title' => 'Site document uploaded',
             'body' => ($doc->title ?: $doc->original_name),
             'url' => url("/sites/{$site->id}"),
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'document' => [
+                    'id' => $doc->id,
+                    'title' => $doc->title,
+                    'category' => $doc->category,
+                    'expiry_date' => $doc->expiry_date?->toDateString(),
+                    'notes' => $doc->notes,
+                    'original_name' => $doc->original_name,
+                    'size_bytes' => $doc->size_bytes,
+                ],
+            ]);
+        }
 
         return back()->with('success', 'Document uploaded.');
     }
@@ -77,7 +92,7 @@ class SiteDocumentController extends Controller
 
         AuditLogger::log('sites.documents.update', $document, ['site_id' => $site->id]);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site_document', $document, $site, [
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site_document', $document, null, [
             'title' => 'Site document updated',
             'body' => ($document->title ?: $document->original_name),
             'url' => url("/sites/{$site->id}"),
@@ -115,7 +130,7 @@ class SiteDocumentController extends Controller
             'original_name' => $document->original_name,
         ]);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'site_document', $document, $site, [
+        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'site_document', $document, null, [
             'title' => 'Site document deleted',
             'body' => ($document->title ?: $document->original_name),
             'url' => url("/sites/{$site->id}"),

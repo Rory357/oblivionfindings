@@ -12,7 +12,6 @@ import {
 import { useState, type PropsWithChildren, type ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/app-sidebar';
-import FlashToaster from '@/components/flash-toaster';
 import PullToRefresh from '@/components/pull-to-refresh';
 import {
     StaffBottomNav,
@@ -157,8 +156,6 @@ export default function StaffPageShell({
             >
                 Skip to main content
             </a>
-
-            <FlashToaster />
 
             {!mobileOnly ? (
                 <div className="hidden lg:block">

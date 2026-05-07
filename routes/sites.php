@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Sites\{
+    ChecklistsDashboardController,
     SiteCalendarController,
     SiteComplianceController,
     SiteHazardController,
@@ -12,7 +13,6 @@ use App\Http\Controllers\Sites\{
     SiteHardwareController,
     SiteIntegrationController,
     SiteInspectionController,
-    SiteOnboardingController,
     SiteReportingController,
     SiteRoomController,
     SiteResourceController,
@@ -170,16 +170,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.integrations.updateOverrides')
             ->middleware('permission:integrations.manage_site_secrets');
 
-        // Onboarding
-        Route::get('/onboarding', [SiteOnboardingController::class, 'wizard'])
-            ->name('sites.onboarding.wizard')
-            ->middleware('permission:sites.update');
-        Route::post('/onboarding/step', [SiteOnboardingController::class, 'saveStep'])
-            ->name('sites.onboarding.saveStep')
-            ->middleware('permission:sites.update');
-        Route::post('/onboarding/complete', [SiteOnboardingController::class, 'complete'])
-            ->name('sites.onboarding.complete')
-            ->middleware('permission:sites.update');
     });
 
     // Hazard routes (not site-scoped)
@@ -352,6 +342,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Global Checklists dashboard (cross-site overview)
+    Route::get('/checklists', [ChecklistsDashboardController::class, 'index'])
+        ->name('checklists.index')
+        ->middleware('permission:checklists.view');
+
     // Checklist Templates (global management)
     Route::get('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'index'])
         ->name('sites.checklists.templates.index')

@@ -40,6 +40,47 @@ class StoreSiteRequest extends FormRequest
             'risk_notes' => ['nullable', 'string', 'max:5000'],
             'risk_review_date' => ['nullable', 'date'],
             'primary_contact_user_id' => ['nullable', 'exists:users,id'],
+            'contacts' => ['nullable', 'array'],
+            'contacts.*.id' => ['nullable', 'integer'],
+            'contacts.*.type' => ['nullable', 'string', 'max:50'],
+            'contacts.*.name' => ['required_with:contacts.*', 'string', 'max:255'],
+            'contacts.*.role' => ['nullable', 'string', 'max:255'],
+            'contacts.*.phone' => ['nullable', 'string', 'max:60'],
+            'contacts.*.email' => ['nullable', 'string', 'email', 'max:255'],
+            'contacts.*.is_primary' => ['nullable', 'boolean'],
+            'contacts.*.notes' => ['nullable', 'string', 'max:5000'],
+
+            'rooms' => ['nullable', 'array'],
+            'rooms.*.id' => ['nullable', 'integer'],
+            'rooms.*.name' => ['required_with:rooms.*', 'string', 'max:255'],
+            'rooms.*.notes' => ['nullable', 'string', 'max:2000'],
+
+            'resources' => ['nullable', 'array'],
+            'resources.*.id' => ['nullable', 'integer'],
+            'resources.*.name' => ['required_with:resources.*', 'string', 'max:255'],
+            'resources.*.resource_type' => ['nullable', 'string', 'max:60'],
+            'resources.*.capacity' => ['nullable', 'integer', 'min:0'],
+
+            'zones' => ['nullable', 'array'],
+            'zones.*.id' => ['nullable', 'integer'],
+            'zones.*.name' => ['required_with:zones.*', 'string', 'max:255'],
+            'zones.*.zone_type' => ['nullable', 'string', 'max:60'],
+
+            'assets' => ['nullable', 'array'],
+            'assets.*' => ['integer', 'exists:assets,id'],
+
+            'checklists' => ['nullable', 'array'],
+            'checklists.*.template_id' => ['required_with:checklists.*', 'integer', 'exists:site_checklist_templates,id'],
+            'checklists.*.enabled' => ['nullable', 'boolean'],
+            'checklists.*.frequency' => ['nullable', 'string', 'max:30'],
+            'checklists.*.assigned_to_user_id' => ['nullable', 'exists:users,id'],
+
+            'documents' => ['nullable', 'array'],
+            'documents.*.file' => ['required_with:documents.*', 'file', 'max:51200'],
+            'documents.*.title' => ['nullable', 'string', 'max:200'],
+            'documents.*.category' => ['nullable', 'string', 'max:60'],
+            'documents.*.expiry_date' => ['nullable', 'date'],
+            'documents.*.notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

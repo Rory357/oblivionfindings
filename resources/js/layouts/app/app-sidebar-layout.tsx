@@ -1,6 +1,5 @@
 import { AppSidebar, AppSidebarMobile } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import FlashToaster from '@/components/flash-toaster';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -24,7 +23,6 @@ export default function AppSidebarLayout({
             >
                 Skip to main content
             </a>
-            <FlashToaster />
             <AppSidebar
                 collapsed={collapsed}
                 onCollapsedChange={(nextCollapsed) =>

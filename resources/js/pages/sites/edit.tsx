@@ -1,25 +1,44 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
+import WizardStepper from '@/components/wizard-stepper';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Home, Warehouse, MapPin, AlertTriangle, Upload, FileText, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+    ArrowLeft,
+    ArrowRight,
+    Check,
+    Loader2,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+    SITE_TYPES,
+    STEPS,
+    StepAddress,
+    StepAssets,
+    StepBasics,
+    StepChecklists,
+    StepContacts,
+    StepDocuments,
+    StepRoomsOrResources,
+    StepSafety,
+    emptyContact,
+    type AvailableAsset,
+    type ChecklistTemplate,
+    type Contact,
+    type DocumentRecord,
+    type Resource,
+    type Room,
+    type SiteType,
+    type WizardData,
+    type WizardUser,
+    type Zone,
+} from './_wizard';
 
 type Site = {
     id: number;
     name: string;
-    type: 'head_office' | 'house' | 'facility' | 'residential';
+    type: SiteType;
     phone?: string;
     email?: string;
     manager_name?: string;
@@ -44,107 +63,113 @@ type Site = {
     risk_notes?: string;
     risk_review_date?: string;
     primary_contact_user_id?: number;
-};
-
-type User = {
-    id: number;
-    name: string;
-};
-
-type SiteDocument = {
-    id: number;
-    title: string;
-    category?: string;
-    expiry_date?: string;
-    notes?: string;
-    original_name: string;
-    size_bytes: number;
+    contacts?: Array<{
+        id: number;
+        type?: string | null;
+        name: string;
+        role?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        is_primary: boolean;
+        notes?: string | null;
+    }>;
+    rooms?: Array<{ id: number; name: string; notes?: string | null }>;
+    resources?: Array<{
+        id: number;
+        name: string;
+        resource_type?: string | null;
+        capacity?: number | null;
+    }>;
+    zones?: Array<{ id: number; name: string; zone_type?: string | null }>;
+    checklist_assignments?: Array<{
+        id: number;
+        template_id: number;
+        frequency: string;
+        assigned_to_user_id?: number | null;
+    }>;
+    documents?: DocumentRecord[];
+    assigned_asset_ids?: number[];
 };
 
 type PageProps = {
     site: Site;
-    users: User[];
-    documents: SiteDocument[];
+    users: WizardUser[];
+    checklistTemplates: ChecklistTemplate[];
+    availableAssets: AvailableAsset[];
     labels?: Record<string, string>;
 };
 
-const siteTypes = [
-    { value: 'head_office', label: 'Head Office', icon: Building2, description: 'Administrative headquarters with meeting rooms' },
-    { value: 'house', label: 'House', icon: Home, description: 'Residential home with client bedrooms' },
-    { value: 'facility', label: 'Facilities', icon: Warehouse, description: 'Workshop, cafe, or day programme space' },
-    { value: 'residential', label: 'Residential', icon: Home, description: 'Client home used for residential/home-support visits' },
+const WORKFLOW_HELP = [
+    'Update saved instantly',
+    'Documents managed live',
+    'Audit trail captured',
+    'Notify managers if needed',
 ];
 
 export default function EditSite() {
-    const { site, users, documents: initialDocuments, labels } = usePage<PageProps>().props;
+    const { site, users, checklistTemplates, availableAssets, labels } =
+        usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
 
-    const [uploadedDocs, setUploadedDocs] = useState<SiteDocument[]>(initialDocuments ?? []);
-    const [uploading, setUploading] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [pendingDoc, setPendingDoc] = useState({ title: '', category: '', expiry_date: '', notes: '' });
+    const initialContacts: Contact[] = useMemo(
+        () =>
+            (site.contacts ?? []).map((c) => ({
+                id: c.id,
+                type: c.type ?? 'general',
+                name: c.name ?? '',
+                role: c.role ?? '',
+                phone: c.phone ?? '',
+                email: c.email ?? '',
+                is_primary: !!c.is_primary,
+                notes: c.notes ?? '',
+            })),
+        [site.contacts],
+    );
 
-    const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    const initialRooms: Room[] = useMemo(
+        () =>
+            (site.rooms ?? []).map((r) => ({
+                id: r.id,
+                name: r.name ?? '',
+                notes: r.notes ?? '',
+            })),
+        [site.rooms],
+    );
 
-    const handleUploadDocument = async () => {
-        const file = fileInputRef.current?.files?.[0];
-        if (!file || !pendingDoc.title.trim()) return;
+    const initialResources: Resource[] = useMemo(
+        () =>
+            (site.resources ?? []).map((r) => ({
+                id: r.id,
+                name: r.name ?? '',
+                resource_type: r.resource_type ?? 'meeting_room',
+                capacity: r.capacity != null ? String(r.capacity) : '',
+            })),
+        [site.resources],
+    );
 
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('title', pendingDoc.title);
-            if (pendingDoc.category) formData.append('category', pendingDoc.category);
-            if (pendingDoc.expiry_date) formData.append('expiry_date', pendingDoc.expiry_date);
-            if (pendingDoc.notes) formData.append('notes', pendingDoc.notes);
+    const initialZones: Zone[] = useMemo(
+        () =>
+            (site.zones ?? []).map((z) => ({
+                id: z.id,
+                name: z.name ?? '',
+                zone_type: z.zone_type ?? 'workshop',
+            })),
+        [site.zones],
+    );
 
-            const res = await fetch(`/sites/${site.id}/documents`, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken() },
-                body: formData,
-            });
+    const initialChecklists = useMemo(
+        () =>
+            (site.checklist_assignments ?? []).map((a) => ({
+                template_id: a.template_id,
+                enabled: true,
+                frequency: a.frequency ?? 'monthly',
+                assigned_to_user_id: a.assigned_to_user_id?.toString() ?? '',
+            })),
+        [site.checklist_assignments],
+    );
 
-            if (res.ok) {
-                const json = await res.json();
-                setUploadedDocs((prev) => [json.document, ...prev]);
-                setPendingDoc({ title: '', category: '', expiry_date: '', notes: '' });
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            } else {
-                alert('Failed to upload document. Please try again.');
-            }
-        } catch {
-            alert('Upload failed. Please check your connection and try again.');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleDeleteDocument = async (docId: number) => {
-        if (!confirm('Are you sure you want to delete this document?')) return;
-        try {
-            const res = await fetch(`/sites/${site.id}/documents/${docId}`, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': csrfToken() },
-            });
-            if (res.ok) {
-                setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
-            } else {
-                alert('Failed to delete document.');
-            }
-        } catch {
-            alert('Delete failed. Please check your connection and try again.');
-        }
-    };
-
-    const formatFileSize = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors } = useForm<WizardData>({
         name: site.name,
         type: site.type,
         phone: site.phone ?? '',
@@ -170,16 +195,151 @@ export default function EditSite() {
         is_high_needs: site.is_high_needs,
         risk_notes: site.risk_notes ?? '',
         risk_review_date: site.risk_review_date ?? '',
-        primary_contact_user_id: site.primary_contact_user_id?.toString() ?? '',
+        primary_contact_user_id:
+            site.primary_contact_user_id?.toString() ?? '',
+        contacts: initialContacts,
+        rooms: initialRooms,
+        resources: initialResources,
+        zones: initialZones,
+        assets: site.assigned_asset_ids ?? [],
+        checklists: initialChecklists,
     });
 
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        put(`/sites/${site.id}`);
-    }
+    const [step, setStep] = useState(0);
+    const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
+    const [existingDocs, setExistingDocs] = useState<DocumentRecord[]>(
+        site.documents ?? [],
+    );
 
-    const selectedType = siteTypes.find(t => t.value === data.type);
-    const TypeIcon = selectedType?.icon || Home;
+    const selectedType = useMemo(
+        () => SITE_TYPES.find((t) => t.value === data.type) ?? SITE_TYPES[1],
+        [data.type],
+    );
+
+    const summaryAddress = useMemo(() => {
+        const parts = [
+            data.address_line_1,
+            data.suburb,
+            data.city,
+            data.postcode,
+        ].filter(Boolean);
+        return parts.length > 0 ? parts.join(', ') : null;
+    }, [data.address_line_1, data.suburb, data.city, data.postcode]);
+
+    const goNext = () => {
+        if (step === 0) {
+            const e: Record<string, string> = {};
+            if (!data.name.trim()) e.name = 'Please give the site a name.';
+            setStepErrors(e);
+            if (Object.keys(e).length > 0) return;
+        }
+        setStepErrors({});
+        setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    };
+
+    const goBack = () => {
+        setStepErrors({});
+        setStep((s) => Math.max(0, s - 1));
+    };
+
+    const submit = () => {
+        put(`/sites/${site.id}`, {
+            data: {
+                ...data,
+                checklists: data.checklists.filter((c) => c.enabled),
+            } as any,
+        } as any);
+    };
+
+    const csrfToken = () =>
+        (
+            document.querySelector(
+                'meta[name="csrf-token"]',
+            ) as HTMLMetaElement | null
+        )?.content ?? '';
+
+    const xhrConfig = () => ({
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        withCredentials: true,
+    });
+
+    const uploadDocument = async (draft: {
+        file: File;
+        title: string;
+        category: string;
+        expiry_date: string;
+        notes: string;
+    }) => {
+        const fd = new FormData();
+        fd.append('file', draft.file);
+        if (draft.title) fd.append('title', draft.title);
+        if (draft.category) fd.append('category', draft.category);
+        if (draft.expiry_date) fd.append('expiry_date', draft.expiry_date);
+        if (draft.notes) fd.append('notes', draft.notes);
+
+        try {
+            const res = await axios.post(
+                `/sites/${site.id}/documents`,
+                fd,
+                xhrConfig(),
+            );
+            if (res.data?.document) {
+                setExistingDocs((prev) => [res.data.document, ...prev]);
+            } else {
+                router.reload({ only: ['site'] });
+            }
+        } catch {
+            alert('Failed to upload document. Please try again.');
+        }
+    };
+
+    const deleteDocument = async (id: number) => {
+        if (!confirm('Delete this document?')) return;
+        try {
+            await axios.delete(
+                `/sites/${site.id}/documents/${id}`,
+                xhrConfig(),
+            );
+            setExistingDocs((prev) => prev.filter((d) => d.id !== id));
+        } catch {
+            alert('Failed to delete document.');
+        }
+    };
+
+    const addContact = () =>
+        setData('contacts', [...data.contacts, emptyContact()]);
+    const updateContact = (index: number, patch: Partial<Contact>) =>
+        setData(
+            'contacts',
+            data.contacts.map((c, i) =>
+                i === index ? { ...c, ...patch } : c,
+            ),
+        );
+    const removeContact = (index: number) =>
+        setData(
+            'contacts',
+            data.contacts.filter((_, i) => i !== index),
+        );
+    const setPrimaryContact = (index: number) =>
+        setData(
+            'contacts',
+            data.contacts.map((c, i) => ({
+                ...c,
+                is_primary: i === index,
+            })),
+        );
+
+    const setDataAdapter = (key: keyof WizardData, value: any) =>
+        setData(key, value);
+
+    const allErrors: Record<string, string | undefined> = {
+        ...(errors as any),
+        ...stepErrors,
+    };
 
     return (
         <AppLayout
@@ -191,504 +351,315 @@ export default function EditSite() {
         >
             <Head title={`Edit ${siteSingular}`} />
 
-            <div className="m-4 max-w-4xl">
-                <form onSubmit={submit} className="space-y-6">
-                    {/* Type Selection - Prominent */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <TypeIcon className="w-5 h-5" />
-                                Site Type
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-3 gap-4">
-                                {siteTypes.map((type) => {
-                                    const Icon = type.icon;
-                                    const isSelected = data.type === type.value;
-                                    return (
-                                        <div
-                                            key={type.value}
-                                            onClick={() => setData('type', type.value as any)}
-                                            className={`cursor-pointer rounded-lg border p-4 transition-colors ${
-                                                isSelected
-                                                    ? 'border-primary bg-primary/10'
-                                                    : 'border hover:border-primary/50'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
-                                                <span className={`font-medium ${isSelected ? 'text-primary/70' : ''}`}>
-                                                    {type.label}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">{type.description}</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <input type="hidden" name="type" value={data.type} />
-                            {errors.type && <div className="mt-2 text-sm text-status-critical">{errors.type}</div>}
-                        </CardContent>
-                    </Card>
-
-                    {/* Basic Information */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Basic Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="name">Site Name *</Label>
-                                <Input
-                                    id="name"
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    className="mt-1"
-                                />
-                                {errors.name && <div className="mt-1 text-sm text-status-critical">{errors.name}</div>}
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="phone">Primary Phone</Label>
-                                    <Input
-                                        id="phone"
-                                        value={data.phone}
-                                        onChange={(e) => setData('phone', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={data.email}
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="primary_contact_user_id">Site Lead / Manager</Label>
-                                <Select
-                                    value={data.primary_contact_user_id || undefined}
-                                    onValueChange={(v) => setData('primary_contact_user_id', v)}
-                                >
-                                    <SelectTrigger className="mt-1">
-                                        <SelectValue placeholder="Select manager..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {users.map((u) => (
-                                            <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="manager_name">Manager Name</Label>
-                                    <Input
-                                        id="manager_name"
-                                        value={data.manager_name}
-                                        onChange={(e) => setData('manager_name', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="manager_phone">Manager Phone</Label>
-                                    <Input
-                                        id="manager_phone"
-                                        value={data.manager_phone}
-                                        onChange={(e) => setData('manager_phone', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="after_hours_phone">After-hours Phone</Label>
-                                <Input
-                                    id="after_hours_phone"
-                                    value={data.after_hours_phone}
-                                    onChange={(e) => setData('after_hours_phone', e.target.value)}
-                                    className="mt-1"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Address */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MapPin className="w-5 h-5" />
-                                Address & Location
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="address_line_1">Address Line 1</Label>
-                                    <Input
-                                        id="address_line_1"
-                                        value={data.address_line_1}
-                                        onChange={(e) => setData('address_line_1', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="address_line_2">Address Line 2</Label>
-                                    <Input
-                                        id="address_line_2"
-                                        value={data.address_line_2}
-                                        onChange={(e) => setData('address_line_2', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div>
-                                    <Label htmlFor="suburb">Suburb</Label>
-                                    <Input
-                                        id="suburb"
-                                        value={data.suburb}
-                                        onChange={(e) => setData('suburb', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="city">City</Label>
-                                    <Input
-                                        id="city"
-                                        value={data.city}
-                                        onChange={(e) => setData('city', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="postcode">Postcode</Label>
-                                    <Input
-                                        id="postcode"
-                                        value={data.postcode}
-                                        onChange={(e) => setData('postcode', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="country">Country</Label>
-                                    <Input
-                                        id="country"
-                                        value={data.country}
-                                        onChange={(e) => setData('country', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="region">Region</Label>
-                                    <Input
-                                        id="region"
-                                        value={data.region}
-                                        onChange={(e) => setData('region', e.target.value)}
-                                        className="mt-1"
-                                        placeholder="e.g., North Island, Auckland"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="latitude">Latitude (GPS)</Label>
-                                    <Input
-                                        id="latitude"
-                                        type="number"
-                                        step="any"
-                                        value={data.latitude}
-                                        onChange={(e) => setData('latitude', e.target.value)}
-                                        className="mt-1"
-                                        placeholder="-36.8485"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="longitude">Longitude (GPS)</Label>
-                                    <Input
-                                        id="longitude"
-                                        type="number"
-                                        step="any"
-                                        value={data.longitude}
-                                        onChange={(e) => setData('longitude', e.target.value)}
-                                        className="mt-1"
-                                        placeholder="174.7633"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="access_instructions">Access Instructions</Label>
-                                <Textarea
-                                    id="access_instructions"
-                                    value={data.access_instructions}
-                                    onChange={(e) => setData('access_instructions', e.target.value)}
-                                    className="mt-1"
-                                    rows={3}
-                                    placeholder="Gate codes, key locations, parking instructions..."
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    This information is permission-protected
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Risk Flags */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-status-warning">
-                                <AlertTriangle className="w-5 h-5" />
-                                Risk Assessment
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-wrap gap-4">
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="is_high_risk"
-                                        checked={data.is_high_risk}
-                                        onCheckedChange={(checked) => setData('is_high_risk', checked as boolean)}
-                                    />
-                                    <Label htmlFor="is_high_risk" className="font-normal cursor-pointer">
-                                        High Risk Site
-                                    </Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="is_high_needs"
-                                        checked={data.is_high_needs}
-                                        onCheckedChange={(checked) => setData('is_high_needs', checked as boolean)}
-                                    />
-                                    <Label htmlFor="is_high_needs" className="font-normal cursor-pointer">
-                                        High Needs Site
-                                    </Label>
-                                </div>
-                            </div>
-
-                            {(data.is_high_risk || data.is_high_needs) && (
-                                <>
-                                    <div>
-                                        <Label htmlFor="risk_notes">Risk Notes / Reason</Label>
-                                        <Textarea
-                                            id="risk_notes"
-                                            value={data.risk_notes}
-                                            onChange={(e) => setData('risk_notes', e.target.value)}
-                                            className="mt-1"
-                                            rows={3}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="risk_review_date">Risk Review Date</Label>
-                                        <Input
-                                            id="risk_review_date"
-                                            type="date"
-                                            value={data.risk_review_date}
-                                            onChange={(e) => setData('risk_review_date', e.target.value)}
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Safety & Operations */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Safety & Operations</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="emergency_plan_location">Emergency Plan Location</Label>
-                                <Input
-                                    id="emergency_plan_location"
-                                    value={data.emergency_plan_location}
-                                    onChange={(e) => setData('emergency_plan_location', e.target.value)}
-                                    className="mt-1"
-                                    placeholder="e.g., Kitchen drawer, Office filing cabinet"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="medication_storage_location">Medication Storage Location</Label>
-                                <Input
-                                    id="medication_storage_location"
-                                    value={data.medication_storage_location}
-                                    onChange={(e) => setData('medication_storage_location', e.target.value)}
-                                    className="mt-1"
-                                    placeholder="e.g., Locked cabinet in office"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="notes">General Notes</Label>
-                                <Textarea
-                                    id="notes"
-                                    value={data.notes}
-                                    onChange={(e) => setData('notes', e.target.value)}
-                                    className="mt-1"
-                                    rows={4}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Documents */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <FileText className="w-5 h-5" />
-                                Documents
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* Upload form */}
-                            <div className="p-4 rounded-lg border space-y-3">
-                                <h4 className="text-sm font-medium flex items-center gap-2">
-                                    <Upload className="w-4 h-4" />
-                                    Upload Document
-                                </h4>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Title *</Label>
-                                        <Input
-                                            value={pendingDoc.title}
-                                            onChange={(e) => setPendingDoc({ ...pendingDoc, title: e.target.value })}
-                                            placeholder="e.g. Fire Evacuation Plan"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>Category</Label>
-                                        <Select
-                                            value={pendingDoc.category || undefined}
-                                            onValueChange={(v) => setPendingDoc({ ...pendingDoc, category: v })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select category" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="evacuation_plan">Evacuation Plan</SelectItem>
-                                                <SelectItem value="compliance_cert">Compliance Certificate</SelectItem>
-                                                <SelectItem value="insurance">Insurance</SelectItem>
-                                                <SelectItem value="lease">Lease / Tenancy</SelectItem>
-                                                <SelectItem value="safety">Health & Safety</SelectItem>
-                                                <SelectItem value="policy">Policy</SelectItem>
-                                                <SelectItem value="other">Other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label>Expiry Date</Label>
-                                        <Input
-                                            type="date"
-                                            value={pendingDoc.expiry_date}
-                                            onChange={(e) => setPendingDoc({ ...pendingDoc, expiry_date: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label>Comments</Label>
-                                    <Textarea
-                                        value={pendingDoc.notes}
-                                        onChange={(e) => setPendingDoc({ ...pendingDoc, notes: e.target.value })}
-                                        placeholder="Add any comments or notes about this document..."
-                                        rows={3}
-                                    />
-                                </div>
-                                <div>
-                                    <Label>File *</Label>
-                                    <Input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-                                        className="cursor-pointer"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    onClick={handleUploadDocument}
-                                    disabled={uploading || !pendingDoc.title.trim()}
-                                >
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    {uploading ? 'Uploading...' : 'Upload Document'}
-                                </Button>
-                            </div>
-
-                            {/* Uploaded documents list */}
-                            {uploadedDocs.length > 0 && (
-                                <div className="space-y-2">
-                                    <h4 className="text-sm font-medium">Uploaded Documents ({uploadedDocs.length})</h4>
-                                    {uploadedDocs.map((doc) => (
-                                        <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <FileText className="w-5 h-5 text-primary flex-shrink-0" />
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium truncate">{doc.title}</p>
-                                                    <p className="text-xs text-muted-foreground truncate">
-                                                        {doc.original_name}
-                                                        {doc.size_bytes > 0 && ` · ${formatFileSize(doc.size_bytes)}`}
-                                                        {doc.category && ` · ${doc.category}`}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-status-critical hover:text-status-critical flex-shrink-0"
-                                                onClick={() => handleDeleteDocument(doc.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Status */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Status</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="is_active"
-                                    checked={data.is_active}
-                                    onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                />
-                                <Label htmlFor="is_active" className="font-normal cursor-pointer">
-                                    Site is active and operational
-                                </Label>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <div className="flex items-center gap-4">
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => window.history.back()}>
-                            Cancel
-                        </Button>
+            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-8 lg:max-w-5xl">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Edit {site.name}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Eight steps. Documents save instantly; everything
+                            else saves on submit.
+                        </p>
                     </div>
-                </form>
+                    <Link
+                        href={`/sites/${site.id}`}
+                        aria-label="Cancel and return to site"
+                        className="frontline-focus inline-flex min-h-10 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+                    >
+                        Cancel
+                    </Link>
+                </div>
+
+                <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+                    <div className="min-w-0 space-y-6 lg:space-y-8">
+                        <WizardStepper steps={STEPS} current={step} />
+
+                        <Card className="p-4 sm:p-6 lg:p-8">
+                            {step === 0 && (
+                                <StepBasics
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                    users={users}
+                                />
+                            )}
+                            {step === 1 && (
+                                <StepAddress
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                />
+                            )}
+                            {step === 2 && (
+                                <StepRoomsOrResources
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                />
+                            )}
+                            {step === 3 && (
+                                <StepContacts
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                    onAdd={addContact}
+                                    onUpdate={updateContact}
+                                    onRemove={removeContact}
+                                    onSetPrimary={setPrimaryContact}
+                                />
+                            )}
+                            {step === 4 && (
+                                <StepAssets
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                    availableAssets={availableAssets}
+                                />
+                            )}
+                            {step === 5 && (
+                                <StepDocuments
+                                    pending={[]}
+                                    existing={existingDocs}
+                                    onAddPending={uploadDocument}
+                                    onRemovePending={() => undefined}
+                                    onDeleteExisting={deleteDocument}
+                                />
+                            )}
+                            {step === 6 && (
+                                <StepChecklists
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                    templates={checklistTemplates}
+                                    users={users}
+                                />
+                            )}
+                            {step === 7 && (
+                                <StepSafety
+                                    data={data}
+                                    setData={setDataAdapter}
+                                    errors={allErrors}
+                                />
+                            )}
+                        </Card>
+
+                        <div className="flex items-center gap-2">
+                            {step > 0 && (
+                                <Button
+                                    variant="outline"
+                                    size="lg"
+                                    onClick={goBack}
+                                    disabled={processing}
+                                    className="flex-1 lg:flex-none"
+                                >
+                                    <ArrowLeft className="mr-1.5 h-4 w-4" />
+                                    Back
+                                </Button>
+                            )}
+                            {step < STEPS.length - 1 ? (
+                                <Button
+                                    size="lg"
+                                    onClick={goNext}
+                                    className="flex-1 lg:min-w-[180px] lg:flex-none"
+                                >
+                                    Next
+                                    <ArrowRight className="ml-1.5 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="lg"
+                                    onClick={submit}
+                                    disabled={processing}
+                                    className="flex-1 lg:min-w-[180px] lg:flex-none"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            Saving…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check className="mr-1.5 h-4 w-4" />
+                                            Save changes
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    <aside aria-label="Site summary" className="hidden lg:block">
+                        <Card className="sticky top-4 space-y-6 p-5">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                    Step {step + 1} of {STEPS.length}
+                                </p>
+                                <h2 className="text-base font-semibold">
+                                    {siteSingular} summary
+                                </h2>
+                            </div>
+
+                            <dl className="space-y-4 text-sm">
+                                <SummaryRow label="Type">
+                                    <span className="flex items-center gap-2 font-medium">
+                                        <selectedType.icon className="h-4 w-4 text-primary" />
+                                        {selectedType.label}
+                                    </span>
+                                </SummaryRow>
+                                <SummaryRow label="Name">
+                                    {data.name || <Empty>Not set</Empty>}
+                                </SummaryRow>
+                                <SummaryRow label="Address">
+                                    {summaryAddress ?? (
+                                        <Empty>Not set</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow
+                                    label={typeAreaLabel(data.type) ?? 'Areas'}
+                                >
+                                    {typeAreaCount(data) > 0 ? (
+                                        `${typeAreaCount(data)} ${typeAreaNoun(data.type, typeAreaCount(data))}`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Contacts">
+                                    {data.contacts.length > 0 ? (
+                                        `${data.contacts.length} contact${data.contacts.length === 1 ? '' : 's'}`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Documents">
+                                    {existingDocs.length > 0 ? (
+                                        `${existingDocs.length} on file`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Checklists">
+                                    {data.checklists.filter((c) => c.enabled)
+                                        .length > 0 ? (
+                                        `${data.checklists.filter((c) => c.enabled).length} scheduled`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Risk level">
+                                    {data.is_high_risk ||
+                                    data.is_high_needs ? (
+                                        <RiskPill warning>
+                                            {data.is_high_risk &&
+                                            data.is_high_needs
+                                                ? 'High risk + needs'
+                                                : data.is_high_risk
+                                                  ? 'High risk'
+                                                  : 'High needs'}
+                                        </RiskPill>
+                                    ) : (
+                                        <RiskPill>Standard</RiskPill>
+                                    )}
+                                </SummaryRow>
+                            </dl>
+
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold">
+                                    What happens next
+                                </h3>
+                                <ol className="space-y-2">
+                                    {WORKFLOW_HELP.map((item, index) => (
+                                        <li
+                                            key={item}
+                                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                                        >
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold text-foreground">
+                                                {index + 1}
+                                            </span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        </Card>
+                    </aside>
+                </div>
             </div>
         </AppLayout>
+    );
+}
+
+function typeAreaLabel(type: SiteType): string | null {
+    if (type === 'house') return 'Rooms';
+    if (type === 'head_office') return 'Resources';
+    if (type === 'facility') return 'Zones';
+    return null;
+}
+
+function typeAreaCount(data: WizardData): number {
+    if (data.type === 'house') return data.rooms.length;
+    if (data.type === 'head_office') return data.resources.length;
+    if (data.type === 'facility') return data.zones.length;
+    return 0;
+}
+
+function typeAreaNoun(type: SiteType, count: number): string {
+    const singular =
+        type === 'house'
+            ? 'room'
+            : type === 'head_office'
+              ? 'resource'
+              : 'zone';
+    return count === 1 ? singular : `${singular}s`;
+}
+
+function SummaryRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-xs font-medium text-muted-foreground">
+                {label}
+            </dt>
+            <dd className="mt-1 font-medium">{children}</dd>
+        </div>
+    );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+    return (
+        <span className="font-normal text-muted-foreground italic">
+            {children}
+        </span>
+    );
+}
+
+function RiskPill({
+    warning = false,
+    children,
+}: {
+    warning?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <span
+            className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold text-foreground ${
+                warning
+                    ? 'border-status-warning/40 bg-status-warning-bg'
+                    : 'border-status-success/40 bg-status-success-bg'
+            }`}
+        >
+            <span
+                aria-hidden
+                className={`h-2 w-2 rounded-full ${
+                    warning ? 'bg-status-warning' : 'bg-status-success'
+                }`}
+            />
+            {children}
+        </span>
     );
 }

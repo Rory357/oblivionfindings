@@ -1,78 +1,176 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
+import WizardStepper from '@/components/wizard-stepper';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Home, Warehouse, MapPin, AlertTriangle } from 'lucide-react';
-
-type User = {
-    id: number;
-    name: string;
-};
+    ArrowLeft,
+    ArrowRight,
+    Check,
+    Loader2,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+    SITE_TYPES,
+    STEPS,
+    StepAddress,
+    StepAssets,
+    StepBasics,
+    StepChecklists,
+    StepContacts,
+    StepDocuments,
+    StepRoomsOrResources,
+    StepSafety,
+    emptyContact,
+    type AvailableAsset,
+    type ChecklistTemplate,
+    type Contact,
+    type DocumentDraft,
+    type SiteType,
+    type WizardData,
+    type WizardUser,
+} from './_wizard';
 
 type PageProps = {
-    users: User[];
+    users: WizardUser[];
+    checklistTemplates: ChecklistTemplate[];
+    availableAssets: AvailableAsset[];
     labels?: Record<string, string>;
 };
 
-const siteTypes = [
-    { value: 'head_office', label: 'Head Office', icon: Building2, description: 'Administrative headquarters with meeting rooms' },
-    { value: 'house', label: 'House', icon: Home, description: 'Residential home with client bedrooms' },
-    { value: 'facility', label: 'Facilities', icon: Warehouse, description: 'Workshop, cafe, or day programme space' },
-    { value: 'residential', label: 'Residential', icon: Home, description: 'Client home used for residential/home-support visits' },
+const WORKFLOW_HELP = [
+    'Site is created',
+    'Documents uploaded',
+    'Checklists scheduled',
+    'Ready for clients & shifts',
 ];
 
+const initialData: WizardData = {
+    name: '',
+    type: 'house',
+    phone: '',
+    email: '',
+    manager_name: '',
+    manager_phone: '',
+    after_hours_phone: '',
+    emergency_plan_location: '',
+    medication_storage_location: '',
+    notes: '',
+    address_line_1: '',
+    address_line_2: '',
+    suburb: '',
+    city: '',
+    postcode: '',
+    country: 'New Zealand',
+    region: '',
+    latitude: '',
+    longitude: '',
+    access_instructions: '',
+    is_active: true,
+    is_high_risk: false,
+    is_high_needs: false,
+    risk_notes: '',
+    risk_review_date: '',
+    primary_contact_user_id: '',
+    contacts: [],
+    rooms: [],
+    resources: [],
+    zones: [],
+    assets: [],
+    checklists: [],
+};
+
 export default function CreateSite() {
-    const { users, labels } = usePage<PageProps>().props;
+    const { users, checklistTemplates, availableAssets, labels } =
+        usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
 
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        type: 'house' as 'head_office' | 'house' | 'facility' | 'residential',
-        phone: '',
-        email: '',
-        manager_name: '',
-        manager_phone: '',
-        after_hours_phone: '',
-        emergency_plan_location: '',
-        medication_storage_location: '',
-        notes: '',
-        address_line_1: '',
-        address_line_2: '',
-        suburb: '',
-        city: '',
-        postcode: '',
-        country: 'New Zealand',
-        region: '',
-        latitude: '',
-        longitude: '',
-        access_instructions: '',
-        is_active: true,
-        is_high_risk: false,
-        is_high_needs: false,
-        risk_notes: '',
-        risk_review_date: '',
-        primary_contact_user_id: '',
-    });
+    const [data, setDataState] = useState<WizardData>(initialData);
+    const setData = (key: keyof WizardData, value: any) =>
+        setDataState((prev) => ({ ...prev, [key]: value }));
 
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        post('/sites');
-    }
+    const [pendingDocs, setPendingDocs] = useState<DocumentDraft[]>([]);
+    const [step, setStep] = useState(0);
+    const [errors, setErrors] = useState<Record<string, string | undefined>>(
+        {},
+    );
+    const [processing, setProcessing] = useState(false);
 
-    const selectedType = siteTypes.find(t => t.value === data.type);
-    const TypeIcon = selectedType?.icon || Home;
+    const selectedType = useMemo(
+        () => SITE_TYPES.find((t) => t.value === data.type) ?? SITE_TYPES[1],
+        [data.type],
+    );
+
+    const summaryAddress = useMemo(() => {
+        const parts = [
+            data.address_line_1,
+            data.suburb,
+            data.city,
+            data.postcode,
+        ].filter(Boolean);
+        return parts.length > 0 ? parts.join(', ') : null;
+    }, [data.address_line_1, data.suburb, data.city, data.postcode]);
+
+    const goNext = () => {
+        if (step === 0) {
+            const e: Record<string, string> = {};
+            if (!data.name.trim()) e.name = 'Please give the site a name.';
+            setErrors(e);
+            if (Object.keys(e).length > 0) return;
+        }
+        setErrors({});
+        setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    };
+
+    const goBack = () => {
+        setErrors({});
+        setStep((s) => Math.max(0, s - 1));
+    };
+
+    const submit = () => {
+        setProcessing(true);
+        setErrors({});
+
+        const fd = buildFormData(data, pendingDocs);
+
+        router.post('/sites', fd, {
+            forceFormData: true,
+            preserveScroll: true,
+            onError: (errs) => {
+                const flat: Record<string, string> = {};
+                for (const [key, val] of Object.entries(errs)) {
+                    flat[key] = Array.isArray(val) ? val[0] : String(val);
+                }
+                setErrors(flat);
+                jumpToFirstError(flat, setStep);
+            },
+            onFinish: () => setProcessing(false),
+        });
+    };
+
+    const addContact = () =>
+        setData('contacts', [...data.contacts, emptyContact()]);
+    const updateContact = (index: number, patch: Partial<Contact>) =>
+        setData(
+            'contacts',
+            data.contacts.map((c, i) =>
+                i === index ? { ...c, ...patch } : c,
+            ),
+        );
+    const removeContact = (index: number) =>
+        setData(
+            'contacts',
+            data.contacts.filter((_, i) => i !== index),
+        );
+    const setPrimaryContact = (index: number) =>
+        setData(
+            'contacts',
+            data.contacts.map((c, i) => ({
+                ...c,
+                is_primary: i === index,
+            })),
+        );
 
     return (
         <AppLayout
@@ -83,389 +181,472 @@ export default function CreateSite() {
         >
             <Head title={`Add ${siteSingular}`} />
 
-            <div className="m-4 max-w-4xl">
-                <form onSubmit={submit} className="space-y-6">
-                    {/* Type Selection - Prominent */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <TypeIcon className="w-5 h-5" />
-                                Site Type
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-3 gap-4">
-                                {siteTypes.map((type) => {
-                                    const Icon = type.icon;
-                                    const isSelected = data.type === type.value;
-                                    return (
-                                        <div
-                                            key={type.value}
-                                            onClick={() => setData('type', type.value as any)}
-                                            className={`cursor-pointer rounded-lg border p-4 transition-colors ${
-                                                isSelected
-                                                    ? 'border-primary bg-primary/10'
-                                                    : 'border hover:border-primary/50'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
-                                                <span className={`font-medium ${isSelected ? 'text-primary/70' : ''}`}>
-                                                    {type.label}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">{type.description}</p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <input type="hidden" name="type" value={data.type} />
-                            {errors.type && <div className="mt-2 text-sm text-status-critical">{errors.type}</div>}
-                        </CardContent>
-                    </Card>
-
-                    {/* Basic Information */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Basic Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="name">Site Name *</Label>
-                                <Input
-                                    id="name"
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    className="mt-1"
-                                />
-                                {errors.name && <div className="mt-1 text-sm text-status-critical">{errors.name}</div>}
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="phone">Primary Phone</Label>
-                                    <Input
-                                        id="phone"
-                                        value={data.phone}
-                                        onChange={(e) => setData('phone', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={data.email}
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="primary_contact_user_id">Site Lead / Manager</Label>
-                                <Select
-                                    value={data.primary_contact_user_id || undefined}
-                                    onValueChange={(v) => setData('primary_contact_user_id', v)}
-                                >
-                                    <SelectTrigger className="mt-1">
-                                        <SelectValue placeholder="Select manager..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {users.map((u) => (
-                                            <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="manager_name">Manager Name</Label>
-                                    <Input
-                                        id="manager_name"
-                                        value={data.manager_name}
-                                        onChange={(e) => setData('manager_name', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="manager_phone">Manager Phone</Label>
-                                    <Input
-                                        id="manager_phone"
-                                        value={data.manager_phone}
-                                        onChange={(e) => setData('manager_phone', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="after_hours_phone">After-hours Phone</Label>
-                                <Input
-                                    id="after_hours_phone"
-                                    value={data.after_hours_phone}
-                                    onChange={(e) => setData('after_hours_phone', e.target.value)}
-                                    className="mt-1"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Address */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MapPin className="w-5 h-5" />
-                                Address & Location
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="address_line_1">Address Line 1</Label>
-                                    <Input
-                                        id="address_line_1"
-                                        value={data.address_line_1}
-                                        onChange={(e) => setData('address_line_1', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="address_line_2">Address Line 2</Label>
-                                    <Input
-                                        id="address_line_2"
-                                        value={data.address_line_2}
-                                        onChange={(e) => setData('address_line_2', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div>
-                                    <Label htmlFor="suburb">Suburb</Label>
-                                    <Input
-                                        id="suburb"
-                                        value={data.suburb}
-                                        onChange={(e) => setData('suburb', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="city">City</Label>
-                                    <Input
-                                        id="city"
-                                        value={data.city}
-                                        onChange={(e) => setData('city', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="postcode">Postcode</Label>
-                                    <Input
-                                        id="postcode"
-                                        value={data.postcode}
-                                        onChange={(e) => setData('postcode', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="country">Country</Label>
-                                    <Input
-                                        id="country"
-                                        value={data.country}
-                                        onChange={(e) => setData('country', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="region">Region</Label>
-                                    <Input
-                                        id="region"
-                                        value={data.region}
-                                        onChange={(e) => setData('region', e.target.value)}
-                                        className="mt-1"
-                                        placeholder="e.g., North Island, Auckland"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="latitude">Latitude (GPS)</Label>
-                                    <Input
-                                        id="latitude"
-                                        type="number"
-                                        step="any"
-                                        value={data.latitude}
-                                        onChange={(e) => setData('latitude', e.target.value)}
-                                        className="mt-1"
-                                        placeholder="-36.8485"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="longitude">Longitude (GPS)</Label>
-                                    <Input
-                                        id="longitude"
-                                        type="number"
-                                        step="any"
-                                        value={data.longitude}
-                                        onChange={(e) => setData('longitude', e.target.value)}
-                                        className="mt-1"
-                                        placeholder="174.7633"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="access_instructions">Access Instructions</Label>
-                                <Textarea
-                                    id="access_instructions"
-                                    value={data.access_instructions}
-                                    onChange={(e) => setData('access_instructions', e.target.value)}
-                                    className="mt-1"
-                                    rows={3}
-                                    placeholder="Gate codes, key locations, parking instructions..."
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    This information is permission-protected
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Risk Flags */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-status-warning">
-                                <AlertTriangle className="w-5 h-5" />
-                                Risk Assessment
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-wrap gap-4">
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="is_high_risk"
-                                        checked={data.is_high_risk}
-                                        onCheckedChange={(checked) => setData('is_high_risk', checked as boolean)}
-                                    />
-                                    <Label htmlFor="is_high_risk" className="font-normal cursor-pointer">
-                                        High Risk Site
-                                    </Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="is_high_needs"
-                                        checked={data.is_high_needs}
-                                        onCheckedChange={(checked) => setData('is_high_needs', checked as boolean)}
-                                    />
-                                    <Label htmlFor="is_high_needs" className="font-normal cursor-pointer">
-                                        High Needs Site
-                                    </Label>
-                                </div>
-                            </div>
-
-                            {(data.is_high_risk || data.is_high_needs) && (
-                                <>
-                                    <div>
-                                        <Label htmlFor="risk_notes">Risk Notes / Reason</Label>
-                                        <Textarea
-                                            id="risk_notes"
-                                            value={data.risk_notes}
-                                            onChange={(e) => setData('risk_notes', e.target.value)}
-                                            className="mt-1"
-                                            rows={3}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="risk_review_date">Risk Review Date</Label>
-                                        <Input
-                                            id="risk_review_date"
-                                            type="date"
-                                            value={data.risk_review_date}
-                                            onChange={(e) => setData('risk_review_date', e.target.value)}
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Safety & Operations */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Safety & Operations</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="emergency_plan_location">Emergency Plan Location</Label>
-                                <Input
-                                    id="emergency_plan_location"
-                                    value={data.emergency_plan_location}
-                                    onChange={(e) => setData('emergency_plan_location', e.target.value)}
-                                    className="mt-1"
-                                    placeholder="e.g., Kitchen drawer, Office filing cabinet"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="medication_storage_location">Medication Storage Location</Label>
-                                <Input
-                                    id="medication_storage_location"
-                                    value={data.medication_storage_location}
-                                    onChange={(e) => setData('medication_storage_location', e.target.value)}
-                                    className="mt-1"
-                                    placeholder="e.g., Locked cabinet in office"
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="notes">General Notes</Label>
-                                <Textarea
-                                    id="notes"
-                                    value={data.notes}
-                                    onChange={(e) => setData('notes', e.target.value)}
-                                    className="mt-1"
-                                    rows={4}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Status */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Status</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="is_active"
-                                    checked={data.is_active}
-                                    onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                />
-                                <Label htmlFor="is_active" className="font-normal cursor-pointer">
-                                    Site is active and operational
-                                </Label>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <div className="flex items-center gap-4">
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Creating...' : `Create ${siteSingular}`}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => window.history.back()}>
-                            Cancel
-                        </Button>
+            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-8 lg:max-w-5xl">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Add a {siteSingular.toLowerCase()}
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Eight quick steps. You can update anything later.
+                        </p>
                     </div>
-                </form>
+                    <Link
+                        href="/sites"
+                        aria-label="Cancel and return to sites list"
+                        className="frontline-focus inline-flex min-h-10 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+                    >
+                        Cancel
+                    </Link>
+                </div>
+
+                <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+                    <div className="min-w-0 space-y-6 lg:space-y-8">
+                        <WizardStepper steps={STEPS} current={step} />
+
+                        <Card className="p-4 sm:p-6 lg:p-8">
+                            {step === 0 && (
+                                <StepBasics
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                    users={users}
+                                />
+                            )}
+                            {step === 1 && (
+                                <StepAddress
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                />
+                            )}
+                            {step === 2 && (
+                                <StepRoomsOrResources
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                />
+                            )}
+                            {step === 3 && (
+                                <StepContacts
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                    onAdd={addContact}
+                                    onUpdate={updateContact}
+                                    onRemove={removeContact}
+                                    onSetPrimary={setPrimaryContact}
+                                />
+                            )}
+                            {step === 4 && (
+                                <StepAssets
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                    availableAssets={availableAssets}
+                                />
+                            )}
+                            {step === 5 && (
+                                <StepDocuments
+                                    pending={pendingDocs}
+                                    onAddPending={(d) =>
+                                        setPendingDocs([...pendingDocs, d])
+                                    }
+                                    onRemovePending={(i) =>
+                                        setPendingDocs(
+                                            pendingDocs.filter(
+                                                (_, j) => j !== i,
+                                            ),
+                                        )
+                                    }
+                                />
+                            )}
+                            {step === 6 && (
+                                <StepChecklists
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                    templates={checklistTemplates}
+                                    users={users}
+                                />
+                            )}
+                            {step === 7 && (
+                                <StepSafety
+                                    data={data}
+                                    setData={setData}
+                                    errors={errors}
+                                />
+                            )}
+                        </Card>
+
+                        <div className="flex items-center gap-2">
+                            {step > 0 && (
+                                <Button
+                                    variant="outline"
+                                    size="lg"
+                                    onClick={goBack}
+                                    disabled={processing}
+                                    className="flex-1 lg:flex-none"
+                                >
+                                    <ArrowLeft className="mr-1.5 h-4 w-4" />
+                                    Back
+                                </Button>
+                            )}
+                            {step < STEPS.length - 1 ? (
+                                <Button
+                                    size="lg"
+                                    onClick={goNext}
+                                    className="flex-1 lg:min-w-[180px] lg:flex-none"
+                                >
+                                    Next
+                                    <ArrowRight className="ml-1.5 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="lg"
+                                    onClick={submit}
+                                    disabled={processing}
+                                    className="flex-1 lg:min-w-[180px] lg:flex-none"
+                                >
+                                    {processing ? (
+                                        <>
+                                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            Creating…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check className="mr-1.5 h-4 w-4" />
+                                            Create {siteSingular.toLowerCase()}
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    <aside aria-label="Site summary" className="hidden lg:block">
+                        <Card className="sticky top-4 space-y-6 p-5">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                    Step {step + 1} of {STEPS.length}
+                                </p>
+                                <h2 className="text-base font-semibold">
+                                    {siteSingular} summary
+                                </h2>
+                            </div>
+
+                            <dl className="space-y-4 text-sm">
+                                <SummaryRow label="Type">
+                                    <span className="flex items-center gap-2 font-medium">
+                                        <selectedType.icon className="h-4 w-4 text-primary" />
+                                        {selectedType.label}
+                                    </span>
+                                </SummaryRow>
+                                <SummaryRow label="Name">
+                                    {data.name || (
+                                        <Empty>Not set</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Address">
+                                    {summaryAddress ?? <Empty>Not set</Empty>}
+                                </SummaryRow>
+                                <SummaryRow
+                                    label={typeAreaLabel(data.type) ?? 'Areas'}
+                                >
+                                    {typeAreaCount(data) > 0 ? (
+                                        `${typeAreaCount(data)} ${typeAreaNoun(data.type, typeAreaCount(data))}`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Contacts">
+                                    {data.contacts.length > 0 ? (
+                                        `${data.contacts.length} contact${data.contacts.length === 1 ? '' : 's'}`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Assets">
+                                    {data.assets.length > 0 ? (
+                                        `${data.assets.length} selected`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Documents">
+                                    {pendingDocs.length > 0 ? (
+                                        `${pendingDocs.length} pending upload`
+                                    ) : (
+                                        <Empty>None staged</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Checklists">
+                                    {data.checklists.filter((c) => c.enabled)
+                                        .length > 0 ? (
+                                        `${data.checklists.filter((c) => c.enabled).length} scheduled`
+                                    ) : (
+                                        <Empty>None</Empty>
+                                    )}
+                                </SummaryRow>
+                                <SummaryRow label="Risk level">
+                                    {data.is_high_risk ||
+                                    data.is_high_needs ? (
+                                        <RiskPill warning>
+                                            {data.is_high_risk &&
+                                            data.is_high_needs
+                                                ? 'High risk + needs'
+                                                : data.is_high_risk
+                                                  ? 'High risk'
+                                                  : 'High needs'}
+                                        </RiskPill>
+                                    ) : (
+                                        <RiskPill>Standard</RiskPill>
+                                    )}
+                                </SummaryRow>
+                            </dl>
+
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold">
+                                    What happens next
+                                </h3>
+                                <ol className="space-y-2">
+                                    {WORKFLOW_HELP.map((item, index) => (
+                                        <li
+                                            key={item}
+                                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                                        >
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold text-foreground">
+                                                {index + 1}
+                                            </span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        </Card>
+                    </aside>
+                </div>
             </div>
         </AppLayout>
+    );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function buildFormData(
+    data: WizardData,
+    pendingDocs: DocumentDraft[],
+): FormData {
+    const fd = new FormData();
+
+    const scalar = (key: string, value: string | number | boolean | null) => {
+        if (value === null || value === undefined || value === '') return;
+        fd.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
+    };
+
+    scalar('name', data.name);
+    scalar('type', data.type);
+    scalar('phone', data.phone);
+    scalar('email', data.email);
+    scalar('manager_name', data.manager_name);
+    scalar('manager_phone', data.manager_phone);
+    scalar('after_hours_phone', data.after_hours_phone);
+    scalar('emergency_plan_location', data.emergency_plan_location);
+    scalar('medication_storage_location', data.medication_storage_location);
+    scalar('notes', data.notes);
+    scalar('address_line_1', data.address_line_1);
+    scalar('address_line_2', data.address_line_2);
+    scalar('suburb', data.suburb);
+    scalar('city', data.city);
+    scalar('postcode', data.postcode);
+    scalar('country', data.country);
+    scalar('region', data.region);
+    if (data.latitude) scalar('latitude', Number(data.latitude));
+    if (data.longitude) scalar('longitude', Number(data.longitude));
+    scalar('access_instructions', data.access_instructions);
+    fd.append('is_active', data.is_active ? '1' : '0');
+    fd.append('is_high_risk', data.is_high_risk ? '1' : '0');
+    fd.append('is_high_needs', data.is_high_needs ? '1' : '0');
+    scalar('risk_notes', data.risk_notes);
+    scalar('risk_review_date', data.risk_review_date);
+    scalar('primary_contact_user_id', data.primary_contact_user_id);
+
+    data.contacts.forEach((c, i) => {
+        if (c.id) fd.append(`contacts[${i}][id]`, String(c.id));
+        fd.append(`contacts[${i}][type]`, c.type || 'general');
+        fd.append(`contacts[${i}][name]`, c.name);
+        if (c.role) fd.append(`contacts[${i}][role]`, c.role);
+        if (c.phone) fd.append(`contacts[${i}][phone]`, c.phone);
+        if (c.email) fd.append(`contacts[${i}][email]`, c.email);
+        fd.append(`contacts[${i}][is_primary]`, c.is_primary ? '1' : '0');
+        if (c.notes) fd.append(`contacts[${i}][notes]`, c.notes);
+    });
+
+    data.rooms.forEach((r, i) => {
+        if (r.id) fd.append(`rooms[${i}][id]`, String(r.id));
+        fd.append(`rooms[${i}][name]`, r.name);
+        if (r.notes) fd.append(`rooms[${i}][notes]`, r.notes);
+    });
+
+    data.resources.forEach((r, i) => {
+        if (r.id) fd.append(`resources[${i}][id]`, String(r.id));
+        fd.append(`resources[${i}][name]`, r.name);
+        if (r.resource_type)
+            fd.append(`resources[${i}][resource_type]`, r.resource_type);
+        if (r.capacity) fd.append(`resources[${i}][capacity]`, r.capacity);
+    });
+
+    data.zones.forEach((z, i) => {
+        if (z.id) fd.append(`zones[${i}][id]`, String(z.id));
+        fd.append(`zones[${i}][name]`, z.name);
+        if (z.zone_type) fd.append(`zones[${i}][zone_type]`, z.zone_type);
+    });
+
+    data.assets.forEach((id, i) => {
+        fd.append(`assets[${i}]`, String(id));
+    });
+
+    data.checklists
+        .filter((c) => c.enabled)
+        .forEach((c, i) => {
+            fd.append(`checklists[${i}][template_id]`, String(c.template_id));
+            fd.append(`checklists[${i}][enabled]`, '1');
+            fd.append(`checklists[${i}][frequency]`, c.frequency);
+            if (c.assigned_to_user_id)
+                fd.append(
+                    `checklists[${i}][assigned_to_user_id]`,
+                    c.assigned_to_user_id,
+                );
+        });
+
+    pendingDocs.forEach((d, i) => {
+        fd.append(`documents[${i}][file]`, d.file);
+        if (d.title) fd.append(`documents[${i}][title]`, d.title);
+        if (d.category) fd.append(`documents[${i}][category]`, d.category);
+        if (d.expiry_date)
+            fd.append(`documents[${i}][expiry_date]`, d.expiry_date);
+        if (d.notes) fd.append(`documents[${i}][notes]`, d.notes);
+    });
+
+    return fd;
+}
+
+function jumpToFirstError(
+    errs: Record<string, string>,
+    setStep: (n: number) => void,
+) {
+    const keys = Object.keys(errs);
+    if (keys.length === 0) return;
+    const k = keys[0];
+    const map: Record<string, number> = {
+        name: 0,
+        type: 0,
+        primary_contact_user_id: 0,
+        is_active: 0,
+        address_line_1: 1,
+        address_line_2: 1,
+        suburb: 1,
+        city: 1,
+        postcode: 1,
+        country: 1,
+        region: 1,
+        latitude: 1,
+        longitude: 1,
+        access_instructions: 1,
+        rooms: 2,
+        resources: 2,
+        zones: 2,
+        phone: 3,
+        email: 3,
+        manager_name: 3,
+        manager_phone: 3,
+        after_hours_phone: 3,
+        contacts: 3,
+        assets: 4,
+        checklists: 6,
+        emergency_plan_location: 7,
+        medication_storage_location: 7,
+        is_high_risk: 7,
+        is_high_needs: 7,
+        risk_notes: 7,
+        risk_review_date: 7,
+        notes: 7,
+    };
+    const root = k.split('.')[0];
+    if (map[root] !== undefined) setStep(map[root]);
+}
+
+function typeAreaLabel(type: SiteType): string | null {
+    if (type === 'house') return 'Rooms';
+    if (type === 'head_office') return 'Resources';
+    if (type === 'facility') return 'Zones';
+    return null;
+}
+
+function typeAreaCount(data: WizardData): number {
+    if (data.type === 'house') return data.rooms.length;
+    if (data.type === 'head_office') return data.resources.length;
+    if (data.type === 'facility') return data.zones.length;
+    return 0;
+}
+
+function typeAreaNoun(type: SiteType, count: number): string {
+    const singular =
+        type === 'house'
+            ? 'room'
+            : type === 'head_office'
+              ? 'resource'
+              : 'zone';
+    return count === 1 ? singular : `${singular}s`;
+}
+
+function SummaryRow({
+    label,
+    children,
+}: {
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div>
+            <dt className="text-xs font-medium text-muted-foreground">
+                {label}
+            </dt>
+            <dd className="mt-1 font-medium">{children}</dd>
+        </div>
+    );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+    return (
+        <span className="font-normal text-muted-foreground italic">
+            {children}
+        </span>
+    );
+}
+
+function RiskPill({
+    warning = false,
+    children,
+}: {
+    warning?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <span
+            className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold text-foreground ${
+                warning
+                    ? 'border-status-warning/40 bg-status-warning-bg'
+                    : 'border-status-success/40 bg-status-success-bg'
+            }`}
+        >
+            <span
+                aria-hidden
+                className={`h-2 w-2 rounded-full ${
+                    warning ? 'bg-status-warning' : 'bg-status-success'
+                }`}
+            />
+            {children}
+        </span>
     );
 }

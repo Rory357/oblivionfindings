@@ -8,7 +8,9 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistTemplate;
+use App\Models\SiteChecklistTemplateItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SiteChecklistController extends Controller
 {
@@ -119,19 +121,20 @@ class SiteChecklistController extends Controller
 
         $run->update([
             'status' => 'in_progress',
-            'started_at' => now(),
+            'started_at' => $run->started_at ?? now(),
         ]);
 
-        return redirect()->back();
+        return redirect()->route('sites.checklists.showRun', $run->id);
     }
 
     public function saveResponse(Request $request, SiteChecklistRun $run)
     {
+        @set_time_limit(120);
         $this->authorize('update', $run->site);
 
-        $batchValidated = $request->validate([
+        $validated = $request->validate([
             'responses' => 'required|array|min:1',
-            'responses.*.template_item_id' => 'required|exists:site_checklist_template_items,id',
+            'responses.*.template_item_id' => 'required|integer',
             'responses.*.response_value' => 'nullable|string',
             'responses.*.notes' => 'nullable|string',
             'responses.*.photo_path' => 'nullable|string',
@@ -141,22 +144,7 @@ class SiteChecklistController extends Controller
             'signature_name' => 'nullable|string',
         ]);
 
-        foreach ($batchValidated['responses'] as $response) {
-            SiteChecklistResponse::updateOrCreate(
-                [
-                    'run_id' => $run->id,
-                    'template_item_id' => $response['template_item_id'],
-                ],
-                [
-                    'response_value' => $response['response_value'] ?? null,
-                    'notes' => $response['notes'] ?? null,
-                    'photo_path' => $response['photo_path'] ?? null,
-                    'is_failed' => $response['is_failed'] ?? false,
-                ]
-            );
-        }
-
-        // Recalculate completion
+        $this->bulkUpsertResponses($run, $validated['responses']);
         $run->calculateCompletion();
 
         return redirect()->back();
@@ -164,59 +152,92 @@ class SiteChecklistController extends Controller
 
     public function completeRun(Request $request, SiteChecklistRun $run)
     {
+        @set_time_limit(120);
         $this->authorize('update', $run->site);
+
+        // If already completed, short-circuit so duplicate submits (page reloads,
+        // double-clicks, retries after a previous timeout) don't redo all the work.
+        if ($run->status === 'completed') {
+            return redirect()
+                ->route('sites.checklists.index', $run->site_id)
+                ->with('success', 'Checklist already completed.');
+        }
 
         $validated = $request->validate([
             'responses' => 'required|array|min:1',
-            'responses.*.template_item_id' => 'required|exists:site_checklist_template_items,id',
+            'responses.*.template_item_id' => 'required|integer',
             'responses.*.response_value' => 'nullable|string',
             'responses.*.notes' => 'nullable|string',
             'responses.*.photo_path' => 'nullable|string',
             'responses.*.is_failed' => 'boolean',
             'responses.*.create_hazard' => 'boolean',
             'overall_notes' => 'nullable|string',
-            'signature_name' => 'nullable|string|required',
+            'signature_name' => 'required|string',
         ]);
 
-        // Save all responses first
-        foreach ($validated['responses'] as $response) {
-            SiteChecklistResponse::updateOrCreate(
-                [
-                    'run_id' => $run->id,
-                    'template_item_id' => $response['template_item_id'],
-                ],
-                [
-                    'response_value' => $response['response_value'] ?? null,
-                    'notes' => $response['notes'] ?? null,
-                    'photo_path' => $response['photo_path'] ?? null,
-                    'is_failed' => $response['is_failed'] ?? false,
-                ]
-            );
+        DB::transaction(function () use ($run, $validated, $request) {
+            $this->bulkUpsertResponses($run, $validated['responses']);
 
-            // Create hazards for failed items if requested
-            if ($response['is_failed'] && $response['create_hazard'] ?? false) {
-                $templateItem = SiteChecklistTemplate::find($response['template_item_id']);
-                if ($templateItem) {
-                    // Create a hazard record for this failure
-                    // You may need to adjust this based on your Hazard model structure
-                    // This is a placeholder for the hazard creation logic
-                }
-            }
-        }
+            $run->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'completed_by_user_id' => $request->user()->id,
+                'overall_notes' => $validated['overall_notes'] ?? null,
+            ]);
 
-        $run->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'completed_by_user_id' => $request->user()->id,
-            'overall_notes' => $validated['overall_notes'] ?? null,
-        ]);
-
-        // Recalculate final stats
-        $run->calculateCompletion();
+            $run->calculateCompletion();
+        });
 
         return redirect()
             ->route('sites.checklists.index', $run->site_id)
             ->with('success', 'Checklist completed.');
+    }
+
+    /**
+     * Bulk-upsert responses keyed by (run_id, template_item_id).
+     * Single SQL statement instead of N updateOrCreate calls.
+     * Filters out any template_item_ids that don't belong to this run's template.
+     */
+    private function bulkUpsertResponses(SiteChecklistRun $run, array $responses): void
+    {
+        if (empty($responses)) {
+            return;
+        }
+
+        $validItemIds = SiteChecklistTemplateItem::where('template_id', $run->template_id)
+            ->pluck('id')
+            ->all();
+        $validIdSet = array_flip($validItemIds);
+
+        $now = now();
+        $rows = [];
+        foreach ($responses as $r) {
+            $itemId = (int) ($r['template_item_id'] ?? 0);
+            if (!isset($validIdSet[$itemId])) {
+                continue;
+            }
+            $rows[] = [
+                'run_id' => $run->id,
+                'tenant_id' => $run->tenant_id,
+                'template_item_id' => $itemId,
+                'response_value' => $r['response_value'] ?? null,
+                'notes' => $r['notes'] ?? null,
+                'photo_path' => $r['photo_path'] ?? null,
+                'is_failed' => (bool) ($r['is_failed'] ?? false),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (empty($rows)) {
+            return;
+        }
+
+        SiteChecklistResponse::upsert(
+            $rows,
+            ['run_id', 'template_item_id'],
+            ['response_value', 'notes', 'photo_path', 'is_failed', 'updated_at'],
+        );
     }
 
     public function assignChecklist(Request $request, Site $site)
@@ -269,6 +290,27 @@ class SiteChecklistController extends Controller
     {
         $this->authorize('update', $site);
         abort_unless($assignment->site_id === $site->id, 404);
+
+        // Reuse an existing open run for this assignment instead of creating duplicates.
+        // Prefer in_progress, then today's scheduled run, then any other scheduled run.
+        $existing = SiteChecklistRun::where('assignment_id', $assignment->id)
+            ->whereIn('status', ['in_progress', 'scheduled'])
+            ->orderByRaw("FIELD(status, 'in_progress', 'scheduled')")
+            ->orderByDesc('scheduled_date')
+            ->first();
+
+        if ($existing) {
+            if ($existing->status === 'scheduled') {
+                $existing->update([
+                    'status' => 'in_progress',
+                    'started_at' => $existing->started_at ?? now(),
+                ]);
+            }
+
+            return redirect()
+                ->route('sites.checklists.showRun', $existing->id)
+                ->with('success', 'Resumed in-progress checklist run.');
+        }
 
         $run = SiteChecklistRun::create([
             'assignment_id' => $assignment->id,

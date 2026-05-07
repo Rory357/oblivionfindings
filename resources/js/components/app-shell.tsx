@@ -1,5 +1,4 @@
 import { SidebarProvider } from '@/components/ui/sidebar';
-import FlashToaster from '@/components/flash-toaster';
 import { SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
 
@@ -14,7 +13,6 @@ export function AppShell({ children, variant = 'header' }: AppShellProps) {
     if (variant === 'header') {
         return (
             <div className="flex min-h-screen w-full flex-col">
-                <FlashToaster />
                 {children}
             </div>
         );
@@ -22,7 +20,6 @@ export function AppShell({ children, variant = 'header' }: AppShellProps) {
 
     return (
         <SidebarProvider defaultOpen={isOpen}>
-            <FlashToaster />
             {children}
         </SidebarProvider>
     );

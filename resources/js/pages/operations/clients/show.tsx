@@ -1045,7 +1045,7 @@ export default function ClientShow({
 
                 <ClientSafetyRibbon safety={safety} className="mt-4" />
 
-                <div className="-mx-4 mt-4 overflow-x-auto border-b px-4">
+                <div className="scrollbar-pretty -mx-4 mt-4 overflow-x-auto border-b px-4">
                     <div className="flex w-max items-center gap-1 pb-0">
                         {tabs
                             .filter((t) => t.show)

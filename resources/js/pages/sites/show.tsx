@@ -1,6 +1,5 @@
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,11 +39,8 @@ import {
     Building2,
     Calendar,
     Car,
-    CheckCircle2,
-    ChevronDown,
-    ChevronUp,
-    Circle,
     ClipboardCheck,
+    Clock,
     Cpu,
     DollarSign,
     DoorOpen,
@@ -54,18 +50,24 @@ import {
     Home,
     Layers,
     LayoutGrid,
+    Mail,
     MapPin,
+    Navigation,
     Package,
+    Phone,
+    Pill,
     Plus,
     Route,
     Shield,
     ShieldAlert,
     Star,
+    StickyNote,
     Truck,
+    User,
     Users,
     Warehouse,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentType } from 'react';
 
 type Site = {
     id: number;
@@ -91,11 +93,6 @@ type Site = {
     risk_notes?: string | null;
     risk_review_date?: string | null;
     primary_contact?: { id: number; name: string } | null;
-    onboarding_completed_at?: string | null;
-    onboarding_progress?: Record<
-        string,
-        { completed?: boolean; data?: any; completed_at?: string }
-    >;
     service_contexts?: Array<{
         id: number;
         name: string;
@@ -199,6 +196,48 @@ type CoverageRequirement = {
     service_context?: { id: number; name: string; type?: string | null } | null;
 };
 
+type ChecklistsSummary = {
+    stats: {
+        active_assignments: number;
+        scheduled: number;
+        in_progress: number;
+        overdue: number;
+        completed_30d: number;
+    };
+    assignments: Array<{
+        id: number;
+        frequency: string;
+        start_date: string | null;
+        template: {
+            id: number;
+            name: string;
+            description?: string | null;
+            frequency?: string | null;
+        } | null;
+        assigned_to: { id: number; name: string } | null;
+    }>;
+    recentRuns: Array<{
+        id: number;
+        status: 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'skipped';
+        scheduled_date: string | null;
+        completed_at: string | null;
+        completion_percentage: number;
+        items_passed: number;
+        items_failed: number;
+        is_overdue: boolean;
+        template: { id: number; name: string } | null;
+        completed_by: { id: number; name: string } | null;
+    }>;
+    availableTemplates: Array<{
+        id: number;
+        name: string;
+        description?: string | null;
+        frequency: string;
+        items_count: number;
+    }>;
+    can: { view: boolean; schedule: boolean; run: boolean };
+};
+
 type SiteFleetData = {
     vehicles: Array<{
         id: number;
@@ -283,6 +322,7 @@ type Props = {
     can_edit: boolean;
     can?: { createAsset?: boolean };
     fleet?: SiteFleetData;
+    checklistsSummary?: ChecklistsSummary;
 };
 
 const typeIcons = {
@@ -306,6 +346,466 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
+function ContactRow({
+    icon: Icon,
+    label,
+    value,
+    href,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    value?: string | null;
+    href?: string;
+}) {
+    const content = (
+        <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Icon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </div>
+                <div className="truncate text-sm font-medium">
+                    {value || (
+                        <span className="font-normal text-muted-foreground italic">
+                            Not specified
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+    return value && href ? (
+        <a href={href} className="block text-foreground hover:text-primary">
+            {content}
+        </a>
+    ) : (
+        content
+    );
+}
+
+function SiteChecklistsTab({
+    siteId,
+    summary,
+}: {
+    siteId: number;
+    summary?: ChecklistsSummary;
+}) {
+    const [assignOpen, setAssignOpen] = useState(false);
+    const form = useForm({ template_id: '', frequency: 'monthly' });
+
+    if (!summary) {
+        return (
+            <Card>
+                <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                    Loading…
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const { stats, assignments, recentRuns, availableTemplates, can } = summary;
+    const assignedIds = new Set(
+        assignments.map((a) => a.template?.id).filter(Boolean) as number[],
+    );
+    const unassignedTemplates = availableTemplates.filter(
+        (t) => !assignedIds.has(t.id),
+    );
+
+    const frequencyLabels: Record<string, string> = {
+        once: 'One-time',
+        daily: 'Daily',
+        weekly: 'Weekly',
+        fortnightly: 'Fortnightly',
+        monthly: 'Monthly',
+        quarterly: 'Quarterly',
+    };
+
+    const handleAssign = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(`/sites/${siteId}/checklists/assign`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAssignOpen(false);
+                form.reset();
+            },
+        });
+    };
+
+    const startRun = (assignmentId: number) => {
+        router.post(
+            `/sites/${siteId}/checklists/assignments/${assignmentId}/run`,
+            {},
+            { preserveScroll: true },
+        );
+    };
+
+    const formatDate = (v: string | null) =>
+        v
+            ? new Date(v).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+              })
+            : '—';
+
+    return (
+        <div className="space-y-4">
+            {/* Stat strip */}
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
+                {[
+                    {
+                        label: 'Active',
+                        value: stats.active_assignments,
+                        tone: 'text-foreground',
+                    },
+                    {
+                        label: 'Scheduled',
+                        value: stats.scheduled,
+                        tone: 'text-foreground',
+                    },
+                    {
+                        label: 'In Progress',
+                        value: stats.in_progress,
+                        tone: 'text-amber-600 dark:text-amber-400',
+                    },
+                    {
+                        label: 'Overdue',
+                        value: stats.overdue,
+                        tone:
+                            stats.overdue > 0
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-foreground',
+                    },
+                    {
+                        label: 'Completed (30d)',
+                        value: stats.completed_30d,
+                        tone: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                ].map((s) => (
+                    <Card key={s.label}>
+                        <CardContent className="p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {s.label}
+                            </p>
+                            <p
+                                className={`mt-1 text-2xl font-semibold tabular-nums ${s.tone}`}
+                            >
+                                {s.value}
+                            </p>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Assignments */}
+            <Card>
+                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+                    <div>
+                        <CardTitle className="text-base">
+                            Assigned checklists
+                        </CardTitle>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Templates active for this site
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={`/sites/${siteId}/checklists/runs`}>
+                                View runs
+                            </Link>
+                        </Button>
+                        {can.schedule && (
+                            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+                                <DialogTrigger asChild>
+                                    <Button size="sm">
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Assign template
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Assign checklist template
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <form
+                                        onSubmit={handleAssign}
+                                        className="space-y-4"
+                                    >
+                                        <div>
+                                            <Label>Template</Label>
+                                            {unassignedTemplates.length === 0 ? (
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    All applicable templates are
+                                                    already assigned.{' '}
+                                                    <Link
+                                                        href="/sites/checklists/templates/create"
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        Create a new template
+                                                    </Link>
+                                                </p>
+                                            ) : (
+                                                <Select
+                                                    value={
+                                                        form.data.template_id ||
+                                                        undefined
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'template_id',
+                                                            v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger className="mt-1">
+                                                        <SelectValue placeholder="Choose template…" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {unassignedTemplates.map(
+                                                            (t) => (
+                                                                <SelectItem
+                                                                    key={t.id}
+                                                                    value={String(
+                                                                        t.id,
+                                                                    )}
+                                                                >
+                                                                    {t.name} (
+                                                                    {t.items_count}{' '}
+                                                                    items)
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <Label>Frequency</Label>
+                                            <Select
+                                                value={form.data.frequency}
+                                                onValueChange={(v) =>
+                                                    form.setData('frequency', v)
+                                                }
+                                            >
+                                                <SelectTrigger className="mt-1">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="once">
+                                                        One-time
+                                                    </SelectItem>
+                                                    <SelectItem value="daily">
+                                                        Daily
+                                                    </SelectItem>
+                                                    <SelectItem value="weekly">
+                                                        Weekly
+                                                    </SelectItem>
+                                                    <SelectItem value="fortnightly">
+                                                        Fortnightly
+                                                    </SelectItem>
+                                                    <SelectItem value="monthly">
+                                                        Monthly
+                                                    </SelectItem>
+                                                    <SelectItem value="quarterly">
+                                                        Quarterly
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="flex justify-end gap-2 pt-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setAssignOpen(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    form.processing ||
+                                                    !form.data.template_id
+                                                }
+                                            >
+                                                Assign
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {assignments.length === 0 ? (
+                        <div className="rounded-lg border border-dashed py-8 text-center">
+                            <ClipboardCheck className="mx-auto mb-2 h-10 w-10 text-muted-foreground/50" />
+                            <p className="text-sm font-medium">
+                                No checklists assigned yet
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {availableTemplates.length === 0
+                                    ? 'No templates are available for this site type.'
+                                    : 'Assign a template to start tracking checklists.'}
+                            </p>
+                            {can.schedule && availableTemplates.length > 0 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-4"
+                                    onClick={() => setAssignOpen(true)}
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Assign template
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="divide-y rounded-lg border">
+                            {assignments.map((a) => (
+                                <div
+                                    key={a.id}
+                                    className="flex items-center justify-between gap-3 px-4 py-3"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <p className="truncate text-sm font-medium">
+                                                {a.template?.name ?? 'Untitled'}
+                                            </p>
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[10px]"
+                                            >
+                                                {frequencyLabels[a.frequency] ??
+                                                    a.frequency}
+                                            </Badge>
+                                        </div>
+                                        {a.template?.description && (
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                                {a.template.description}
+                                            </p>
+                                        )}
+                                        {a.assigned_to && (
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                Assigned to {a.assigned_to.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                    {can.run && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => startRun(a.id)}
+                                        >
+                                            Start run
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Recent runs */}
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Recent runs</CardTitle>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        Latest scheduled and completed runs
+                    </p>
+                </CardHeader>
+                <CardContent>
+                    {recentRuns.length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                            No runs recorded yet.
+                        </p>
+                    ) : (
+                        <div className="divide-y rounded-lg border">
+                            {recentRuns.map((r) => {
+                                const failed = r.items_failed > 0;
+                                const isDone = r.status === 'completed';
+                                const tone = r.is_overdue
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : isDone && failed
+                                      ? 'text-amber-600 dark:text-amber-400'
+                                      : isDone
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-muted-foreground';
+                                const label = r.is_overdue
+                                    ? 'Overdue'
+                                    : isDone
+                                      ? 'Completed'
+                                      : r.status === 'in_progress'
+                                        ? 'In progress'
+                                        : 'Scheduled';
+                                return (
+                                    <Link
+                                        key={r.id}
+                                        href={`/sites/checklists/runs/${r.id}`}
+                                        className="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-accent/40"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium">
+                                                {r.template?.name ?? 'Untitled'}
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                {label} · {formatDate(
+                                                    isDone
+                                                        ? r.completed_at
+                                                        : r.scheduled_date,
+                                                )}
+                                                {r.completed_by && (
+                                                    <> · {r.completed_by.name}</>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {isDone && (
+                                                <span
+                                                    className={`text-xs tabular-nums ${tone}`}
+                                                >
+                                                    {r.items_passed}/
+                                                    {r.items_passed + r.items_failed}{' '}
+                                                    passed
+                                                </span>
+                                            )}
+                                            {!isDone && (
+                                                <span
+                                                    className={`text-xs tabular-nums ${tone}`}
+                                                >
+                                                    {Math.round(
+                                                        r.completion_percentage,
+                                                    )}
+                                                    %
+                                                </span>
+                                            )}
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <div className="flex justify-end gap-2">
+                <Button asChild variant="outline" size="sm">
+                    <Link href="/checklists">Open global dashboard</Link>
+                </Button>
+                <Button asChild size="sm">
+                    <Link href={`/sites/${siteId}/checklists`}>
+                        Open full checklists page
+                    </Link>
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export default function SiteShow({
     site,
     clients,
@@ -324,13 +824,9 @@ export default function SiteShow({
     can_edit,
     can: assetCan,
     fleet,
+    checklistsSummary,
 }: Props) {
     const TypeIcon = typeIcons[site.type];
-    const percent = Math.round(
-        (checklist.filter((c) => c.done).length /
-            Math.max(1, checklist.length)) *
-            100,
-    );
     const page = usePage<any>();
     const canGlobal = page.props?.auth?.can;
     const canSeeVendorsCredentials = !!(
@@ -348,13 +844,6 @@ export default function SiteShow({
         }
     };
 
-    // Checklist for onboarding
-    const isOnboardingComplete = !!site.onboarding_completed_at;
-
-    // Collapsible setup completeness — always default to collapsed so it stays
-    // unobtrusive; users can expand to see the checklist.
-    const [setupExpanded, setSetupExpanded] = useState(false);
-
     return (
         <AppLayout
             breadcrumbs={[
@@ -365,53 +854,73 @@ export default function SiteShow({
             <Head title={site.name} />
 
             <PageShell>
-                {/* Header with badges */}
-                <div className="flex flex-col gap-4">
-                    <PageHeader
-                        title={site.name}
-                        description={site.address || '—'}
-                        actions={
-                            <div className="flex items-center gap-2">
-                                <Badge
-                                    variant="outline"
-                                    className={typeColors[site.type]}
-                                >
+                {/* ── Hero Header ──────────────────────────────── */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+
+                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
+                        {/* Site icon */}
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
+                            <TypeIcon className="h-12 w-12 text-white md:h-14 md:w-14" />
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 text-center md:text-left">
+                            <h1 className="text-2xl font-bold md:text-3xl">
+                                {site.name}
+                            </h1>
+                            {site.address && (
+                                <p className="mt-0.5 flex items-center justify-center gap-1.5 text-sm text-white/60 md:justify-start">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    {site.address}
+                                </p>
+                            )}
+
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                                <Badge className="border-white/20 bg-white/10 text-white/90">
                                     <TypeIcon className="mr-1 h-3 w-3" />
                                     {site.display_type}
                                 </Badge>
                                 {site.is_high_risk && (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-status-warning/50 bg-status-warning-bg text-status-warning"
-                                    >
+                                    <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                         <AlertTriangle className="mr-1 h-3 w-3" />
                                         High Risk
                                     </Badge>
                                 )}
                                 {site.is_high_needs && (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-status-warning/50 bg-status-warning-bg text-status-warning"
-                                    >
+                                    <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                         <AlertCircle className="mr-1 h-3 w-3" />
                                         High Needs
                                     </Badge>
                                 )}
                                 <Badge
-                                    variant="outline"
                                     className={
                                         site.is_active
                                             ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                            : 'border-border/30 text-muted-foreground'
+                                            : 'border-white/20 bg-white/10 text-white/90'
                                     }
                                 >
                                     {site.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
+                                {site.region && (
+                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                        {site.region}
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right: Actions + KPIs */}
+                        <div className="flex flex-col items-center gap-3 md:items-end">
+                            <div className="flex flex-wrap gap-2">
                                 {can_edit && (
                                     <Button
                                         asChild
-                                        variant="secondary"
                                         size="sm"
+                                        variant="outline"
+                                        className="border-white/20 bg-white/10 text-white hover:bg-white/20"
                                     >
                                         <Link href={`/sites/${site.id}/edit`}>
                                             Edit
@@ -419,157 +928,100 @@ export default function SiteShow({
                                     </Button>
                                 )}
                             </div>
-                        }
-                    />
-                </div>
 
-                {/* Setup completeness — compact, unobtrusive strip.
-                    Hidden entirely once fully onboarded. */}
-                {!isOnboardingComplete && (
-                    <div className="rounded-lg border border-border bg-muted/60 dark:border-border dark:bg-muted/30">
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setSetupExpanded((v) => !v)}
-                            onKeyDown={(event) => {
-                                if (
-                                    event.key === 'Enter' ||
-                                    event.key === ' '
-                                ) {
-                                    event.preventDefault();
-                                    setSetupExpanded((v) => !v);
-                                }
-                            }}
-                            className="flex w-full items-center gap-3 px-3 py-2 text-left text-xs"
-                        >
-                            <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                        percent >= 70
-                                            ? 'bg-primary'
-                                            : percent >= 40
-                                              ? 'bg-status-warning'
-                                              : 'bg-muted'
-                                    }`}
-                                    style={{ width: `${percent}%` }}
-                                />
-                            </div>
-                            <span className="text-muted-foreground">
-                                Site setup
-                            </span>
-                            <span className="font-medium">
-                                {checklist.filter((c) => c.done).length}/
-                                {checklist.length} · {percent}%
-                            </span>
-                            <Link
-                                href={`/sites/${site.id}/onboarding`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="ml-auto text-primary hover:underline"
-                            >
-                                Continue →
-                            </Link>
-                            {setupExpanded ? (
-                                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-                            ) : (
-                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                        </div>
-                        {setupExpanded && (
-                            <div className="border-t border-border px-3 py-3 dark:border-border">
-                                <div className="grid gap-1.5 sm:grid-cols-2">
-                                    {checklist.map((item) => (
-                                        <div
-                                            key={item.key}
-                                            className={`flex items-center gap-2 text-xs ${
-                                                item.done
-                                                    ? 'text-status-success dark:text-status-success'
-                                                    : 'text-muted-foreground'
-                                            }`}
-                                        >
-                                            {item.done ? (
-                                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                            ) : (
-                                                <Circle className="h-3.5 w-3.5 shrink-0" />
-                                            )}
-                                            <span
-                                                className={
-                                                    item.done
-                                                        ? ''
-                                                        : 'opacity-80'
-                                                }
-                                            >
-                                                {item.label}
-                                            </span>
-                                        </div>
-                                    ))}
+                            {/* KPI Stats */}
+                            <div className="hidden gap-6 text-center md:flex">
+                                <div>
+                                    <p className="text-2xl font-bold">
+                                        {clients.length}
+                                    </p>
+                                    <p className="text-xs text-white/50">
+                                        Clients
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">
+                                        {assets.length}
+                                    </p>
+                                    <p className="text-xs text-white/50">
+                                        Assets
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">
+                                        {contacts.length}
+                                    </p>
+                                    <p className="text-xs text-white/50">
+                                        Contacts
+                                    </p>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
-                )}
+                </div>
 
                 {/* Main Tabs */}
                 <Tabs defaultValue="overview" className="space-y-4">
-                    <TabsList className="scrollbar-hide flex h-auto w-full justify-start gap-1 overflow-x-auto pb-1">
+                    <TabsList className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1">
                         <TabsTrigger
                             value="overview"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <LayoutGrid className="h-4 w-4" />
                             Overview
                         </TabsTrigger>
                         <TabsTrigger
                             value="clients"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <Users className="h-4 w-4" />
                             Clients ({clients.length})
                         </TabsTrigger>
                         <TabsTrigger
                             value="assets"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <Package className="h-4 w-4" />
                             Assets ({assets.length})
                         </TabsTrigger>
                         <TabsTrigger
                             value="contacts"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <FileText className="h-4 w-4" />
                             Contacts ({contacts.length})
                         </TabsTrigger>
                         <TabsTrigger
                             value="documents"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <FileText className="h-4 w-4" />
                             Documents ({documents.length})
                         </TabsTrigger>
                         <TabsTrigger
                             value="calendar"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <Calendar className="h-4 w-4" />
                             Calendar
                         </TabsTrigger>
                         <TabsTrigger
                             value="checklists"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <ClipboardCheck className="h-4 w-4" />
                             Checklists
                         </TabsTrigger>
                         <TabsTrigger
                             value="hazards"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <ShieldAlert className="h-4 w-4" />
                             Hazards
                         </TabsTrigger>
                         <TabsTrigger
                             value="fleet"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                             onClick={loadFleet}
                         >
                             <Car className="h-4 w-4" />
@@ -585,7 +1037,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="financials"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <DollarSign className="h-4 w-4" />
                             Financials
@@ -593,7 +1045,7 @@ export default function SiteShow({
                         {canSeeVendorsCredentials && (
                             <TabsTrigger
                                 value="vendors-credentials"
-                                className="flex items-center gap-1"
+                                className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                             >
                                 <Truck className="h-4 w-4" />
                                 Vendors & Credentials
@@ -601,7 +1053,7 @@ export default function SiteShow({
                         )}
                         <TabsTrigger
                             value="hardware"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <Cpu className="h-4 w-4" />
                             Hardware
@@ -616,7 +1068,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="type-specific"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             {site.type === 'house' && (
                                 <BedDouble className="h-4 w-4" />
@@ -635,7 +1087,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="staff-requirements"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <GraduationCap className="h-4 w-4" />
                             Staff Requirements
@@ -650,7 +1102,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="shift-coverage"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <Layers className="h-4 w-4" />
                             Shift Coverage
@@ -665,7 +1117,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="service-contexts"
-                            className="flex items-center gap-1"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
                         >
                             <Layers className="h-4 w-4" />
                             Services
@@ -683,188 +1135,238 @@ export default function SiteShow({
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-4">
                         <div className="grid gap-4 lg:grid-cols-2">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Contact Information</CardTitle>
+                            {/* Contact Information */}
+                            <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
+                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <Phone className="h-4 w-4" />
+                                        </span>
+                                        Contact Information
+                                    </CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-0 text-sm">
-                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
-                                        <div className="text-muted-foreground">
-                                            Phone
-                                        </div>
-                                        <div>
-                                            {site.phone || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
-                                        <div className="text-muted-foreground">
-                                            Email
-                                        </div>
-                                        <div>
-                                            {site.email || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
-                                        <div className="text-muted-foreground">
-                                            Site Lead
-                                        </div>
-                                        <div>
-                                            {site.primary_contact?.name ||
-                                                site.manager_name || (
-                                                    <span className="text-muted-foreground italic">
-                                                        —
-                                                    </span>
-                                                )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
-                                        <div className="text-muted-foreground">
-                                            Manager Phone
-                                        </div>
-                                        <div>
-                                            {site.manager_phone || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
-                                        <div className="text-muted-foreground">
-                                            After hours
-                                        </div>
-                                        <div>
-                                            {site.after_hours_phone || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
+                                <CardContent className="divide-y divide-border/40 p-0 text-sm">
+                                    <ContactRow
+                                        icon={Phone}
+                                        label="Phone"
+                                        value={site.phone}
+                                        href={
+                                            site.phone
+                                                ? `tel:${site.phone}`
+                                                : undefined
+                                        }
+                                    />
+                                    <ContactRow
+                                        icon={Mail}
+                                        label="Email"
+                                        value={site.email}
+                                        href={
+                                            site.email
+                                                ? `mailto:${site.email}`
+                                                : undefined
+                                        }
+                                    />
+                                    <ContactRow
+                                        icon={User}
+                                        label="Site Lead"
+                                        value={
+                                            site.primary_contact?.name ||
+                                            site.manager_name ||
+                                            null
+                                        }
+                                    />
+                                    <ContactRow
+                                        icon={Phone}
+                                        label="Manager Phone"
+                                        value={site.manager_phone}
+                                        href={
+                                            site.manager_phone
+                                                ? `tel:${site.manager_phone}`
+                                                : undefined
+                                        }
+                                    />
+                                    <ContactRow
+                                        icon={Clock}
+                                        label="After Hours"
+                                        value={site.after_hours_phone}
+                                        href={
+                                            site.after_hours_phone
+                                                ? `tel:${site.after_hours_phone}`
+                                                : undefined
+                                        }
+                                    />
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Location</CardTitle>
+                            {/* Location */}
+                            <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
+                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <MapPin className="h-4 w-4" />
+                                        </span>
+                                        Location
+                                    </CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-3 text-sm">
-                                    <div>
-                                        <div className="text-muted-foreground">
-                                            Address
-                                        </div>
-                                        <div className="mt-1">
-                                            {site.address || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
+                                <CardContent className="space-y-4 text-sm">
+                                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                                        <div className="flex items-start gap-2.5">
+                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    Address
+                                                </div>
+                                                <div className="mt-1 leading-relaxed">
+                                                    {site.address || (
+                                                        <span className="text-muted-foreground italic">
+                                                            Not specified
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    {site.region && (
-                                        <div>
-                                            <div className="text-muted-foreground">
-                                                Region
+
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {site.region && (
+                                            <div className="rounded-lg border border-border/60 p-3">
+                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    Region
+                                                </div>
+                                                <div className="mt-1 font-medium">
+                                                    {site.region}
+                                                </div>
                                             </div>
-                                            <div className="mt-1">
-                                                {site.region}
+                                        )}
+                                        {site.latitude && site.longitude && (
+                                            <div className="rounded-lg border border-border/60 p-3">
+                                                <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    <Navigation className="h-3 w-3" />
+                                                    GPS
+                                                </div>
+                                                <div className="mt-1 font-mono text-xs">
+                                                    {site.latitude},{' '}
+                                                    {site.longitude}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                    {site.latitude && site.longitude && (
-                                        <div>
-                                            <div className="text-muted-foreground">
-                                                GPS Coordinates
-                                            </div>
-                                            <div className="mt-1 font-mono text-xs">
-                                                {site.latitude},{' '}
-                                                {site.longitude}
-                                            </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+
                                     {site.access_instructions && (
-                                        <div>
-                                            <div className="text-muted-foreground">
-                                                Access Instructions
-                                            </div>
-                                            <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                                                {site.access_instructions}
+                                        <div className="rounded-lg border border-status-info/20 bg-status-info-bg/50 p-3">
+                                            <div className="flex items-start gap-2.5">
+                                                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-status-info" />
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-xs font-medium tracking-wide text-status-info uppercase">
+                                                        Access Instructions
+                                                    </div>
+                                                    <div className="mt-1 leading-relaxed whitespace-pre-wrap">
+                                                        {
+                                                            site.access_instructions
+                                                        }
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Safety & Medication</CardTitle>
+                            {/* Safety & Medication */}
+                            <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
+                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <Shield className="h-4 w-4" />
+                                        </span>
+                                        Safety & Medication
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
-                                    <div>
-                                        <div className="text-muted-foreground">
-                                            Emergency plan location
-                                        </div>
-                                        <div className="mt-1">
-                                            {site.emergency_plan_location || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">
-                                            Medication storage location
-                                        </div>
-                                        <div className="mt-1">
-                                            {site.medication_storage_location || (
-                                                <span className="text-muted-foreground italic">
-                                                    —
-                                                </span>
-                                            )}
+                                    <div className="rounded-lg border border-border/60 p-3">
+                                        <div className="flex items-start gap-2.5">
+                                            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    Emergency Plan
+                                                </div>
+                                                <div className="mt-1">
+                                                    {site.emergency_plan_location || (
+                                                        <span className="text-muted-foreground italic">
+                                                            Not specified
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
+                                    <div className="rounded-lg border border-border/60 p-3">
+                                        <div className="flex items-start gap-2.5">
+                                            <Pill className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    Medication Storage
+                                                </div>
+                                                <div className="mt-1">
+                                                    {site.medication_storage_location || (
+                                                        <span className="text-muted-foreground italic">
+                                                            Not specified
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {(site.is_high_risk ||
                                         site.is_high_needs) && (
-                                        <>
-                                            <div className="border-t pt-2">
-                                                <div className="flex items-center gap-1 font-medium text-status-warning">
-                                                    <AlertTriangle className="h-4 w-4" />
-                                                    Risk Information
-                                                </div>
-                                                {site.risk_notes && (
-                                                    <div className="mt-1 text-muted-foreground">
-                                                        {site.risk_notes}
-                                                    </div>
-                                                )}
-                                                {site.risk_review_date && (
-                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                        Review due:{' '}
-                                                        {site.risk_review_date}
-                                                    </div>
-                                                )}
+                                        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg/50 p-3">
+                                            <div className="flex items-center gap-2 font-semibold text-status-warning">
+                                                <AlertTriangle className="h-4 w-4" />
+                                                Risk Information
                                             </div>
-                                        </>
+                                            {site.risk_notes && (
+                                                <div className="mt-2 text-foreground/90">
+                                                    {site.risk_notes}
+                                                </div>
+                                            )}
+                                            {site.risk_review_date && (
+                                                <div className="mt-2 flex items-center gap-1.5 text-xs text-status-warning">
+                                                    <Calendar className="h-3 w-3" />
+                                                    Review due:{' '}
+                                                    {site.risk_review_date}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Notes</CardTitle>
+                            {/* Notes */}
+                            <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
+                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <StickyNote className="h-4 w-4" />
+                                        </span>
+                                        Notes
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-sm whitespace-pre-wrap text-muted-foreground">
-                                        {site.notes || 'No notes recorded.'}
-                                    </div>
+                                    {site.notes ? (
+                                        <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                                            {site.notes}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                                                <StickyNote className="h-5 w-5 text-muted-foreground" />
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">
+                                                No notes recorded
+                                            </p>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
@@ -1086,35 +1588,10 @@ export default function SiteShow({
 
                     {/* Checklists Tab */}
                     <TabsContent value="checklists">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Checklists & Walkthroughs</CardTitle>
-                                <Button asChild>
-                                    <Link href={`/sites/${site.id}/checklists`}>
-                                        View All Checklists
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="py-8 text-center text-muted-foreground">
-                                    <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                    <p>
-                                        Scheduled checklists and completed runs
-                                    </p>
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        className="mt-4"
-                                    >
-                                        <Link
-                                            href={`/sites/${site.id}/checklists`}
-                                        >
-                                            Manage Checklists
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <SiteChecklistsTab
+                            siteId={site.id}
+                            summary={checklistsSummary}
+                        />
                     </TabsContent>
 
                     {/* Hazards Tab */}
@@ -2230,7 +2707,7 @@ function TypeSpecificTab({
                             <p>No bedrooms configured yet</p>
                             <Button asChild className="mt-4">
                                 <Link
-                                    href={`/sites/${site.id}/onboarding?step=rooms`}
+                                    href={`/sites/${site.id}/edit`}
                                 >
                                     Add Bedrooms
                                 </Link>
@@ -2291,7 +2768,7 @@ function TypeSpecificTab({
                             <p>No rooms or resources configured yet</p>
                             <Button asChild className="mt-4">
                                 <Link
-                                    href={`/sites/${site.id}/onboarding?step=resources`}
+                                    href={`/sites/${site.id}/edit`}
                                 >
                                     Add Resources
                                 </Link>
@@ -2342,7 +2819,7 @@ function TypeSpecificTab({
                         <p>No zones configured yet</p>
                         <Button asChild className="mt-4">
                             <Link
-                                href={`/sites/${site.id}/onboarding?step=zones`}
+                                href={`/sites/${site.id}/edit`}
                             >
                                 Add Zones
                             </Link>
