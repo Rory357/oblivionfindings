@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\ClientDocumentFolder;
 use App\Models\TimelineEvent;
 use App\Services\Rag\OpenAiVectorStoreClient;
 use App\Services\AuditLogger;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,9 +26,27 @@ class ClientDocumentController extends Controller
             ->with(['uploadedBy:id,name,email'])
             ->get();
 
+        $folderRecords = ClientDocumentFolder::query()
+            ->where('client_id', $client->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'created_at']);
+
+        $folderNames = $folderRecords
+            ->pluck('name')
+            ->merge($documents->pluck('folder')->filter())
+            ->map(fn ($folder) => trim((string) $folder))
+            ->filter(fn ($folder) => $folder !== '')
+            ->unique()
+            ->sort()
+            ->values();
+
         return inertia('operations/clients/documents', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
             'can_edit' => $request->user()?->canDo('clients.update') ?? false,
+            'folders' => $folderNames->map(fn ($name) => [
+                'id' => $folderRecords->firstWhere('name', $name)?->id,
+                'name' => $name,
+            ])->values(),
             'documents' => $documents->map(fn ($d) => [
                 'id' => $d->id,
                 'title' => $d->title,
@@ -66,6 +86,8 @@ class ClientDocumentController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $folder = $this->ensureFolder($client, $data['folder'] ?? null);
+
         $file = $request->file('file');
         $dir = "client_documents/{$client->id}";
         $stored = $file->store($dir, 'local');
@@ -75,7 +97,7 @@ class ClientDocumentController extends Controller
             'uploaded_by_user_id' => $request->user()?->id,
             'title' => $data['title'] ?? null,
             'category' => $data['category'] ?? null,
-            'folder' => $data['folder'] ?? null,
+            'folder' => $folder,
             'version' => $data['version'] ?? null,
             'effective_date' => $data['effective_date'] ?? null,
             'expiry_date' => $data['expiry_date'] ?? null,
@@ -157,6 +179,10 @@ class ClientDocumentController extends Controller
             $data['portal_visible'] = $document->portal_visible;
         }
 
+        if (array_key_exists('folder', $data)) {
+            $data['folder'] = $this->ensureFolder($client, $data['folder']);
+        }
+
         $document->update($data);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'document', $document, $client, [
@@ -166,6 +192,22 @@ class ClientDocumentController extends Controller
         ]);
 
         return back()->with('success', 'Document updated.');
+    }
+
+    public function storeFolder(Request $request, Client $client)
+    {
+        $this->authorize('update', $client);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $folder = $this->ensureFolder($client, $data['name']);
+        if ($folder === null) {
+            return back()->withErrors(['name' => 'The folder name field is required.']);
+        }
+
+        return back()->with('success', 'Folder created.');
     }
 
     public function download(Request $request, Client $client, ClientDocument $document)
@@ -205,5 +247,20 @@ class ClientDocumentController extends Controller
         ]);
 
         return back()->with('success', 'Document deleted.');
+    }
+
+    private function ensureFolder(Client $client, ?string $folder): ?string
+    {
+        $folder = trim((string) $folder);
+        if ($folder === '') {
+            return null;
+        }
+
+        ClientDocumentFolder::query()->firstOrCreate([
+            'client_id' => $client->id,
+            'name' => $folder,
+        ]);
+
+        return $folder;
     }
 }

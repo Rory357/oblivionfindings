@@ -43,8 +43,10 @@ import {
     Clock,
     Cpu,
     DollarSign,
+    Download,
     DoorOpen,
     FileText,
+    FolderOpen,
     Fuel,
     GraduationCap,
     Home,
@@ -68,6 +70,14 @@ import {
     Warehouse,
 } from 'lucide-react';
 import { useMemo, useState, type ComponentType } from 'react';
+import {
+    formatSiteDocumentFileSize,
+    getSiteDocumentCategory,
+    getSiteDocumentFileInfo,
+    isSiteDocumentExpired,
+    isSiteDocumentExpiringSoon,
+    type SiteDocumentRecord,
+} from './_document-helpers';
 
 type Site = {
     id: number;
@@ -113,20 +123,7 @@ type Contact = {
     notes?: string | null;
 };
 
-type Doc = {
-    id: number;
-    title?: string | null;
-    category?: string | null;
-    version?: string | null;
-    effective_date?: string | null;
-    expiry_date?: string | null;
-    notes?: string | null;
-    original_name: string;
-    mime_type?: string | null;
-    size_bytes?: number | null;
-    created_at?: string | null;
-    uploaded_by?: { id: number; name: string; email: string } | null;
-};
+type Doc = SiteDocumentRecord;
 
 type AssetLite = {
     id: number;
@@ -2549,133 +2546,180 @@ function DocumentsTab({
     documents: Doc[];
     can_edit: boolean;
 }) {
-    const docForm = useForm({
-        file: null as File | null,
-        title: '',
-        category: 'evacuation_plan',
-        version: '',
-        effective_date: '',
-        expiry_date: '',
-        notes: '',
+    const groupedDocuments = useMemo(() => {
+        return documents.reduce<Record<string, Doc[]>>((groups, document) => {
+            const folder = document.folder || 'Unfiled';
+            groups[folder] = [...(groups[folder] ?? []), document];
+
+            return groups;
+        }, {});
+    }, [documents]);
+
+    const folderNames = Object.keys(groupedDocuments).sort((a, b) => {
+        if (a === 'Unfiled') return -1;
+        if (b === 'Unfiled') return 1;
+
+        return a.localeCompare(b);
     });
 
+    const expiredCount = documents.filter((document) =>
+        isSiteDocumentExpired(document.expiry_date),
+    ).length;
+    const expiringCount = documents.filter((document) =>
+        isSiteDocumentExpiringSoon(document.expiry_date),
+    ).length;
+
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Site documents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {documents.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">
-                            No documents uploaded yet.
-                        </div>
-                    ) : (
-                        <div className="overflow-hidden rounded-xl border">
-                            <table className="w-full text-sm">
-                                <thead className="border-b bg-muted/5">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-medium">
-                                            Title
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-medium">
-                                            Category
-                                        </th>
-                                        <th className="px-4 py-3" />
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {documents.map((d) => (
-                                        <tr
-                                            key={d.id}
-                                            className="border-b last:border-b-0 hover:bg-muted/50"
-                                        >
-                                            <td className="px-4 py-3 font-medium">
-                                                {d.title || d.original_name}
-                                            </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {d.category || '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <Link
-                                                    href={`/sites/${site.id}/documents/${d.id}/download`}
-                                                    className="text-primary/70 hover:text-primary/70"
-                                                >
-                                                    Download
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div className="font-medium">
+                        {documents.length}{' '}
+                        {documents.length === 1 ? 'document' : 'documents'}
+                    </div>
+                    {(expiredCount > 0 || expiringCount > 0) && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                            {expiredCount > 0 && (
+                                <Badge className="bg-status-critical-bg text-status-critical">
+                                    {expiredCount} expired
+                                </Badge>
+                            )}
+                            {expiringCount > 0 && (
+                                <Badge className="bg-status-warning-bg text-status-warning">
+                                    {expiringCount} expiring
+                                </Badge>
+                            )}
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+                {can_edit && (
+                    <Button asChild className="bg-primary hover:bg-primary">
+                        <Link href={`/sites/${site.id}/documents`}>
+                            Manage Documents
+                        </Link>
+                    </Button>
+                )}
+            </div>
 
-            {can_edit && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Upload document</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                docForm.post(`/sites/${site.id}/documents`, {
-                                    forceFormData: true,
-                                    preserveScroll: true,
-                                    onSuccess: () => docForm.reset(),
-                                });
-                            }}
-                            className="space-y-3"
-                        >
-                            <div>
-                                <Label>File</Label>
-                                <Input
-                                    type="file"
-                                    onChange={(e) =>
-                                        docForm.setData(
-                                            'file',
-                                            e.target.files?.[0] || null,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <Label>Title</Label>
-                                    <Input
-                                        value={docForm.data.title}
-                                        onChange={(e) =>
-                                            docForm.setData(
-                                                'title',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Category</Label>
-                                    <Input
-                                        value={docForm.data.category}
-                                        onChange={(e) =>
-                                            docForm.setData(
-                                                'category',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <Button type="submit" disabled={docForm.processing}>
-                                {docForm.processing ? 'Uploading…' : 'Upload'}
-                            </Button>
-                        </form>
+            {documents.length === 0 ? (
+                <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                        <FileText className="mb-3 h-10 w-10 text-muted-foreground" />
+                        <p className="font-medium">No documents uploaded yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Site documents will appear here once they are added.
+                        </p>
                     </CardContent>
                 </Card>
+            ) : (
+                <div className="space-y-6">
+                    {folderNames.map((folder) => (
+                        <section key={folder} className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
+                                <FolderOpen className="h-4 w-4 text-primary" />
+                                <span>{folder}</span>
+                                <Badge variant="secondary">
+                                    {groupedDocuments[folder].length}
+                                </Badge>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                {groupedDocuments[folder].map((document) => (
+                                    <SiteDocumentPreviewCard
+                                        key={document.id}
+                                        siteId={site.id}
+                                        document={document}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+                </div>
             )}
         </div>
+    );
+}
+
+function SiteDocumentPreviewCard({
+    siteId,
+    document,
+}: {
+    siteId: number;
+    document: Doc;
+}) {
+    const fileInfo = getSiteDocumentFileInfo(document.original_name);
+    const Icon = fileInfo.icon;
+    const category = getSiteDocumentCategory(document.category);
+
+    return (
+        <Card
+            className={`transition-shadow hover:shadow-md ${
+                isSiteDocumentExpired(document.expiry_date)
+                    ? 'border-status-critical/40'
+                    : ''
+            }`}
+        >
+            <CardContent className="p-4">
+                <div className="flex flex-col items-center text-center">
+                    <div
+                        className={`mb-3 flex h-12 w-12 items-center justify-center rounded-xl ${fileInfo.bg}`}
+                    >
+                        <Icon className={`h-6 w-6 ${fileInfo.color}`} />
+                    </div>
+                    <a
+                        href={`/sites/${siteId}/documents/${document.id}/download`}
+                        className="line-clamp-2 text-sm font-medium hover:text-primary"
+                    >
+                        {document.title || document.original_name}
+                    </a>
+                    <p className="mt-1 max-w-full truncate text-xs text-muted-foreground">
+                        {document.original_name}
+                    </p>
+                    <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                        {category ? (
+                            <Badge
+                                variant="secondary"
+                                className={`text-[10px] ${category.color}`}
+                            >
+                                {category.label}
+                            </Badge>
+                        ) : document.category ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                                {document.category}
+                            </Badge>
+                        ) : null}
+                        {isSiteDocumentExpired(document.expiry_date) ? (
+                            <Badge className="bg-status-critical-bg text-[10px] text-status-critical">
+                                Expired
+                            </Badge>
+                        ) : isSiteDocumentExpiringSoon(
+                              document.expiry_date,
+                          ) ? (
+                            <Badge className="bg-status-warning-bg text-[10px] text-status-warning">
+                                Expiring
+                            </Badge>
+                        ) : null}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>
+                            {formatSiteDocumentFileSize(document.size_bytes)}
+                        </span>
+                        <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label="Download document"
+                        >
+                            <a
+                                href={`/sites/${siteId}/documents/${document.id}/download`}
+                            >
+                                <Download className="h-3.5 w-3.5" />
+                            </a>
+                        </Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
 

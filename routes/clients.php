@@ -72,6 +72,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('clients.photo.destroy');
 
         // Document management
+        Route::post('/clients/{client}/document-folders', [ClientDocumentController::class, 'storeFolder'])
+            ->name('clients.document-folders.store');
         Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])
             ->name('clients.documents.store');
         Route::put('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'update'])

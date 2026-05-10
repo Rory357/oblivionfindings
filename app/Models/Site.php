@@ -79,6 +79,11 @@ class Site extends Model
         return $this->hasMany(SiteDocument::class);
     }
 
+    public function documentFolders(): HasMany
+    {
+        return $this->hasMany(SiteDocumentFolder::class);
+    }
+
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class);

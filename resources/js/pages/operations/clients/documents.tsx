@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Download,
     File,
@@ -168,12 +168,14 @@ const CATEGORIES = [
 type Props = {
     client: { id: number; first_name: string; last_name: string };
     can_edit: boolean;
+    folders?: Array<{ id?: number | null; name: string }>;
     documents: Array<any>;
 };
 
 export default function ClientDocuments({
     client,
     can_edit,
+    folders = [],
     documents,
 }: Props) {
     const { labels } = usePage().props as any;
@@ -187,6 +189,7 @@ export default function ClientDocuments({
     const [currentFolder, setCurrentFolder] = useState<string | null>(null);
     const [showNewFolder, setShowNewFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
+    const [creatingFolder, setCreatingFolder] = useState(false);
 
     const uploadForm = useForm<{
         file: File | null;
@@ -230,14 +233,16 @@ export default function ClientDocuments({
         notes: '',
     });
 
-    // Derive unique folder names from all documents
     const allFolders = useMemo(() => {
         const set = new Set<string>();
+        folders.forEach((folder) => {
+            if (folder.name) set.add(folder.name);
+        });
         documents.forEach((d) => {
             if (d.folder) set.add(d.folder);
         });
         return Array.from(set).sort();
-    }, [documents]);
+    }, [documents, folders]);
 
     const filtered = useMemo(() => {
         return documents.filter((d) => {
@@ -267,14 +272,23 @@ export default function ClientDocuments({
     // Folder counts for root view
     const folderCounts = useMemo(() => {
         const counts: Record<string, number> = {};
+        const query = search.trim().toLowerCase();
+
+        allFolders.forEach((folder) => {
+            if (categoryFilter) return;
+            if (query && !folder.toLowerCase().includes(query)) return;
+
+            counts[folder] = 0;
+        });
+
         documents.forEach((d) => {
             if (d.folder) {
                 // Apply search filter to folder counts
                 if (
-                    search &&
+                    query &&
                     !(d.title ?? d.original_name ?? '')
                         .toLowerCase()
-                        .includes(search.toLowerCase())
+                        .includes(query)
                 )
                     return;
                 if (categoryFilter && d.category !== categoryFilter) return;
@@ -282,7 +296,7 @@ export default function ClientDocuments({
             }
         });
         return counts;
-    }, [documents, search, categoryFilter]);
+    }, [allFolders, documents, search, categoryFilter]);
 
     const stats = {
         total: documents.length,
@@ -290,6 +304,11 @@ export default function ClientDocuments({
         expired: documents.filter((d) => isExpired(d.expiry_date)).length,
         portal: documents.filter((d) => d.portal_visible).length,
     };
+
+    const visibleFolders = useMemo(
+        () => Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)),
+        [folderCounts],
+    );
 
     const openEdit = (doc: any) => {
         setEditingDoc(doc);
@@ -308,9 +327,21 @@ export default function ClientDocuments({
     const handleCreateFolder = () => {
         const trimmed = newFolderName.trim();
         if (!trimmed) return;
-        setCurrentFolder(trimmed);
-        setShowNewFolder(false);
-        setNewFolderName('');
+
+        router.post(
+            `/operations/clients/${client.id}/document-folders`,
+            { name: trimmed },
+            {
+                preserveScroll: true,
+                onStart: () => setCreatingFolder(true),
+                onSuccess: () => {
+                    setCurrentFolder(trimmed);
+                    setShowNewFolder(false);
+                    setNewFolderName('');
+                },
+                onFinish: () => setCreatingFolder(false),
+            },
+        );
     };
 
     return (
@@ -477,8 +508,7 @@ export default function ClientDocuments({
 
                 {/* Documents */}
                 {filesInCurrentView.length === 0 &&
-                (currentFolder !== null ||
-                    Object.keys(folderCounts).length === 0) ? (
+                (currentFolder !== null || visibleFolders.length === 0) ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
                             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
@@ -514,7 +544,7 @@ export default function ClientDocuments({
                     <div className="space-y-6">
                         {/* Folder cards (only at root level) */}
                         {currentFolder === null &&
-                            Object.keys(folderCounts).length > 0 && (
+                            visibleFolders.length > 0 && (
                                 <div>
                                     <div className="mb-2 flex items-center gap-2">
                                         <FolderOpen className="h-4 w-4 text-primary" />
@@ -523,11 +553,8 @@ export default function ClientDocuments({
                                         </span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                                        {Object.entries(folderCounts)
-                                            .sort(([a], [b]) =>
-                                                a.localeCompare(b),
-                                            )
-                                            .map(([folder, count]) => (
+                                        {visibleFolders.map(
+                                            ([folder, count]) => (
                                                 /* eslint-disable-next-line no-restricted-syntax -- Folder selectors are custom card-style buttons, not standard action buttons. */
                                                 <button
                                                     key={folder}
@@ -547,7 +574,8 @@ export default function ClientDocuments({
                                                         {count !== 1 ? 's' : ''}
                                                     </span>
                                                 </button>
-                                            ))}
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -682,14 +710,11 @@ export default function ClientDocuments({
                         <CardContent className="p-0">
                             {/* Folder rows at root level */}
                             {currentFolder === null &&
-                                Object.keys(folderCounts).length > 0 && (
+                                visibleFolders.length > 0 && (
                                     <table className="w-full text-sm">
                                         <tbody>
-                                            {Object.entries(folderCounts)
-                                                .sort(([a], [b]) =>
-                                                    a.localeCompare(b),
-                                                )
-                                                .map(([folder, count]) => (
+                                            {visibleFolders.map(
+                                                ([folder, count]) => (
                                                     <tr
                                                         key={folder}
                                                         className="cursor-pointer border-b hover:bg-muted"
@@ -723,7 +748,8 @@ export default function ClientDocuments({
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                ),
+                                            )}
                                         </tbody>
                                     </table>
                                 )}
@@ -1295,7 +1321,7 @@ export default function ClientDocuments({
                         </Button>
                         <Button
                             className="bg-primary hover:bg-primary"
-                            disabled={!newFolderName.trim()}
+                            disabled={creatingFolder || !newFolderName.trim()}
                             onClick={handleCreateFolder}
                         >
                             Create Folder

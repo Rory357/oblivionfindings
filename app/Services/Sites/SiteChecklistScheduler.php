@@ -41,9 +41,12 @@ class SiteChecklistScheduler
         SiteChecklistAssignment $assignment,
         Carbon $endDate
     ): int {
-        $count = 0;
         $startDate = $assignment->start_date;
-        
+
+        if ($assignment->runs()->awaitingCompletion()->exists()) {
+            return 0;
+        }
+
         // Get already scheduled dates
         $scheduledDates = SiteChecklistRun::where('assignment_id', $assignment->id)
             ->pluck('scheduled_date')
@@ -51,7 +54,7 @@ class SiteChecklistScheduler
             ->toArray();
 
         $currentDate = Carbon::parse($startDate);
-        
+
         while ($currentDate <= $endDate) {
             if (!in_array($currentDate->format('Y-m-d'), $scheduledDates)) {
                 SiteChecklistRun::create([
@@ -62,14 +65,14 @@ class SiteChecklistScheduler
                     'scheduled_date' => $currentDate->copy(),
                     'status' => 'scheduled',
                 ]);
-                $count++;
+                return 1;
             }
 
             // Advance based on frequency
             $currentDate = $this->advanceDate($currentDate, $assignment->frequency);
         }
 
-        return $count;
+        return 0;
     }
 
     /**

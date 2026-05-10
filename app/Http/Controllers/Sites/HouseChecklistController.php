@@ -131,10 +131,18 @@ class HouseChecklistController extends Controller
             ]
         );
 
+        if ($assignment->runs()->awaitingCompletion()->exists()) {
+            return redirect()->back()->with(
+                'info',
+                'Complete the existing checklist run before starting another.'
+            );
+        }
+
         $run = SiteChecklistRun::create([
             'assignment_id' => $assignment->id,
             'template_id' => $template->id,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'scheduled_date' => now()->toDateString(),
             'started_at' => now(),
             'status' => 'in_progress',

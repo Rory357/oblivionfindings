@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\AuditLog;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistRun;
@@ -13,6 +14,7 @@ use App\Models\SiteCredential;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SiteVendor;
 use App\Models\User;
+use App\Services\Sites\SiteChecklistScheduler;
 use App\Services\Sites\SiteCredentialEncryptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -174,6 +176,177 @@ class SitesModuleIntegrationTest extends TestCase
                 ->has('items', 1)
                 ->has('responses', 1)
             );
+    }
+
+    public function test_checklist_run_can_complete_without_recursive_observer_updates(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+
+        $template = SiteChecklistTemplate::create([
+            'tenant_id' => $site->tenant_id,
+            'key' => 'house_quality_' . uniqid(),
+            'name' => 'House Quality Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        $passItem = SiteChecklistTemplateItem::create([
+            'tenant_id' => $site->tenant_id,
+            'template_id' => $template->id,
+            'sort_order' => 1,
+            'question' => 'Entry locks working?',
+            'response_type' => 'yes_no',
+            'is_required' => true,
+            'failure_creates_hazard' => false,
+        ]);
+
+        $failItem = SiteChecklistTemplateItem::create([
+            'tenant_id' => $site->tenant_id,
+            'template_id' => $template->id,
+            'sort_order' => 2,
+            'question' => 'Fire extinguishers tagged?',
+            'response_type' => 'yes_no',
+            'is_required' => true,
+            'failure_creates_hazard' => true,
+        ]);
+
+        $assignment = SiteChecklistAssignment::create([
+            'tenant_id' => $site->tenant_id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'frequency' => 'monthly',
+            'start_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $run = SiteChecklistRun::create([
+            'tenant_id' => $site->tenant_id,
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'scheduled_date' => now()->toDateString(),
+            'status' => 'in_progress',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/checklists/runs/{$run->id}/complete", [
+                'responses' => [
+                    [
+                        'template_item_id' => $passItem->id,
+                        'response_value' => 'yes',
+                        'is_failed' => false,
+                    ],
+                    [
+                        'template_item_id' => $failItem->id,
+                        'response_value' => 'no',
+                        'is_failed' => true,
+                        'create_hazard' => false,
+                    ],
+                ],
+                'overall_notes' => 'Completed during test.',
+                'signature_name' => $this->admin->name,
+            ])
+            ->assertRedirect(route('sites.checklists.index', $site->id));
+
+        $run->refresh();
+
+        $this->assertSame('completed', $run->status);
+        $this->assertSame(1, $run->items_passed);
+        $this->assertSame(1, $run->items_failed);
+        $this->assertSame('100.00', (string) $run->completion_percentage);
+        $this->assertDatabaseCount('site_checklist_responses', 2);
+        $this->assertSame(1, AuditLog::where('action', 'checklist.completed')
+            ->where('auditable_type', $run->getMorphClass())
+            ->where('auditable_id', $run->id)
+            ->count());
+    }
+
+    public function test_create_run_reuses_existing_unfinished_run(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+
+        $template = SiteChecklistTemplate::create([
+            'tenant_id' => $site->tenant_id,
+            'key' => 'house_quality_' . uniqid(),
+            'name' => 'House Quality Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'daily',
+            'is_active' => true,
+        ]);
+
+        $assignment = SiteChecklistAssignment::create([
+            'tenant_id' => $site->tenant_id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'frequency' => 'daily',
+            'start_date' => now()->subDay()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $run = SiteChecklistRun::create([
+            'tenant_id' => $site->tenant_id,
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'scheduled_date' => now()->subDay()->toDateString(),
+            'status' => 'overdue',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$site->id}/checklists/assignments/{$assignment->id}/run")
+            ->assertRedirect(route('sites.checklists.showRun', $run->id));
+
+        $run->refresh();
+
+        $this->assertSame('in_progress', $run->status);
+        $this->assertSame(1, SiteChecklistRun::where('assignment_id', $assignment->id)->count());
+    }
+
+    public function test_scheduler_waits_for_existing_run_to_complete_before_creating_next(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+
+        $template = SiteChecklistTemplate::create([
+            'tenant_id' => $site->tenant_id,
+            'key' => 'house_quality_' . uniqid(),
+            'name' => 'House Quality Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'daily',
+            'is_active' => true,
+        ]);
+
+        $assignment = SiteChecklistAssignment::create([
+            'tenant_id' => $site->tenant_id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'frequency' => 'daily',
+            'start_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $run = SiteChecklistRun::create([
+            'tenant_id' => $site->tenant_id,
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'scheduled_date' => now()->toDateString(),
+            'status' => 'in_progress',
+        ]);
+
+        $scheduler = app(SiteChecklistScheduler::class);
+
+        $this->assertSame(0, $scheduler->generateRunsForAssignment($assignment, now()->addDays(7)));
+        $this->assertSame(1, SiteChecklistRun::where('assignment_id', $assignment->id)->count());
+
+        $run->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'completed_by_user_id' => $this->admin->id,
+        ]);
+
+        $this->assertSame(1, $scheduler->generateRunsForAssignment($assignment->fresh(), now()->addDays(7)));
+        $this->assertSame(2, SiteChecklistRun::where('assignment_id', $assignment->id)->count());
     }
 
     public function test_credential_reveal_and_copy_are_audited(): void

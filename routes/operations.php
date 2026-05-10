@@ -206,6 +206,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.personal-assets.destroy');
 
         // Document management
+        Route::post('/clients/{client}/document-folders', [ClientDocumentController::class, 'storeFolder'])
+            ->name('operations.clients.document-folders.store');
         Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])
             ->name('operations.clients.documents.store');
         Route::put('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'update'])

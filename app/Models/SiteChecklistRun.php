@@ -92,6 +92,11 @@ class SiteChecklistRun extends Model
                      ->whereIn('status', ['scheduled', 'in_progress']);
     }
 
+    public function scopeAwaitingCompletion($query)
+    {
+        return $query->whereIn('status', ['scheduled', 'in_progress', 'overdue']);
+    }
+
     public function scopeForSite($query, int $siteId)
     {
         return $query->where('site_id', $siteId);
@@ -110,9 +115,10 @@ class SiteChecklistRun extends Model
         $completed = $this->responses()->count();
         $failed = $this->responses()->where('is_failed', true)->count();
 
-        $this->completion_percentage = $total > 0 ? ($completed / $total) * 100 : 0;
-        $this->items_passed = $completed - $failed;
-        $this->items_failed = $failed;
-        $this->save();
+        $this->forceFill([
+            'completion_percentage' => $total > 0 ? ($completed / $total) * 100 : 0,
+            'items_passed' => $completed - $failed,
+            'items_failed' => $failed,
+        ])->saveQuietly();
     }
 }

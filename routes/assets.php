@@ -37,6 +37,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('sites.show');
 
         // Site documents (view/download)
+        Route::get('/sites/{site}/documents', [SiteDocumentController::class, 'index'])
+            ->whereNumber('site')
+            ->name('sites.documents.index');
         Route::get('/sites/{site}/documents/{document}/download', [SiteDocumentController::class, 'download'])
             ->whereNumber('site')
             ->name('sites.documents.download');
@@ -67,6 +70,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('sites.contacts.destroy');
 
         // Site documents
+        Route::post('/sites/{site}/document-folders', [SiteDocumentController::class, 'storeFolder'])
+            ->whereNumber('site')
+            ->name('sites.document-folders.store');
         Route::post('/sites/{site}/documents', [SiteDocumentController::class, 'store'])
             ->whereNumber('site')
             ->name('sites.documents.store');

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\ClientDocumentFolder;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -620,6 +621,41 @@ class ClientControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->has('documents', 1)
         );
+    }
+
+    public function test_client_documents_manager_lists_empty_folders(): void
+    {
+        $client = Client::factory()->create();
+        ClientDocumentFolder::create([
+            'client_id' => $client->id,
+            'name' => 'Medical Records',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('operations.clients.documents.index', $client))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('operations/clients/documents')
+                ->where('client.id', $client->id)
+                ->where('folders.0.name', 'Medical Records')
+                ->has('documents', 0)
+            );
+    }
+
+    public function test_client_document_folder_create_persists_folder(): void
+    {
+        $client = Client::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('operations.clients.document-folders.store', $client), [
+                'name' => 'Policies',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('client_document_folders', [
+            'client_id' => $client->id,
+            'name' => 'Policies',
+        ]);
     }
 
     public function test_show_returns_timeline_events(): void

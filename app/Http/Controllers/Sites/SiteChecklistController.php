@@ -177,6 +177,7 @@ class SiteChecklistController extends Controller
 
         DB::transaction(function () use ($run, $validated, $request) {
             $this->bulkUpsertResponses($run, $validated['responses']);
+            $run->calculateCompletion();
 
             $run->update([
                 'status' => 'completed',
@@ -184,9 +185,7 @@ class SiteChecklistController extends Controller
                 'completed_by_user_id' => $request->user()->id,
                 'overall_notes' => $validated['overall_notes'] ?? null,
             ]);
-
-            $run->calculateCompletion();
-        });
+        }, 3);
 
         return redirect()
             ->route('sites.checklists.index', $run->site_id)
@@ -291,16 +290,16 @@ class SiteChecklistController extends Controller
         $this->authorize('update', $site);
         abort_unless($assignment->site_id === $site->id, 404);
 
-        // Reuse an existing open run for this assignment instead of creating duplicates.
-        // Prefer in_progress, then today's scheduled run, then any other scheduled run.
+        // Reuse any run still awaiting completion instead of creating duplicates.
+        // Prefer in_progress, then scheduled, then overdue.
         $existing = SiteChecklistRun::where('assignment_id', $assignment->id)
-            ->whereIn('status', ['in_progress', 'scheduled'])
-            ->orderByRaw("FIELD(status, 'in_progress', 'scheduled')")
+            ->awaitingCompletion()
+            ->orderByRaw("FIELD(status, 'in_progress', 'scheduled', 'overdue')")
             ->orderByDesc('scheduled_date')
             ->first();
 
         if ($existing) {
-            if ($existing->status === 'scheduled') {
+            if (in_array($existing->status, ['scheduled', 'overdue'], true)) {
                 $existing->update([
                     'status' => 'in_progress',
                     'started_at' => $existing->started_at ?? now(),

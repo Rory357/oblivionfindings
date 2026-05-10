@@ -76,9 +76,12 @@ class StoreSiteRequest extends FormRequest
             'checklists.*.assigned_to_user_id' => ['nullable', 'exists:users,id'],
 
             'documents' => ['nullable', 'array'],
-            'documents.*.file' => ['required_with:documents.*', 'file', 'max:51200'],
+            'documents.*.file' => ['required_with:documents.*', 'file', 'max:51200', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
             'documents.*.title' => ['nullable', 'string', 'max:200'],
             'documents.*.category' => ['nullable', 'string', 'max:60'],
+            'documents.*.folder' => ['nullable', 'string', 'max:255'],
+            'documents.*.version' => ['nullable', 'string', 'max:30'],
+            'documents.*.effective_date' => ['nullable', 'date'],
             'documents.*.expiry_date' => ['nullable', 'date'],
             'documents.*.notes' => ['nullable', 'string', 'max:2000'],
         ];

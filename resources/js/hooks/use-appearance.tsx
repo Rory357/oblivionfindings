@@ -1,8 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
 import { applyPalette, DEFAULT_BRAND_HEX } from '@/lib/derive-palette';
+import { usePage } from '@inertiajs/react';
+import { useCallback, useEffect, useState } from 'react';
 
 export type Appearance = 'light' | 'dark' | 'system';
 export type SidebarDensity = 'comfortable' | 'compact';
+
+type ServerAppearance = {
+    theme?: Appearance | null;
+    accent_colour?: string | null;
+    font_size?: number | null;
+    sidebar_density?: SidebarDensity | null;
+    reduce_motion?: boolean | null;
+} | null;
+
+interface AppearancePageProps extends Record<string, unknown> {
+    appearance?: ServerAppearance;
+}
 
 /**
  * Keys used in localStorage. Server preferences (via Inertia shared props)
@@ -62,10 +75,16 @@ const mediaQuery = () => {
 };
 
 const handleSystemThemeChange = () => {
-    const currentAppearance = localStorage.getItem(
-        APPEARANCE_STORAGE.theme,
-    ) as Appearance;
-    applyTheme(currentAppearance || 'system');
+    const currentAppearance = localStorage.getItem(APPEARANCE_STORAGE.theme);
+    applyTheme(isAppearance(currentAppearance) ? currentAppearance : 'system');
+};
+
+let systemThemeListenerAttached = false;
+
+const ensureSystemThemeListener = () => {
+    if (systemThemeListenerAttached) return;
+    mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+    systemThemeListenerAttached = true;
 };
 
 /**
@@ -81,24 +100,99 @@ function readLSBool(key: string): boolean {
     return v === 'true';
 }
 
-/**
- * Apply every saved appearance preference from localStorage. Called at app
- * startup before first paint. Server-side preferences (via Inertia props)
- * are re-applied by the Appearance page on mount so the server remains the
- * source of truth when it disagrees with the cache.
- */
-export function initializeAppearance() {
-    const theme = (readLS(APPEARANCE_STORAGE.theme) as Appearance) || 'system';
+function isAppearance(value: unknown): value is Appearance {
+    return value === 'light' || value === 'dark' || value === 'system';
+}
+
+function isSidebarDensity(value: unknown): value is SidebarDensity {
+    return value === 'comfortable' || value === 'compact';
+}
+
+function resolveTheme(serverAppearance?: ServerAppearance): Appearance {
+    if (isAppearance(serverAppearance?.theme)) {
+        return serverAppearance.theme;
+    }
+
+    const stored = readLS(APPEARANCE_STORAGE.theme);
+
+    return isAppearance(stored) ? stored : 'system';
+}
+
+function cachePreference(key: string, value: string | number | boolean | null) {
+    if (typeof window === 'undefined') return;
+
+    if (value === null) {
+        localStorage.removeItem(key);
+        return;
+    }
+
+    localStorage.setItem(key, String(value));
+}
+
+function applyAppearancePreferences(serverAppearance?: ServerAppearance) {
+    const theme = resolveTheme(serverAppearance);
     applyTheme(theme);
+    cachePreference(APPEARANCE_STORAGE.theme, theme);
+    setCookie('appearance', theme);
 
-    applyAccent(readLS(APPEARANCE_STORAGE.accent));
-    applyFontSize(readLS(APPEARANCE_STORAGE.fontSize));
-    applySidebarDensity(
-        readLS(APPEARANCE_STORAGE.density) as SidebarDensity | null,
-    );
-    applyReduceMotion(readLSBool(APPEARANCE_STORAGE.reduceMotion));
+    if (serverAppearance && 'accent_colour' in serverAppearance) {
+        cachePreference(
+            APPEARANCE_STORAGE.accent,
+            serverAppearance.accent_colour ?? null,
+        );
+        if (serverAppearance.accent_colour) {
+            applyAccent(serverAppearance.accent_colour);
+        }
+    } else {
+        applyAccent(readLS(APPEARANCE_STORAGE.accent));
+    }
 
-    mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+    if (
+        serverAppearance &&
+        typeof serverAppearance.font_size === 'number'
+    ) {
+        cachePreference(APPEARANCE_STORAGE.fontSize, serverAppearance.font_size);
+        applyFontSize(serverAppearance.font_size);
+    } else {
+        applyFontSize(readLS(APPEARANCE_STORAGE.fontSize));
+    }
+
+    if (isSidebarDensity(serverAppearance?.sidebar_density)) {
+        cachePreference(
+            APPEARANCE_STORAGE.density,
+            serverAppearance.sidebar_density,
+        );
+        applySidebarDensity(serverAppearance.sidebar_density);
+    } else {
+        applySidebarDensity(
+            readLS(APPEARANCE_STORAGE.density) as SidebarDensity | null,
+        );
+    }
+
+    if (
+        serverAppearance &&
+        typeof serverAppearance.reduce_motion === 'boolean'
+    ) {
+        cachePreference(
+            APPEARANCE_STORAGE.reduceMotion,
+            serverAppearance.reduce_motion,
+        );
+        applyReduceMotion(serverAppearance.reduce_motion);
+    } else {
+        applyReduceMotion(readLSBool(APPEARANCE_STORAGE.reduceMotion));
+    }
+
+    return theme;
+}
+
+/**
+ * Apply every saved appearance preference. Server-side preferences from
+ * Inertia are authoritative; localStorage is only the anonymous/offline
+ * fallback and is refreshed from the server when available.
+ */
+export function initializeAppearance(serverAppearance?: ServerAppearance) {
+    applyAppearancePreferences(serverAppearance);
+    ensureSystemThemeListener();
 }
 
 /**
@@ -107,7 +201,17 @@ export function initializeAppearance() {
 export const initializeTheme = initializeAppearance;
 
 export function useAppearance() {
-    const [appearance, setAppearance] = useState<Appearance>('system');
+    const page = usePage<AppearancePageProps>();
+    const rawServerAppearance = page.props.appearance ?? null;
+    const hasServerAppearance = rawServerAppearance !== null;
+    const serverTheme = rawServerAppearance?.theme;
+    const serverAccent = rawServerAppearance?.accent_colour;
+    const serverFontSize = rawServerAppearance?.font_size;
+    const serverDensity = rawServerAppearance?.sidebar_density;
+    const serverReduceMotion = rawServerAppearance?.reduce_motion;
+    const [appearance, setAppearance] = useState<Appearance>(() =>
+        resolveTheme(rawServerAppearance),
+    );
 
     const updateAppearance = useCallback((mode: Appearance) => {
         setAppearance(mode);
@@ -160,19 +264,27 @@ export function useAppearance() {
     }, []);
 
     useEffect(() => {
-        const savedAppearance = localStorage.getItem(
-            APPEARANCE_STORAGE.theme,
-        ) as Appearance | null;
+        const serverAppearance = hasServerAppearance
+            ? {
+                  theme: serverTheme,
+                  accent_colour: serverAccent,
+                  font_size: serverFontSize,
+                  sidebar_density: serverDensity,
+                  reduce_motion: serverReduceMotion,
+              }
+            : null;
 
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        updateAppearance(savedAppearance || 'system');
-
-        return () =>
-            mediaQuery()?.removeEventListener(
-                'change',
-                handleSystemThemeChange,
-            );
-    }, [updateAppearance]);
+        setAppearance(applyAppearancePreferences(serverAppearance));
+        ensureSystemThemeListener();
+    }, [
+        hasServerAppearance,
+        serverTheme,
+        serverAccent,
+        serverFontSize,
+        serverDensity,
+        serverReduceMotion,
+    ]);
 
     return {
         appearance,

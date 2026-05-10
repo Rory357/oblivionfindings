@@ -183,6 +183,11 @@ class Client extends Model
         return $this->hasMany(\App\Models\ClientDocument::class);
     }
 
+    public function documentFolders()
+    {
+        return $this->hasMany(\App\Models\ClientDocumentFolder::class);
+    }
+
     public function familyPortalSetting()
     {
         return $this->hasOne(\App\Models\FamilyPortalSetting::class);

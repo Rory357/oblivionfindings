@@ -10,7 +10,7 @@ class SiteChecklistRunObserver
     public function updated(SiteChecklistRun $run): void
     {
         // Log completion
-        if ($run->isDirty('status') && $run->status === 'completed') {
+        if ($run->wasChanged('status') && $run->status === 'completed') {
             AuditLogger::log('checklist.completed', $run, [
                 'site_id' => $run->site_id,
                 'template_id' => $run->template_id,

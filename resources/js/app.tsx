@@ -38,6 +38,10 @@ createInertiaApp({
             import.meta.glob('./pages/**/*.tsx'),
         ),
     setup({ el, App, props }) {
+        const initialPageProps = props.initialPage.props as {
+            appearance?: Parameters<typeof initializeAppearance>[0];
+        };
+        initializeAppearance(initialPageProps.appearance);
         bootEmarOffline();
         bootOfflineQueue();
         const root = createRoot(el);
@@ -69,7 +73,3 @@ createInertiaApp({
         color: '#4B5563',
     },
 });
-
-// Apply saved theme + accent + font size + density + motion preferences on
-// load, before the first React render. Avoids a flash of default styles.
-initializeAppearance();

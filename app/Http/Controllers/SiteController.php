@@ -17,6 +17,7 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
 use App\Models\SiteDocument;
+use App\Models\SiteDocumentFolder;
 use App\Models\SiteFacilityZone;
 use App\Models\SiteHoResource;
 use App\Models\SiteHouseRoom;
@@ -303,6 +304,7 @@ class SiteController extends Controller
                 'id' => $d->id,
                 'title' => $d->title,
                 'category' => $d->category,
+                'folder' => $d->folder,
                 'version' => $d->version,
                 'effective_date' => optional($d->effective_date)->toDateString(),
                 'expiry_date' => optional($d->expiry_date)->toDateString(),
@@ -722,12 +724,17 @@ class SiteController extends Controller
 
             $entry = $meta[$index] ?? [];
             $stored = $file->store("site_documents/{$site->id}", 'local');
+            $folder = $this->ensureDocumentFolder($site, $entry['folder'] ?? null);
 
             SiteDocument::create([
+                'tenant_id' => $site->tenant_id,
                 'site_id' => $site->id,
                 'uploaded_by_user_id' => $userId,
                 'title' => $entry['title'] ?? null,
                 'category' => $entry['category'] ?? null,
+                'folder' => $folder,
+                'version' => $entry['version'] ?? null,
+                'effective_date' => $entry['effective_date'] ?? null,
                 'expiry_date' => $entry['expiry_date'] ?? null,
                 'notes' => $entry['notes'] ?? null,
                 'storage_disk' => 'local',
@@ -737,6 +744,21 @@ class SiteController extends Controller
                 'size_bytes' => $file->getSize(),
             ]);
         }
+    }
+
+    private function ensureDocumentFolder(Site $site, ?string $folder): ?string
+    {
+        $folder = trim((string) $folder);
+        if ($folder === '') {
+            return null;
+        }
+
+        SiteDocumentFolder::query()->firstOrCreate([
+            'site_id' => $site->id,
+            'name' => $folder,
+        ]);
+
+        return $folder;
     }
 
     public function edit(Site $site)
@@ -766,7 +788,7 @@ class SiteController extends Controller
 
         $documents = SiteDocument::where('site_id', $site->id)
             ->orderByDesc('created_at')
-            ->get(['id', 'title', 'category', 'expiry_date', 'notes', 'original_name', 'size_bytes']);
+            ->get(['id', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'notes', 'original_name', 'mime_type', 'size_bytes']);
 
         $assignedAssetIds = Asset::where('site_id', $site->id)->pluck('id')->all();
 

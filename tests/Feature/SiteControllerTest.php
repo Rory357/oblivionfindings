@@ -6,8 +6,12 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteDocument;
+use App\Models\SiteDocumentFolder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SiteControllerTest extends TestCase
@@ -226,6 +230,126 @@ class SiteControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('assets', 3)
             );
+    }
+
+    public function test_site_show_returns_document_folders(): void
+    {
+        $site = Site::factory()->create();
+        SiteDocument::create([
+            'tenant_id' => $site->tenant_id,
+            'site_id' => $site->id,
+            'uploaded_by_user_id' => $this->admin->id,
+            'title' => 'Fire Safety Certificate',
+            'category' => 'safety',
+            'folder' => 'Compliance',
+            'storage_disk' => 'local',
+            'storage_path' => 'site_documents/'.$site->id.'/fire-safety.pdf',
+            'original_name' => 'fire-safety.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 1024,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('documents.0.folder', 'Compliance')
+                ->where('documents.0.category', 'safety')
+            );
+    }
+
+    public function test_site_documents_manager_lists_foldered_documents(): void
+    {
+        $site = Site::factory()->create();
+        SiteDocument::create([
+            'tenant_id' => $site->tenant_id,
+            'site_id' => $site->id,
+            'uploaded_by_user_id' => $this->admin->id,
+            'title' => 'Evacuation Plan',
+            'category' => 'evacuation_plan',
+            'folder' => 'Safety',
+            'storage_disk' => 'local',
+            'storage_path' => 'site_documents/'.$site->id.'/evacuation-plan.pdf',
+            'original_name' => 'evacuation-plan.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 2048,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('sites.documents.index', $site))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('sites/documents')
+                ->where('site.id', $site->id)
+                ->where('documents.0.folder', 'Safety')
+                ->where('can_edit', true)
+            );
+    }
+
+    public function test_site_documents_manager_lists_empty_folders(): void
+    {
+        $site = Site::factory()->create();
+        SiteDocumentFolder::create([
+            'site_id' => $site->id,
+            'name' => 'Compliance',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('sites.documents.index', $site))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('sites/documents')
+                ->where('site.id', $site->id)
+                ->where('folders.0.name', 'Compliance')
+                ->has('documents', 0)
+            );
+    }
+
+    public function test_site_document_folder_create_persists_folder(): void
+    {
+        $site = Site::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('sites.document-folders.store', $site), [
+                'name' => 'Maintenance',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('site_document_folders', [
+            'site_id' => $site->id,
+            'name' => 'Maintenance',
+        ]);
+    }
+
+    public function test_site_document_upload_stores_folder_and_tenant(): void
+    {
+        Storage::fake('local');
+
+        $site = Site::factory()->create(['tenant_id' => 7]);
+        $file = UploadedFile::fake()->create('maintenance-plan.pdf', 12, 'application/pdf');
+
+        $this->actingAs($this->admin)
+            ->post(route('sites.documents.store', $site), [
+                'file' => $file,
+                'title' => 'Maintenance Plan',
+                'category' => 'maintenance',
+                'folder' => 'Maintenance',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('site_documents', [
+            'tenant_id' => 7,
+            'site_id' => $site->id,
+            'title' => 'Maintenance Plan',
+            'category' => 'maintenance',
+            'folder' => 'Maintenance',
+            'original_name' => 'maintenance-plan.pdf',
+        ]);
+
+        $this->assertDatabaseHas('site_document_folders', [
+            'site_id' => $site->id,
+            'name' => 'Maintenance',
+        ]);
     }
 
     public function test_site_show_returns_404_for_nonexistent_site(): void
