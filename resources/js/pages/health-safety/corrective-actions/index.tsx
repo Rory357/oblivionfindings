@@ -143,7 +143,7 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
 
                 {/* Bulk selection banner */}
                 {selected.size > 0 && (
-                    <div className="flex items-center justify-between rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-sm dark:border-status-info/30 dark:bg-status-info">
+                    <div className="flex items-center justify-between rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-sm dark:border-status-info/30">
                         <span className="font-medium text-status-info dark:text-status-info">
                             {selected.size} action
                             {selected.size !== 1 ? 's' : ''} selected
@@ -298,7 +298,7 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                                                     ? 'bg-status-critical-bg'
                                                     : '',
                                                 isSelected
-                                                    ? 'bg-status-info-bg dark:bg-status-info'
+                                                    ? 'bg-status-info-bg'
                                                     : '',
                                             ].join(' ')}
                                         >

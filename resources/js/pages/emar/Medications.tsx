@@ -230,7 +230,7 @@ function DoseTimesPreview({ frequency }: { frequency: string }) {
     if (!frequency) return null;
 
     return (
-        <div className="rounded-md border border-status-success/30 bg-status-success-bg p-3 dark:border-status-success/30 dark:bg-status-success">
+        <div className="rounded-md border border-status-success/30 bg-status-success-bg p-3 dark:border-status-success/30">
             <div className="flex items-center gap-2 text-sm font-medium text-status-success dark:text-status-success">
                 <Clock className="h-4 w-4" />
                 Scheduled Dose Times
@@ -583,7 +583,7 @@ function MedicationFormFields({
 
             {/* PRN fields - shown when is_prn is checked */}
             {form.data.is_prn && (
-                <div className="rounded-md border border-status-info/30 bg-status-info-bg p-4 dark:border-status-info/30 dark:bg-status-info">
+                <div className="rounded-md border border-status-info/30 bg-status-info-bg p-4 dark:border-status-info/30">
                     <p className="mb-3 text-sm font-medium text-status-info dark:text-status-info">
                         PRN Details
                     </p>
@@ -820,7 +820,7 @@ function ImportCsvDialog() {
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
                         <p className="font-medium text-status-info dark:text-status-info">
                             CSV Format
                         </p>

@@ -54,19 +54,19 @@ type Props = {
 };
 
 const severityConfig: Record<string, { bg: string; text: string; border: string; darkBg: string; darkText: string }> = {
-    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical', border: 'border-l-red-600', darkBg: 'dark:bg-status-critical', darkText: 'dark:text-status-critical' },
-    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-l-orange-500', darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
-    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-l-amber-500', darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
-    low: { bg: 'bg-status-info-bg', text: 'text-status-info', border: 'border-l-blue-500', darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
+    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical', border: 'border-l-red-600', darkBg: '', darkText: 'dark:text-status-critical' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-l-orange-500', darkBg: '', darkText: 'dark:text-status-warning' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-l-amber-500', darkBg: '', darkText: 'dark:text-status-warning' },
+    low: { bg: 'bg-status-info-bg', text: 'text-status-info', border: 'border-l-blue-500', darkBg: '', darkText: 'dark:text-status-info' },
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock; darkBg: string; darkText: string }> = {
-    open: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock, darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
-    triaged: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Eye, darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
+    open: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock, darkBg: '', darkText: 'dark:text-status-info' },
+    triaged: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Eye, darkBg: '', darkText: 'dark:text-status-info' },
     investigating: { bg: 'bg-primary/10', text: 'text-primary', icon: Search, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
-    action_plan: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: FileEdit, darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
-    monitoring: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: Eye, darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
-    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2, darkBg: 'dark:bg-status-success', darkText: 'dark:text-status-success' },
+    action_plan: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: FileEdit, darkBg: '', darkText: 'dark:text-status-warning' },
+    monitoring: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: Eye, darkBg: '', darkText: 'dark:text-status-warning' },
+    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2, darkBg: '', darkText: 'dark:text-status-success' },
     referred_external: { bg: 'bg-primary/10', text: 'text-primary', icon: ExternalLink, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
     no_action_required: { bg: 'bg-muted', text: 'text-foreground', icon: CheckCircle2, darkBg: 'dark:bg-muted-foreground/80/10', darkText: 'dark:text-muted-foreground' },
     reported: { bg: 'bg-muted', text: 'text-foreground', icon: Clock, darkBg: 'dark:bg-muted-foreground/80/10', darkText: 'dark:text-muted-foreground' },
@@ -77,10 +77,10 @@ const statusConfig: Record<string, { bg: string; text: string; icon: typeof Cloc
 /* ------------------------------------------------------------------ */
 
 const STAT_COLORS = {
-    blue: { bg: 'bg-status-info-bg dark:bg-status-info', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
-    red: { bg: 'bg-status-critical-bg dark:bg-status-critical', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
-    amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
-    emerald: { bg: 'bg-status-success-bg dark:bg-status-success', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
+    blue: { bg: 'bg-status-info-bg', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
+    red: { bg: 'bg-status-critical-bg', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
+    amber: { bg: 'bg-status-warning-bg', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
+    emerald: { bg: 'bg-status-success-bg', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
 };
 
 function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {

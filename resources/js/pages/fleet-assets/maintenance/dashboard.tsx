@@ -461,7 +461,7 @@ export default function MaintenanceDashboard({
                                     {overdueServices.map((svc) => (
                                         <div
                                             key={svc.id}
-                                            className="flex items-center justify-between rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 dark:border-status-critical/30 dark:bg-status-critical"
+                                            className="flex items-center justify-between rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 dark:border-status-critical/30"
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">{svc.name}</p>

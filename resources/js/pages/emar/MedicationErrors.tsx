@@ -580,7 +580,7 @@ export default function MedicationErrors({
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                            <div className="rounded-lg bg-status-warning-bg p-2">
                                 <Clock className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
@@ -595,7 +595,7 @@ export default function MedicationErrors({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-critical-bg p-2 dark:bg-status-critical">
+                            <div className="rounded-lg bg-status-critical-bg p-2">
                                 <ShieldAlert className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
@@ -610,7 +610,7 @@ export default function MedicationErrors({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                            <div className="rounded-lg bg-status-info-bg p-2">
                                 <AlertTriangle className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
@@ -625,7 +625,7 @@ export default function MedicationErrors({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                            <div className="rounded-lg bg-status-success-bg p-2">
                                 <CheckCircle className="h-5 w-5 text-status-success" />
                             </div>
                             <div>

@@ -304,8 +304,8 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                 <div className="grid grid-cols-3 gap-3">
                                     {[
                                         { value: 'good', label: 'Good', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
-                                        { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg dark:bg-status-warning', textColor: 'text-status-warning dark:text-status-warning' },
-                                        { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg dark:bg-status-critical', textColor: 'text-status-critical dark:text-status-critical' },
+                                        { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg', textColor: 'text-status-warning dark:text-status-warning' },
+                                        { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg', textColor: 'text-status-critical dark:text-status-critical' },
                                     ].map((opt) => (
                                         <Button
                                             key={opt.value}
@@ -337,8 +337,8 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                 <div className="grid grid-cols-3 gap-3">
                                     {[
                                         { value: 'clean', label: 'Clean', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
-                                        { value: 'acceptable', label: 'Acceptable', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg dark:bg-status-warning', textColor: 'text-status-warning dark:text-status-warning' },
-                                        { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg dark:bg-status-critical', textColor: 'text-status-critical dark:text-status-critical' },
+                                        { value: 'acceptable', label: 'Acceptable', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg', textColor: 'text-status-warning dark:text-status-warning' },
+                                        { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg', textColor: 'text-status-critical dark:text-status-critical' },
                                     ].map((opt) => (
                                         <Button
                                             key={opt.value}
@@ -385,7 +385,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                             "flex items-center justify-between rounded-xl border-2 p-4 transition-all",
                                             form.data[item.key]
                                                 ? "border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/10"
-                                                : "border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical"
+                                                : "border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30"
                                         )}>
                                             <div className="flex items-center gap-3">
                                                 <div className={cn(

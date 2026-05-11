@@ -607,7 +607,7 @@ export default function NotificationEscalations({
                         </Card>
                         <Card className="border-status-success/30 dark:border-status-success/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg">
                                     <Zap className="h-4 w-4 text-status-success dark:text-status-success" />
                                 </div>
                                 <div>
@@ -622,7 +622,7 @@ export default function NotificationEscalations({
                         </Card>
                         <Card className="border-status-warning/30 dark:border-status-warning/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg dark:bg-status-warning">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg">
                                     <Bell className="h-4 w-4 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
@@ -637,7 +637,7 @@ export default function NotificationEscalations({
                         </Card>
                         <Card className="border-status-critical/30 dark:border-status-critical/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg dark:bg-status-critical">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg">
                                     <Megaphone className="h-4 w-4 text-status-critical dark:text-status-critical" />
                                 </div>
                                 <div>
@@ -653,9 +653,9 @@ export default function NotificationEscalations({
                     </div>
 
                     {/* ── Info Banner ── */}
-                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30 dark:bg-status-info">
+                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">
                         <CardContent className="flex gap-3 p-4">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-info-bg dark:bg-status-info">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-info-bg">
                                 <Info className="h-4 w-4 text-status-info dark:text-status-info" />
                             </div>
                             <div className="space-y-2 text-sm text-status-info dark:text-status-info">
@@ -1063,7 +1063,7 @@ export default function NotificationEscalations({
                                                         <div
                                                             className={`flex items-center justify-between gap-4 rounded-lg border px-4 py-3 ${
                                                                 r.force_delivery
-                                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
                                                                     : 'bg-background'
                                                             }`}
                                                         >

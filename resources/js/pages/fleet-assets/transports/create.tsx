@@ -602,7 +602,7 @@ export default function TransportCreate({
                                 )}
 
                                 {selectedShift && (
-                                    <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                                    <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
                                         <p className="font-medium text-status-info dark:text-status-info">
                                             Linked shift #{selectedShift.id}
                                         </p>

@@ -244,7 +244,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                         label="Critical"
                         value={stats.my_critical}
                         icon={AlertTriangle}
-                        className={stats.my_critical > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : undefined}
+                        className={stats.my_critical > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' : undefined}
                     />
                 </div>
 

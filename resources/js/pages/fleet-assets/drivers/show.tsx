@@ -300,11 +300,11 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                                         <div className="text-3xl font-bold">{safeSessions.length}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Sessions</div>
                                     </div>
-                                    <div className="rounded-lg bg-status-warning-bg p-3 text-center dark:bg-status-warning">
+                                    <div className="rounded-lg bg-status-warning-bg p-3 text-center">
                                         <div className="text-2xl font-bold text-status-warning">{aggregatedMetrics.harsh_brakes}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Harsh Brakes</div>
                                     </div>
-                                    <div className="rounded-lg bg-status-critical-bg p-3 text-center dark:bg-status-critical">
+                                    <div className="rounded-lg bg-status-critical-bg p-3 text-center">
                                         <div className="text-2xl font-bold text-status-critical">{aggregatedMetrics.speeding_events}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Speeding Events</div>
                                     </div>

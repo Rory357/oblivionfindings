@@ -396,7 +396,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {pre_trip_results && (
-                                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 dark:border-status-info/30 dark:bg-status-info">
+                                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 dark:border-status-info/30">
                                         <div className="mb-1 text-sm font-medium text-status-info dark:text-status-info">Pre-Trip Comparison</div>
                                         <div className="grid gap-2 text-xs sm:grid-cols-3">
                                             <div>

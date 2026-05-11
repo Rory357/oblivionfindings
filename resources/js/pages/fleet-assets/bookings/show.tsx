@@ -200,7 +200,7 @@ export default function BookingShow({ booking, can }: Props) {
                                     </div>
                                 )}
                                 {b.rejection_reason && (
-                                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 dark:border-status-critical/30 dark:bg-status-critical">
+                                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 dark:border-status-critical/30">
                                         <dt className="text-xs text-status-critical dark:text-status-critical">Rejection Reason</dt>
                                         <dd className="mt-1 font-medium text-status-critical dark:text-status-critical">{b.rejection_reason}</dd>
                                     </div>

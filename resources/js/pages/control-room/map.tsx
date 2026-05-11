@@ -520,7 +520,7 @@ export default function ControlRoomMap({
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                            <div className="rounded-lg bg-status-info-bg p-2">
                                 <Radio className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
@@ -535,7 +535,7 @@ export default function ControlRoomMap({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                            <div className="rounded-lg bg-status-success-bg p-2">
                                 <Wifi className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
@@ -550,7 +550,7 @@ export default function ControlRoomMap({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-critical-bg p-2 dark:bg-status-critical">
+                            <div className="rounded-lg bg-status-critical-bg p-2">
                                 <WifiOff className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
@@ -565,7 +565,7 @@ export default function ControlRoomMap({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                            <div className="rounded-lg bg-status-warning-bg p-2">
                                 <AlertTriangle className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>

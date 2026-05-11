@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 
 const COLOR_MAP: Record<string, { bg: string; text: string; iconBg: string }> = {
     purple: { bg: 'bg-primary/10 dark:bg-primary/30', text: 'text-primary dark:text-primary/70', iconBg: 'bg-primary/10 dark:bg-primary/40' },
-    blue: { bg: 'bg-status-info-bg dark:bg-status-info', text: 'text-status-info dark:text-status-info', iconBg: 'bg-status-info-bg dark:bg-status-info' },
-    amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', text: 'text-status-warning dark:text-status-warning', iconBg: 'bg-status-warning-bg dark:bg-status-warning' },
-    cyan: { bg: 'bg-status-info-bg dark:bg-status-info', text: 'text-status-info dark:text-status-info', iconBg: 'bg-status-info-bg dark:bg-status-info' },
-    red: { bg: 'bg-status-critical-bg dark:bg-status-critical', text: 'text-status-critical dark:text-status-critical', iconBg: 'bg-status-critical-bg dark:bg-status-critical' },
+    blue: { bg: 'bg-status-info-bg', text: 'text-status-info dark:text-status-info', iconBg: 'bg-status-info-bg' },
+    amber: { bg: 'bg-status-warning-bg', text: 'text-status-warning dark:text-status-warning', iconBg: 'bg-status-warning-bg' },
+    cyan: { bg: 'bg-status-info-bg', text: 'text-status-info dark:text-status-info', iconBg: 'bg-status-info-bg' },
+    red: { bg: 'bg-status-critical-bg', text: 'text-status-critical dark:text-status-critical', iconBg: 'bg-status-critical-bg' },
     slate: { bg: 'bg-muted dark:bg-muted/30', text: 'text-foreground dark:text-muted-foreground', iconBg: 'bg-muted dark:bg-muted/40' },
 };
 

@@ -134,9 +134,9 @@ export default function HandoversIndex({
                                     <div
                                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
                                             h.status === 'acknowledged'
-                                                ? 'bg-status-success-bg text-status-success dark:bg-status-success'
+                                                ? 'bg-status-success-bg text-status-success'
                                                 : h.status === 'submitted'
-                                                  ? 'bg-status-warning-bg text-status-warning dark:bg-status-warning'
+                                                  ? 'bg-status-warning-bg text-status-warning'
                                                   : 'bg-muted text-foreground dark:bg-muted/40'
                                         }`}
                                     >

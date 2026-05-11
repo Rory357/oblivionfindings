@@ -449,7 +449,7 @@ export default function Profile({
                                             {mustVerifyEmail &&
                                                 profileData.emailVerifiedAt ===
                                                     null && (
-                                                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/50 dark:bg-status-warning">
+                                                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/50">
                                                         <p className="text-sm text-status-warning dark:text-status-warning">
                                                             Your email address
                                                             is unverified.{' '}
@@ -1228,7 +1228,7 @@ export default function Profile({
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="mb-4 flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50 dark:bg-status-critical">
+                                <div className="mb-4 flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50">
                                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                                     <div className="text-sm text-status-critical dark:text-status-critical">
                                         <span className="font-semibold">

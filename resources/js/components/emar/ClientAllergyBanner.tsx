@@ -15,28 +15,28 @@ interface Props {
 
 const severityConfig: Record<string, { bg: string; border: string; text: string; badge: string; icon: typeof ShieldAlert }> = {
     life_threatening: {
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         border: 'border-status-critical/30 dark:border-status-critical/30',
         text: 'text-status-critical dark:text-status-critical',
         badge: 'bg-status-critical text-white',
         icon: Skull,
     },
     severe: {
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         border: 'border-status-warning/30 dark:border-status-warning/30',
         text: 'text-status-warning dark:text-status-warning',
         badge: 'bg-status-warning text-white',
         icon: ShieldAlert,
     },
     moderate: {
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         border: 'border-status-warning/30 dark:border-status-warning/30',
         text: 'text-status-warning dark:text-status-warning',
         badge: 'bg-status-warning text-white',
         icon: AlertTriangle,
     },
     mild: {
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         border: 'border-status-info/30 dark:border-status-info/30',
         text: 'text-status-info dark:text-status-info',
         badge: 'bg-status-info text-white',

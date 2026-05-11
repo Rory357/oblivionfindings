@@ -218,8 +218,8 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
                                     <div
                                         key={evt.id}
                                         className={`flex items-start gap-3 rounded-md border p-3 text-sm ${
-                                            evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' :
-                                            evt.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning' :
+                                            evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' :
+                                            evt.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30' :
                                             ''
                                         }`}
                                     >

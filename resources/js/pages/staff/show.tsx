@@ -478,7 +478,7 @@ export default function StaffShow({
                                     </div>
                                 </div>
                                 <div
-                                    className={`rounded-md border p-3 text-center ${fleet.stats.incidents_30d > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}
+                                    className={`rounded-md border p-3 text-center ${fleet.stats.incidents_30d > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' : ''}`}
                                 >
                                     <AlertTriangle
                                         className={`mx-auto mb-1 h-4 w-4 ${fleet.stats.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}

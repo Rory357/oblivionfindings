@@ -258,7 +258,7 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
                                 <CardContent>
                                     <div className="space-y-2">
                                         {(h.damage_notes ?? []).map((note, i) => (
-                                            <div key={i} className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30 dark:bg-status-warning">
+                                            <div key={i} className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30">
                                                 <div className="text-sm font-medium">{note.area}</div>
                                                 <div className="text-sm text-muted-foreground">{note.description}</div>
                                             </div>
@@ -298,7 +298,7 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
                                     ].map((item) => (
                                         <div key={item.label} className={cn(
                                             'flex items-center gap-3 rounded-lg border p-3 transition-colors',
-                                            item.value ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success' : 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                            item.value ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30' : 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
                                         )}>
                                             {item.value ? (
                                                 <Check className="h-5 w-5 text-status-success" />

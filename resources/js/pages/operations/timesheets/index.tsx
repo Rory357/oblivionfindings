@@ -952,7 +952,7 @@ export default function TimesheetsIndex({
                                                     </td>
                                                 </tr>
                                                 {showReturnBanner ? (
-                                                    <tr className="border-t bg-status-warning-bg dark:bg-status-warning">
+                                                    <tr className="border-t bg-status-warning-bg">
                                                         <td
                                                             colSpan={rowColspan}
                                                             className="p-3"

@@ -94,7 +94,7 @@ export function ProgressNoteEntry({
     if (compact) {
         return (
             <div
-                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs ${note.is_flagged ? 'border-l-2 border-l-red-500 bg-status-critical-bg dark:bg-status-critical' : ''}`}
+                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs ${note.is_flagged ? 'border-l-2 border-l-red-500 bg-status-critical-bg' : ''}`}
             >
                 {note.author && (
                     <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/40">

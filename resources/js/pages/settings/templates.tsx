@@ -84,12 +84,12 @@ const CATEGORY_CONFIG: Record<
     },
     hr: {
         colour: 'text-status-info dark:text-status-info',
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         icon: Users,
     },
     incidents: {
         colour: 'text-status-critical dark:text-status-critical',
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         icon: AlertTriangle,
     },
     system: {

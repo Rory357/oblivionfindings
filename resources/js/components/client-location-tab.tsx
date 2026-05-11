@@ -164,7 +164,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
         <div className="space-y-4 mt-4">
             {/* Consent Warning */}
             {!hasConsent && (
-                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning">
+                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
                     <CardContent className="flex items-center gap-3 p-4">
                         <ShieldOff className="h-5 w-5 text-status-warning dark:text-status-warning shrink-0" />
                         <div>
@@ -179,7 +179,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
 
             {/* No Tracker */}
             {!hasTracker && (
-                <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30 dark:bg-status-info">
+                <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">
                     <CardContent className="flex items-center gap-3 p-4">
                         <Radio className="h-5 w-5 text-status-info dark:text-status-info shrink-0" />
                         <div className="flex-1">
@@ -206,11 +206,11 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
                             {isOnline ? (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg dark:bg-status-success">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg">
                                     <Wifi className="h-5 w-5 text-status-success dark:text-status-success" />
                                 </div>
                             ) : (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-critical-bg dark:bg-status-critical">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-critical-bg">
                                     <WifiOff className="h-5 w-5 text-status-critical dark:text-status-critical" />
                                 </div>
                             )}
@@ -245,8 +245,8 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                         <CardContent className="flex items-center gap-3 p-4">
                             <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
                                 (tracker.battery ?? 100) < 20
-                                    ? 'bg-status-critical-bg dark:bg-status-critical'
-                                    : 'bg-status-success-bg dark:bg-status-success'
+                                    ? 'bg-status-critical-bg'
+                                    : 'bg-status-success-bg'
                             }`}>
                                 {(tracker.battery ?? 100) < 20 ? (
                                     <BatteryLow className="h-5 w-5 text-status-critical dark:text-status-critical" />
@@ -266,7 +266,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                     {/* Last Seen */}
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg dark:bg-status-info">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg">
                                 <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
                             </div>
                             <div>

@@ -24,7 +24,7 @@ export function EligibilityAlertBanner({
 
     if (type === 'blocked') {
         return (
-            <Alert variant="destructive" className={cn('border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical', className)}>
+            <Alert variant="destructive" className={cn('border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30', className)}>
                 <ShieldAlert className="size-4" />
                 <AlertTitle>{title ?? 'This staff member cannot be assigned'}</AlertTitle>
                 <AlertDescription>

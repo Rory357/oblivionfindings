@@ -8,10 +8,10 @@
  */
 
 const CELL_COLORS: Record<string, string> = {
-    low: 'bg-status-success-bg dark:bg-status-success',
-    medium: 'bg-status-warning-bg dark:bg-status-warning',
-    high: 'bg-status-warning-bg dark:bg-status-warning',
-    extreme: 'bg-status-critical-bg dark:bg-status-critical',
+    low: 'bg-status-success-bg',
+    medium: 'bg-status-warning-bg',
+    high: 'bg-status-warning-bg',
+    extreme: 'bg-status-critical-bg',
 };
 
 const ACTIVE_RING = 'ring-2 ring-offset-1 ring-ring';

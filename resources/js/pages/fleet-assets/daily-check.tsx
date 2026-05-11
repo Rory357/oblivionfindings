@@ -148,8 +148,8 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
                                             ? 'border-primary/30 bg-primary/10/30 dark:bg-primary/10'
-                                            : 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning'
-                                        : 'border-status-critical/30 bg-status-critical-bg dark:bg-status-critical'
+                                            : 'border-status-warning/30 bg-status-warning-bg'
+                                        : 'border-status-critical/30 bg-status-critical-bg'
                                 }`}
                             >
                                 <CardContent className="p-4">

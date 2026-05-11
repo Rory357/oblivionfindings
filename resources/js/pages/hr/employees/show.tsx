@@ -2695,7 +2695,7 @@ export default function EmployeeShow({
                                                             {tasks.map((t) => (
                                                                 <div
                                                                     key={t.id}
-                                                                    className={`flex items-start gap-3 rounded-lg border p-3 ${t.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/20 dark:bg-status-success' : ''}`}
+                                                                    className={`flex items-start gap-3 rounded-lg border p-3 ${t.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/20' : ''}`}
                                                                 >
                                                                     {t.status ===
                                                                     'completed' ? (

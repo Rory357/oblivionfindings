@@ -604,7 +604,7 @@ function RecordStep({
 
                 {/* Over-limit banner */}
                 {med.over_limit && (
-                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm dark:border-status-critical/30 dark:bg-status-critical">
+                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm dark:border-status-critical/30">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical dark:text-status-critical" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-critical dark:text-status-critical">
@@ -623,7 +623,7 @@ function RecordStep({
                     still saves the record without a shift_id; we just tell the
                     worker that, so the reporting context isn't ambiguous. */}
                 {nullShiftNotice && (
-                    <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                    <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
                         <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-info dark:text-status-info" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-info dark:text-status-info">

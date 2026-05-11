@@ -987,8 +987,8 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                     <div
                                         key={evt.id}
                                         className={`flex items-start gap-3 rounded-md border p-3 text-sm ${
-                                            evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' :
-                                            evt.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning' :
+                                            evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' :
+                                            evt.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30' :
                                             ''
                                         }`}
                                     >
@@ -1029,7 +1029,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                 {maintenanceRecords.map((m) => {
                                     const isOverdue = m.status === 'scheduled' && m.scheduled_for && new Date(m.scheduled_for) < new Date();
                                     return (
-                                        <div key={m.id} className={`rounded-lg border p-4 text-sm ${isOverdue ? 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning' : ''}`}>
+                                        <div key={m.id} className={`rounded-lg border p-4 text-sm ${isOverdue ? 'border-status-warning/30 bg-status-warning-bg' : ''}`}>
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex flex-wrap items-center gap-2">

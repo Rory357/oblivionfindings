@@ -312,7 +312,7 @@ export default function MyHrIndex({
                                     <CalendarDays className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-info-bg dark:bg-status-info">
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-info-bg">
                                 <div
                                     className="h-full rounded-full bg-status-info transition-all"
                                     style={{
@@ -344,7 +344,7 @@ export default function MyHrIndex({
                                     <Receipt className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-warning-bg dark:bg-status-warning">
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-warning-bg">
                                 <div
                                     className="h-full rounded-full bg-status-warning transition-all"
                                     style={{
@@ -400,7 +400,7 @@ export default function MyHrIndex({
                                     <Target className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-success-bg dark:bg-status-success">
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-success-bg">
                                 <div
                                     className="h-full rounded-full bg-status-success transition-all"
                                     style={{

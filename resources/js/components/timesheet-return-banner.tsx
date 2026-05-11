@@ -103,7 +103,7 @@ export function TimesheetReturnBanner({
                             <Button
                                 type="button"
                                 size="sm"
-                                className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:bg-status-warning dark:hover:bg-status-warning"
+                                className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:hover:bg-status-warning"
                                 onClick={() => setEditOpen(true)}
                                 disabled={!timesheet.can_edit_inline}
                                 title={
@@ -125,7 +125,7 @@ export function TimesheetReturnBanner({
                         <Button
                             asChild
                             size="sm"
-                            className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:bg-status-warning dark:hover:bg-status-warning"
+                            className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:hover:bg-status-warning"
                         >
                             <Link href={href}>
                                 Fix and resend

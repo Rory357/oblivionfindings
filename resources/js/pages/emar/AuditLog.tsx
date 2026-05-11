@@ -86,7 +86,7 @@ const EVENT_CONFIG: Record<
         label: 'Medication Started',
         icon: Pill,
         color: 'text-status-success dark:text-status-success',
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
         badgeVariant:
             'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
@@ -94,7 +94,7 @@ const EVENT_CONFIG: Record<
         label: 'Medication Ceased',
         icon: XCircle,
         color: 'text-status-critical dark:text-status-critical',
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         badgeVariant:
             'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
@@ -102,7 +102,7 @@ const EVENT_CONFIG: Record<
         label: 'Medication Changed',
         icon: Edit,
         color: 'text-status-warning dark:text-status-warning',
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         badgeVariant:
             'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
@@ -110,7 +110,7 @@ const EVENT_CONFIG: Record<
         label: 'Dose Administered',
         icon: Check,
         color: 'text-status-info dark:text-status-info',
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         badgeVariant:
             'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
@@ -118,7 +118,7 @@ const EVENT_CONFIG: Record<
         label: 'Dose Refused',
         icon: XCircle,
         color: 'text-status-warning dark:text-status-warning',
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         badgeVariant:
             'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
@@ -126,7 +126,7 @@ const EVENT_CONFIG: Record<
         label: 'Dose Missed',
         icon: AlertTriangle,
         color: 'text-status-critical dark:text-status-critical',
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         badgeVariant:
             'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
@@ -142,7 +142,7 @@ const EVENT_CONFIG: Record<
         label: 'Review Completed',
         icon: ClipboardCheck,
         color: 'text-status-info dark:text-status-info',
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         badgeVariant:
             'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
@@ -150,7 +150,7 @@ const EVENT_CONFIG: Record<
         label: 'Stock Received',
         icon: Package,
         color: 'text-status-success dark:text-status-success',
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
         badgeVariant:
             'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
@@ -158,7 +158,7 @@ const EVENT_CONFIG: Record<
         label: 'Medication Destroyed',
         icon: Trash2,
         color: 'text-status-critical dark:text-status-critical',
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         badgeVariant:
             'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
@@ -166,7 +166,7 @@ const EVENT_CONFIG: Record<
         label: 'Error Reported',
         icon: AlertOctagon,
         color: 'text-status-critical dark:text-status-critical',
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         badgeVariant:
             'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
@@ -371,7 +371,7 @@ export default function AuditLog({
                 <div className="mb-6 grid gap-3 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info-bg dark:bg-status-info">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info-bg">
                                 <FileText className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
@@ -386,7 +386,7 @@ export default function AuditLog({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success-bg">
                                 <Calendar className="h-5 w-5 text-status-success" />
                             </div>
                             <div>

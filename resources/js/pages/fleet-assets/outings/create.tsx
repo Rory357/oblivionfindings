@@ -497,7 +497,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
                             {/* Medication alert */}
                             {hasMedicationAlert && (
-                                <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/30 dark:bg-status-warning">
+                                <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/30">
                                     <Pill className="h-5 w-5 text-status-warning shrink-0" />
                                     <div>
                                         <p className="text-sm font-medium text-status-warning dark:text-status-warning">Medication Reminder</p>
@@ -733,7 +733,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
                                         {/* Vehicle compatibility warning */}
                                         {form.data.asset_id && !isVehicleCompatible(filteredVehicles.find((v) => String(v.id) === form.data.asset_id) ?? {} as VehicleOption) && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 dark:border-status-warning/30 dark:bg-status-warning">
+                                            <div className="flex items-center gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 dark:border-status-warning/30">
                                                 <AlertTriangle className="h-4 w-4 text-status-warning shrink-0" />
                                                 <p className="text-xs text-status-warning dark:text-status-warning">
                                                     This vehicle does not meet all accessibility needs of selected residents.

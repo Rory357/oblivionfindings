@@ -162,8 +162,8 @@ export default function ClientSafetyRibbon({
             className={cn(
                 'rounded-xl border-2 shadow-sm',
                 hasDanger
-                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
-                    : 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning',
+                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
+                    : 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30',
                 sticky && 'sticky top-2 z-20 md:top-4',
                 className,
             )}

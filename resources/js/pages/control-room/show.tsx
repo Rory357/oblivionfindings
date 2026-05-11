@@ -815,7 +815,7 @@ export default function ControlRoomAlertShow({
 
                                                 {/* Affected Residents */}
                                                 {fc?.affected_resident_count != null && fc.affected_resident_count > 0 && (
-                                                    <div className="rounded-md bg-status-warning-bg dark:bg-status-warning p-3">
+                                                    <div className="rounded-md bg-status-warning-bg p-3">
                                                         <div className="flex items-center gap-2 text-xs font-semibold uppercase text-status-warning dark:text-status-warning"><Users className="h-3 w-3" /> Affected Residents ({fc.affected_resident_count})</div>
                                                     </div>
                                                 )}

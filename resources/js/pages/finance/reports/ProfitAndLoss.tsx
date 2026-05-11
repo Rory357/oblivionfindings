@@ -95,7 +95,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-success-bg p-3 dark:bg-status-success">
+                            <div className="rounded-full bg-status-success-bg p-3">
                                 <TrendingUp className="h-5 w-5 text-status-success dark:text-status-success" />
                             </div>
                             <div>
@@ -108,7 +108,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-critical-bg p-3 dark:bg-status-critical">
+                            <div className="rounded-full bg-status-critical-bg p-3">
                                 <TrendingDown className="h-5 w-5 text-status-critical dark:text-status-critical" />
                             </div>
                             <div>
@@ -124,8 +124,8 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.net_profit >= 0
-                                        ? 'bg-status-success-bg dark:bg-status-success'
-                                        : 'bg-status-critical-bg dark:bg-status-critical'
+                                        ? 'bg-status-success-bg'
+                                        : 'bg-status-critical-bg'
                                 }`}
                             >
                                 <DollarSign

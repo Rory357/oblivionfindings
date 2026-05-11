@@ -127,9 +127,9 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border bg-status-info-bg dark:bg-status-info">
+                    <Card className="border bg-status-info-bg">
                         <CardContent className="flex items-center gap-4 p-4">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-info-bg dark:bg-status-info">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-info-bg">
                                 <Radio className="h-6 w-6 text-status-info dark:text-status-info" />
                             </div>
                             <div>

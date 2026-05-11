@@ -178,7 +178,7 @@ export default function MyTraining({ complianceStatuses }: Props) {
 
                 {/* Urgency Banner */}
                 {urgentItems.length > 0 && (
-                    <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50 dark:bg-status-critical">
+                    <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50">
                         <div className="flex items-start gap-3">
                             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                             <div>

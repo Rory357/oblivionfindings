@@ -20,7 +20,7 @@ export default function PreviousShiftCard({ shift }: { shift: PreviousShift }) {
     const timesheetStatus = shift.timesheet?.status ?? 'draft';
 
     return (
-        <section className="rounded-xl border border-status-success/30 bg-status-success-bg p-4 shadow-sm dark:border-status-success/40 dark:bg-status-success">
+        <section className="rounded-xl border border-status-success/30 bg-status-success-bg p-4 shadow-sm dark:border-status-success/40">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">

@@ -124,7 +124,7 @@ export default function RolesIndex(props: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 py-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-info-bg dark:bg-status-info">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-info-bg">
                                 <KeyRound className="h-5 w-5 text-status-info dark:text-status-info" />
                             </div>
                             <div>
@@ -135,7 +135,7 @@ export default function RolesIndex(props: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 py-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg">
                                 <Users className="h-5 w-5 text-status-success dark:text-status-success" />
                             </div>
                             <div>

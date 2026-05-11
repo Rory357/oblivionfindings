@@ -1037,7 +1037,7 @@ export default function FamilyDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-3 rounded-lg bg-status-warning-bg p-3 dark:bg-status-warning">
+                                    <div className="flex items-center gap-3 rounded-lg bg-status-warning-bg p-3">
                                         <span className="text-2xl">
                                             {dailySummary.completedToday > 0 &&
                                             dailySummary.scheduledToday === 0
@@ -1127,7 +1127,7 @@ export default function FamilyDashboard({
                                         </div>
                                     )}
                                     {carePlan.important_to_me && (
-                                        <div className="rounded-lg bg-status-warning-bg p-3 dark:bg-status-warning">
+                                        <div className="rounded-lg bg-status-warning-bg p-3">
                                             <p className="mb-1 text-xs font-medium text-status-warning dark:text-status-warning">
                                                 ⭐ What's Important to Me
                                             </p>
@@ -1159,7 +1159,7 @@ export default function FamilyDashboard({
                                     {(carePlan.likes || carePlan.dislikes) && (
                                         <div className="grid grid-cols-2 gap-3">
                                             {carePlan.likes && (
-                                                <div className="rounded-lg bg-status-success-bg p-3 dark:bg-status-success">
+                                                <div className="rounded-lg bg-status-success-bg p-3">
                                                     <p className="mb-1 text-xs font-medium text-status-success dark:text-status-success">
                                                         💚 Things I Love
                                                     </p>
@@ -1718,7 +1718,7 @@ export default function FamilyDashboard({
 
                         {/* On Shift Now */}
                         {(currentShiftWorker || nextShiftWorker) && (
-                            <Card className="border-status-success/30 bg-status-success-bg dark:bg-status-success">
+                            <Card className="border-status-success/30 bg-status-success-bg">
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span>🟢</span>

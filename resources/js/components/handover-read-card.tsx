@@ -115,7 +115,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
             aria-label="Handover from last shift"
             className={cn(
                 'scroll-mt-20 rounded-xl border border-status-info/30 bg-status-info-bg p-4 shadow-sm',
-                'dark:border-status-info/40 dark:bg-status-info',
+                'dark:border-status-info/40',
             )}
         >
             <div className="flex items-start justify-between gap-3">

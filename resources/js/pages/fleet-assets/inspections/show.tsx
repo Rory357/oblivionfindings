@@ -220,11 +220,11 @@ export default function InspectionShow({ inspection }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-3 gap-3">
-                                <div className="rounded-lg bg-status-success-bg p-3 text-center dark:bg-status-success">
+                                <div className="rounded-lg bg-status-success-bg p-3 text-center">
                                     <div className="text-2xl font-bold text-status-success">{counts.pass}</div>
                                     <div className="mt-1 text-xs text-muted-foreground">Passed</div>
                                 </div>
-                                <div className="rounded-lg bg-status-critical-bg p-3 text-center dark:bg-status-critical">
+                                <div className="rounded-lg bg-status-critical-bg p-3 text-center">
                                     <div className="text-2xl font-bold text-status-critical">{counts.fail}</div>
                                     <div className="mt-1 text-xs text-muted-foreground">Failed</div>
                                 </div>
@@ -255,9 +255,9 @@ export default function InspectionShow({ inspection }: Props) {
                                         className={cn(
                                             'flex items-center gap-3 rounded-lg border p-3 transition-colors',
                                             item.result === 'fail'
-                                                ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                                ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
                                                 : item.result === 'pass'
-                                                ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/50 dark:bg-status-success'
+                                                ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/50'
                                                 : ''
                                         )}
                                     >

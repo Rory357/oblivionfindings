@@ -234,12 +234,12 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Wages</p>
                                 <p className="mt-1 text-xl font-bold text-primary dark:text-primary/70">{$(dashboard.staffing.wages)}</p>
                             </div>
-                            <div className="rounded-lg bg-status-info-bg p-4 dark:bg-status-info">
+                            <div className="rounded-lg bg-status-info-bg p-4">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Employer On-Costs</p>
                                 <p className="mt-1 text-xl font-bold text-status-info dark:text-status-info">{$(dashboard.staffing.employer_oncost)}</p>
                                 <p className="mt-0.5 text-[10px] text-muted-foreground">{pct(dashboard.staffing.oncost_pct_of_wages)} of wages</p>
                             </div>
-                            <div className="rounded-lg bg-status-info-bg p-4 dark:bg-status-info">
+                            <div className="rounded-lg bg-status-info-bg p-4">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Total Staffing</p>
                                 <p className="mt-1 text-xl font-bold text-status-info dark:text-status-info">{$(dashboard.staffing.total_staffing_cost)}</p>
                             </div>

@@ -452,7 +452,7 @@ export default function ControlRoomIndex({
                         href="/control-room?severity=critical"
                         className={
                             stats.critical > 0
-                                ? 'border-status-critical/30 bg-status-critical-bg dark:bg-status-critical'
+                                ? 'border-status-critical/30 bg-status-critical-bg'
                                 : undefined
                         }
                     />
@@ -469,7 +469,7 @@ export default function ControlRoomIndex({
                         href="/control-room/sla"
                         className={
                             sla_compliance_pct < 90
-                                ? 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning'
+                                ? 'border-status-warning/30 bg-status-warning-bg'
                                 : undefined
                         }
                     />
@@ -479,7 +479,7 @@ export default function ControlRoomIndex({
                 {(stats.critical > 0 || active_shift) && (
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                         {stats.critical > 0 && (
-                            <div className="flex flex-1 items-center gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-2.5 dark:border-status-critical/30 dark:bg-status-critical">
+                            <div className="flex flex-1 items-center gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-2.5 dark:border-status-critical/30">
                                 <div className="relative flex h-3 w-3">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-critical opacity-75" />
                                     <span className="relative inline-flex h-3 w-3 rounded-full bg-status-critical" />

@@ -79,7 +79,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {isVerbalOrTelephone && (
-                        <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30 dark:bg-status-warning">
+                        <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
                             <p className="text-sm text-status-warning dark:text-status-warning">
                                 Verbal and telephone orders require prescriber countersignature within 72 hours.

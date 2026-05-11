@@ -51,11 +51,11 @@ const bucketColors: Record<string, string> = {
 };
 
 const bucketBgColors: Record<string, string> = {
-    current: 'bg-status-success-bg dark:bg-status-success',
-    '1_30': 'bg-status-warning-bg dark:bg-status-warning',
-    '31_60': 'bg-status-warning-bg dark:bg-status-warning',
-    '61_90': 'bg-status-critical-bg dark:bg-status-critical',
-    '90_plus': 'bg-status-critical-bg dark:bg-status-critical',
+    current: 'bg-status-success-bg',
+    '1_30': 'bg-status-warning-bg',
+    '31_60': 'bg-status-warning-bg',
+    '61_90': 'bg-status-critical-bg',
+    '90_plus': 'bg-status-critical-bg',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [

@@ -71,7 +71,7 @@ export function OverrideConfirmationDialog({
 
                 <div className="space-y-3">
                     {/* Warning list */}
-                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30 dark:bg-status-warning">
+                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30">
                         <ul className="space-y-1.5">
                             {warnings.map((w, i) => (
                                 <li key={i} className="flex items-start gap-2 text-sm text-status-warning dark:text-status-warning">
@@ -113,7 +113,7 @@ export function OverrideConfirmationDialog({
                     <Button
                         onClick={handleConfirm}
                         disabled={!canSubmit}
-                        className="bg-status-warning text-white hover:bg-status-warning dark:bg-status-warning dark:hover:bg-status-warning"
+                        className="bg-status-warning text-white hover:bg-status-warning dark:hover:bg-status-warning"
                     >
                         {processing ? 'Assigning...' : 'Override & Assign'}
                     </Button>

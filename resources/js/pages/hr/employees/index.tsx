@@ -154,22 +154,22 @@ interface StatCardProps {
 
 const STAT_COLORS = {
     blue: {
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         icon: 'text-status-info dark:text-status-info',
         ring: 'ring-status-info dark:ring-status-info/20',
     },
     emerald: {
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
         icon: 'text-status-success dark:text-status-success',
         ring: 'ring-status-success dark:ring-status-success/20',
     },
     amber: {
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         icon: 'text-status-warning dark:text-status-warning',
         ring: 'ring-status-warning dark:ring-status-warning/20',
     },
     red: {
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         icon: 'text-status-critical dark:text-status-critical',
         ring: 'ring-status-critical dark:ring-status-critical/20',
     },

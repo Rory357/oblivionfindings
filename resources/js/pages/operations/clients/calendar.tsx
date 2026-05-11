@@ -64,19 +64,19 @@ const categories = [
         dot: 'bg-status-info',
         label: 'Shifts',
         icon: CalendarDays,
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
     },
     {
         dot: 'bg-status-success',
         label: 'Family Visits',
         icon: Users,
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
     },
     {
         dot: 'bg-status-warning',
         label: 'GP Visits',
         icon: Stethoscope,
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
     },
     {
         dot: 'bg-primary',
@@ -94,7 +94,7 @@ const categories = [
         dot: 'bg-status-info',
         label: 'Activities',
         icon: Calendar,
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
     },
 ];
 

@@ -176,7 +176,7 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                                <div className="rounded-lg bg-status-info-bg p-2">
                                     <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
                                 </div>
                                 <div>
@@ -202,7 +202,7 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                                <div className="rounded-lg bg-status-success-bg p-2">
                                     <ShieldCheck className="h-5 w-5 text-status-success dark:text-status-success" />
                                 </div>
                                 <div>
@@ -215,7 +215,7 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                                <div className="rounded-lg bg-status-warning-bg p-2">
                                     <AlertTriangle className="h-5 w-5 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
@@ -532,7 +532,7 @@ export default function ControlRoomStats({
                                             key={i}
                                             className={`rounded-lg border p-4 ${
                                                 !ss.is_healthy
-                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
                                                     : 'border-border'
                                             }`}
                                         >

@@ -787,7 +787,7 @@ export default function TransportShow({
                                         </div>
                                     )}
                                     {t.shift && (
-                                        <div className="rounded-md bg-status-info-bg p-3 dark:bg-status-info">
+                                        <div className="rounded-md bg-status-info-bg p-3">
                                             <dt className="text-xs text-status-info dark:text-status-info">
                                                 Linked Shift
                                             </dt>
@@ -1044,7 +1044,7 @@ export default function TransportShow({
 
                         {t.status === 'in_progress' &&
                             (completion_blockers ?? []).length > 0 && (
-                                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning">
+                                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
                                     <CardContent className="space-y-2 p-4">
                                         <div className="flex items-center gap-2 text-sm font-semibold text-status-warning dark:text-status-warning">
                                             <AlertTriangle className="h-4 w-4" />

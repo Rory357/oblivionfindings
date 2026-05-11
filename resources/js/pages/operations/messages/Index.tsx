@@ -722,7 +722,7 @@ export default function MessagesChat({
 
                             {/* Pinned Messages */}
                             {showPinned && pinnedMsgs.length > 0 && (
-                                <div className="border-b bg-status-warning-bg px-4 py-2 dark:bg-status-warning">
+                                <div className="border-b bg-status-warning-bg px-4 py-2">
                                     <div className="mb-1 flex items-center justify-between">
                                         <span className="text-[10px] font-semibold tracking-wider text-status-warning uppercase">
                                             <Pin className="mr-1 inline h-3 w-3" />

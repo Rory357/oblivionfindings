@@ -125,7 +125,7 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
 
                 {/* Funding Gap Banner */}
                 {gap.is_underfunded && (
-                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/30 dark:bg-status-critical">
+                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/30">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical dark:text-status-critical" />
                         <div>
                             <p className="text-sm font-medium text-status-critical dark:text-status-critical">Underfunded Client</p>

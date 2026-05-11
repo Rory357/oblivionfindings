@@ -132,7 +132,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                                <div className="rounded-lg bg-status-info-bg p-2">
                                     <DollarSign className="h-5 w-5 text-status-info dark:text-status-info" />
                                 </div>
                                 <div>
@@ -145,7 +145,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-critical-bg p-2 dark:bg-status-critical">
+                                <div className="rounded-lg bg-status-critical-bg p-2">
                                     <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical" />
                                 </div>
                                 <div>
@@ -158,7 +158,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                                <div className="rounded-lg bg-status-warning-bg p-2">
                                     <CalendarClock className="h-5 w-5 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
@@ -261,7 +261,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                         key={bill.id}
                                         className={cn(
                                             'cursor-pointer hover:bg-muted/50',
-                                            isOverdue(bill) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:bg-status-critical dark:hover:bg-status-critical',
+                                            isOverdue(bill) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
                                         onClick={() => router.get(`/finance/bills/${bill.id}`)}
                                     >

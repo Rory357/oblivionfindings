@@ -389,7 +389,7 @@ export default function StockManagement({
                 <div className="mb-6 grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-info-bg text-status-info dark:bg-status-info">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-info-bg text-status-info">
                                 <Package className="h-5 w-5" />
                             </div>
                             <div>
@@ -404,7 +404,7 @@ export default function StockManagement({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
                                 <AlertTriangle className="h-5 w-5" />
                             </div>
                             <div>
@@ -419,7 +419,7 @@ export default function StockManagement({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
                                 <Clock className="h-5 w-5" />
                             </div>
                             <div>
@@ -434,7 +434,7 @@ export default function StockManagement({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical">
                                 <Calendar className="h-5 w-5" />
                             </div>
                             <div>
@@ -1347,7 +1347,7 @@ export default function StockManagement({
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr
-                                                    className={`border-b ${tab === 'low' ? 'bg-status-warning-bg dark:bg-status-warning' : tab === 'expired' ? 'bg-status-critical-bg dark:bg-status-critical' : 'bg-muted/50'}`}
+                                                    className={`border-b ${tab === 'low' ? 'bg-status-warning-bg' : tab === 'expired' ? 'bg-status-critical-bg' : 'bg-muted/50'}`}
                                                 >
                                                     <th className="p-3 text-left font-medium">
                                                         Medication

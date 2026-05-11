@@ -2950,7 +2950,7 @@ export default function ClientShow({
                                             return (
                                                 <div
                                                     key={step.id}
-                                                    className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}
+                                                    className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' : ''}`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
@@ -7496,7 +7496,7 @@ export default function ClientShow({
                             <div className="space-y-6">
                                 {/* Stats */}
                                 <div className="grid gap-3 sm:grid-cols-3">
-                                    <Card className="border bg-status-info-bg dark:bg-status-info">
+                                    <Card className="border bg-status-info-bg">
                                         <CardContent className="p-4">
                                             <div className="text-2xl font-bold text-status-info dark:text-status-info">
                                                 {ts.transports_30d}
@@ -7517,7 +7517,7 @@ export default function ClientShow({
                                         </CardContent>
                                     </Card>
                                     <Card
-                                        className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg dark:bg-status-critical' : 'bg-muted/30'}`}
+                                        className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg' : 'bg-muted/30'}`}
                                     >
                                         <CardContent className="p-4">
                                             <div
@@ -8586,7 +8586,7 @@ function AssessmentsTab({
                         return (
                             <Card
                                 key={a.id}
-                                className={`overflow-hidden border-l-4 ${typeStyle.border} ${isOverdue ? 'bg-status-critical-bg dark:bg-status-critical' : ''}`}
+                                className={`overflow-hidden border-l-4 ${typeStyle.border} ${isOverdue ? 'bg-status-critical-bg' : ''}`}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start justify-between gap-3">
@@ -10451,13 +10451,13 @@ const CAL_CATEGORIES = [
         dot: 'bg-status-info',
         label: 'Shifts',
         icon: CalendarDays,
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
     },
     {
         dot: 'bg-status-success',
         label: 'Family Visits',
         icon: Users,
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
     },
     {
         dot: 'bg-status-critical',
@@ -10469,7 +10469,7 @@ const CAL_CATEGORIES = [
         dot: 'bg-status-warning',
         label: 'GP Visits',
         icon: Stethoscope,
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
     },
     {
         dot: 'bg-primary',
@@ -10481,7 +10481,7 @@ const CAL_CATEGORIES = [
         dot: 'bg-status-info',
         label: 'Activities',
         icon: Calendar,
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
     },
     {
         dot: 'bg-primary/70',

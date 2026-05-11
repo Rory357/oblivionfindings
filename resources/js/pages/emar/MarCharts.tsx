@@ -1582,16 +1582,16 @@ export default function MarCharts({
                                                                                                             className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
                                                                                                                 a.status ===
                                                                                                                 'given'
-                                                                                                                    ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success'
+                                                                                                                    ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30'
                                                                                                                     : a.status ===
                                                                                                                         'missed'
-                                                                                                                      ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                                                                                                                      ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
                                                                                                                       : a.status ===
                                                                                                                           'refused'
-                                                                                                                        ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                                                                                                        ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
                                                                                                                         : a.status ===
                                                                                                                             'withheld'
-                                                                                                                          ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                                                                                                          ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
                                                                                                                           : 'border-muted bg-muted/30'
                                                                                                             }`}
                                                                                                         >

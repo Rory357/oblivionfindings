@@ -53,25 +53,25 @@ const views: { key: ViewKey; label: string }[] = [
 
 const categories = [
     {
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         dot: 'bg-status-info',
         label: 'Shifts',
         icon: CalendarDays,
     },
     {
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
         dot: 'bg-status-success',
         label: 'In Progress',
         icon: Clock,
     },
     {
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         dot: 'bg-status-warning',
         label: 'Medications',
         icon: Pill,
     },
     {
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
         dot: 'bg-status-success',
         label: 'Leave',
         icon: Palmtree,

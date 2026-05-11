@@ -86,9 +86,9 @@ const formatNZD = (amount: number) =>
 const formatPct = (pct: number) => `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 
 const varianceColorClasses: Record<string, string> = {
-    green: 'text-status-success bg-status-success-bg dark:text-status-success dark:bg-status-success',
-    yellow: 'text-status-warning bg-status-warning-bg dark:text-status-warning dark:bg-status-warning',
-    red: 'text-status-critical bg-status-critical-bg dark:text-status-critical dark:bg-status-critical',
+    green: 'text-status-success bg-status-success-bg dark:text-status-success',
+    yellow: 'text-status-warning bg-status-warning-bg dark:text-status-warning',
+    red: 'text-status-critical bg-status-critical-bg dark:text-status-critical',
 };
 
 const varianceBadgeClasses: Record<string, string> = {

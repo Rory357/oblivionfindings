@@ -197,7 +197,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             <Switch checked={portalMicrosoftEnabled} onCheckedChange={setPortalMicrosoftEnabled} />
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-status-info-bg p-4 text-sm dark:bg-status-info">
+                                    <div className="rounded-lg bg-status-info-bg p-4 text-sm">
                                         <p className="flex items-center gap-2 font-medium text-status-info dark:text-status-info">
                                             <Info className="h-4 w-4" />
                                             Required API Permissions
@@ -251,7 +251,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             <Switch checked={portalGoogleEnabled} onCheckedChange={setPortalGoogleEnabled} />
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-status-success-bg p-4 text-sm dark:bg-status-success">
+                                    <div className="rounded-lg bg-status-success-bg p-4 text-sm">
                                         <p className="flex items-center gap-2 font-medium text-status-success dark:text-status-success">
                                             <Info className="h-4 w-4" />
                                             Required OAuth Scopes

@@ -1690,7 +1690,7 @@ export default function SiteShow({
                                                 </CardContent>
                                             </Card>
                                             <Card
-                                                className={`border ${fs.incidents_this_month > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}
+                                                className={`border ${fs.incidents_this_month > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' : ''}`}
                                             >
                                                 <CardContent className="p-4 text-center">
                                                     <AlertTriangle

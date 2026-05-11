@@ -398,13 +398,13 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical"><XCircle className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical"><XCircle className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{expired.length}</p><p className="text-xs text-muted-foreground">Expired Assessments</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning"><Clock className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning"><Clock className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{expiringSoon.length}</p><p className="text-xs text-muted-foreground">Expiring Within 30 Days</p></div>
                         </CardContent>
                     </Card>

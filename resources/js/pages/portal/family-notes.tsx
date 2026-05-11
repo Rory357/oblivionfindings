@@ -514,7 +514,7 @@ function NoteCard({
 
                         {/* Staff Response */}
                         {note.staff_response && (
-                            <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2 dark:bg-status-info">
+                            <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2">
                                 <p className="text-xs">
                                     <span className="font-medium">
                                         {note.staff_responded_by_name}

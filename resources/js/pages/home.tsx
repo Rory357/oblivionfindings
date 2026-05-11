@@ -69,7 +69,7 @@ const Home: React.FC = () => {
                 {/* Background effects */}
                 <div className="pointer-events-none absolute inset-0">
                     <div className="absolute -top-20 -right-20 h-[400px] w-[400px] rounded-full bg-primary/10 blur-3xl dark:bg-primary/10" />
-                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-status-success blur-3xl dark:bg-status-success" />
+                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-status-success blur-3xl" />
                 </div>
 
                 <div className="relative mx-auto max-w-4xl text-center">

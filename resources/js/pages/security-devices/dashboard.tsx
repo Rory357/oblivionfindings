@@ -218,8 +218,8 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                                             <div
                                                 key={evt.id}
                                                 className={`flex items-center justify-between rounded-md border p-3 text-sm ${
-                                                    evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' :
-                                                    'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                                    evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30' :
+                                                    'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-2 min-w-0">
@@ -258,7 +258,7 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                                 {overdueMaintenance.length > 0 ? (
                                     <div className="space-y-2">
                                         {overdueMaintenance.map((m) => (
-                                            <div key={m.id} className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning p-3 text-sm">
+                                            <div key={m.id} className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 p-3 text-sm">
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-medium">{m.type.replace(/_/g, ' ')}</span>

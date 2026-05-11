@@ -1227,15 +1227,15 @@ export default function Data() {
                         <CardContent className="space-y-6">
                             {/* Stats row */}
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-center dark:border-status-warning/30 dark:bg-status-warning">
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-center dark:border-status-warning/30">
                                     <p className="text-2xl font-bold tabular-nums text-status-warning dark:text-status-warning">{dsarOpen}</p>
                                     <p className="text-xs text-status-warning dark:text-status-warning">Open Requests</p>
                                 </div>
-                                <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-center dark:border-status-success/30 dark:bg-status-success">
+                                <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-center dark:border-status-success/30">
                                     <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{dsarCompleted}</p>
                                     <p className="text-xs text-status-success dark:text-status-success">Completed</p>
                                 </div>
-                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-center dark:border-status-critical/30 dark:bg-status-critical">
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-center dark:border-status-critical/30">
                                     <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{dsarOverdue}</p>
                                     <p className="text-xs text-status-critical dark:text-status-critical">Overdue (&gt;20 working days)</p>
                                 </div>
@@ -1291,7 +1291,7 @@ export default function Data() {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg dark:bg-status-critical">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg">
                                         <ShieldAlert className="h-5 w-5 text-status-critical" />
                                     </div>
                                     <div>
@@ -1449,7 +1449,7 @@ export default function Data() {
                     <Card className="border-status-critical/30 dark:border-status-critical/30">
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg dark:bg-status-critical">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg">
                                     <Trash2 className="h-5 w-5 text-status-critical" />
                                 </div>
                                 <div>

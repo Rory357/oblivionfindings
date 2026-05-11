@@ -211,7 +211,7 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
                         {records.data.length > 0 ? (
                             <div className="space-y-2">
                                 {records.data.map((r) => (
-                                    <div key={r.id} className={`rounded-lg border p-4 text-sm ${r.is_overdue ? 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning' : ''}`}>
+                                    <div key={r.id} className={`rounded-lg border p-4 text-sm ${r.is_overdue ? 'border-status-warning/30 bg-status-warning-bg' : ''}`}>
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">

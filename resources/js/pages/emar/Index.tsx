@@ -287,7 +287,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {overdueMedications.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-status-critical/30 bg-status-critical-bg p-2.5 dark:border-status-critical/40 dark:bg-status-critical">
+                                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-status-critical/30 bg-status-critical-bg p-2.5 dark:border-status-critical/40">
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium">
                                                 {item.client ? `${item.client.first_name} ${item.client.last_name}` : 'Unknown Client'}
@@ -604,25 +604,25 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <CardContent>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Link href="/emar/competency" className="group block">
-                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 transition-all hover:shadow-sm dark:border-status-warning/30 dark:bg-status-warning">
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 transition-all hover:shadow-sm dark:border-status-warning/30">
                                     <p className="text-2xl font-bold text-status-warning dark:text-status-warning">{compliance.competencyExpiring}</p>
                                     <p className="text-xs text-muted-foreground">Competency Expiring (30d)</p>
                                 </div>
                             </Link>
                             <Link href="/emar/competency" className="group block">
-                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 transition-all hover:shadow-sm dark:border-status-critical/30 dark:bg-status-critical">
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 transition-all hover:shadow-sm dark:border-status-critical/30">
                                     <p className="text-2xl font-bold text-status-critical dark:text-status-critical">{compliance.competencyExpired}</p>
                                     <p className="text-xs text-muted-foreground">Competency Expired</p>
                                 </div>
                             </Link>
                             <Link href="/emar/reviews" className="group block">
-                                <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 transition-all hover:shadow-sm dark:border-status-info/30 dark:bg-status-info">
+                                <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 transition-all hover:shadow-sm dark:border-status-info/30">
                                     <p className="text-2xl font-bold text-status-info dark:text-status-info">{compliance.pendingReviews}</p>
                                     <p className="text-xs text-muted-foreground">Pending Reviews</p>
                                 </div>
                             </Link>
                             <Link href="/emar/reviews" className="group block">
-                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 transition-all hover:shadow-sm dark:border-status-critical/30 dark:bg-status-critical">
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 transition-all hover:shadow-sm dark:border-status-critical/30">
                                     <p className="text-2xl font-bold text-status-critical dark:text-status-critical">{compliance.overdueReviews}</p>
                                     <p className="text-xs text-muted-foreground">Overdue Reviews</p>
                                 </div>

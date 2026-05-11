@@ -1003,7 +1003,7 @@ export default function ControlRoomShifts({
                                         key={note.id}
                                         className={`rounded-lg border p-3 ${
                                             note.is_pinned
-                                                ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                                ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
                                                 : 'bg-card'
                                         }`}
                                     >

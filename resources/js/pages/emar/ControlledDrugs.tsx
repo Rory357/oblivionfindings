@@ -924,7 +924,7 @@ export default function ControlledDrugs({
                             </div>
 
                             {hasBalanceDiscrepancy && (
-                                <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 dark:border-status-critical/30 dark:bg-status-critical">
+                                <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 dark:border-status-critical/30">
                                     <p className="mb-2 flex items-center gap-1 text-sm font-medium text-status-critical dark:text-status-critical">
                                         <AlertTriangle className="h-3.5 w-3.5" />{' '}
                                         Discrepancy detected

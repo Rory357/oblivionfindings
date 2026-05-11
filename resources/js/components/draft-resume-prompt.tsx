@@ -35,7 +35,7 @@ export default function DraftResumePrompt({
             aria-label={title}
             className={cn(
                 'rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm shadow-sm',
-                'dark:border-status-warning/40 dark:bg-status-warning',
+                'dark:border-status-warning/40',
                 className,
             )}
         >

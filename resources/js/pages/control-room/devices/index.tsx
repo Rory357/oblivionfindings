@@ -147,9 +147,9 @@ function BatteryIndicator({ level }: { level: number | null }) {
 function DeviceCard({ device }: { device: DeviceItem }) {
     let cardBg = '';
     if (device.status === 'offline') {
-        cardBg = 'bg-status-critical-bg dark:bg-status-critical border-status-critical/50';
+        cardBg = 'bg-status-critical-bg border-status-critical/50';
     } else if (device.is_stale) {
-        cardBg = 'bg-status-warning-bg dark:bg-status-warning border-status-warning/50';
+        cardBg = 'bg-status-warning-bg border-status-warning/50';
     }
 
     return (

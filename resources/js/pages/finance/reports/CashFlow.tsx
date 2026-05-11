@@ -146,8 +146,8 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.total_operating >= 0
-                                        ? 'bg-status-success-bg dark:bg-status-success'
-                                        : 'bg-status-critical-bg dark:bg-status-critical'
+                                        ? 'bg-status-success-bg'
+                                        : 'bg-status-critical-bg'
                                 }`}
                             >
                                 <ArrowUpCircle
@@ -177,8 +177,8 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.total_investing >= 0
-                                        ? 'bg-status-success-bg dark:bg-status-success'
-                                        : 'bg-status-critical-bg dark:bg-status-critical'
+                                        ? 'bg-status-success-bg'
+                                        : 'bg-status-critical-bg'
                                 }`}
                             >
                                 <ArrowDownCircle
@@ -208,8 +208,8 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.total_financing >= 0
-                                        ? 'bg-status-success-bg dark:bg-status-success'
-                                        : 'bg-status-critical-bg dark:bg-status-critical'
+                                        ? 'bg-status-success-bg'
+                                        : 'bg-status-critical-bg'
                                 }`}
                             >
                                 <TrendingUp
@@ -239,8 +239,8 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.net_cash_change >= 0
-                                        ? 'bg-status-success-bg dark:bg-status-success'
-                                        : 'bg-status-critical-bg dark:bg-status-critical'
+                                        ? 'bg-status-success-bg'
+                                        : 'bg-status-critical-bg'
                                 }`}
                             >
                                 <Wallet

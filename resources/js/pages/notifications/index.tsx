@@ -101,28 +101,28 @@ const MODULE_COLOURS: Record<
     },
     hr: {
         border: 'border-l-blue-500',
-        bg: 'bg-status-info-bg dark:bg-status-info',
+        bg: 'bg-status-info-bg',
         text: 'text-status-info dark:text-status-info',
         icon: Users,
         dot: 'bg-status-info',
     },
     governance: {
         border: 'border-l-emerald-500',
-        bg: 'bg-status-success-bg dark:bg-status-success',
+        bg: 'bg-status-success-bg',
         text: 'text-status-success dark:text-status-success',
         icon: ShieldAlert,
         dot: 'bg-status-success',
     },
     sites: {
         border: 'border-l-amber-500',
-        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        bg: 'bg-status-warning-bg',
         text: 'text-status-warning dark:text-status-warning',
         icon: Building2,
         dot: 'bg-status-warning',
     },
     incidents: {
         border: 'border-l-red-500',
-        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        bg: 'bg-status-critical-bg',
         text: 'text-status-critical dark:text-status-critical',
         icon: TriangleAlert,
         dot: 'bg-status-critical',
@@ -349,7 +349,7 @@ export default function NotificationsIndex({
                     </Card>
                     <Card className="border-status-success/30 dark:border-status-success/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg">
                                 <CheckCircle2 className="h-5 w-5 text-status-success dark:text-status-success" />
                             </div>
                             <div>
@@ -364,7 +364,7 @@ export default function NotificationsIndex({
                     </Card>
                     <Card className="border-status-warning/30 dark:border-status-warning/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg dark:bg-status-warning">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg">
                                 <TriangleAlert className="h-5 w-5 text-status-warning dark:text-status-warning" />
                             </div>
                             <div>

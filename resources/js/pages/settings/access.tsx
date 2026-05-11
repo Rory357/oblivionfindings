@@ -798,7 +798,7 @@ function BoardGovernanceTab({
                 </Card>
                 <Card>
                     <CardContent className="flex items-center gap-3 py-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg dark:bg-status-success">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg">
                             <Landmark className="h-5 w-5 text-status-success" />
                         </div>
                         <div>
@@ -813,7 +813,7 @@ function BoardGovernanceTab({
                 </Card>
                 <Card>
                     <CardContent className="flex items-center gap-3 py-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-warning-bg dark:bg-status-warning">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-warning-bg">
                             <Calendar className="h-5 w-5 text-status-warning" />
                         </div>
                         <div>

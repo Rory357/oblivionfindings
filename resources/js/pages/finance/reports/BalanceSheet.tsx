@@ -113,7 +113,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-info-bg p-3 dark:bg-status-info">
+                            <div className="rounded-full bg-status-info-bg p-3">
                                 <Landmark className="h-5 w-5 text-status-info dark:text-status-info" />
                             </div>
                             <div>
@@ -126,7 +126,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-critical-bg p-3 dark:bg-status-critical">
+                            <div className="rounded-full bg-status-critical-bg p-3">
                                 <HandCoins className="h-5 w-5 text-status-critical dark:text-status-critical" />
                             </div>
                             <div>
@@ -139,7 +139,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-status-warning-bg p-3 dark:bg-status-warning">
+                            <div className="rounded-full bg-status-warning-bg p-3">
                                 <Scale className="h-5 w-5 text-status-warning dark:text-status-warning" />
                             </div>
                             <div>

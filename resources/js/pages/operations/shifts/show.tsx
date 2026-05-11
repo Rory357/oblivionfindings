@@ -1953,7 +1953,7 @@ export default function ShiftShow({
                                                             }
                                                             className={
                                                                 !isAlreadyAssigned
-                                                                    ? 'bg-status-warning hover:bg-status-warning dark:bg-status-warning dark:hover:bg-status-warning'
+                                                                    ? 'bg-status-warning hover:bg-status-warning dark:hover:bg-status-warning'
                                                                     : ''
                                                             }
                                                             onClick={() => {

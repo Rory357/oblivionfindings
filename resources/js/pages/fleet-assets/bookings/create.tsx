@@ -342,7 +342,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
 
                             {/* Compatibility Warnings */}
                             {compatibilityWarnings.length > 0 && (
-                                <div className="sm:col-span-2 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/30 dark:bg-status-warning">
+                                <div className="sm:col-span-2 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/30">
                                     <div className="flex items-center gap-2 mb-2">
                                         <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         <span className="text-sm font-medium text-status-warning dark:text-status-warning">Accessibility Mismatch</span>
@@ -503,7 +503,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                                 </p>
                                 <div className="space-y-2">
                                     {safeConflicts.map((c) => (
-                                        <div key={c.id} className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 dark:border-status-warning/30 dark:bg-status-warning">
+                                        <div key={c.id} className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 dark:border-status-warning/30">
                                             <div>
                                                 <p className="text-sm font-medium">{c.user_name}</p>
                                                 <p className="text-xs text-muted-foreground">{c.purpose}</p>

@@ -58,7 +58,7 @@ export const TIMELINE_CATEGORY_VOCAB: Record<TimelineCategory, TimelineCategoryE
     shift: {
         label: 'Shift',
         dot: 'bg-status-info',
-        bg: 'bg-status-info-bg border-l-blue-400 dark:bg-status-info dark:border-l-blue-500',
+        bg: 'bg-status-info-bg border-l-blue-400 dark:border-l-blue-500',
         pill: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
     clinical: {
@@ -70,19 +70,19 @@ export const TIMELINE_CATEGORY_VOCAB: Record<TimelineCategory, TimelineCategoryE
     medication: {
         label: 'Medication',
         dot: 'bg-status-success',
-        bg: 'bg-status-success-bg border-l-emerald-400 dark:bg-status-success dark:border-l-emerald-500',
+        bg: 'bg-status-success-bg border-l-emerald-400 dark:border-l-emerald-500',
         pill: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
     incident: {
         label: 'Incident',
         dot: 'bg-status-critical',
-        bg: 'bg-status-critical-bg border-l-red-400 dark:bg-status-critical dark:border-l-red-500',
+        bg: 'bg-status-critical-bg border-l-red-400 dark:border-l-red-500',
         pill: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     communication: {
         label: 'Communication',
         dot: 'bg-status-warning',
-        bg: 'bg-status-warning-bg border-l-amber-400 dark:bg-status-warning dark:border-l-amber-500',
+        bg: 'bg-status-warning-bg border-l-amber-400 dark:border-l-amber-500',
         pill: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
     other: {

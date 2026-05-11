@@ -191,7 +191,7 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                                             <tr
                                                 key={r.id}
                                                 className={`border-b last:border-b-0 transition-colors hover:bg-muted/30 ${
-                                                    r.outings === 0 ? 'bg-status-critical-bg dark:bg-status-critical' : ''
+                                                    r.outings === 0 ? 'bg-status-critical-bg' : ''
                                                 }`}
                                             >
                                                 <td className="px-3 py-2">

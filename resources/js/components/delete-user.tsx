@@ -25,7 +25,7 @@ export default function DeleteUser() {
                 title="Delete account"
                 description="Delete your account and all of its resources"
             />
-            <div className="space-y-4 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/10 dark:bg-status-critical">
+            <div className="space-y-4 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/10">
                 <div className="relative space-y-0.5 text-status-critical dark:text-status-critical">
                     <p className="font-medium">Warning</p>
                     <p className="text-sm">

@@ -117,9 +117,9 @@ function SummaryPill({
 }) {
     const ring =
         tone === 'danger'
-            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60 dark:bg-status-critical'
+            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60'
             : tone === 'warn'
-              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60 dark:bg-status-warning'
+              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60'
               : 'border-border bg-card';
     const iconTone =
         tone === 'danger'
@@ -315,7 +315,7 @@ export default function MedsToday({
                             : `Give as-needed med (${prn_medications.length} available)`
                     }
                     variant="outline"
-                    className="frontline-focus group h-auto w-full justify-start gap-3 rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left whitespace-normal transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
+                    className="frontline-focus group h-auto w-full justify-start gap-3 rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left whitespace-normal transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
@@ -338,7 +338,7 @@ export default function MedsToday({
                     <Link
                         href={active_round.url}
                         aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
-                        className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm dark:border-status-success/60 dark:bg-status-success"
+                        className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm dark:border-status-success/60"
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-success text-white">
@@ -526,7 +526,7 @@ export default function MedsToday({
 
                 {/* ── Safety / follow-up hint ─────────────────────────── */}
                 {stats.meds_overdue > 0 && (
-                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm dark:border-status-critical/30 dark:bg-status-critical">
+                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm dark:border-status-critical/30">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical dark:text-status-critical" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-critical dark:text-status-critical">

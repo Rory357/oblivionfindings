@@ -81,10 +81,10 @@ type Props = {
 };
 
 const STATUS_CONFIG: Record<string, { color: string; bgColor: string; label: string }> = {
-    planned: { color: 'text-status-info dark:text-status-info', bgColor: 'bg-status-info-bg border-status-info/30 dark:bg-status-info dark:border-status-info/30', label: 'Planned' },
+    planned: { color: 'text-status-info dark:text-status-info', bgColor: 'bg-status-info-bg border-status-info/30 dark:border-status-info/30', label: 'Planned' },
     active: { color: 'text-primary dark:text-primary', bgColor: 'bg-primary/10 border-primary dark:bg-primary/30 dark:border-primary/30', label: 'Active' },
     completed: { color: 'text-foreground dark:text-muted-foreground', bgColor: 'bg-muted border-border dark:bg-muted/30 dark:border-border', label: 'Completed' },
-    cancelled: { color: 'text-status-critical dark:text-status-critical', bgColor: 'bg-status-critical-bg border-status-critical/30 dark:bg-status-critical dark:border-status-critical/30', label: 'Cancelled' },
+    cancelled: { color: 'text-status-critical dark:text-status-critical', bgColor: 'bg-status-critical-bg border-status-critical/30 dark:border-status-critical/30', label: 'Cancelled' },
 };
 
 const PURPOSE_LABELS: Record<string, string> = {

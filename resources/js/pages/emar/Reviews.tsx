@@ -318,19 +318,19 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical"><AlertTriangle className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical"><AlertTriangle className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{overdueReviews.length}</p><p className="text-xs text-muted-foreground">Overdue Reviews</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning"><Calendar className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning"><Calendar className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{upcomingReviews.length}</p><p className="text-xs text-muted-foreground">Upcoming (30 Days)</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-success-bg text-status-success dark:bg-status-success"><CheckCircle className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-success-bg text-status-success"><CheckCircle className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{reviews.data.filter((r: any) => r.status === 'completed').length}</p><p className="text-xs text-muted-foreground">Completed (Visible)</p></div>
                         </CardContent>
                     </Card>

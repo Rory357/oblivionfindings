@@ -159,7 +159,7 @@ export default function MilesightIntegration({
                 </div>
 
                 {/* ── Scaffold state banner ───────────────────────────── */}
-                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning">
+                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
                     <CardContent className="flex items-start gap-3 p-4 text-sm">
                         <Clock className="mt-0.5 h-4 w-4 text-status-warning dark:text-status-warning" />
                         <div className="space-y-1 leading-6">

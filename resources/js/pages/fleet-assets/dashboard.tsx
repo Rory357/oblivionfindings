@@ -472,7 +472,7 @@ export default function FleetAssetsDashboard({
                 {/*  ALERT BANNER                                                 */}
                 {/* ============================================================ */}
                 {((stats.overdue_count ?? 0) > 0 || (stats.critical_alerts ?? 0) > 0 || (stats.outings_past_return ?? 0) > 0) && (
-                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical px-4 py-3">
+                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 px-4 py-3">
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical shrink-0 mt-0.5" />
                             <div className="flex-1 space-y-1">
@@ -832,7 +832,7 @@ export default function FleetAssetsDashboard({
                                 <CardContent>
                                     <div className="space-y-1.5">
                                         {(after_hours_trips ?? []).slice(0, 6).map((trip) => (
-                                            <div key={trip.id} className="flex items-center gap-2 rounded border border-status-warning/30 bg-status-warning-bg px-2.5 py-1.5 text-xs dark:border-status-warning/30 dark:bg-status-warning">
+                                            <div key={trip.id} className="flex items-center gap-2 rounded border border-status-warning/30 bg-status-warning-bg px-2.5 py-1.5 text-xs dark:border-status-warning/30">
                                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-warning" />
                                                 <span className="font-medium truncate">{trip.vehicle}</span>
                                                 <span className="text-muted-foreground truncate">{trip.driver}</span>

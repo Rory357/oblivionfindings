@@ -287,9 +287,9 @@ function HomeKpi({
 }) {
     const ring =
         tone === 'danger'
-            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60 dark:bg-status-critical'
+            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60'
             : tone === 'warn'
-              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60 dark:bg-status-warning'
+              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60'
               : 'border-border bg-card';
     const iconTone =
         tone === 'danger'
@@ -758,7 +758,7 @@ export default function MyDay({
 
                 {/* ── Manager banner (only if a manager lands here directly) ─ */}
                 {is_manager && manager_data && (
-                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30 dark:bg-status-info">
+                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">
                         <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
                                 <div className="flex items-center gap-2">
@@ -806,7 +806,7 @@ export default function MyDay({
                             <Link
                                 href={active_round.url}
                                 aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
-                                className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm dark:border-status-success/60 dark:bg-status-success"
+                                className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm dark:border-status-success/60"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-success text-white">

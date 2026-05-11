@@ -568,19 +568,19 @@ function RoundCompleteView({
                 </p>
 
                 <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center text-sm">
-                    <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                    <div className="rounded-lg bg-status-success-bg p-2">
                         <p className="text-lg font-bold text-status-success dark:text-status-success">
                             {progress.given}
                         </p>
                         <p className="text-xs text-muted-foreground">Given</p>
                     </div>
-                    <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                    <div className="rounded-lg bg-status-warning-bg p-2">
                         <p className="text-lg font-bold text-status-warning dark:text-status-warning">
                             {progress.refused}
                         </p>
                         <p className="text-xs text-muted-foreground">Refused</p>
                     </div>
-                    <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                    <div className="rounded-lg bg-status-warning-bg p-2">
                         <p className="text-lg font-bold text-status-warning dark:text-status-warning">
                             {progress.held}
                         </p>

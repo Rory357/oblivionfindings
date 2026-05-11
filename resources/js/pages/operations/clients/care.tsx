@@ -257,7 +257,7 @@ export default function ClientCare({
                     onClick={() => setPrnOpen(true)}
                     disabled={prnDisabled}
                     aria-label={`Give as-needed med to ${fullName}`}
-                    className="frontline-focus group h-auto w-full justify-start gap-3 rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
+                    className="frontline-focus group h-auto w-full justify-start gap-3 rounded-xl border-status-warning/30 bg-status-warning-bg p-4 text-left hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
@@ -281,7 +281,7 @@ export default function ClientCare({
                     this client, saying so up-front prevents surprises when a
                     PRN gets recorded outside a shift. */}
                 {!hasActiveShift && prnCount > 0 && can.record_prn && (
-                    <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                    <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
                         <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-info dark:text-status-info" />
                         <div className="min-w-0">
                             <p className="font-medium text-status-info dark:text-status-info">

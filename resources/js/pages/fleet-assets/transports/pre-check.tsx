@@ -159,7 +159,7 @@ export default function TransportPreCheck({
                 />
 
                 {pre_check_completed && (
-                    <div className="rounded-lg border-2 border-status-success/30 bg-status-success-bg p-4 dark:border-status-success/30 dark:bg-status-success">
+                    <div className="rounded-lg border-2 border-status-success/30 bg-status-success-bg p-4 dark:border-status-success/30">
                         <div className="flex items-center gap-3">
                             <CheckCircle className="h-6 w-6 text-status-success" />
                             <div>
@@ -209,8 +209,8 @@ export default function TransportPreCheck({
                                         key={item.key}
                                         className={cn(
                                             'border-2 transition-colors',
-                                            checked === true && 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success',
-                                            checked === false && 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical',
+                                            checked === true && 'border-status-success/30 bg-status-success-bg dark:border-status-success/30',
+                                            checked === false && 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30',
                                             checked === null && 'border-border',
                                         )}
                                     >
@@ -219,8 +219,8 @@ export default function TransportPreCheck({
                                                 <div className="flex items-center gap-3">
                                                     <div className={cn(
                                                         'flex h-10 w-10 items-center justify-center rounded-full',
-                                                        checked === true && 'bg-status-success-bg dark:bg-status-success',
-                                                        checked === false && 'bg-status-critical-bg dark:bg-status-critical',
+                                                        checked === true && 'bg-status-success-bg',
+                                                        checked === false && 'bg-status-critical-bg',
                                                         checked === null && 'bg-muted',
                                                     )}>
                                                         <Icon className={cn(

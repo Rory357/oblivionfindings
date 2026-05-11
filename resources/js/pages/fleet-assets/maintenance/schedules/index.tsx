@@ -767,7 +767,7 @@ export default function SchedulesIndex({
                                         key={schedule.id}
                                         className={`border-b transition-colors hover:bg-muted/30 ${
                                             schedule.is_overdue
-                                                ? 'border-l-4 border-l-red-500 bg-status-critical-bg dark:bg-status-critical'
+                                                ? 'border-l-4 border-l-red-500 bg-status-critical-bg'
                                                 : dueSoon
                                                   ? 'border-l-4 border-l-amber-500'
                                                   : ''

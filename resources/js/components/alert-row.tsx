@@ -90,22 +90,22 @@ const TYPE_TONE: Record<
 > = {
     alert: {
         ring: 'border-border',
-        iconBg: 'bg-status-warning-bg dark:bg-status-warning',
+        iconBg: 'bg-status-warning-bg',
         iconFg: 'text-status-warning dark:text-status-warning',
     },
     incident: {
         ring: 'border-border',
-        iconBg: 'bg-status-critical-bg dark:bg-status-critical',
+        iconBg: 'bg-status-critical-bg',
         iconFg: 'text-status-critical dark:text-status-critical',
     },
     followup: {
         ring: 'border-border',
-        iconBg: 'bg-status-info-bg dark:bg-status-info',
+        iconBg: 'bg-status-info-bg',
         iconFg: 'text-status-info dark:text-status-info',
     },
     note_followup: {
         ring: 'border-border',
-        iconBg: 'bg-status-info-bg dark:bg-status-info',
+        iconBg: 'bg-status-info-bg',
         iconFg: 'text-status-info dark:text-status-info',
     },
     shift: {

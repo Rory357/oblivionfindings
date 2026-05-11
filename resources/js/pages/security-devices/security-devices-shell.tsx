@@ -151,7 +151,7 @@ export default function SecurityDevicesShell({ sectionKey }: Props) {
                         <Card
                             className={
                                 section.key === 'access-control'
-                                    ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
+                                    ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
                                     : undefined
                             }
                         >
