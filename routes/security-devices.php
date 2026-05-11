@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
 use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
+use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
@@ -235,14 +236,37 @@ Route::middleware([
                 ->name('security-devices.integrations.unifi.defaults');
         });
 
-    // ── Queclink provider configuration (scaffold) ───────────────
-    // Credentials and connection testing are live; site mapping +
-    // device sync ship in PR C1.
+    // ── Queclink integration hub ─────────────────────────────────
+    // Direct device-to-server TCP intake is the primary path; IMS cloud
+    // credentials (kept for parity) live under /key on the same prefix.
     Route::prefix('/integrations/queclink')
         ->middleware('permission:securityDevices.integrations.manage')
         ->group(function () {
-            Route::get('/', [QueclinkController::class, 'index'])
+            // Hub overview + listener config (replaces former scaffold page).
+            Route::get('/', [QueclinkHubController::class, 'index'])
                 ->name('security-devices.integrations.queclink');
+            Route::post('/settings', [QueclinkHubController::class, 'saveSettings'])
+                ->name('security-devices.integrations.queclink.settings');
+            Route::get('/provisioning', [QueclinkHubController::class, 'provisioningString'])
+                ->name('security-devices.integrations.queclink.provisioning');
+
+            // Pairing flows — pending tray → vehicle / staff / client.
+            Route::post('/devices/{queclinkDevice}/claim', [QueclinkHubController::class, 'claimDevice'])
+                ->name('security-devices.integrations.queclink.claim');
+            Route::post('/devices/{queclinkDevice}/reject', [QueclinkHubController::class, 'rejectDevice'])
+                ->name('security-devices.integrations.queclink.reject');
+            Route::post('/devices/{queclinkDevice}/release', [QueclinkHubController::class, 'releaseDevice'])
+                ->name('security-devices.integrations.queclink.release');
+
+            // Debug console — live frames + AT command REPL.
+            Route::get('/frames', [QueclinkHubController::class, 'frames'])
+                ->name('security-devices.integrations.queclink.frames');
+            Route::get('/stream', [QueclinkHubController::class, 'stream'])
+                ->name('security-devices.integrations.queclink.stream');
+            Route::post('/devices/{queclinkDevice}/command', [QueclinkHubController::class, 'sendCommand'])
+                ->name('security-devices.integrations.queclink.command');
+
+            // IMS cloud credential management (legacy scaffold endpoints).
             Route::post('/key', [QueclinkController::class, 'saveKey'])
                 ->name('security-devices.integrations.queclink.key');
             Route::post('/test', [QueclinkController::class, 'testKey'])

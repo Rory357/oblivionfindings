@@ -59,6 +59,18 @@ return [
         'ingest_token' => env('TELEMETRY_INGEST_TOKEN'),
     ],
 
+    'queclink' => [
+        // Default TCP listener port for device intake. Operators can override
+        // at runtime via the AppSetting key `queclink.listener.port`; the
+        // queclink:install command rewrites the systemd unit + UFW rule
+        // when the setting changes.
+        'port' => env('QUECLINK_LISTENER_PORT', 8090),
+        // Public hostname devices dial into. Used by the device-provisioning
+        // string generator on the integration hub page. Runtime override via
+        // AppSetting key `queclink.public_hostname`.
+        'public_hostname' => env('QUECLINK_PUBLIC_HOSTNAME'),
+    ],
+
     'xero' => [
         'client_id' => env('XERO_CLIENT_ID'),
         'client_secret' => env('XERO_CLIENT_SECRET'),
