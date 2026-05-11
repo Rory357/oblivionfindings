@@ -26,7 +26,7 @@ export function AppSidebarHeader({
     return (
         <>
             {auth.impersonating && (
-                <div className="flex items-center justify-between gap-2 bg-primary px-6 py-2 text-sm font-medium text-white md:px-4">
+                <div className="flex items-center justify-between gap-2 bg-primary px-6 py-2 text-sm font-medium text-primary-foreground md:px-4">
                     <div className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 shrink-0" />
                         <span>
@@ -39,7 +39,7 @@ export function AppSidebarHeader({
                     </div>
                     <Button
                         size="sm"
-                        className="shrink-0 border border-white/30 bg-white text-primary hover:bg-primary/10"
+                        className="shrink-0 border border-primary-foreground/30 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                         onClick={handleStopImpersonating}
                     >
                         Stop Impersonating

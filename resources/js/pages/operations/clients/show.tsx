@@ -1418,7 +1418,7 @@ export default function ClientShow({
                                             </div>
                                         </CardHeader>
                                         <CardContent className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr_1fr]">
-                                            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm">
+                                            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
                                                 <div className="flex items-center gap-6">
                                                     <DonutChart
                                                         segments={
@@ -1465,7 +1465,7 @@ export default function ClientShow({
                                             </div>
 
                                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                                                <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm">
+                                                <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
                                                     <HalfMoonGauge
                                                         value={siteCoverageRate}
                                                         label="Covered windows"
@@ -1474,7 +1474,7 @@ export default function ClientShow({
                                                         color="#6366f1"
                                                     />
                                                 </div>
-                                                <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm">
+                                                <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div>
                                                             <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
@@ -1522,7 +1522,7 @@ export default function ClientShow({
                                                 </div>
                                             </div>
 
-                                            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm">
+                                            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div>
                                                         <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
@@ -1673,7 +1673,7 @@ export default function ClientShow({
                                                     // eslint-disable-next-line no-restricted-syntax -- Recurring series tiles are nested inside the overview Card content.
                                                     <div
                                                         key={series.id}
-                                                        className="rounded-xl border border-primary/70 bg-white/80 p-4"
+                                                        className="rounded-xl border border-primary/70 bg-white/80 p-4 dark:bg-muted/40"
                                                     >
                                                         <div className="flex flex-wrap gap-2">
                                                             <Badge
@@ -1880,7 +1880,7 @@ export default function ClientShow({
                                                     </div>
                                                     {aboutMe.how_to_support && (
                                                         // eslint-disable-next-line no-restricted-syntax -- Support preference callout is nested inside the About Me Card content.
-                                                        <div className="rounded-lg border border-primary bg-white p-3">
+                                                        <div className="rounded-lg border border-primary bg-card p-3">
                                                             <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                 How to Support
                                                                 Me Best
@@ -3412,7 +3412,7 @@ export default function ClientShow({
                                                         // eslint-disable-next-line no-restricted-syntax -- Medication rows use status strip styling inside the clinical Card.
                                                         <div
                                                             key={m.id}
-                                                            className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-white p-3 shadow-sm"
+                                                            className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-card p-3 shadow-sm"
                                                         >
                                                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                                                                 <Pill className="h-4 w-4 text-primary" />
@@ -4283,7 +4283,7 @@ export default function ClientShow({
                                                             </div>
                                                             <Button
                                                                 size="sm"
-                                                                className="bg-white font-semibold text-primary shadow-sm hover:bg-primary/10"
+                                                                className="bg-card font-semibold text-primary shadow-sm hover:bg-primary/10"
                                                                 asChild
                                                             >
                                                                 <Link
@@ -4453,7 +4453,7 @@ export default function ClientShow({
                                                             </div>
                                                             {aboutMe.how_to_support && (
                                                                 // eslint-disable-next-line no-restricted-syntax -- Support preference callout is nested inside the About Me Card content.
-                                                                <div className="rounded-lg border border-primary bg-white p-3">
+                                                                <div className="rounded-lg border border-primary bg-card p-3">
                                                                     <p className="text-[10px] font-bold tracking-wider text-primary uppercase">
                                                                         How to
                                                                         Support
@@ -6455,7 +6455,7 @@ export default function ClientShow({
                                                                 <a
                                                                     key={d.id}
                                                                     href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                                                    className={`group rounded-xl border bg-white p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}
+                                                                    className={`group rounded-xl border bg-card p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}
                                                                 >
                                                                     <div
                                                                         className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl ${fi.bg}`}

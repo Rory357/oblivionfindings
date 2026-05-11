@@ -532,7 +532,7 @@ export default function StaffDocuments({
                                                     onClick={() =>
                                                         setCurrentFolder(folder)
                                                     }
-                                                    className="flex flex-col items-center rounded-xl border bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                                                    className="flex flex-col items-center rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
                                                 >
                                                     <FolderOpen className="h-10 w-10 text-status-warning" />
                                                     <span className="mt-2 text-xs font-medium">
@@ -579,7 +579,7 @@ export default function StaffDocuments({
                                         return (
                                             <div
                                                 key={d.id}
-                                                className={`group relative rounded-xl border bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}
+                                                className={`group relative rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}
                                             >
                                                 {/* File icon */}
                                                 <div

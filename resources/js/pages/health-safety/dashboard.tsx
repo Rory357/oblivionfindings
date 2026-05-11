@@ -144,7 +144,7 @@ const KPI_CONFIG: Array<{
                 ? 'border-status-critical/30 bg-status-critical-bg'
                 : v > 0
                   ? 'border-status-warning/30 bg-status-warning-bg'
-                  : 'border-border bg-white',
+                  : 'border-border bg-card',
         iconBg: (v) =>
             v > 5
                 ? 'bg-status-critical-bg text-status-critical'
@@ -158,7 +158,7 @@ const KPI_CONFIG: Array<{
         icon: Eye,
         href: '/incidents?type=near_miss',
         color: () => 'text-foreground',
-        bgColor: () => 'border-border bg-white',
+        bgColor: () => 'border-border bg-card',
         iconBg: () => 'bg-status-info-bg text-status-info',
     },
     {
@@ -200,7 +200,7 @@ const KPI_CONFIG: Array<{
         bgColor: (v) =>
             v > 0
                 ? 'border-status-critical/30 bg-status-critical-bg'
-                : 'border-border bg-white',
+                : 'border-border bg-card',
         iconBg: (v) =>
             v > 0
                 ? 'bg-status-critical-bg text-status-critical'
@@ -215,7 +215,7 @@ const KPI_CONFIG: Array<{
         bgColor: (v) =>
             v > 0
                 ? 'border-status-warning/30 bg-status-warning-bg'
-                : 'border-border bg-white',
+                : 'border-border bg-card',
         iconBg: (v) =>
             v > 0
                 ? 'bg-status-warning-bg text-status-warning'
@@ -269,7 +269,7 @@ const KPI_CONFIG: Array<{
         bgColor: (v) =>
             v > 0
                 ? 'border-status-warning/30 bg-status-warning-bg'
-                : 'border-border bg-white',
+                : 'border-border bg-card',
         iconBg: (v) =>
             v > 0
                 ? 'bg-status-warning-bg text-status-warning'
@@ -284,7 +284,7 @@ const KPI_CONFIG: Array<{
         bgColor: (v) =>
             v > 0
                 ? 'border-primary bg-primary/10/60'
-                : 'border-border bg-white',
+                : 'border-border bg-card',
         iconBg: (v) =>
             v > 0
                 ? 'bg-primary/10 text-primary'
@@ -299,7 +299,7 @@ const KPI_CONFIG: Array<{
         bgColor: (v) =>
             v > 0
                 ? 'border-status-warning/30 bg-status-warning-bg'
-                : 'border-border bg-white',
+                : 'border-border bg-card',
         iconBg: (v) =>
             v > 0
                 ? 'bg-status-warning-bg text-status-warning'

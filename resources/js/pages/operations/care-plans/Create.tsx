@@ -516,7 +516,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     My Dreams & Aspirations
                                 </Label>
                                 <Textarea
-                                    className="min-h-[100px] border-status-critical/30 bg-white"
+                                    className="min-h-[100px] border-status-critical/30 bg-background"
                                     value={data.content.about_me?.dreams}
                                     onChange={(e) =>
                                         setAboutMeField(
@@ -534,7 +534,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                         What{"'"}s Important TO Me
                                     </Label>
                                     <Textarea
-                                        className="min-h-[100px] border-status-critical/30 bg-white"
+                                        className="min-h-[100px] border-status-critical/30 bg-background"
                                         value={
                                             data.content.about_me
                                                 ?.important_to_me
@@ -553,7 +553,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                         What{"'"}s Important FOR Me
                                     </Label>
                                     <Textarea
-                                        className="min-h-[100px] border-status-critical/30 bg-white"
+                                        className="min-h-[100px] border-status-critical/30 bg-background"
                                         value={
                                             data.content.about_me
                                                 ?.important_for_me
@@ -574,7 +574,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     My Ideal Day
                                 </Label>
                                 <Textarea
-                                    className="min-h-[100px] border-status-critical/30 bg-white"
+                                    className="min-h-[100px] border-status-critical/30 bg-background"
                                     value={data.content.about_me?.ideal_day}
                                     onChange={(e) =>
                                         setAboutMeField(
@@ -626,7 +626,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     How to Support Me Best
                                 </Label>
                                 <Textarea
-                                    className="min-h-[100px] border-status-critical/30 bg-white"
+                                    className="min-h-[100px] border-status-critical/30 bg-background"
                                     value={
                                         data.content.about_me?.how_to_support
                                     }

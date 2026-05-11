@@ -374,7 +374,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                         return (
                             <div
                                 key={hazard.id}
-                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-white transition-all hover:shadow-md ${riskBorderColors[hazard.risk_rating] ?? 'border-l-slate-300'}`}
+                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-card transition-all hover:shadow-md ${riskBorderColors[hazard.risk_rating] ?? 'border-l-slate-300'}`}
                                 onClick={() => router.visit(`/hazards/${hazard.id}`)}
                             >
                                 <div className="block px-4 py-3 pr-12">

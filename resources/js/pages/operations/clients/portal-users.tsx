@@ -88,7 +88,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                                 <Label htmlFor="portal_role">Portal role</Label>
                                 <select
                                     id="portal_role"
-                                    className="mt-2 w-full rounded-md border bg-white px-3 py-2 text-sm"
+                                    className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm"
                                     value={form.data.portal_role}
                                     onChange={(e) => form.setData('portal_role', e.target.value)}
                                 >
@@ -101,7 +101,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                                 <Label htmlFor="relation">Relation</Label>
                                 <select
                                     id="relation"
-                                    className="mt-2 w-full rounded-md border bg-white px-3 py-2 text-sm"
+                                    className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm"
                                     value={form.data.relation}
                                     onChange={(e) => form.setData('relation', e.target.value)}
                                 >

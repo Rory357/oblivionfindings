@@ -1,5 +1,5 @@
 import { applyPalette, DEFAULT_BRAND_HEX } from '@/lib/derive-palette';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 
 export type Appearance = 'light' | 'dark' | 'system';
@@ -213,32 +213,91 @@ export function useAppearance() {
         resolveTheme(rawServerAppearance),
     );
 
-    const updateAppearance = useCallback((mode: Appearance) => {
-        setAppearance(mode);
-        localStorage.setItem(APPEARANCE_STORAGE.theme, mode);
-        setCookie('appearance', mode);
-        applyTheme(mode);
-    }, []);
+    const updateAppearance = useCallback(
+        (mode: Appearance, opts?: { persist?: boolean }) => {
+            setAppearance(mode);
+            localStorage.setItem(APPEARANCE_STORAGE.theme, mode);
+            setCookie('appearance', mode);
+            applyTheme(mode);
+            // Auto-persist to the server so the choice survives logout/login
+            // and other devices. Callers that are only hydrating from server
+            // state pass { persist: false } to avoid a redundant round-trip.
+            if (opts?.persist !== false && typeof window !== 'undefined') {
+                router.put(
+                    '/settings/appearance',
+                    { theme: mode },
+                    {
+                        preserveScroll: true,
+                        preserveState: true,
+                        only: [],
+                    },
+                );
+            }
+        },
+        [],
+    );
 
-    const updateAccent = useCallback((hex: string) => {
-        localStorage.setItem(APPEARANCE_STORAGE.accent, hex);
-        applyAccent(hex);
-    }, []);
+    // Fire-and-forget save of one appearance field. Skipped during server
+    // hydration ({ persist: false }) and during accent picker drag (handled
+    // separately via debounce in the appearance page).
+    const persistField = useCallback(
+        (payload: Record<string, unknown>) => {
+            if (typeof window === 'undefined') return;
+            router.put('/settings/appearance', payload, {
+                preserveScroll: true,
+                preserveState: true,
+                only: [],
+            });
+        },
+        [],
+    );
 
-    const updateFontSize = useCallback((px: number) => {
-        localStorage.setItem(APPEARANCE_STORAGE.fontSize, String(px));
-        applyFontSize(px);
-    }, []);
+    const updateAccent = useCallback(
+        (hex: string, opts?: { persist?: boolean }) => {
+            localStorage.setItem(APPEARANCE_STORAGE.accent, hex);
+            applyAccent(hex);
+            // Accent colour is NOT auto-persisted here — the colour picker
+            // fires on every drag, which would flood the server. The
+            // appearance page debounces and persists on commit.
+            if (opts?.persist === true) {
+                persistField({ accent_colour: hex });
+            }
+        },
+        [persistField],
+    );
 
-    const updateSidebarDensity = useCallback((density: SidebarDensity) => {
-        localStorage.setItem(APPEARANCE_STORAGE.density, density);
-        applySidebarDensity(density);
-    }, []);
+    const updateFontSize = useCallback(
+        (px: number, opts?: { persist?: boolean }) => {
+            localStorage.setItem(APPEARANCE_STORAGE.fontSize, String(px));
+            applyFontSize(px);
+            if (opts?.persist !== false) {
+                persistField({ font_size: px });
+            }
+        },
+        [persistField],
+    );
 
-    const updateReduceMotion = useCallback((on: boolean) => {
-        localStorage.setItem(APPEARANCE_STORAGE.reduceMotion, String(on));
-        applyReduceMotion(on);
-    }, []);
+    const updateSidebarDensity = useCallback(
+        (density: SidebarDensity, opts?: { persist?: boolean }) => {
+            localStorage.setItem(APPEARANCE_STORAGE.density, density);
+            applySidebarDensity(density);
+            if (opts?.persist !== false) {
+                persistField({ sidebar_density: density });
+            }
+        },
+        [persistField],
+    );
+
+    const updateReduceMotion = useCallback(
+        (on: boolean, opts?: { persist?: boolean }) => {
+            localStorage.setItem(APPEARANCE_STORAGE.reduceMotion, String(on));
+            applyReduceMotion(on);
+            if (opts?.persist !== false) {
+                persistField({ reduce_motion: on });
+            }
+        },
+        [persistField],
+    );
 
     const resetAccent = useCallback(() => {
         localStorage.removeItem(APPEARANCE_STORAGE.accent);

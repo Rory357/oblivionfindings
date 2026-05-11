@@ -3154,7 +3154,7 @@ function CoverageRequirementsTab({
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                            <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                 <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                                     Windows
                                 </p>
@@ -3165,7 +3165,7 @@ function CoverageRequirementsTab({
                                     Active demand windows
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-status-critical/70 bg-white/85 p-4 shadow-sm">
+                            <div className="rounded-2xl border border-status-critical/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                 <p className="text-[11px] font-semibold tracking-[0.16em] text-status-critical uppercase">
                                     Under-covered
                                 </p>
@@ -3176,7 +3176,7 @@ function CoverageRequirementsTab({
                                     Need action now
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-status-success/70 bg-white/85 p-4 shadow-sm">
+                            <div className="rounded-2xl border border-status-success/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                 <p className="text-[11px] font-semibold tracking-[0.16em] text-status-success uppercase">
                                     Exact
                                 </p>
@@ -3187,7 +3187,7 @@ function CoverageRequirementsTab({
                                     Demand matched cleanly
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-status-warning/70 bg-white/85 p-4 shadow-sm">
+                            <div className="rounded-2xl border border-status-warning/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                 <p className="text-[11px] font-semibold tracking-[0.16em] text-status-warning uppercase">
                                     Largest gap
                                 </p>
@@ -3201,7 +3201,7 @@ function CoverageRequirementsTab({
                         </div>
 
                         <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-                            <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                            <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                 <div className="flex items-center gap-6">
                                     <DonutChart
                                         segments={coverageSegments}
@@ -3238,7 +3238,7 @@ function CoverageRequirementsTab({
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                     <ProgressRing
                                         value={stableCoverageRate}
                                         size={104}
@@ -3254,7 +3254,7 @@ function CoverageRequirementsTab({
                                         </p>
                                     </div>
                                 </div>
-                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                     <ProgressRing
                                         value={shortageRate}
                                         size={104}
@@ -3280,7 +3280,7 @@ function CoverageRequirementsTab({
                             </div>
                         ) : (
                             <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40">
                                     <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                                         Largest gaps
                                     </p>
@@ -3313,7 +3313,7 @@ function CoverageRequirementsTab({
                                     {sitePreview.alerts.map((alert, index) => (
                                         <div
                                             key={`${alert.rule_name}-${alert.window_label}-${index}`}
-                                            className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm"
+                                            className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm dark:bg-muted/40"
                                         >
                                             <div className="flex items-center justify-between gap-3">
                                                 <div>

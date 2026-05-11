@@ -228,7 +228,7 @@ export default function ClientAssignments({
                                 </CardContent>
                             </Card>
                         ) : (
-                            <Card className="bg-white">
+                            <Card className="bg-card">
                                 <CardContent className="space-y-1.5 p-2">
                                     {unassignedWorkers.map((w) => (
                                         <Button

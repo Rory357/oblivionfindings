@@ -134,19 +134,19 @@ function TodaySummaryCard({ summary }: { summary: TodaysSummary }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded bg-white p-2 text-center">
+          <div className="rounded bg-card p-2 text-center">
             <div className="text-xs text-muted-foreground">Scheduled</div>
             <div className="text-lg font-bold text-foreground">{total_scheduled}</div>
           </div>
-          <div className="rounded bg-white p-2 text-center">
+          <div className="rounded bg-card p-2 text-center">
             <div className="text-xs text-muted-foreground">Completed</div>
             <div className="text-lg font-bold text-status-success">{completed}</div>
           </div>
-          <div className="rounded bg-white p-2 text-center">
+          <div className="rounded bg-card p-2 text-center">
             <div className="text-xs text-muted-foreground">Remaining</div>
             <div className="text-lg font-bold text-status-warning">{remaining}</div>
           </div>
-          <div className="rounded bg-white p-2 text-center">
+          <div className="rounded bg-card p-2 text-center">
             <div className="text-xs text-muted-foreground">Completion</div>
             <div className="text-lg font-bold text-status-info">{completion_percentage}%</div>
           </div>

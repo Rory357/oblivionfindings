@@ -524,7 +524,7 @@ export default function ProgressNotesIndex({
                 )}
 
                 {/* Filters */}
-                <Card className="bg-white/50 shadow-sm">
+                <Card className="bg-white/50 shadow-sm dark:bg-muted/50">
                     <CardContent className="space-y-2 p-3">
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="relative flex-1">

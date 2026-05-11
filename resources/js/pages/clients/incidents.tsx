@@ -503,7 +503,7 @@ export default function ClientIncidents({
                         return (
                             <div
                                 key={i.id}
-                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-white transition-all hover:shadow-md ${sev.border}`}
+                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-card transition-all hover:shadow-md ${sev.border}`}
                                 onClick={() =>
                                     router.visit(`/incidents/${i.id}`)
                                 }

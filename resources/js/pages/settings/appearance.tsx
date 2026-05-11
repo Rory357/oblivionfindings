@@ -184,11 +184,11 @@ export default function Appearance() {
     // Hydrate live-apply from server on first mount so hard-refresh matches
     // persisted state even if localStorage is cleared.
     useEffect(() => {
-        updateAppearance(server.theme);
+        updateAppearance(server.theme, { persist: false });
         if (server.accent_colour) updateAccent(server.accent_colour);
-        updateFontSize(server.font_size);
-        updateSidebarDensity(server.sidebar_density);
-        updateReduceMotion(server.reduce_motion);
+        updateFontSize(server.font_size, { persist: false });
+        updateSidebarDensity(server.sidebar_density, { persist: false });
+        updateReduceMotion(server.reduce_motion, { persist: false });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

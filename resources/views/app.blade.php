@@ -6,7 +6,14 @@ $_userAccent = $_authUser?->accent_colour;
 $_userFontSize = $_authUser?->font_size ?? 14;
 $_userDensity = $_authUser?->sidebar_density ?? 'comfortable';
 $_userReduceMotion = (bool) ($_authUser?->reduce_motion ?? false);
-$_userTheme = $_authUser?->theme ?? ($appearance ?? 'system');
+// Theme resolution order: user's saved preference, then the appearance
+// cookie (set when the user toggled the theme but the save is in-flight or
+// they're not signed in yet), then the controller-provided $appearance, then
+// 'system'. Without the cookie fallback, a user who toggled to light but
+// whose users.theme is still null sees a dark flash on every page load.
+$_cookieTheme = request()->cookie('appearance');
+$_cookieTheme = in_array($_cookieTheme, ['light', 'dark', 'system'], true) ? $_cookieTheme : null;
+$_userTheme = $_authUser?->theme ?? $_cookieTheme ?? ($appearance ?? 'system');
 
 $_htmlClasses = [];
 if ($_userTheme === 'dark') {

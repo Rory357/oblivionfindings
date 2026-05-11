@@ -102,7 +102,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
                 href={link.url || '#'}
                 className={cn(
                   'px-3 py-1 rounded text-sm',
-                  link.active ? 'bg-status-info text-white' : 'bg-white text-muted-foreground hover:bg-muted',
+                  link.active ? 'bg-status-info text-white' : 'bg-card text-muted-foreground hover:bg-muted',
                   !link.url && 'opacity-50 pointer-events-none'
                 )}
                 dangerouslySetInnerHTML={{ __html: link.label }}

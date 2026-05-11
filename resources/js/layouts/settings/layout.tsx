@@ -202,7 +202,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     return (
         <div className="flex h-full min-h-0">
             {/* Desktop sidebar */}
-            <aside className="hidden w-60 shrink-0 overflow-y-auto border-r bg-white lg:block">
+            <aside className="hidden w-60 shrink-0 overflow-y-auto border-r bg-card lg:block">
                 <div className="px-3 pt-4 pb-2">
                     <h2 className="px-3 text-lg font-semibold tracking-tight">Settings</h2>
                 </div>
@@ -211,7 +211,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
             {/* Mobile header + sheet */}
             <div className="flex flex-1 flex-col overflow-hidden">
-                <div className="flex items-center gap-3 border-b bg-white px-4 py-3 lg:hidden">
+                <div className="flex items-center gap-3 border-b bg-card px-4 py-3 lg:hidden">
                     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="shrink-0">

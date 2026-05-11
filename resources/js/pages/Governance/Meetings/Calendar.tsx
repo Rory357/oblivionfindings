@@ -223,7 +223,7 @@ export default function MeetingsCalendar({
                     </div>
                 </div>
 
-                <Card className="mb-4 flex flex-col gap-3 bg-white p-4 md:flex-row md:items-center md:justify-between">
+                <Card className="mb-4 flex flex-col gap-3 bg-card p-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-2">
                         <Button
                             variant="outline"
@@ -311,7 +311,7 @@ export default function MeetingsCalendar({
                                             className={cn(
                                                 'h-auto min-h-[92px] justify-start rounded-lg border p-2 text-left',
                                                 day.inMonth
-                                                    ? 'bg-white'
+                                                    ? 'bg-card'
                                                     : 'bg-muted text-muted-foreground',
                                                 isActive &&
                                                     'border-status-info/30 ring-1 ring-status-info',

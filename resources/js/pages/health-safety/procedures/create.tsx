@@ -367,7 +367,7 @@ export default function ProcedureCreate() {
                                                     item,
                                                 )
                                                     ? 'border-status-info/30 bg-status-info-bg text-status-info'
-                                                    : 'border-border bg-white text-muted-foreground hover:bg-muted'
+                                                    : 'border-border bg-card text-muted-foreground hover:bg-muted'
                                             }`}
                                         >
                                             {item}

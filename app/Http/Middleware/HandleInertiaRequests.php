@@ -153,9 +153,15 @@ class HandleInertiaRequests extends Middleware
             ],
             // Per-user appearance preferences so the React app can hydrate
             // from server state instead of only trusting localStorage. Null
-            // values mean "fall back to brand/org defaults".
+            // values mean "fall back to brand/org defaults". The `appearance`
+            // cookie is a fallback for users who toggled the theme but whose
+            // DB column is still null (e.g. first login on a new device) —
+            // without it the first paint reverts to system/dark.
             'appearance' => $user ? [
-                'theme' => $user->theme ?? 'system',
+                'theme' => $user->theme
+                    ?? (in_array($request->cookie('appearance'), ['light', 'dark', 'system'], true)
+                        ? $request->cookie('appearance')
+                        : 'system'),
                 'accent_colour' => $user->accent_colour,
                 'font_size' => (int) ($user->font_size ?? 14),
                 'sidebar_density' => $user->sidebar_density ?? 'comfortable',

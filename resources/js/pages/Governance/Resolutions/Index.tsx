@@ -91,7 +91,7 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                   {my_pending_votes.map((vote) => (
                     <div
                       key={vote.id}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-status-warning/30"
+                      className="flex items-center justify-between p-3 bg-card rounded-lg border border-status-warning/30"
                     >
                       <div>
                         <p className="font-medium text-foreground">{vote.title}</p>

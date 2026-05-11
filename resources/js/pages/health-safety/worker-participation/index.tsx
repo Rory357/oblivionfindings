@@ -1422,7 +1422,7 @@ export default function WorkerParticipationIndex({
                                                                                         item.id ??
                                                                                         idx
                                                                                     }
-                                                                                    className="flex items-start gap-2 rounded-lg border bg-white p-2.5 text-xs"
+                                                                                    className="flex items-start gap-2 rounded-lg border bg-card p-2.5 text-xs"
                                                                                 >
                                                                                     <CheckCircle2
                                                                                         className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
@@ -1812,7 +1812,7 @@ export default function WorkerParticipationIndex({
                                                                             </div>
                                                                             <a
                                                                                 href={`/health-safety/worker-participation/consultations/${c.id}/documents/document`}
-                                                                                className="flex shrink-0 items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info transition-colors hover:bg-status-info-bg hover:text-status-info"
+                                                                                className="flex shrink-0 items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-xs font-medium text-status-info transition-colors hover:bg-status-info-bg hover:text-status-info"
                                                                             >
                                                                                 <Download className="h-3.5 w-3.5" />
                                                                                 Download
@@ -1837,7 +1837,7 @@ export default function WorkerParticipationIndex({
                                                                             </div>
                                                                             <a
                                                                                 href={`/health-safety/worker-participation/consultations/${c.id}/documents/outcome`}
-                                                                                className="flex shrink-0 items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info transition-colors hover:bg-status-info-bg hover:text-status-info"
+                                                                                className="flex shrink-0 items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-xs font-medium text-status-info transition-colors hover:bg-status-info-bg hover:text-status-info"
                                                                             >
                                                                                 <Download className="h-3.5 w-3.5" />
                                                                                 Download

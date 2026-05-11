@@ -705,7 +705,7 @@ export default function CarePlanShow({
                                     {noteGoalId === goal.id && (
                                         <div className="mt-2 rounded-lg border border-primary bg-primary/10/30 p-3">
                                             <Textarea
-                                                className="min-h-[60px] bg-white text-sm"
+                                                className="min-h-[60px] bg-background text-sm"
                                                 value={quickNote}
                                                 onChange={(e) => setQuickNote(e.target.value)}
                                                 placeholder="Add a progress note for this goal..."
@@ -723,7 +723,7 @@ export default function CarePlanShow({
                                         <div className="mt-2 space-y-1.5 rounded-lg border bg-muted/50 p-2.5">
                                             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Note History</p>
                                             {getGoalNotes(goal.id).map((note: any) => (
-                                                <div key={note.id} className="rounded border bg-white p-2 text-xs">
+                                                <div key={note.id} className="rounded border bg-card p-2 text-xs">
                                                     <div className="flex items-center justify-between">
                                                         <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
                                                         <span className="text-[10px] text-muted-foreground">{formatDate(note.created_at)}</span>

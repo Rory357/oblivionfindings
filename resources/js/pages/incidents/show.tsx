@@ -388,7 +388,7 @@ function FollowupList({
 
                         {f.notes ? (
                             // eslint-disable-next-line no-restricted-syntax -- Follow-up notes are nested inside a follow-up list item, not standalone Cards.
-                            <div className="mt-3 rounded-md border bg-white/60 p-2.5 text-sm whitespace-pre-wrap">
+                            <div className="mt-3 rounded-md border bg-card/60 p-2.5 text-sm whitespace-pre-wrap">
                                 {f.notes}
                             </div>
                         ) : null}
@@ -1427,7 +1427,7 @@ export default function IncidentShow({
                             </div>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 {/* eslint-disable-next-line no-restricted-syntax -- WorkSafe status fields are nested inside the incident detail Card. */}
-                                <div className="space-y-1 rounded-lg border border-status-critical/30 bg-white p-3">
+                                <div className="space-y-1 rounded-lg border border-status-critical/30 bg-card p-3">
                                     <Label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                         Site preserved
                                     </Label>
@@ -1437,7 +1437,7 @@ export default function IncidentShow({
                                 </div>
                                 {incident.site_preservation_released_at && (
                                     // eslint-disable-next-line no-restricted-syntax -- WorkSafe status fields are nested inside the incident detail Card.
-                                    <div className="space-y-1 rounded-lg border border-status-critical/30 bg-white p-3">
+                                    <div className="space-y-1 rounded-lg border border-status-critical/30 bg-card p-3">
                                         <Label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                             Preservation released
                                         </Label>
@@ -1702,7 +1702,7 @@ export default function IncidentShow({
                                 {correctiveActions.map((action, index) => (
                                     <div
                                         key={index}
-                                        className={`rounded-lg border p-4 ${action.status === 'completed' ? 'border-status-success/30 bg-status-success-bg' : 'bg-white'}`}
+                                        className={`rounded-lg border p-4 ${action.status === 'completed' ? 'border-status-success/30 bg-status-success-bg' : 'bg-card'}`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
@@ -1953,7 +1953,7 @@ export default function IncidentShow({
                                 // eslint-disable-next-line no-restricted-syntax -- Attachment rows are compact list items inside the attachments Card.
                                 <div
                                     key={a.id}
-                                    className="flex items-center gap-3 rounded-lg border bg-white p-3 transition-colors hover:bg-muted/30"
+                                    className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/30"
                                 >
                                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                                         <FileText className="h-5 w-5" />
