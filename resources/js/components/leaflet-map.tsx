@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 // Lazy-load leaflet to avoid SSR issues
 let L: typeof import('leaflet') | null = null;
@@ -319,14 +319,217 @@ export default function LeafletMap({
     const satelliteLayerRef = useRef<any>(null);
     const layerControlRef = useRef<any>(null);
     const initRef = useRef(false);
-    const [mapReady, setMapReady] = useState(false);
     const onMapClickRef = useRef(onMapClick);
+    const clusterZoomHandlerRef = useRef<((e: any) => void) | null>(null);
+
+    // Latest-props mirror. Render helpers below read from this rather than
+    // their defining closure so the imperative renders fired from the async
+    // init effect always see the most recent props, even if a sibling render
+    // happened while leaflet was loading.
+    const propsRef = useRef({
+        markers,
+        onMarkerClick,
+        clustering,
+        polyline,
+        polylineOptions,
+        geofences,
+        zoom,
+    });
+    propsRef.current = {
+        markers,
+        onMarkerClick,
+        clustering,
+        polyline,
+        polylineOptions,
+        geofences,
+        zoom,
+    };
 
     // Resolve dark mode: explicit prop or auto-detect from html element
     const resolvedDark =
         darkMode ??
         (typeof document !== 'undefined' &&
             document.documentElement.classList.contains('dark'));
+
+    // ── Render helpers ──────────────────────────────────────────────────────
+    // Defined in the component body (not inside useEffect) so the init effect
+    // can call them imperatively after async leaflet load completes — no need
+    // for an `isReady` flag in any useEffect deps array.
+
+    function renderMarkers() {
+        if (!markersLayerRef.current || !L) return;
+        const { markers, onMarkerClick, clustering, zoom } = propsRef.current;
+        markersLayerRef.current.clearLayers();
+        const map = mapRef.current;
+        const currentZoom = map?.getZoom() ?? zoom;
+
+        if (clustering && markers.length > 20) {
+            const clusters = clusterMarkers(markers, currentZoom);
+
+            clusters.forEach((group) => {
+                if (group.markers.length === 1) {
+                    const m = group.markers[0];
+                    const icon = createDivIcon(L!, m);
+                    const leafletMarker = L!.marker([m.lat, m.lng], { icon });
+                    if (m.popup || m.title) {
+                        leafletMarker.bindPopup(
+                            `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
+                        );
+                    }
+                    if (onMarkerClick)
+                        leafletMarker.on('click', () =>
+                            onMarkerClick(m.id),
+                        );
+                    markersLayerRef.current.addLayer(leafletMarker);
+                } else {
+                    const clusterIcon = createClusterIcon(
+                        L!,
+                        group.markers.length,
+                    );
+                    const clusterMarker = L!.marker(
+                        [group.lat, group.lng],
+                        { icon: clusterIcon },
+                    );
+                    clusterMarker.on('click', () => {
+                        const bounds = L!.latLngBounds(
+                            group.markers.map(
+                                (m) => [m.lat, m.lng] as [number, number],
+                            ),
+                        );
+                        map?.fitBounds(bounds, { padding: [40, 40] });
+                    });
+                    markersLayerRef.current.addLayer(clusterMarker);
+                }
+            });
+        } else {
+            markers.forEach((m) => {
+                const icon = createDivIcon(L!, m);
+                const leafletMarker = L!.marker([m.lat, m.lng], { icon });
+
+                if (m.popup || m.title) {
+                    leafletMarker.bindPopup(
+                        `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
+                    );
+                }
+
+                if (onMarkerClick)
+                    leafletMarker.on('click', () => onMarkerClick(m.id));
+                markersLayerRef.current.addLayer(leafletMarker);
+            });
+        }
+    }
+
+    // Auto-fit bounds to all markers. Intentionally skipped when clustering
+    // is active with >20 markers (matches pre-refactor behaviour) and when
+    // called from the zoomend handler.
+    function fitBoundsToMarkers() {
+        if (!L || !mapRef.current) return;
+        const { markers, clustering } = propsRef.current;
+        if (clustering && markers.length > 20) return;
+        if (markers.length <= 1) return;
+        const bounds = L.latLngBounds(
+            markers.map((m) => [m.lat, m.lng] as [number, number]),
+        );
+        mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+    }
+
+    function renderPolyline() {
+        if (!polylineLayerRef.current || !L) return;
+        const { polyline, polylineOptions } = propsRef.current;
+        polylineLayerRef.current.clearLayers();
+
+        if (!polyline || polyline.length < 2) return;
+
+        const opts = polylineOptions ?? {};
+        const color = opts.color ?? '#3b82f6';
+
+        const line = L.polyline(
+            polyline.map((p) => [p.lat, p.lng] as [number, number]),
+            {
+                color,
+                weight: 4,
+                opacity: 0.8,
+                className: opts.animated
+                    ? 'leaflet-animated-polyline'
+                    : undefined,
+            },
+        );
+        polylineLayerRef.current.addLayer(line);
+
+        if (opts.showArrows !== false && polyline.length > 2) {
+            addDirectionArrows(L, polylineLayerRef.current, polyline, color);
+        }
+
+        if (opts.showEndpoints !== false) {
+            const startPt = polyline[0];
+            const endPt = polyline[polyline.length - 1];
+            if (startPt) {
+                const startIcon = createEndpointIcon(L, 'start');
+                polylineLayerRef.current.addLayer(
+                    L.marker([startPt.lat, startPt.lng], {
+                        icon: startIcon,
+                        interactive: false,
+                    }),
+                );
+            }
+            if (endPt) {
+                const endIcon = createEndpointIcon(L, 'end');
+                polylineLayerRef.current.addLayer(
+                    L.marker([endPt.lat, endPt.lng], {
+                        icon: endIcon,
+                        interactive: false,
+                    }),
+                );
+            }
+        }
+    }
+
+    function renderGeofences() {
+        if (!geofenceLayerRef.current || !L) return;
+        const { geofences } = propsRef.current;
+        geofenceLayerRef.current.clearLayers();
+
+        geofences.forEach((gf) => {
+            const color = gf.color ?? 'var(--map-geofence-default, #ef4444)';
+            if (gf.type === 'circle' && gf.center && gf.radius_m) {
+                const circle = L!.circle([gf.center.lat, gf.center.lng], {
+                    radius: gf.radius_m,
+                    color,
+                    fillColor: color,
+                    fillOpacity: 0.1,
+                    weight: 2,
+                });
+                if (gf.name) circle.bindPopup(gf.name);
+                geofenceLayerRef.current.addLayer(circle);
+            } else if (gf.type === 'polygon' && gf.coordinates?.length) {
+                const polygon = L!.polygon(
+                    gf.coordinates.map(
+                        (c) => [c.lat, c.lng] as [number, number],
+                    ),
+                    { color, fillColor: color, fillOpacity: 0.1, weight: 2 },
+                );
+                if (gf.name) polygon.bindPopup(gf.name);
+                geofenceLayerRef.current.addLayer(polygon);
+            }
+        });
+    }
+
+    // Idempotently attach the zoomend listener used to re-cluster on zoom.
+    function syncClusterZoomListener() {
+        const { markers, clustering } = propsRef.current;
+        const map = mapRef.current;
+        if (!map) return;
+
+        if (clusterZoomHandlerRef.current) {
+            map.off('zoomend', clusterZoomHandlerRef.current);
+            clusterZoomHandlerRef.current = null;
+        }
+        if (clustering && markers.length > 20) {
+            const handler = () => renderMarkers();
+            map.on('zoomend', handler);
+            clusterZoomHandlerRef.current = handler;
+        }
+    }
 
     // Initialize map
     useEffect(() => {
@@ -404,7 +607,15 @@ export default function LeafletMap({
                 });
 
                 initRef.current = true;
-                setMapReady(true);
+
+                // Imperatively render initial layer state. This replaces the
+                // old `mapReady` state trigger so the layer effects below no
+                // longer need an extra dep to fire after init.
+                renderMarkers();
+                fitBoundsToMarkers();
+                renderPolyline();
+                renderGeofences();
+                syncClusterZoomListener();
             }
         })();
 
@@ -468,184 +679,37 @@ export default function LeafletMap({
         mapRef.current.setView([center.lat, center.lng], zoom);
     }, [center.lat, center.lng, zoom]);
 
-    // Update markers (with optional clustering)
+    // Re-render markers when marker-related props change
     useEffect(() => {
-        if (!markersLayerRef.current || !L || !initRef.current) return;
-        markersLayerRef.current.clearLayers();
-
-        const map = mapRef.current;
-
-        const renderMarkers = () => {
-            if (!markersLayerRef.current || !L) return;
-            markersLayerRef.current.clearLayers();
-
-            const currentZoom = map?.getZoom() ?? zoom;
-
-            if (clustering && markers.length > 20) {
-                const clusters = clusterMarkers(markers, currentZoom);
-
-                clusters.forEach((group) => {
-                    if (group.markers.length === 1) {
-                        const m = group.markers[0];
-                        const icon = createDivIcon(L!, m);
-                        const leafletMarker = L!.marker([m.lat, m.lng], {
-                            icon,
-                        });
-                        if (m.popup || m.title) {
-                            leafletMarker.bindPopup(
-                                `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
-                            );
-                        }
-                        if (onMarkerClick)
-                            leafletMarker.on('click', () =>
-                                onMarkerClick(m.id),
-                            );
-                        markersLayerRef.current.addLayer(leafletMarker);
-                    } else {
-                        const clusterIcon = createClusterIcon(
-                            L!,
-                            group.markers.length,
-                        );
-                        const clusterMarker = L!.marker(
-                            [group.lat, group.lng],
-                            { icon: clusterIcon },
-                        );
-                        clusterMarker.on('click', () => {
-                            const bounds = L!.latLngBounds(
-                                group.markers.map(
-                                    (m) => [m.lat, m.lng] as [number, number],
-                                ),
-                            );
-                            map?.fitBounds(bounds, { padding: [40, 40] });
-                        });
-                        markersLayerRef.current.addLayer(clusterMarker);
-                    }
-                });
-            } else {
-                markers.forEach((m) => {
-                    const icon = createDivIcon(L!, m);
-                    const leafletMarker = L!.marker([m.lat, m.lng], { icon });
-
-                    if (m.popup || m.title) {
-                        leafletMarker.bindPopup(
-                            `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
-                        );
-                    }
-
-                    if (onMarkerClick)
-                        leafletMarker.on('click', () => onMarkerClick(m.id));
-                    markersLayerRef.current.addLayer(leafletMarker);
-                });
-            }
-        };
-
+        if (!initRef.current) return;
         renderMarkers();
+        fitBoundsToMarkers();
+        syncClusterZoomListener();
+    }, [markers, onMarkerClick, clustering, zoom]);
 
-        // Re-cluster on zoom change when clustering is enabled
-        if (clustering && markers.length > 20) {
-            const onZoom = () => renderMarkers();
-            map?.on('zoomend', onZoom);
-            return () => {
-                map?.off('zoomend', onZoom);
-            };
-        }
-
-        // Auto-fit bounds if multiple markers
-        if (markers.length > 1) {
-            const bounds = L.latLngBounds(
-                markers.map((m) => [m.lat, m.lng] as [number, number]),
-            );
-            map?.fitBounds(bounds, { padding: [40, 40] });
-        }
-    }, [markers, onMarkerClick, clustering, zoom, mapReady]);
-
-    // Update polyline with enhancements (animated dash, direction arrows, endpoints)
+    // Re-render polyline when polyline-related props change
     useEffect(() => {
-        if (!polylineLayerRef.current || !L || !initRef.current) return;
-        polylineLayerRef.current.clearLayers();
+        if (!initRef.current) return;
+        renderPolyline();
+    }, [polyline, polylineOptions]);
 
-        if (!polyline || polyline.length < 2) return;
-
-        const opts = polylineOptions ?? {};
-        const color = opts.color ?? '#3b82f6';
-
-        const line = L.polyline(
-            polyline.map((p) => [p.lat, p.lng] as [number, number]),
-            {
-                color,
-                weight: 4,
-                opacity: 0.8,
-                className: opts.animated
-                    ? 'leaflet-animated-polyline'
-                    : undefined,
-            },
-        );
-        polylineLayerRef.current.addLayer(line);
-
-        // Direction arrows along the polyline
-        if (opts.showArrows !== false && polyline.length > 2) {
-            addDirectionArrows(L, polylineLayerRef.current, polyline, color);
-        }
-
-        // Start (green A) / End (red B) markers
-        if (opts.showEndpoints !== false) {
-            const startPt = polyline[0];
-            const endPt = polyline[polyline.length - 1];
-            if (startPt) {
-                const startIcon = createEndpointIcon(L, 'start');
-                polylineLayerRef.current.addLayer(
-                    L.marker([startPt.lat, startPt.lng], {
-                        icon: startIcon,
-                        interactive: false,
-                    }),
-                );
-            }
-            if (endPt) {
-                const endIcon = createEndpointIcon(L, 'end');
-                polylineLayerRef.current.addLayer(
-                    L.marker([endPt.lat, endPt.lng], {
-                        icon: endIcon,
-                        interactive: false,
-                    }),
-                );
-            }
-        }
-    }, [polyline, polylineOptions, mapReady]);
-
-    // Update geofences
+    // Re-render geofences when geofences change
     useEffect(() => {
-        if (!geofenceLayerRef.current || !L || !initRef.current) return;
-        geofenceLayerRef.current.clearLayers();
-
-        geofences.forEach((gf) => {
-            const color = gf.color ?? 'var(--map-geofence-default, #ef4444)';
-            if (gf.type === 'circle' && gf.center && gf.radius_m) {
-                const circle = L!.circle([gf.center.lat, gf.center.lng], {
-                    radius: gf.radius_m,
-                    color,
-                    fillColor: color,
-                    fillOpacity: 0.1,
-                    weight: 2,
-                });
-                if (gf.name) circle.bindPopup(gf.name);
-                geofenceLayerRef.current.addLayer(circle);
-            } else if (gf.type === 'polygon' && gf.coordinates?.length) {
-                const polygon = L!.polygon(
-                    gf.coordinates.map(
-                        (c) => [c.lat, c.lng] as [number, number],
-                    ),
-                    { color, fillColor: color, fillOpacity: 0.1, weight: 2 },
-                );
-                if (gf.name) polygon.bindPopup(gf.name);
-                geofenceLayerRef.current.addLayer(polygon);
-            }
-        });
-    }, [geofences, mapReady]);
+        if (!initRef.current) return;
+        renderGeofences();
+    }, [geofences]);
 
     // Clean up
     useEffect(() => {
         return () => {
             if (mapRef.current) {
+                if (clusterZoomHandlerRef.current) {
+                    mapRef.current.off(
+                        'zoomend',
+                        clusterZoomHandlerRef.current,
+                    );
+                    clusterZoomHandlerRef.current = null;
+                }
                 mapRef.current.remove();
                 mapRef.current = null;
                 initRef.current = false;

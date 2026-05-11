@@ -1,3 +1,4 @@
+import FleetHero from '@/components/fleet-hero';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -61,27 +62,35 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
         t.key.toLowerCase().includes(search.toLowerCase())
     );
 
+    const activeCount = templates.data.filter(t => t.is_active).length;
+    const inactiveCount = templates.data.length - activeCount;
+    const totalItems = templates.data.reduce((sum, t) => sum + (t.items_count || 0), 0);
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: 'Checklist Templates', href: '/sites/checklists/templates' }]}>
             <Head title="Checklist Templates" />
 
             <div className="flex flex-col gap-4 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <ClipboardCheck className="w-5 h-5" />
-                            Checklist Templates
-                        </h1>
-                        <p className="text-sm text-muted-foreground">Manage reusable checklists for site inspections and walkthroughs</p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/sites/checklists/templates/create">
-                            <Plus className="w-4 h-4 mr-1" />
-                            New Template
-                        </Link>
-                    </Button>
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title="Checklist Templates"
+                    description="Manage reusable checklists for site inspections and walkthroughs"
+                    icon={<ClipboardCheck className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: templates.data.length },
+                        { label: 'Active', value: activeCount },
+                        { label: 'Inactive', value: inactiveCount },
+                        { label: 'Items', value: totalItems },
+                    ]}
+                    actions={
+                        <Button asChild>
+                            <Link href="/sites/checklists/templates/create">
+                                <Plus className="w-4 h-4 mr-1" />
+                                New Template
+                            </Link>
+                        </Button>
+                    }
+                />
 
                 {/* Filters */}
                 <div className="flex gap-3">

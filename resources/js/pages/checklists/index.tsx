@@ -29,6 +29,7 @@ import {
     TabsRoot,
     TabsTrigger,
 } from '@/components/ui/tabs';
+import FleetHero from '@/components/fleet-hero';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
@@ -387,39 +388,36 @@ export default function ChecklistsDashboard({
             <Head title="Checklists" />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                <ClipboardCheck className="h-5 w-5" />
-                            </span>
-                            Checklists
-                        </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Operational checklists, walkthroughs and inspections across every
-                            site.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {can.manageTemplates && (
-                            <Button asChild variant="outline">
-                                <Link href="/sites/checklists/templates">
-                                    <Layers className="mr-1.5 h-4 w-4" />
-                                    Manage Templates
-                                </Link>
-                            </Button>
-                        )}
-                        {can.manageTemplates && (
-                            <Button asChild>
-                                <Link href="/sites/checklists/templates/create">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Template
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title="Checklists"
+                    description="Operational checklists, walkthroughs and inspections across every site."
+                    icon={<ClipboardCheck className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Templates', value: stats.templates_active },
+                        { label: 'Assignments', value: stats.assignments_active },
+                        { label: 'Overdue', value: stats.runs_overdue },
+                        { label: 'Completed 30d', value: stats.runs_completed_30d },
+                    ]}
+                    actions={
+                        can.manageTemplates ? (
+                            <div className="flex flex-wrap gap-2">
+                                <Button asChild variant="outline">
+                                    <Link href="/sites/checklists/templates">
+                                        <Layers className="mr-1.5 h-4 w-4" />
+                                        Manage Templates
+                                    </Link>
+                                </Button>
+                                <Button asChild>
+                                    <Link href="/sites/checklists/templates/create">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Template
+                                    </Link>
+                                </Button>
+                            </div>
+                        ) : undefined
+                    }
+                />
 
                 {/* Stat row */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
