@@ -19,7 +19,7 @@ class HouseLedgerService
         return HouseLedger::firstOrCreate(
             ['site_id' => $site->id],
             [
-                'tenant_id' => $site->tenant_id,
+                'tenant_id' => $site->tenant_id ?? 1,
                 'opening_balance' => 0,
                 'current_balance' => 0,
                 'currency' => 'NZD',

@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
 use App\Models\HouseLedger;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Sites\HouseLedgerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class HouseLedgerTest extends TestCase
@@ -33,6 +37,8 @@ class HouseLedgerTest extends TestCase
 
         $this->houseSite = Site::factory()->create(['type' => 'house']);
         $this->officeSite = Site::factory()->create(['type' => 'head_office']);
+
+        Bus::fake();
     }
 
     public function test_ledger_index_requires_authentication(): void
@@ -63,7 +69,7 @@ class HouseLedgerTest extends TestCase
     public function test_admin_can_add_ledger_entry(): void
     {
         $this->actingAs($this->admin)
-            ->post("/sites/{$this->houseSite->id}/ledger", [
+            ->post("/sites/{$this->houseSite->id}/ledger/entries", [
                 'entry_type' => 'income',
                 'category' => 'funding',
                 'description' => 'Monthly house funding',
@@ -82,6 +88,38 @@ class HouseLedgerTest extends TestCase
             'amount' => 1500.00,
             'running_balance' => 1500.00,
         ]);
+
+        Bus::assertDispatched(ProcessFinancialEventJob::class, fn (ProcessFinancialEventJob $job) => $job->eventData['event_type'] === 'house_ledger_income'
+            && $job->eventData['site_id'] === $this->houseSite->id);
+    }
+
+    public function test_ledger_index_can_return_json_with_date_filters(): void
+    {
+        $service = app(HouseLedgerService::class);
+        $ledger = $service->getOrCreateLedger($this->houseSite);
+
+        $service->addEntry($ledger, [
+            'entry_type' => 'income',
+            'category' => 'funding',
+            'description' => 'April funding',
+            'amount' => 500.00,
+            'entry_date' => '2026-04-15',
+        ], $this->admin->id);
+
+        $service->addEntry($ledger, [
+            'entry_type' => 'expense',
+            'category' => 'groceries',
+            'description' => 'May groceries',
+            'amount' => 120.00,
+            'entry_date' => '2026-05-03',
+        ], $this->admin->id);
+
+        $this->actingAs($this->admin)
+            ->getJson("/sites/{$this->houseSite->id}/ledger?from=2026-05-01&to=2026-05-31")
+            ->assertOk()
+            ->assertJsonPath('ledger.id', $ledger->id)
+            ->assertJsonPath('entries.meta.total', 1)
+            ->assertJsonPath('entries.data.0.description', 'May groceries');
     }
 
     public function test_expense_reduces_balance(): void
@@ -163,6 +201,106 @@ class HouseLedgerTest extends TestCase
 
         $ledger = HouseLedger::where('site_id', $this->houseSite->id)->first();
         $this->assertNotNull($ledger->last_reconciled_at);
+        $this->assertSame($this->admin->id, $ledger->reconciled_by);
+    }
+
+    public function test_admin_can_download_ledger_attachment(): void
+    {
+        Storage::fake('private');
+
+        $service = app(HouseLedgerService::class);
+        $ledger = $service->getOrCreateLedger($this->houseSite);
+        Storage::disk('private')->put('house-ledger/test-receipt.pdf', 'receipt-content');
+
+        $entry = $service->addEntry($ledger, [
+            'entry_type' => 'expense',
+            'category' => 'groceries',
+            'description' => 'Receipt attached',
+            'amount' => 20.00,
+            'entry_date' => '2026-02-20',
+            'attachments' => [[
+                'path' => 'house-ledger/test-receipt.pdf',
+                'disk' => 'private',
+                'original_name' => 'test-receipt.pdf',
+                'mime_type' => 'application/pdf',
+                'size' => 15,
+            ]],
+        ], $this->admin->id);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->houseSite->id}/ledger/entries/{$entry->id}/download")
+            ->assertOk();
+    }
+
+    public function test_download_attachment_requires_ledger_view_permission(): void
+    {
+        Storage::fake('private');
+
+        $service = app(HouseLedgerService::class);
+        $ledger = $service->getOrCreateLedger($this->houseSite);
+        Storage::disk('private')->put('house-ledger/perm-receipt.pdf', 'receipt');
+
+        $entry = $service->addEntry($ledger, [
+            'entry_type' => 'expense',
+            'category' => 'groceries',
+            'description' => 'Permission-gated receipt',
+            'amount' => 12.50,
+            'entry_date' => '2026-02-20',
+            'attachments' => [[
+                'path' => 'house-ledger/perm-receipt.pdf',
+                'disk' => 'private',
+                'original_name' => 'perm-receipt.pdf',
+                'mime_type' => 'application/pdf',
+                'size' => 7,
+            ]],
+        ], $this->admin->id);
+
+        // User can view sites (passes route middleware + SitePolicy) but lacks sites.ledger.view.
+        $unprivileged = User::factory()->create(['role' => 'viewer', 'approved_at' => now()]);
+        $grants = Permission::whereIn('key', ['sites.viewAny', 'sites.type.house.view'])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
+            ->all();
+        $unprivileged->permissionOverrides()->attach($grants);
+
+        $this->actingAs($unprivileged)
+            ->get("/sites/{$this->houseSite->id}/ledger/entries/{$entry->id}/download")
+            ->assertForbidden();
+    }
+
+    public function test_ledger_routes_reject_cross_tenant_sites(): void
+    {
+        $otherTenantSite = Site::factory()->create([
+            'tenant_id' => 2,
+            'type' => 'house',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$otherTenantSite->id}/ledger")
+            ->assertForbidden();
+    }
+
+    public function test_site_show_includes_inline_house_ledger_payload(): void
+    {
+        $service = app(HouseLedgerService::class);
+        $ledger = $service->getOrCreateLedger($this->houseSite);
+        $service->addEntry($ledger, [
+            'entry_type' => 'income',
+            'category' => 'funding',
+            'description' => 'Opening balance',
+            'amount' => 300.00,
+            'entry_date' => '2026-02-20',
+        ], $this->admin->id);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->houseSite->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('sites/show')
+                ->has('houseLedger.ledger')
+                ->has('houseLedger.entries.data', 1)
+                ->where('houseLedger.entries.data.0.description', 'Opening balance')
+            );
     }
 
     public function test_non_house_site_cannot_add_ledger_entry(): void

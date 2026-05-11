@@ -39,6 +39,7 @@ use App\Domain\Finance\Http\Controllers\PaymentRunController;
 use App\Domain\Finance\Http\Controllers\PettyCashController;
 use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
+use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
 use App\Domain\Finance\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Executive Financial Dashboard
     Route::get('/executive-dashboard', [ExecutiveFinancialDashboardController::class, 'index'])
         ->name('executive-dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // All-Sites Financial Overview
+    Route::get('/sites', [SitesFinancialOverviewController::class, 'index'])
+        ->name('sites.overview')
         ->middleware('permission:finance.dashboard');
 
     // Site Financial Dashboard

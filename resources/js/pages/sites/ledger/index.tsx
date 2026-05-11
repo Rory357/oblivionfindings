@@ -74,7 +74,7 @@ type Entry = {
     amount: number;
     running_balance: number;
     entry_date: string;
-    recorded_by: { id: number; name: string };
+    recorded_by: { id: number; name: string } | null;
     approved_by: { id: number; name: string } | null;
     notes?: string;
     attachments?: Attachment[];
@@ -181,7 +181,7 @@ export default function SiteLedger({
 
     const handleCreate = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post(`/sites/${site.id}/ledger`, {
+        form.post(`/sites/${site.id}/ledger/entries`, {
             forceFormData: true,
             onSuccess: () => {
                 setCreateOpen(false);
@@ -396,7 +396,7 @@ export default function SiteLedger({
                                                 {entry.attachments &&
                                                 entry.attachments.length > 0 ? (
                                                     <a
-                                                        href={`/sites/${site.id}/ledger/entries/${entry.id}/attachment`}
+                                                        href={`/sites/${site.id}/ledger/entries/${entry.id}/download`}
                                                         className="inline-flex items-center gap-1 text-sm text-status-info hover:text-status-info"
                                                         target="_blank"
                                                         rel="noopener noreferrer"
@@ -414,7 +414,7 @@ export default function SiteLedger({
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                {entry.recorded_by.name}
+                                                {entry.recorded_by?.name ?? '-'}
                                             </TableCell>
                                         </TableRow>
                                     ))}

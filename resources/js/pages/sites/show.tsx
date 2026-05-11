@@ -78,6 +78,9 @@ import {
     isSiteDocumentExpiringSoon,
     type SiteDocumentRecord,
 } from './_document-helpers';
+import SiteLedgerPanel, {
+    type SiteLedgerPanelData,
+} from './_ledger-panel';
 
 type Site = {
     id: number;
@@ -292,6 +295,7 @@ type Props = {
     documents: Doc[];
     assets: AssetLite[];
     checklist: ChecklistItem[];
+    houseLedger?: SiteLedgerPanelData | null;
     typeSpecificData: TypeSpecificData;
     vendors?: VendorLite[];
     staffRequirements?: StaffRequirement[];
@@ -810,6 +814,7 @@ export default function SiteShow({
     contacts,
     documents,
     checklist,
+    houseLedger,
     typeSpecificData,
     vendors = [],
     staffRequirements = [],
@@ -2260,28 +2265,10 @@ export default function SiteShow({
                     </TabsContent>
 
                     <TabsContent value="financials">
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center gap-4 py-12">
-                                <DollarSign className="h-10 w-10 text-primary/40" />
-                                <div className="text-center">
-                                    <p className="font-medium">
-                                        Financial Dashboard
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        View detailed cost breakdowns, budgets,
-                                        and trends for this site.
-                                    </p>
-                                </div>
-                                <Link
-                                    href={`/finance/sites/${site.id}/financial-dashboard`}
-                                >
-                                    <Button>
-                                        <DollarSign className="mr-2 h-4 w-4" />
-                                        Open Financial Dashboard
-                                    </Button>
-                                </Link>
-                            </CardContent>
-                        </Card>
+                        <SiteLedgerPanel
+                            site={site}
+                            ledgerData={houseLedger}
+                        />
                     </TabsContent>
                 </Tabs>
             </PageShell>

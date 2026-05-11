@@ -24,6 +24,8 @@ use App\Models\SiteHouseRoom;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
+use App\Services\Sites\HouseLedgerPresenter;
+use App\Services\Sites\HouseLedgerService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -140,6 +142,7 @@ class SiteController extends Controller
         $user = $request->user();
         $tenantId = $site->tenant_id ?? $user?->tenant_id ?? $user?->organization_id ?? 1;
         $siteDevices = app(DeviceRegistryService::class)->forSite($tenantId, $site->id);
+        $houseLedger = $this->buildHouseLedgerData($site, $user);
 
         // Assets linked to this site (includes both site-owned assets and client-owned assets stored at the site)
         $assets = Asset::query()
@@ -335,6 +338,7 @@ class SiteController extends Controller
                 'updated_at' => $a->updated_at?->toDateTimeString(),
             ]),
             'checklist' => $checklist,
+            'houseLedger' => $houseLedger,
             'vendors' => \App\Models\SiteVendor::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->orderBy('service_type')
@@ -407,6 +411,32 @@ class SiteController extends Controller
             'fleet' => \Inertia\Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
         ]);
+    }
+
+    private function buildHouseLedgerData(Site $site, ?\App\Models\User $user): ?array
+    {
+        if (! in_array($site->type, ['house', 'residential'], true)) {
+            return null;
+        }
+
+        if (! $user?->canDo('sites.ledger.view')) {
+            return null;
+        }
+
+        $tenantId = $user->organization_id;
+        if ($site->tenant_id && $tenantId && (int) $site->tenant_id !== (int) $tenantId) {
+            return null;
+        }
+
+        $ledger = app(HouseLedgerService::class)->getOrCreateLedger($site);
+        $entries = $ledger->entries()
+            ->with(['recordedBy:id,name', 'approvedBy:id,name'])
+            ->orderByDesc('entry_date')
+            ->orderByDesc('id')
+            ->paginate(10);
+        $entries->setPath(url("/sites/{$site->id}/ledger"));
+
+        return HouseLedgerPresenter::payload($site, $ledger, $entries, $user);
     }
 
     private function buildSiteChecklistsSummary(Site $site, $user): array

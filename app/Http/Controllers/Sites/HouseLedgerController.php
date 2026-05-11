@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\HouseLedgerEntry;
 use App\Models\Site;
+use App\Services\Sites\HouseLedgerPresenter;
 use App\Services\Sites\HouseLedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,43 +17,42 @@ class HouseLedgerController extends Controller
 
     public function index(Request $request, Site $site)
     {
-        // Guard: house/residential only
-        if (!in_array($site->type, ['house', 'residential'])) {
-            abort(404, 'Ledger is only available for house/residential sites.');
-        }
+        $this->authorizeLedgerAccess($request, $site, 'sites.ledger.view');
 
-        $user = $request->user();
-        // Permission check
-        if (!$user->canDo('sites.ledger.view')) {
-            abort(403);
-        }
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
 
         $ledger = $this->ledgerService->getOrCreateLedger($site);
+        $perPage = min(max((int) $request->integer('per_page', 10), 1), 50);
 
         $entries = $ledger->entries()
             ->with(['recordedBy:id,name', 'approvedBy:id,name'])
+            ->when($request->filled('from'), fn ($query) => $query->where('entry_date', '>=', $request->date('from')->toDateString()))
+            ->when($request->filled('to'), fn ($query) => $query->where('entry_date', '<=', $request->date('to')->toDateString()))
             ->orderByDesc('entry_date')
             ->orderByDesc('id')
-            ->paginate(50);
+            ->paginate($perPage)
+            ->withQueryString();
 
-        return Inertia::render('sites/ledger/index', [
-            'site' => $site,
-            'ledger' => $ledger,
-            'entries' => $entries,
-            'canCreate' => $user->canDo('sites.ledger.create'),
-            'canManage' => $user->canDo('sites.ledger.manage'),
+        $payload = HouseLedgerPresenter::payload($site, $ledger, $entries, $request->user(), [
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json($payload);
+        }
+
+        return Inertia::render('sites/ledger/index', $payload);
     }
 
     public function store(Request $request, Site $site)
     {
-        if (!in_array($site->type, ['house', 'residential'])) {
-            abort(404);
-        }
-
-        if (!$request->user()->canDo('sites.ledger.create')) {
-            abort(403);
-        }
+        $this->authorizeLedgerAccess($request, $site, 'sites.ledger.create');
 
         $data = $request->validate([
             'entry_type' => ['required', 'string', 'in:income,expense,adjustment,transfer'],
@@ -84,24 +84,27 @@ class HouseLedgerController extends Controller
         unset($data['attachment']);
 
         $ledger = $this->ledgerService->getOrCreateLedger($site);
-        $this->ledgerService->addEntry($ledger, $data, $request->user()->id);
+        $entry = $this->ledgerService->addEntry($ledger, $data, $request->user()->id);
+
+        if ($request->expectsJson()) {
+            $entry->load(['recordedBy:id,name', 'approvedBy:id,name']);
+
+            return response()->json([
+                'ledger' => HouseLedgerPresenter::ledger($ledger->refresh()),
+                'entry' => HouseLedgerPresenter::entry($entry),
+            ], 201);
+        }
 
         return redirect()->back()->with('success', 'Ledger entry recorded.');
     }
 
     public function downloadAttachment(Request $request, Site $site, HouseLedgerEntry $entry)
     {
-        if (!in_array($site->type, ['house', 'residential'])) {
-            abort(404);
-        }
+        $this->authorizeLedgerAccess($request, $site, 'sites.ledger.view');
 
         // Verify entry belongs to this site's ledger
         $ledger = $this->ledgerService->getOrCreateLedger($site);
         abort_unless($entry->house_ledger_id === $ledger->id, 404);
-
-        if (!$request->user()->canDo('sites.ledger.view')) {
-            abort(403);
-        }
 
         $attachments = $entry->attachments;
         if (empty($attachments) || !isset($attachments[0])) {
@@ -125,17 +128,38 @@ class HouseLedgerController extends Controller
 
     public function reconcile(Request $request, Site $site)
     {
-        if (!in_array($site->type, ['house', 'residential'])) {
-            abort(404);
-        }
-
-        if (!$request->user()->canDo('sites.ledger.manage')) {
-            abort(403);
-        }
+        $this->authorizeLedgerAccess($request, $site, 'sites.ledger.manage');
 
         $ledger = $this->ledgerService->getOrCreateLedger($site);
         $this->ledgerService->reconcile($ledger, $request->user()->id);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ledger' => HouseLedgerPresenter::ledger($ledger->refresh()),
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Ledger reconciled.');
     }
+
+    private function authorizeLedgerAccess(Request $request, Site $site, string $permission): void
+    {
+        if (! in_array($site->type, ['house', 'residential'], true)) {
+            abort(404, 'Ledger is only available for house/residential sites.');
+        }
+
+        $this->authorize('view', $site);
+
+        $user = $request->user();
+        $tenantId = $user?->organization_id;
+
+        if ($site->tenant_id && $tenantId && (int) $site->tenant_id !== (int) $tenantId) {
+            abort(403);
+        }
+
+        if (! $user?->canDo($permission)) {
+            abort(403);
+        }
+    }
+
 }

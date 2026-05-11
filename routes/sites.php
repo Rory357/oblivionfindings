@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Sites\{
     ChecklistsDashboardController,
+    HouseLedgerController,
     SiteCalendarController,
     SiteComplianceController,
     SiteHazardController,
@@ -37,6 +38,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Site-scoped routes
     Route::prefix('sites/{site}')->middleware('permission:sites.viewAny')->group(function () {
+        
+        // House ledger
+        Route::get('/ledger', [HouseLedgerController::class, 'index'])
+            ->name('sites.ledger.index');
+        Route::post('/ledger/entries', [HouseLedgerController::class, 'store'])
+            ->name('sites.ledger.entries.store')
+            ->middleware('permission:sites.ledger.create');
+        Route::post('/ledger', [HouseLedgerController::class, 'store'])
+            ->name('sites.ledger.store')
+            ->middleware('permission:sites.ledger.create');
+        Route::get('/ledger/entries/{entry}/download', [HouseLedgerController::class, 'downloadAttachment'])
+            ->name('sites.ledger.entries.download');
+        Route::get('/ledger/entries/{entry}/attachment', [HouseLedgerController::class, 'downloadAttachment'])
+            ->name('sites.ledger.entries.attachment');
+        Route::post('/ledger/reconcile', [HouseLedgerController::class, 'reconcile'])
+            ->name('sites.ledger.reconcile')
+            ->middleware('permission:sites.ledger.manage');
         
         // Calendar
         Route::get('/calendar', [SiteCalendarController::class, 'index'])
