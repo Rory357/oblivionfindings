@@ -1571,7 +1571,7 @@ export default function SiteShow({
                                         size="sm"
                                     >
                                         <Link
-                                            href={`/assets/create?site_id=${site.id}`}
+                                            href={`/fleet-assets/assets/create?site_id=${site.id}`}
                                         >
                                             Add Asset
                                         </Link>

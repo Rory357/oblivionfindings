@@ -140,22 +140,6 @@ Route::middleware(['auth'])->group(function () {
             ->name('assets.documents.download');
     });
 
-    // Asset creation
-    Route::middleware('permission:assets.create')->group(function () {
-        Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');
-        Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
-    });
-
-    // Asset updates
-    Route::middleware('permission:assets.update')->group(function () {
-        Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])
-            ->whereNumber('asset')
-            ->name('assets.edit');
-        Route::put('/assets/{asset}', [AssetController::class, 'update'])
-            ->whereNumber('asset')
-            ->name('assets.update');
-    });
-
     // Asset deletion
     Route::middleware('permission:assets.delete')->group(function () {
         Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])

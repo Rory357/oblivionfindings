@@ -82,7 +82,7 @@ export default function AssetsIndex() {
                         </p>
                     </div>
                     {can?.create ? (
-                        <Link href="/assets/create">
+                        <Link href="/fleet-assets/assets/create">
                             <Button>Create Asset</Button>
                         </Link>
                     ) : null}

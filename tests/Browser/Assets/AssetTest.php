@@ -17,7 +17,7 @@ test('assets create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/assets/create')
+            ->visit('/fleet-assets/assets/create')
             ->waitForText('Asset', 10)
             ->assertSee('Asset');
     });

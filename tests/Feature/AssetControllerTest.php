@@ -182,16 +182,16 @@ class AssetControllerTest extends TestCase
 
     public function test_asset_create_requires_authentication(): void
     {
-        $this->get('/assets/create')->assertRedirect('/login');
+        $this->get('/fleet-assets/assets/create')->assertRedirect('/login');
     }
 
     public function test_asset_create_accessible_by_admin(): void
     {
         $this->actingAs($this->admin)
-            ->get('/assets/create')
+            ->get('/fleet-assets/assets/create')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('assets/create')
+                ->component('fleet-assets/assets/create')
                 ->has('sites')
                 ->has('clients')
                 ->has('categories')
@@ -203,7 +203,7 @@ class AssetControllerTest extends TestCase
         $noPermUser = User::factory()->create(['approved_at' => now()]);
 
         $this->actingAs($noPermUser)
-            ->get('/assets/create')
+            ->get('/fleet-assets/assets/create')
             ->assertForbidden();
     }
 
@@ -214,7 +214,7 @@ class AssetControllerTest extends TestCase
     public function test_asset_store_creates_asset(): void
     {
         $this->actingAs($this->admin)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'name' => 'Test Wheelchair',
                 'site_id' => $this->site->id,
                 'status' => 'active',
@@ -233,7 +233,7 @@ class AssetControllerTest extends TestCase
     public function test_asset_store_validates_required_name(): void
     {
         $this->actingAs($this->admin)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'site_id' => $this->site->id,
                 'status' => 'active',
                 'risk_level' => 'low',
@@ -246,7 +246,7 @@ class AssetControllerTest extends TestCase
     public function test_asset_store_validates_status(): void
     {
         $this->actingAs($this->admin)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'name' => 'Test',
                 'site_id' => $this->site->id,
                 'status' => 'invalid_status',
@@ -260,7 +260,7 @@ class AssetControllerTest extends TestCase
     public function test_asset_store_validates_risk_level(): void
     {
         $this->actingAs($this->admin)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'name' => 'Test',
                 'site_id' => $this->site->id,
                 'status' => 'active',
@@ -274,7 +274,7 @@ class AssetControllerTest extends TestCase
     public function test_asset_store_requires_site_or_client(): void
     {
         $this->actingAs($this->admin)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'name' => 'Test',
                 'status' => 'active',
                 'risk_level' => 'low',
@@ -289,7 +289,7 @@ class AssetControllerTest extends TestCase
         $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $this->actingAs($this->admin)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'name' => 'Client Asset',
                 'client_id' => $client->id,
                 'status' => 'active',
@@ -311,7 +311,7 @@ class AssetControllerTest extends TestCase
         $noPermUser = User::factory()->create(['approved_at' => now()]);
 
         $this->actingAs($noPermUser)
-            ->post('/assets', [
+            ->post('/fleet-assets/assets', [
                 'name' => 'Test',
                 'site_id' => $this->site->id,
                 'status' => 'active',
@@ -380,13 +380,12 @@ class AssetControllerTest extends TestCase
         $asset = Asset::factory()->forSite($this->site)->create();
 
         $this->actingAs($this->admin)
-            ->get("/assets/{$asset->id}/edit")
+            ->get("/fleet-assets/assets/{$asset->id}/edit")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('assets/edit')
+                ->component('fleet-assets/assets/edit')
                 ->has('asset')
                 ->has('sites')
-                ->has('clients')
                 ->has('categories')
             );
     }
@@ -396,15 +395,16 @@ class AssetControllerTest extends TestCase
         $asset = Asset::factory()->forSite($this->site)->create(['name' => 'Old Name']);
 
         $this->actingAs($this->admin)
-            ->put("/assets/{$asset->id}", [
+            ->put("/fleet-assets/assets/{$asset->id}", [
                 'name' => 'Updated Name',
                 'site_id' => $this->site->id,
+                'category' => 'equipment',
                 'status' => 'active',
                 'risk_level' => 'medium',
                 'requires_inspection' => false,
                 'requires_maintenance' => false,
             ])
-            ->assertRedirect("/assets/{$asset->id}");
+            ->assertRedirect("/fleet-assets/assets/{$asset->id}");
 
         $asset->refresh();
         $this->assertEquals('Updated Name', $asset->name);
@@ -416,7 +416,7 @@ class AssetControllerTest extends TestCase
         $asset = Asset::factory()->forSite($this->site)->create();
 
         $this->actingAs($this->admin)
-            ->put("/assets/{$asset->id}", [])
+            ->put("/fleet-assets/assets/{$asset->id}", [])
             ->assertSessionHasErrors(['name', 'status', 'risk_level']);
     }
 

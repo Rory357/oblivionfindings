@@ -422,10 +422,20 @@ class AssetController extends Controller
     {
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $categories = AssetCategory::orderBy('name')->get(['id', 'name', 'slug']);
+        $clients = Client::query()
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'site_id']);
 
         return Inertia::render('fleet-assets/assets/create', [
             'sites' => $sites,
             'categories' => $categories,
+            'clients' => $clients,
+            'prefill' => [
+                'site_id' => $request->integer('site_id') ?: null,
+                'client_id' => $request->integer('client_id') ?: null,
+                'category' => $request->string('category')->toString() ?: null,
+            ],
         ]);
     }
 
@@ -433,7 +443,7 @@ class AssetController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', 'max:50'],
+            'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
@@ -451,8 +461,8 @@ class AssetController extends Controller
             'odometer_km' => ['nullable', 'numeric', 'min:0'],
             'purchase_date' => ['nullable', 'date'],
             'warranty_expires_at' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'risk_level' => ['nullable', 'string', 'max:50'],
+            'status' => ['required', 'in:active,out_of_service,retired'],
+            'risk_level' => ['required', 'in:low,medium,high'],
             'location' => ['nullable', 'string', 'max:255'],
             'requires_inspection' => ['boolean'],
             'inspection_due_at' => ['nullable', 'date'],
@@ -461,12 +471,25 @@ class AssetController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        // If a client was picked, derive the owning site from the client.
+        if (!empty($data['client_id'])) {
+            $client = Client::query()->select('id', 'site_id')->findOrFail($data['client_id']);
+            $data['site_id'] = $client->site_id;
+        }
+
+        // Must belong to at least a site or client.
+        if (empty($data['site_id']) && empty($data['client_id'])) {
+            return back()->withErrors(['site_id' => 'Select a site or a client.'])->withInput();
+        }
+
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
         if (!$this->hasFleetFields()) {
             $data = collect($data)->except($fleetFields)->toArray();
         }
 
-        $data['created_by_user_id'] = $request->user()->id;
+        $userId = $request->user()->id;
+        $data['created_by_user_id'] = $userId;
+        $data['updated_by_user_id'] = $userId;
         $data['status'] = $data['status'] ?? 'active';
 
         $asset = Asset::create($data);
@@ -474,6 +497,8 @@ class AssetController extends Controller
         AuditLogger::log('assets.create', $asset, [
             'asset_id' => $asset->id,
             'name' => $asset->name,
+            'site_id' => $asset->site_id,
+            'client_id' => $asset->client_id,
         ]);
 
         return redirect()->route('fleet-assets.assets.show', $asset)
@@ -523,7 +548,7 @@ class AssetController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', 'max:50'],
+            'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
@@ -541,8 +566,8 @@ class AssetController extends Controller
             'odometer_km' => ['nullable', 'numeric', 'min:0'],
             'purchase_date' => ['nullable', 'date'],
             'warranty_expires_at' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'risk_level' => ['nullable', 'string', 'max:50'],
+            'status' => ['required', 'in:active,out_of_service,retired'],
+            'risk_level' => ['required', 'in:low,medium,high'],
             'location' => ['nullable', 'string', 'max:255'],
             'requires_inspection' => ['boolean'],
             'inspection_due_at' => ['nullable', 'date'],

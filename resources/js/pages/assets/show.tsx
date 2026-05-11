@@ -137,7 +137,7 @@ export default function AssetShow() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         {can?.update ? (
-                            <Link href={`/assets/${a.id}/edit`}>
+                            <Link href={`/fleet-assets/assets/${a.id}/edit`}>
                                 <Button variant="secondary">Edit</Button>
                             </Link>
                         ) : null}

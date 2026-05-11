@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
-use App\Models\AssetCategory;
 use App\Models\Client;
 use App\Models\Site;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class AssetController extends Controller
 {
@@ -77,80 +75,6 @@ class AssetController extends Controller
                 'create' => $user->canDo('assets.create'),
             ],
         ]);
-    }
-
-    public function create(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('assets.create'), 403);
-
-        $sites = Site::query()->orderBy('name')->get(['id', 'name']);
-        $clients = Client::query()->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'site_id']);
-        $categories = AssetCategory::query()->orderBy('name')->get(['id', 'name']);
-
-        return inertia('assets/create', [
-            'sites' => $sites,
-            'clients' => $clients,
-            'categories' => $categories,
-            'prefill' => [
-                'site_id' => $request->integer('site_id') ?: null,
-                'client_id' => $request->integer('client_id') ?: null,
-            ],
-        ]);
-    }
-
-    public function store(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('assets.create'), 403);
-
-        $data = $request->validate([
-            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'asset_tag' => ['nullable', 'string', 'max:100'],
-            'name' => ['required', 'string', 'max:255'],
-            'category' => ['nullable', 'string', 'max:120'],
-            'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
-            'description' => ['nullable', 'string'],
-            'manufacturer' => ['nullable', 'string', 'max:120'],
-            'model' => ['nullable', 'string', 'max:120'],
-            'serial_number' => ['nullable', 'string', 'max:120'],
-            'purchase_date' => ['nullable', 'date'],
-            'warranty_expires_at' => ['nullable', 'date'],
-            'status' => ['required', 'in:active,out_of_service,retired'],
-            'risk_level' => ['required', 'in:low,medium,high'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'requires_inspection' => ['boolean'],
-            'inspection_due_at' => ['nullable', 'date'],
-            'requires_maintenance' => ['boolean'],
-            'maintenance_due_at' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
-
-        // If client_id is set, infer site_id from client unless explicitly set.
-        if (!empty($data['client_id'])) {
-            $client = Client::query()->select('id', 'site_id')->findOrFail($data['client_id']);
-            $data['site_id'] = $client->site_id;
-        }
-
-        // Must belong to at least a site or client (site can come from client)
-        if (empty($data['site_id']) && empty($data['client_id'])) {
-            return back()->withErrors(['site_id' => 'Select a site or a client.']);
-        }
-
-        $data['created_by_user_id'] = $user->id;
-        $data['updated_by_user_id'] = $user->id;
-
-        $data['qr_token'] = $data['qr_token'] ?? Str::uuid()->toString();
-
-        $asset = Asset::create($data);
-
-        AuditLogger::log('assets.create', $asset, [
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-        ]);
-
-        return redirect()->route('assets.show', $asset);
     }
 
     public function show(Request $request, Asset $asset)
@@ -281,92 +205,6 @@ class AssetController extends Controller
                 'manageGeofences' => $user?->canDo('assets.geofences.manage') ?? false,
             ],
         ]);
-    }
-
-    public function edit(Request $request, Asset $asset)
-    {
-        $this->authorize('update', $asset);
-
-        $sites = Site::query()->orderBy('name')->get(['id', 'name']);
-        $clients = Client::query()->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'site_id']);
-        $categories = AssetCategory::query()->orderBy('name')->get(['id', 'name']);
-
-        return inertia('assets/edit', [
-            'asset' => [
-                'id'=>$asset->id,
-                'site_id'=>$asset->site_id,
-                'client_id'=>$asset->client_id,
-                'asset_tag'=>$asset->asset_tag,
-                'name'=>$asset->name,
-                'category'=>$asset->category,
-                'asset_category_id'=>$asset->asset_category_id,
-                'description'=>$asset->description,
-                'manufacturer'=>$asset->manufacturer,
-                'model'=>$asset->model,
-                'serial_number'=>$asset->serial_number,
-                'purchase_date'=>optional($asset->purchase_date)->toDateString(),
-                'warranty_expires_at'=>optional($asset->warranty_expires_at)->toDateString(),
-                'status'=>$asset->status,
-                'risk_level'=>$asset->risk_level,
-                'location'=>$asset->location,
-                'requires_inspection'=>(bool)$asset->requires_inspection,
-                'inspection_due_at'=>optional($asset->inspection_due_at)->toDateString(),
-                'requires_maintenance'=>(bool)$asset->requires_maintenance,
-                'maintenance_due_at'=>optional($asset->maintenance_due_at)->toDateString(),
-                'notes'=>$asset->notes,
-            ],
-            'sites'=>$sites,
-            'clients'=>$clients,
-            'categories'=>$categories,
-        ]);
-    }
-
-    public function update(Request $request, Asset $asset)
-    {
-        $this->authorize('update', $asset);
-
-        $data = $request->validate([
-            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'asset_tag' => ['nullable', 'string', 'max:100'],
-            'name' => ['required', 'string', 'max:255'],
-            'category' => ['nullable', 'string', 'max:120'],
-            'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
-            'description' => ['nullable', 'string'],
-            'manufacturer' => ['nullable', 'string', 'max:120'],
-            'model' => ['nullable', 'string', 'max:120'],
-            'serial_number' => ['nullable', 'string', 'max:120'],
-            'purchase_date' => ['nullable', 'date'],
-            'warranty_expires_at' => ['nullable', 'date'],
-            'status' => ['required', 'in:active,out_of_service,retired'],
-            'risk_level' => ['required', 'in:low,medium,high'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'requires_inspection' => ['boolean'],
-            'inspection_due_at' => ['nullable', 'date'],
-            'requires_maintenance' => ['boolean'],
-            'maintenance_due_at' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
-
-        if (!empty($data['client_id'])) {
-            $client = Client::query()->select('id', 'site_id')->findOrFail($data['client_id']);
-            $data['site_id'] = $client->site_id;
-        }
-
-        if (empty($data['site_id']) && empty($data['client_id'])) {
-            return back()->withErrors(['site_id' => 'Select a site or a client.']);
-        }
-
-        $data['updated_by_user_id'] = $request->user()?->id;
-
-        $asset->update($data);
-
-        AuditLogger::log('assets.update', $asset, [
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-        ]);
-
-        return redirect()->route('assets.show', $asset);
     }
 
     public function destroy(Request $request, Asset $asset)

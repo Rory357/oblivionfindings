@@ -14,26 +14,43 @@ import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Loader2, Save } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+type Client = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    site_id?: number | null;
+};
 
 type Props = {
     categories: Array<{ id: number; name: string; slug: string }>;
     sites: Array<{ id: number; name: string }>;
+    clients?: Client[];
+    prefill?: {
+        site_id?: number | null;
+        client_id?: number | null;
+        category?: string | null;
+    };
 };
 
-export default function AssetCreate({ categories, sites }: Props) {
+export default function AssetCreate({ categories, sites, clients, prefill }: Props) {
     const [step, setStep] = useState(1);
     const steps = ['Basic Info', 'Details', 'Location', 'Compliance'];
+
+    const clientList = clients ?? [];
+    const initialPrefill = prefill ?? {};
 
     const form = useForm({
         name: '',
         asset_tag: '',
-        category: 'vehicle',
+        category: initialPrefill.category ?? 'vehicle',
         asset_category_id: '',
         status: 'active',
         risk_level: 'low',
-        site_id: '',
+        site_id: initialPrefill.site_id ? String(initialPrefill.site_id) : '',
         home_site_id: '',
+        client_id: initialPrefill.client_id ? String(initialPrefill.client_id) : '',
         location: '',
         manufacturer: '',
         model: '',
@@ -54,9 +71,28 @@ export default function AssetCreate({ categories, sites }: Props) {
         notes: '',
     });
 
+    const selectedSiteId = form.data.site_id ? Number(form.data.site_id) : null;
+
+    const filteredClients = useMemo(() => {
+        if (!selectedSiteId) return clientList;
+        return clientList.filter((c) => c.site_id === selectedSiteId);
+    }, [clientList, selectedSiteId]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         form.post('/fleet-assets/assets');
+    };
+
+    const handleClientChange = (value: string) => {
+        if (value === 'none' || !value) {
+            form.setData('client_id', '');
+            return;
+        }
+        form.setData('client_id', value);
+        const client = clientList.find((c) => String(c.id) === value);
+        if (client?.site_id && !form.data.site_id) {
+            form.setData('site_id', String(client.site_id));
+        }
     };
 
     return (
@@ -284,16 +320,22 @@ export default function AssetCreate({ categories, sites }: Props) {
                     {step === 3 && (
                         <Card>
                             <CardHeader>
-                                <CardTitle>Location</CardTitle>
+                                <CardTitle>Location & ownership</CardTitle>
                             </CardHeader>
                             <CardContent className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className="text-sm font-medium">Site</label>
-                                    <Select value={form.data.site_id} onValueChange={(v) => form.setData('site_id', v)}>
+                                    <Select
+                                        value={form.data.site_id || 'none'}
+                                        onValueChange={(v) =>
+                                            form.setData('site_id', v === 'none' ? '' : v)
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select site" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="none">—</SelectItem>
                                             {(sites ?? []).map((site) => (
                                                 <SelectItem key={site.id} value={String(site.id)}>
                                                     {site.name}
@@ -304,12 +346,41 @@ export default function AssetCreate({ categories, sites }: Props) {
                                     {form.errors.site_id && <p className="mt-1 text-xs text-destructive">{form.errors.site_id}</p>}
                                 </div>
                                 <div>
+                                    <label className="text-sm font-medium">Client</label>
+                                    <Select
+                                        value={form.data.client_id || 'none'}
+                                        onValueChange={handleClientChange}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select client (optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">—</SelectItem>
+                                            {filteredClients.map((c) => (
+                                                <SelectItem key={c.id} value={String(c.id)}>
+                                                    {c.first_name} {c.last_name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Picking a client auto-sets the site.
+                                    </p>
+                                    {form.errors.client_id && <p className="mt-1 text-xs text-destructive">{form.errors.client_id}</p>}
+                                </div>
+                                <div>
                                     <label className="text-sm font-medium">Home Site</label>
-                                    <Select value={form.data.home_site_id} onValueChange={(v) => form.setData('home_site_id', v)}>
+                                    <Select
+                                        value={form.data.home_site_id || 'none'}
+                                        onValueChange={(v) =>
+                                            form.setData('home_site_id', v === 'none' ? '' : v)
+                                        }
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select home site" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="none">—</SelectItem>
                                             {(sites ?? []).map((s) => (
                                                 <SelectItem key={s.id} value={String(s.id)}>
                                                     {s.name}
@@ -319,7 +390,7 @@ export default function AssetCreate({ categories, sites }: Props) {
                                     </Select>
                                     {form.errors.home_site_id && <p className="mt-1 text-xs text-destructive">{form.errors.home_site_id}</p>}
                                 </div>
-                                <div className="sm:col-span-2">
+                                <div>
                                     <label className="text-sm font-medium">Location Description</label>
                                     <Input
                                         value={form.data.location}
