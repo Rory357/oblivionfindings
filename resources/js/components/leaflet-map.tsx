@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Lazy-load leaflet to avoid SSR issues
 let L: typeof import('leaflet') | null = null;
@@ -15,6 +15,8 @@ export type MapMarker = {
     heading?: number;
     popup?: string;
     speed?: number;
+    /** Explicit override; accepts any CSS colour value including `var(--token)`. */
+    color?: string;
 };
 
 export type MapGeofence = {
@@ -67,8 +69,12 @@ const SATELLITE_TILE_ATTRIBUTION =
 // ── Marker styling helpers ──────────────────────────────────────────────────
 
 function getMarkerColor(marker: MapMarker): string {
-    if (marker.type === 'house') return '#8b5cf6'; // purple
-    if (marker.type === 'asset') return '#f59e0b'; // amber
+    // 1. Explicit per-marker override always wins.
+    if (marker.color) return marker.color;
+    // 2. Type-based defaults are themable via CSS tokens.
+    if (marker.type === 'house') return 'var(--map-marker-house, #8b5cf6)';
+    if (marker.type === 'asset') return 'var(--map-marker-asset, #f59e0b)';
+    // 3. Status-based colours stay semantic — green=online, red=offline, etc.
     if (marker.status === 'moving') return '#3b82f6'; // blue
     if (marker.status === 'online') return '#22c55e'; // green
     if (marker.status === 'offline') return '#ef4444'; // red
@@ -313,6 +319,7 @@ export default function LeafletMap({
     const satelliteLayerRef = useRef<any>(null);
     const layerControlRef = useRef<any>(null);
     const initRef = useRef(false);
+    const [mapReady, setMapReady] = useState(false);
     const onMapClickRef = useRef(onMapClick);
 
     // Resolve dark mode: explicit prop or auto-detect from html element
@@ -397,6 +404,7 @@ export default function LeafletMap({
                 });
 
                 initRef.current = true;
+                setMapReady(true);
             }
         })();
 
@@ -549,7 +557,7 @@ export default function LeafletMap({
             );
             map?.fitBounds(bounds, { padding: [40, 40] });
         }
-    }, [markers, onMarkerClick, clustering, zoom]);
+    }, [markers, onMarkerClick, clustering, zoom, mapReady]);
 
     // Update polyline with enhancements (animated dash, direction arrows, endpoints)
     useEffect(() => {
@@ -602,7 +610,7 @@ export default function LeafletMap({
                 );
             }
         }
-    }, [polyline, polylineOptions]);
+    }, [polyline, polylineOptions, mapReady]);
 
     // Update geofences
     useEffect(() => {
@@ -610,7 +618,7 @@ export default function LeafletMap({
         geofenceLayerRef.current.clearLayers();
 
         geofences.forEach((gf) => {
-            const color = gf.color ?? '#ef4444';
+            const color = gf.color ?? 'var(--map-geofence-default, #ef4444)';
             if (gf.type === 'circle' && gf.center && gf.radius_m) {
                 const circle = L!.circle([gf.center.lat, gf.center.lng], {
                     radius: gf.radius_m,
@@ -632,7 +640,7 @@ export default function LeafletMap({
                 geofenceLayerRef.current.addLayer(polygon);
             }
         });
-    }, [geofences]);
+    }, [geofences, mapReady]);
 
     // Clean up
     useEffect(() => {

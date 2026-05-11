@@ -58,6 +58,30 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('site')
             ->name('sites.update');
 
+        // Inline overview-card edits (Contact Info, Location, Safety)
+        Route::patch('/sites/{site}/contact-info', [SiteController::class, 'updateContactInfo'])
+            ->whereNumber('site')
+            ->name('sites.contact-info.update');
+        Route::patch('/sites/{site}/location', [SiteController::class, 'updateLocation'])
+            ->whereNumber('site')
+            ->name('sites.location.update');
+        Route::patch('/sites/{site}/safety', [SiteController::class, 'updateSafety'])
+            ->whereNumber('site')
+            ->name('sites.safety.update');
+
+        // Site notes (multi-note log)
+        Route::post('/sites/{site}/notes', [\App\Http\Controllers\Sites\SiteNoteController::class, 'store'])
+            ->whereNumber('site')
+            ->name('sites.notes.store');
+        Route::delete('/sites/{site}/notes/{note}', [\App\Http\Controllers\Sites\SiteNoteController::class, 'destroy'])
+            ->whereNumber('site')
+            ->whereNumber('note')
+            ->name('sites.notes.destroy');
+
+        // Address autocomplete (Nominatim proxy)
+        Route::get('/sites/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
+            ->name('sites.geocode.search');
+
         // Site contacts
         Route::post('/sites/{site}/contacts', [SiteContactController::class, 'store'])
             ->whereNumber('site')

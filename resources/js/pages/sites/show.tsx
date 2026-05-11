@@ -57,6 +57,7 @@ import {
     Navigation,
     Package,
     Phone,
+    Pencil,
     Pill,
     Plus,
     Route,
@@ -81,6 +82,13 @@ import {
 import SiteLedgerPanel, {
     type SiteLedgerPanelData,
 } from './_ledger-panel';
+import {
+    AddSiteNoteDialog,
+    EditContactInfoDialog,
+    EditLocationDialog,
+    EditSafetyDialog,
+} from './_overview-dialogs';
+import SiteOverviewMapCard from './_overview-map-card';
 
 type Site = {
     id: number;
@@ -96,6 +104,12 @@ type Site = {
     medication_storage_location?: string | null;
     notes?: string | null;
     address?: string;
+    address_line_1?: string | null;
+    address_line_2?: string | null;
+    suburb?: string | null;
+    city?: string | null;
+    postcode?: string | null;
+    country?: string | null;
     region?: string | null;
     latitude?: string | null;
     longitude?: string | null;
@@ -324,6 +338,19 @@ type Props = {
     can?: { createAsset?: boolean };
     fleet?: SiteFleetData;
     checklistsSummary?: ChecklistsSummary;
+    siteNotes?: Array<{
+        id: number;
+        body: string;
+        created_at: string | null;
+        created_by: { id: number; name: string } | null;
+    }>;
+    geofences?: Array<{
+        id: number;
+        name: string;
+        type: 'circle' | 'polygon';
+        shape: any;
+        breach_type: 'enter' | 'exit' | 'both';
+    }>;
 };
 
 const typeIcons = {
@@ -827,6 +854,8 @@ export default function SiteShow({
     can: assetCan,
     fleet,
     checklistsSummary,
+    siteNotes = [],
+    geofences = [],
 }: Props) {
     const TypeIcon = typeIcons[site.type];
     const page = usePage<any>();
@@ -834,6 +863,31 @@ export default function SiteShow({
     const canSeeVendorsCredentials = !!(
         canGlobal?.vendors?.view || canGlobal?.credentials?.view
     );
+
+    // Overview-card edit dialogs
+    const [contactInfoOpen, setContactInfoOpen] = useState(false);
+    const [locationOpen, setLocationOpen] = useState(false);
+    const [safetyOpen, setSafetyOpen] = useState(false);
+    const [noteOpen, setNoteOpen] = useState(false);
+
+    const handleDeleteNote = (noteId: number) => {
+        if (!confirm('Delete this note?')) return;
+        router.delete(`/sites/${site.id}/notes/${noteId}`, {
+            preserveScroll: true,
+        });
+    };
+
+    const formatNoteDate = (iso: string | null) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
 
     // Fleet tab lazy load
     const [fleetLoaded, setFleetLoaded] = useState(!!fleet);
@@ -1139,13 +1193,24 @@ export default function SiteShow({
                         <div className="grid gap-4 lg:grid-cols-2">
                             {/* Contact Information */}
                             <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
-                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                             <Phone className="h-4 w-4" />
                                         </span>
                                         Contact Information
                                     </CardTitle>
+                                    {can_edit && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1.5 text-xs"
+                                            onClick={() => setContactInfoOpen(true)}
+                                        >
+                                            <Pencil className="h-3 w-3" />
+                                            Edit
+                                        </Button>
+                                    )}
                                 </CardHeader>
                                 <CardContent className="divide-y divide-border/40 p-0 text-sm">
                                     <ContactRow
@@ -1202,13 +1267,24 @@ export default function SiteShow({
 
                             {/* Location */}
                             <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
-                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                             <MapPin className="h-4 w-4" />
                                         </span>
                                         Location
                                     </CardTitle>
+                                    {can_edit && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1.5 text-xs"
+                                            onClick={() => setLocationOpen(true)}
+                                        >
+                                            <Pencil className="h-3 w-3" />
+                                            Edit
+                                        </Button>
+                                    )}
                                 </CardHeader>
                                 <CardContent className="space-y-4 text-sm">
                                     <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
@@ -1271,18 +1347,38 @@ export default function SiteShow({
                                             </div>
                                         </div>
                                     )}
+
+                                    <SiteOverviewMapCard
+                                        siteId={site.id}
+                                        siteName={site.name}
+                                        latitude={site.latitude}
+                                        longitude={site.longitude}
+                                        geofences={geofences}
+                                        canManage={can_edit}
+                                    />
                                 </CardContent>
                             </Card>
 
                             {/* Safety & Medication */}
                             <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
-                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                             <Shield className="h-4 w-4" />
                                         </span>
                                         Safety & Medication
                                     </CardTitle>
+                                    {can_edit && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1.5 text-xs"
+                                            onClick={() => setSafetyOpen(true)}
+                                        >
+                                            <Pencil className="h-3 w-3" />
+                                            Edit
+                                        </Button>
+                                    )}
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
                                     <div className="rounded-lg border border-border/60 p-3">
@@ -1346,20 +1442,25 @@ export default function SiteShow({
 
                             {/* Notes */}
                             <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
-                                <CardHeader className="border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                             <StickyNote className="h-4 w-4" />
                                         </span>
                                         Notes
                                     </CardTitle>
+                                    {can_edit && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setNoteOpen(true)}
+                                        >
+                                            <Plus className="mr-1 h-3.5 w-3.5" />
+                                            New Note
+                                        </Button>
+                                    )}
                                 </CardHeader>
                                 <CardContent>
-                                    {site.notes ? (
-                                        <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm leading-relaxed whitespace-pre-wrap">
-                                            {site.notes}
-                                        </div>
-                                    ) : (
+                                    {siteNotes.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
                                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                                                 <StickyNote className="h-5 w-5 text-muted-foreground" />
@@ -1368,6 +1469,35 @@ export default function SiteShow({
                                                 No notes recorded
                                             </p>
                                         </div>
+                                    ) : (
+                                        <ul className="space-y-2">
+                                            {siteNotes.map((n) => (
+                                                <li
+                                                    key={n.id}
+                                                    className="rounded-lg border border-border/60 bg-muted/20 p-3"
+                                                >
+                                                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                                                        {n.body}
+                                                    </div>
+                                                    <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                                        <span>
+                                                            {n.created_by?.name ?? 'Unknown'}
+                                                            {' · '}
+                                                            {formatNoteDate(n.created_at)}
+                                                        </span>
+                                                        {can_edit && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteNote(n.id)}
+                                                                className="text-status-critical hover:underline"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     )}
                                 </CardContent>
                             </Card>
@@ -2272,6 +2402,50 @@ export default function SiteShow({
                     </TabsContent>
                 </Tabs>
             </PageShell>
+
+            <EditContactInfoDialog
+                siteId={site.id}
+                isOpen={contactInfoOpen}
+                onClose={() => setContactInfoOpen(false)}
+                initial={{
+                    phone: site.phone ?? '',
+                    email: site.email ?? '',
+                    manager_name: site.manager_name ?? '',
+                    manager_phone: site.manager_phone ?? '',
+                    after_hours_phone: site.after_hours_phone ?? '',
+                }}
+            />
+            <EditLocationDialog
+                siteId={site.id}
+                isOpen={locationOpen}
+                onClose={() => setLocationOpen(false)}
+                initial={{
+                    address_line_1: site.address_line_1 ?? '',
+                    address_line_2: site.address_line_2 ?? '',
+                    suburb: site.suburb ?? '',
+                    city: site.city ?? '',
+                    postcode: site.postcode ?? '',
+                    country: site.country ?? '',
+                    region: site.region ?? '',
+                    latitude: site.latitude ?? '',
+                    longitude: site.longitude ?? '',
+                    access_instructions: site.access_instructions ?? '',
+                }}
+            />
+            <EditSafetyDialog
+                siteId={site.id}
+                isOpen={safetyOpen}
+                onClose={() => setSafetyOpen(false)}
+                initial={{
+                    emergency_plan_location: site.emergency_plan_location ?? '',
+                    medication_storage_location: site.medication_storage_location ?? '',
+                }}
+            />
+            <AddSiteNoteDialog
+                siteId={site.id}
+                isOpen={noteOpen}
+                onClose={() => setNoteOpen(false)}
+            />
         </AppLayout>
     );
 }

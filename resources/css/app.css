@@ -181,6 +181,12 @@
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
 
+    /* Map tokens — themable. Status colours (online/offline/idle/moving) stay
+       semantic and remain hardcoded inside leaflet-map.tsx. */
+    --map-marker-house: var(--primary);
+    --map-marker-asset: var(--status-warning);
+    --map-geofence-default: var(--status-critical);
+
     /* Font-size driver (overridden by user preference) */
     --base-font-size: 14px;
 }

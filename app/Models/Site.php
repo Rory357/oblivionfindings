@@ -216,6 +216,16 @@ class Site extends Model
         return $this->hasMany(\App\Models\ServiceContext::class);
     }
 
+    public function siteNotes(): HasMany
+    {
+        return $this->hasMany(SiteNote::class);
+    }
+
+    public function geofences(): HasMany
+    {
+        return $this->hasMany(AssetGeofence::class);
+    }
+
     // Accessors
     public function getAddressAttribute(): string
     {

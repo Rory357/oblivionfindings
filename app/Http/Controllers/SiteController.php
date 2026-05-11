@@ -137,6 +137,8 @@ class SiteController extends Controller
             'houseRooms' => fn ($q) => $q->active()->orderBy('sort_order'),
             'hoResources' => fn ($q) => $q->active()->orderBy('name'),
             'facilityZones' => fn ($q) => $q->active()->orderBy('name'),
+            'siteNotes' => fn ($q) => $q->with('createdBy:id,name')->orderByDesc('created_at'),
+            'geofences' => fn ($q) => $q->where('is_active', true),
         ]);
 
         $user = $request->user();
@@ -266,6 +268,12 @@ class SiteController extends Controller
                 'notes' => $site->notes,
                 'is_active' => (bool) $site->is_active,
                 'address' => $site->address,
+                'address_line_1' => $site->address_line_1,
+                'address_line_2' => $site->address_line_2,
+                'suburb' => $site->suburb,
+                'city' => $site->city,
+                'postcode' => $site->postcode,
+                'country' => $site->country,
                 'region' => $site->region,
                 'latitude' => $site->latitude,
                 'longitude' => $site->longitude,
@@ -410,7 +418,88 @@ class SiteController extends Controller
             ],
             'fleet' => \Inertia\Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
+            'siteNotes' => $site->siteNotes->map(fn ($n) => [
+                'id' => $n->id,
+                'body' => $n->body,
+                'created_at' => $n->created_at?->toIso8601String(),
+                'created_by' => $n->createdBy?->only(['id', 'name']),
+            ])->values(),
+            'geofences' => $site->geofences->map(fn ($g) => [
+                'id' => $g->id,
+                'name' => $g->name,
+                'type' => $g->type,
+                'shape' => $g->shape,
+                'breach_type' => $g->breach_type,
+            ])->values(),
         ]);
+    }
+
+    public function updateContactInfo(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $data = $request->validate([
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'manager_name' => ['nullable', 'string', 'max:255'],
+            'manager_phone' => ['nullable', 'string', 'max:50'],
+            'after_hours_phone' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $site->update($data);
+
+        \App\Services\AuditLogger::log('site.contact_info.update', $site, [
+            'site_id' => $site->id,
+            'fields' => array_keys($data),
+        ]);
+
+        return back()->with('success', 'Contact information updated.');
+    }
+
+    public function updateLocation(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $data = $request->validate([
+            'address_line_1' => ['nullable', 'string', 'max:255'],
+            'address_line_2' => ['nullable', 'string', 'max:255'],
+            'suburb' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'postcode' => ['nullable', 'string', 'max:20'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'region' => ['nullable', 'string', 'max:100'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'access_instructions' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $site->update($data);
+
+        \App\Services\AuditLogger::log('site.location.update', $site, [
+            'site_id' => $site->id,
+            'fields' => array_keys($data),
+        ]);
+
+        return back()->with('success', 'Location updated.');
+    }
+
+    public function updateSafety(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $data = $request->validate([
+            'emergency_plan_location' => ['nullable', 'string', 'max:1000'],
+            'medication_storage_location' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $site->update($data);
+
+        \App\Services\AuditLogger::log('site.safety.update', $site, [
+            'site_id' => $site->id,
+            'fields' => array_keys($data),
+        ]);
+
+        return back()->with('success', 'Safety information updated.');
     }
 
     private function buildHouseLedgerData(Site $site, ?\App\Models\User $user): ?array
