@@ -10,6 +10,11 @@ class SiteHouseRoomHistory extends Model
 {
     use HasFactory;
 
+    // Eloquent would otherwise auto-pluralize the class name to
+    // `site_house_room_histories`. The actual migration creates a
+    // singular `site_house_room_history` table.
+    protected $table = 'site_house_room_history';
+
     protected $fillable = [
         'room_id',
         'tenant_id',
