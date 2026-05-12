@@ -49,7 +49,7 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get('/sites/calendar')
+            ->get('/calendar')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calendar/global')
@@ -111,8 +111,13 @@ class SitesModuleIntegrationTest extends TestCase
             'requires_reauth' => false,
         ]);
 
+        // Legacy URL now redirects to the canonical /vendors location.
         $this->actingAs($this->admin)
             ->get('/sites/vendors-credentials')
+            ->assertRedirect('/vendors');
+
+        $this->actingAs($this->admin)
+            ->get('/vendors')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('sites/vendors-credentials/global')

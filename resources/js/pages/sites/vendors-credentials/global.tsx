@@ -126,7 +126,7 @@ export default function GlobalVendorsCredentials({
     }, [credentials, siteFilter, credentialTypeFilter, reauthFilter, search]);
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: 'Vendors & Credentials', href: '/sites/vendors-credentials' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: 'Vendors & Credentials', href: '/vendors' }]}>
             <Head title="Vendors & Credentials" />
 
             <div className="m-4 space-y-4">

@@ -233,10 +233,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('sites.inspections.global')
         ->middleware('permission:checklists.view');
 
-    // Global Vendors & Credentials — cross-site dashboard
+    // Global Vendors & Credentials — cross-site dashboard.
+    // Pipe-OR matches the controller's view check: either permission grants access.
     Route::get('/vendors', [SiteVendorController::class, 'globalIndex'])
         ->name('sites.vendors.global')
-        ->middleware('permission:vendors.view');
+        ->middleware('permission:vendors.view|credentials.view');
+
+    // Legacy URL — /sites/vendors-credentials is the previous canonical location.
+    // Permanent redirect preserves bookmarks and historical references.
+    Route::redirect('/sites/vendors-credentials', '/vendors', 301)
+        ->name('sites.vendors-credentials.legacy');
 
     // Site Reports
     Route::get('/sites/reports', [SiteReportingController::class, 'index'])

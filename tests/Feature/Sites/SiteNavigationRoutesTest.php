@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,6 +24,14 @@ function siteNavUser(string $roleName): User
     }
 
     return $user;
+}
+
+function grantPermission(User $user, string $key): void
+{
+    $permission = Permission::query()->where('key', $key)->firstOrFail();
+    $user->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
 }
 
 test('global inspections page loads for users with checklists.view', function () {
@@ -66,12 +75,33 @@ test('global vendors page loads for users with vendors.view', function () {
         );
 });
 
-test('global vendors page is forbidden without vendors.view', function () {
+test('global vendors page is forbidden without vendors.view or credentials.view', function () {
     $user = siteNavUser('support_worker');
 
     $this->actingAs($user)
         ->get('/vendors')
         ->assertForbidden();
+});
+
+test('global vendors page loads for credentials.view-only users (controller OR-logic)', function () {
+    $user = siteNavUser('support_worker');
+    grantPermission($user, 'credentials.view');
+
+    expect($user->canDo('vendors.view'))->toBeFalse();
+    expect($user->canDo('credentials.view'))->toBeTrue();
+
+    $this->actingAs($user)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('sites/vendors-credentials/global'));
+});
+
+test('legacy /sites/vendors-credentials redirects to canonical /vendors', function () {
+    $user = siteNavUser('admin');
+
+    $this->actingAs($user)
+        ->get('/sites/vendors-credentials')
+        ->assertRedirect('/vendors');
 });
 
 test('removed sidebar destination /site-hardware returns 404', function () {

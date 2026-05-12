@@ -655,8 +655,12 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/sites/reports',
             icon: BarChart3,
         });
-    if (can?.vendors?.view)
-        items.push({ title: 'Vendors', href: '/vendors', icon: Package });
+    if (can?.vendors?.view || can?.credentials?.view)
+        items.push({
+            title: 'Vendors & Credentials',
+            href: '/vendors',
+            icon: Package,
+        });
 
     const groups: SubPanelGroup[] = [{ label: 'Sites & Locations', items }];
 
