@@ -9,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -59,6 +60,7 @@ export type RoomRecord = {
     name: string;
     notes?: string | null;
     is_active?: boolean;
+    is_assignable?: boolean;
     sort_order?: number;
     assigned_from?: string | null;
     assigned_until?: string | null;
@@ -111,6 +113,7 @@ function FieldError({ message }: { message?: string }) {
 type RoomFormValues = {
     name: string;
     notes: string;
+    is_assignable: boolean;
 };
 
 export function AddRoomDialog({
@@ -138,7 +141,11 @@ function AddRoomBody({
     siteId: number;
     onClose: () => void;
 }) {
-    const form = useForm<RoomFormValues>({ name: '', notes: '' });
+    const form = useForm<RoomFormValues>({
+        name: '',
+        notes: '',
+        is_assignable: true,
+    });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -188,6 +195,11 @@ function AddRoomBody({
                     />
                     <FieldError message={form.errors.notes} />
                 </div>
+                <AssignableToggle
+                    id="rm-assignable"
+                    value={form.data.is_assignable}
+                    onChange={(v) => form.setData('is_assignable', v)}
+                />
             </div>
             <DialogFooter className="mt-4">
                 <Button type="button" variant="outline" onClick={onClose}>
@@ -201,6 +213,39 @@ function AddRoomBody({
                 </Button>
             </DialogFooter>
         </form>
+    );
+}
+
+function AssignableToggle({
+    id,
+    value,
+    onChange,
+}: {
+    id: string;
+    value: boolean;
+    onChange: (v: boolean) => void;
+}) {
+    return (
+        <div className="flex items-start gap-3 rounded-lg border bg-background/40 p-3">
+            <Checkbox
+                id={id}
+                checked={value}
+                onCheckedChange={(c) => onChange(!!c)}
+                className="mt-0.5"
+            />
+            <div className="min-w-0 flex-1">
+                <Label
+                    htmlFor={id}
+                    className="text-sm font-medium leading-tight"
+                >
+                    Assignable to client
+                </Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                    Untick for shared spaces — kitchens, lounges, bathrooms,
+                    hallways. Only assignable rooms can have a client occupant.
+                </p>
+            </div>
+        </div>
     );
 }
 
@@ -244,6 +289,7 @@ function EditRoomBody({
     const form = useForm<RoomFormValues & { assigned_client_id: number | null }>({
         name: room.name ?? '',
         notes: room.notes ?? '',
+        is_assignable: room.is_assignable ?? true,
         // Preserve the current occupant — the assignment endpoint owns that
         // field, but the legacy update route also accepts it.
         assigned_client_id: room.assigned_client?.id ?? null,
@@ -293,6 +339,20 @@ function EditRoomBody({
                     />
                     <FieldError message={form.errors.notes} />
                 </div>
+                <AssignableToggle
+                    id="erm-assignable"
+                    value={form.data.is_assignable}
+                    onChange={(v) => form.setData('is_assignable', v)}
+                />
+                {!form.data.is_assignable && room.assigned_client && (
+                    <p className="rounded-md border border-status-warning/40 bg-status-warning-bg/40 px-3 py-2 text-xs text-status-warning">
+                        Marking this room as a communal space will unassign{' '}
+                        <span className="font-medium">
+                            {`${room.assigned_client.first_name ?? ''} ${room.assigned_client.last_name ?? ''}`.trim()}
+                        </span>{' '}
+                        and close their assignment history.
+                    </p>
+                )}
             </div>
             <DialogFooter className="mt-4">
                 <Button type="button" variant="outline" onClick={onClose}>
@@ -412,7 +472,14 @@ export function ShowRoomDialog({
                                 {room.name}
                             </DialogTitle>
                             <DialogDescription className="flex flex-wrap items-center gap-2">
-                                {occupant ? (
+                                {room.is_assignable === false ? (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-muted-foreground/30 text-[10px] text-muted-foreground"
+                                    >
+                                        Communal
+                                    </Badge>
+                                ) : occupant ? (
                                     <Badge
                                         variant="outline"
                                         className="border-primary/30 text-[10px] text-primary"
@@ -541,7 +608,7 @@ export function ShowRoomDialog({
                             Edit
                         </Button>
                     )}
-                    {canManage && occupant && (
+                    {canManage && occupant && room.is_assignable !== false && (
                         <Button
                             type="button"
                             variant="outline"
@@ -551,7 +618,7 @@ export function ShowRoomDialog({
                             Unassign
                         </Button>
                     )}
-                    {canManage && (
+                    {canManage && room.is_assignable !== false && (
                         <Button type="button" onClick={onAssign}>
                             <UserPlus className="mr-2 h-4 w-4" />
                             {occupant ? 'Change occupant' : 'Assign client'}
@@ -864,12 +931,17 @@ function AssignRoomBody({
     const currentRoomId = client.room?.id ?? null;
     const pickable = useMemo(
         () =>
-            rooms.filter(
-                (r) =>
+            rooms.filter((r) => {
+                // Communal spaces are never pickable.
+                if (r.is_assignable === false) return false;
+                // Otherwise pick rooms that are free, the client's own, or
+                // their current room (so they can confirm/clear it).
+                return (
                     !r.assigned_client ||
                     r.assigned_client.id === client.id ||
-                    r.id === currentRoomId,
-            ),
+                    r.id === currentRoomId
+                );
+            }),
         [rooms, client.id, currentRoomId],
     );
     const [selectedId, setSelectedId] = useState<number | null>(currentRoomId);

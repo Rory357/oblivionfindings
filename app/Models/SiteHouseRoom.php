@@ -20,6 +20,7 @@ class SiteHouseRoom extends Model
         'assigned_from',
         'assigned_until',
         'is_active',
+        'is_assignable',
         'sort_order',
     ];
 
@@ -27,7 +28,12 @@ class SiteHouseRoom extends Model
         'assigned_from' => 'date',
         'assigned_until' => 'date',
         'is_active' => 'boolean',
+        'is_assignable' => 'boolean',
         'sort_order' => 'integer',
+    ];
+
+    protected $attributes = [
+        'is_assignable' => true,
     ];
 
     public function site(): BelongsTo
@@ -53,7 +59,13 @@ class SiteHouseRoom extends Model
     public function scopeAvailable($query)
     {
         return $query->where('is_active', true)
+                     ->where('is_assignable', true)
                      ->whereNull('assigned_client_id');
+    }
+
+    public function scopeAssignable($query)
+    {
+        return $query->where('is_assignable', true);
     }
 
     public function scopeAssigned($query)

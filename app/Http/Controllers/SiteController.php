@@ -254,6 +254,7 @@ class SiteController extends Controller
                     'name' => $r->name,
                     'notes' => $r->notes,
                     'is_active' => (bool) $r->is_active,
+                    'is_assignable' => (bool) ($r->is_assignable ?? true),
                     'sort_order' => $r->sort_order,
                     'assigned_from' => $r->assigned_from?->toDateString(),
                     'assigned_until' => $r->assigned_until?->toDateString(),
@@ -399,17 +400,22 @@ class SiteController extends Controller
                 'high_risk' => $site->clients->where('risk_level', 'high')->count(),
                 'safeguarding' => $site->clients->where('safeguarding_flag', true)->count(),
             ],
-            'roomsSummary' => $site->type === 'house' ? [
-                'total' => $site->houseRooms->count(),
-                'occupied' => $site->houseRooms->whereNotNull('assigned_client_id')->count(),
-                'available' => $site->houseRooms->whereNull('assigned_client_id')->count(),
-                'occupancy_percent' => $site->houseRooms->count() > 0
-                    ? (int) round(
-                        ($site->houseRooms->whereNotNull('assigned_client_id')->count()
-                            / $site->houseRooms->count()) * 100,
-                    )
-                    : 0,
-            ] : null,
+            'roomsSummary' => $site->type === 'house' ? (function () use ($site) {
+                $assignable = $site->houseRooms->where('is_assignable', true);
+                $communal = $site->houseRooms->where('is_assignable', false);
+                $occupied = $assignable->whereNotNull('assigned_client_id')->count();
+                $assignableCount = $assignable->count();
+                return [
+                    'total' => $site->houseRooms->count(),
+                    'bedrooms' => $assignableCount,
+                    'communal' => $communal->count(),
+                    'occupied' => $occupied,
+                    'available' => $assignable->whereNull('assigned_client_id')->count(),
+                    'occupancy_percent' => $assignableCount > 0
+                        ? (int) round(($occupied / $assignableCount) * 100)
+                        : 0,
+                ];
+            })() : null,
             'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn ($c) => [
                 'id' => $c->id,
                 'type' => $c->type,

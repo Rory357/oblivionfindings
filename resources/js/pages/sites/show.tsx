@@ -256,6 +256,7 @@ type TypeSpecificData = {
         name: string;
         notes?: string | null;
         is_active?: boolean;
+        is_assignable?: boolean;
         sort_order?: number;
         assigned_from?: string | null;
         assigned_until?: string | null;
@@ -292,6 +293,8 @@ type TypeSpecificData = {
 
 type RoomsSummary = {
     total: number;
+    bedrooms: number;
+    communal: number;
     occupied: number;
     available: number;
     occupancy_percent: number;
@@ -3769,19 +3772,21 @@ function BedroomsTab({
 
     const closeDialog = () => setDialog({ mode: null, target: null });
 
-    const stats = summary ?? {
-        total: rooms.length,
-        occupied: rooms.filter((r) => r.assigned_client).length,
-        available: rooms.filter((r) => !r.assigned_client).length,
-        occupancy_percent:
-            rooms.length > 0
-                ? Math.round(
-                      (rooms.filter((r) => r.assigned_client).length /
-                          rooms.length) *
-                          100,
-                  )
-                : 0,
-    };
+    const stats = summary ?? (() => {
+        const assignable = rooms.filter((r) => r.is_assignable !== false);
+        const occupied = assignable.filter((r) => r.assigned_client).length;
+        return {
+            total: rooms.length,
+            bedrooms: assignable.length,
+            communal: rooms.length - assignable.length,
+            occupied,
+            available: assignable.length - occupied,
+            occupancy_percent:
+                assignable.length > 0
+                    ? Math.round((occupied / assignable.length) * 100)
+                    : 0,
+        };
+    })();
 
     return (
         <>
@@ -3790,11 +3795,12 @@ function BedroomsTab({
                     <div>
                         <CardTitle className="flex items-center gap-2 text-base">
                             <BedDouble className="h-4 w-4 text-primary" />
-                            Bedrooms ({stats.total})
+                            Rooms ({stats.total})
                         </CardTitle>
                         <p className="mt-1 text-xs text-muted-foreground">
-                            Manage bedrooms and assignments — open a card for
-                            full history and details.
+                            Bedrooms can have a client assigned — communal
+                            spaces are tracked but cannot have an occupant.
+                            Open a card for full history and details.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -3806,15 +3812,18 @@ function BedroomsTab({
                                 }
                             >
                                 <Plus className="mr-1 h-4 w-4" />
-                                Add bedroom
+                                Add room
                             </Button>
                         )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {stats.total > 0 && (
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            <StatChip label="Total" value={stats.total} />
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                            <StatChip
+                                label="Bedrooms"
+                                value={stats.bedrooms}
+                            />
                             <StatChip
                                 label="Occupied"
                                 value={stats.occupied}
@@ -3838,6 +3847,10 @@ function BedroomsTab({
                                         : 'muted'
                                 }
                             />
+                            <StatChip
+                                label="Communal"
+                                value={stats.communal}
+                            />
                         </div>
                     )}
 
@@ -3847,12 +3860,12 @@ function BedroomsTab({
                                 <BedDouble className="h-6 w-6 text-muted-foreground" />
                             </div>
                             <p className="mt-3 text-sm font-medium">
-                                No bedrooms yet
+                                No rooms yet
                             </p>
                             <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                                Add bedrooms to track who lives where, record
-                                respite stays and keep a full assignment
-                                history.
+                                Add bedrooms and shared spaces to track who
+                                lives where, record respite stays and keep a
+                                full assignment history.
                             </p>
                             {can_edit && (
                                 <Button
@@ -3866,7 +3879,7 @@ function BedroomsTab({
                                     }
                                 >
                                     <Plus className="mr-1 h-4 w-4" />
-                                    Add first bedroom
+                                    Add first room
                                 </Button>
                             )}
                         </div>
@@ -3993,6 +4006,7 @@ function BedroomCard({
     onUnassign: () => void;
 }) {
     const occupant = room.assigned_client ?? null;
+    const isAssignable = room.is_assignable !== false;
     const occupantName = occupant
         ? (() => {
               const full = `${occupant.first_name ?? ''} ${occupant.last_name ?? ''}`.trim();
@@ -4010,17 +4024,40 @@ function BedroomCard({
         : null;
 
     return (
-        <div className="group relative flex h-full flex-col gap-3 rounded-2xl border bg-card/40 p-4 transition-all hover:border-primary/50 hover:bg-card hover:shadow-md">
+        <div
+            className={`group relative flex h-full flex-col gap-3 rounded-2xl border bg-card/40 p-4 transition-all hover:border-primary/50 hover:bg-card hover:shadow-md ${
+                isAssignable ? '' : 'bg-muted/20'
+            }`}
+        >
             <div className="flex items-start gap-3">
-                <span className="shrink-0 rounded-xl border bg-background/60 p-2">
-                    <BedDouble className="h-5 w-5 text-primary" />
+                <span
+                    className={`shrink-0 rounded-xl border p-2 ${
+                        isAssignable
+                            ? 'bg-background/60'
+                            : 'bg-muted/40 opacity-70'
+                    }`}
+                >
+                    <BedDouble
+                        className={`h-5 w-5 ${
+                            isAssignable
+                                ? 'text-primary'
+                                : 'text-muted-foreground'
+                        }`}
+                    />
                 </span>
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                         {room.name}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {occupant ? (
+                        {!isAssignable ? (
+                            <Badge
+                                variant="outline"
+                                className="border-muted-foreground/30 text-[10px] text-muted-foreground"
+                            >
+                                Communal
+                            </Badge>
+                        ) : occupant ? (
                             <Badge
                                 variant="outline"
                                 className="border-primary/30 text-[10px] text-primary"
@@ -4073,7 +4110,11 @@ function BedroomCard({
                 )}
             </div>
 
-            {occupant ? (
+            {!isAssignable ? (
+                <div className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
+                    Shared space — no client occupant
+                </div>
+            ) : occupant ? (
                 <div className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5">
                     <Avatar className="size-8">
                         {occupant.profile_photo_url && (
@@ -4108,18 +4149,17 @@ function BedroomCard({
             )}
 
             <div className="mt-auto flex items-center justify-end gap-2 pt-1">
-                {canEdit &&
-                    (occupant ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={onUnassign}
-                        >
-                            Unassign
-                        </Button>
-                    ) : null)}
-                {canEdit && (
+                {canEdit && isAssignable && occupant && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onUnassign}
+                    >
+                        Unassign
+                    </Button>
+                )}
+                {canEdit && isAssignable && (
                     <Button type="button" size="sm" onClick={onAssign}>
                         {occupant ? 'Change occupant' : 'Assign client'}
                     </Button>
