@@ -3,6 +3,7 @@
 namespace App\Services\Fleet;
 
 use App\Events\FleetVehiclePositionUpdated;
+use App\Models\Asset;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
 use App\Models\FleetTelemetryEvent;
@@ -51,7 +52,7 @@ class FleetTelemetryIngestService
 
         $consent = $consentContext['consent'] ?? $tracker->consent;
         $consentValid = $consent ? $consent->isValid() : false;
-        $consentBlocked = !$consentValid;
+        $consentBlocked = !$consentValid && !$this->isFleetOwnedVehicle($asset);
 
         $idempotencyKey = $this->buildIdempotencyKey($vendor, $normalized, $payload);
 
@@ -203,6 +204,22 @@ class FleetTelemetryIngestService
 
             return ['ok' => true, 'id' => $event->id];
         });
+    }
+
+    // Vehicle trackers on fleet-owned (non-client) assets have legitimate basis
+    // under the employment relationship and don't require per-person consent.
+    // Client-linked or non-vehicle assets remain default-deny (Privacy Act 2020).
+    protected function isFleetOwnedVehicle(Asset $asset): bool
+    {
+        if ($asset->client_id) {
+            return false;
+        }
+
+        if ($asset->category === 'vehicle') {
+            return true;
+        }
+
+        return $asset->categoryRef?->slug === 'vehicle';
     }
 
     protected function buildIdempotencyKey(string $vendor, array $normalized, array $payload): string
