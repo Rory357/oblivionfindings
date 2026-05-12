@@ -181,8 +181,31 @@ type VendorLite = {
     id: number;
     company_name: string;
     service_type: string;
+    contact_name?: string | null;
     phone?: string | null;
+    after_hours_phone?: string | null;
+    email?: string | null;
+    account_number?: string | null;
+    notes?: string | null;
+    preferred_contact_method?: string | null;
     is_preferred: boolean;
+    is_active?: boolean;
+};
+
+type CredentialLite = {
+    id: number;
+    label: string;
+    username?: string | null;
+    url?: string | null;
+    credential_type: string;
+    vendor_id?: number | null;
+    vendor_name?: string | null;
+    notes?: string | null;
+    requires_reauth: boolean;
+    is_shareable: boolean;
+    password_strength?: number | null;
+    has_totp: boolean;
+    last_rotated_at?: string | null;
 };
 
 type StaffRequirement = {
@@ -312,6 +335,7 @@ type Props = {
     houseLedger?: SiteLedgerPanelData | null;
     typeSpecificData: TypeSpecificData;
     vendors?: VendorLite[];
+    credentials?: CredentialLite[];
     staffRequirements?: StaffRequirement[];
     coverageRequirements?: CoverageRequirement[];
     coveragePreview?: Array<{

@@ -18,6 +18,8 @@ class SiteCredential extends Model
         'tenant_id',
         'vendor_id',
         'label',
+        'username',
+        'url',
         'credential_type',
         'encrypted_value',
         'iv',
@@ -25,18 +27,30 @@ class SiteCredential extends Model
         'last_rotated_at',
         'last_rotated_by_user_id',
         'requires_reauth',
+        'is_shareable',
+        'password_strength',
+        'totp_secret_encrypted',
+        'totp_issuer',
+        'totp_account',
     ];
 
     protected $casts = [
         'last_rotated_at' => 'datetime',
         'requires_reauth' => 'boolean',
+        'is_shareable' => 'boolean',
+        'password_strength' => 'integer',
     ];
 
-    // Hidden from serialization
     protected $hidden = [
         'encrypted_value',
         'iv',
+        'totp_secret_encrypted',
     ];
+
+    public function hasTotp(): bool
+    {
+        return !empty($this->totp_secret_encrypted);
+    }
 
     public function site(): BelongsTo
     {

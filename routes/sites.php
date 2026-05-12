@@ -133,6 +133,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.credentials.audit')
             ->middleware('permission:credentials.view');
 
+        // TOTP / Authenticator endpoints — audit-logged through the controller.
+        Route::post('/credentials/totp/generate-secret', [SiteCredentialController::class, 'generateTotpSecret'])
+            ->name('sites.credentials.totp.generate')
+            ->middleware('permission:credentials.manage');
+        Route::post('/credentials/{credential}/totp/code', [SiteCredentialController::class, 'totpCode'])
+            ->name('sites.credentials.totp.code')
+            ->middleware('permission:credentials.reveal');
+        Route::post('/credentials/{credential}/totp/setup', [SiteCredentialController::class, 'setupTotp'])
+            ->name('sites.credentials.totp.setup')
+            ->middleware('permission:credentials.manage');
+        Route::delete('/credentials/{credential}/totp', [SiteCredentialController::class, 'removeTotp'])
+            ->name('sites.credentials.totp.remove')
+            ->middleware('permission:credentials.manage');
+
         // Inspections
         Route::get('/inspections', [SiteInspectionController::class, 'index'])
             ->name('sites.inspections.index')

@@ -9,7 +9,9 @@ use App\Models\SiteCredentialAuditLog;
 use App\Services\Sites\SiteCredentialEncryptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Validation\Rule;
+use PragmaRX\Google2FA\Google2FA;
 
 class SiteCredentialController extends Controller
 {
@@ -72,12 +74,19 @@ class SiteCredentialController extends Controller
             'label' => 'required|string|max:255',
             'credential_type' => 'required|string|max:30',
             'value' => 'required|string',
+            'username' => 'nullable|string|max:255',
+            'url' => 'nullable|string|max:2048',
             'vendor_id' => [
                 'nullable',
                 Rule::exists('site_vendors', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
             ],
             'notes' => 'nullable|string',
             'requires_reauth' => 'boolean',
+            'is_shareable' => 'boolean',
+            'password_strength' => 'nullable|integer|min:0|max:4',
+            'totp_secret' => 'nullable|string|max:512',
+            'totp_issuer' => 'nullable|string|max:255',
+            'totp_account' => 'nullable|string|max:255',
         ]);
 
         $encrypted = $this->encryptionService->encrypt($validated['value']);
@@ -87,14 +96,37 @@ class SiteCredentialController extends Controller
             'tenant_id' => $site->tenant_id,
             'vendor_id' => $validated['vendor_id'] ?? null,
             'label' => $validated['label'],
+            'username' => $validated['username'] ?? null,
+            'url' => $validated['url'] ?? null,
             'credential_type' => $validated['credential_type'],
             'encrypted_value' => $encrypted['value'],
             'iv' => null,
             'notes' => $validated['notes'] ?? null,
             'requires_reauth' => $validated['requires_reauth'] ?? false,
+            'is_shareable' => $validated['is_shareable'] ?? false,
+            'password_strength' => $validated['password_strength'] ?? null,
+            'totp_secret_encrypted' => !empty($validated['totp_secret'])
+                ? Crypt::encryptString($validated['totp_secret'])
+                : null,
+            'totp_issuer' => $validated['totp_issuer'] ?? null,
+            'totp_account' => $validated['totp_account'] ?? null,
             'last_rotated_at' => now(),
             'last_rotated_by_user_id' => $request->user()->id,
         ]);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'create',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        if ($request->wantsJson() || $request->header('X-Inertia')) {
+            return back(303);
+        }
 
         return redirect()
             ->route('sites.credentials.index', $site)
@@ -147,20 +179,27 @@ class SiteCredentialController extends Controller
             'label' => 'required|string|max:255',
             'credential_type' => 'required|string|max:30',
             'value' => 'nullable|string',
+            'username' => 'nullable|string|max:255',
+            'url' => 'nullable|string|max:2048',
             'vendor_id' => [
                 'nullable',
                 Rule::exists('site_vendors', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
             ],
             'notes' => 'nullable|string',
             'requires_reauth' => 'boolean',
+            'is_shareable' => 'boolean',
+            'password_strength' => 'nullable|integer|min:0|max:4',
         ]);
 
         $updateData = [
             'label' => $validated['label'],
             'credential_type' => $validated['credential_type'],
+            'username' => $validated['username'] ?? null,
+            'url' => $validated['url'] ?? null,
             'vendor_id' => $validated['vendor_id'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'requires_reauth' => $validated['requires_reauth'] ?? false,
+            'is_shareable' => $validated['is_shareable'] ?? false,
         ];
 
         // If value provided, re-encrypt
@@ -170,6 +209,7 @@ class SiteCredentialController extends Controller
             $updateData['iv'] = null;
             $updateData['last_rotated_at'] = now();
             $updateData['last_rotated_by_user_id'] = $request->user()->id;
+            $updateData['password_strength'] = $validated['password_strength'] ?? null;
 
             // Audit rotation
             SiteCredentialAuditLog::create([
@@ -196,9 +236,7 @@ class SiteCredentialController extends Controller
 
         $credential->update($updateData);
 
-        return redirect()
-            ->route('sites.credentials.index', $site)
-            ->with('success', 'Credential updated successfully.');
+        return back(303)->with('success', 'Credential updated successfully.');
     }
 
     public function destroy(Request $request, Site $site, SiteCredential $credential)
@@ -220,9 +258,118 @@ class SiteCredentialController extends Controller
 
         $credential->delete();
 
-        return redirect()
-            ->route('sites.credentials.index', $site)
-            ->with('success', 'Credential deleted successfully.');
+        return back(303)->with('success', 'Credential deleted successfully.');
+    }
+
+    public function totpCode(Request $request, Site $site, SiteCredential $credential)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.reveal') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
+
+        if (empty($credential->totp_secret_encrypted)) {
+            abort(404, 'No authenticator configured for this credential.');
+        }
+
+        $secret = Crypt::decryptString($credential->totp_secret_encrypted);
+        $google2fa = new Google2FA();
+        $code = $google2fa->getCurrentOtp($secret);
+
+        $window = 30;
+        $secondsRemaining = $window - (now()->timestamp % $window);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'totp_code',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'code' => $code,
+            'seconds_remaining' => $secondsRemaining,
+            'period' => $window,
+        ]);
+    }
+
+    public function setupTotp(Request $request, Site $site, SiteCredential $credential)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.manage') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
+
+        $validated = $request->validate([
+            'secret' => 'required|string|min:16|max:512',
+            'issuer' => 'nullable|string|max:255',
+            'account' => 'nullable|string|max:255',
+            'verification_code' => 'required|string|size:6',
+        ]);
+
+        $secret = preg_replace('/\s+/', '', $validated['secret']);
+        $google2fa = new Google2FA();
+
+        if (!$google2fa->verifyKey($secret, $validated['verification_code'], 1)) {
+            return back(422)->withErrors([
+                'verification_code' => 'Verification code does not match the secret.',
+            ]);
+        }
+
+        $credential->update([
+            'totp_secret_encrypted' => Crypt::encryptString($secret),
+            'totp_issuer' => $validated['issuer'] ?? $site->name,
+            'totp_account' => $validated['account'] ?? $credential->username ?? $credential->label,
+        ]);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'totp_setup',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return back(303)->with('success', 'Authenticator configured.');
+    }
+
+    public function removeTotp(Request $request, Site $site, SiteCredential $credential)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.manage') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
+
+        $credential->update([
+            'totp_secret_encrypted' => null,
+            'totp_issuer' => null,
+            'totp_account' => null,
+        ]);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'totp_remove',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return back(303)->with('success', 'Authenticator removed.');
+    }
+
+    public function generateTotpSecret(Request $request, Site $site)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.manage') || abort(403);
+
+        $google2fa = new Google2FA();
+        $secret = $google2fa->generateSecretKey();
+
+        return response()->json(['secret' => $secret]);
     }
 
     public function auditLog(Request $request, Site $site, SiteCredential $credential)
