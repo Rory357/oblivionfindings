@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\FleetTelemetryEvent;
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -267,17 +268,19 @@ class FleetTelemetryIngestTest extends TestCase
         ]);
     }
 
-    public function test_consent_masking_blocks_location(): void
+    public function test_consent_masking_blocks_location_for_client_linked_tracker(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
         $site = Site::create(['name' => 'Test Site']);
+        $client = Client::create(['first_name' => 'Mia', 'last_name' => 'Tane']);
         $asset = Asset::create([
             'site_id' => $site->id,
-            'name' => 'Van 5',
+            'client_id' => $client->id,
+            'name' => 'Mia pendant',
             'status' => 'active',
             'risk_level' => 'medium',
-            'category' => 'vehicle',
+            'category' => 'personal_tracker',
         ]);
 
         AssetTracker::create([
@@ -301,6 +304,46 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertDatabaseHas('fleet_telemetry_events', [
             'asset_id' => $asset->id,
             'consent_blocked' => 1,
+            'latitude' => null,
+            'longitude' => null,
         ]);
+    }
+
+    public function test_fleet_vehicle_without_consent_stores_coordinates(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+
+        $site = Site::create(['name' => 'Test Site']);
+        $asset = Asset::create([
+            'site_id' => $site->id,
+            'name' => 'Van 6',
+            'status' => 'active',
+            'risk_level' => 'medium',
+            'category' => 'vehicle',
+        ]);
+
+        AssetTracker::create([
+            'asset_id' => $asset->id,
+            'vendor' => 'queclink',
+            'device_uid' => 'QUE-006',
+            'status' => 'paired',
+            'paired_at' => now(),
+        ]);
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-006',
+                'gps_time' => now()->toISOString(),
+                'lat' => -41.4,
+                'lng' => 174.4,
+                'speed' => 22,
+            ])
+            ->assertStatus(200);
+
+        $event = FleetTelemetryEvent::where('asset_id', $asset->id)->first();
+        $this->assertNotNull($event);
+        $this->assertFalse((bool) $event->consent_blocked);
+        $this->assertEqualsWithDelta(-41.4, (float) $event->latitude, 0.0001);
+        $this->assertEqualsWithDelta(174.4, (float) $event->longitude, 0.0001);
     }
 }
