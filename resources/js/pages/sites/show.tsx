@@ -132,6 +132,17 @@ import {
     type ClientRecord,
 } from './clients/_dialogs';
 import {
+    AddRoomDialog,
+    AssignClientToRoomDialog,
+    AssignRoomToClientDialog,
+    DeleteRoomDialog,
+    EditRoomDialog,
+    ShowRoomDialog,
+    UnassignRoomDialog,
+    type ClientForPicker,
+    type RoomRecord,
+} from './rooms/_dialogs';
+import {
     CreateTemplateDialog,
     StartRunDialog,
 } from '@/pages/checklists/_dialogs';
@@ -217,7 +228,7 @@ type ClientLite = {
     funding_type?: string | null;
     key_worker?: { id: number; name: string } | null;
     service_context?: { id: number; name: string; type?: string | null } | null;
-    room_name?: string | null;
+    room?: { id: number; name: string } | null;
 };
 
 type AvailableClient = {
@@ -243,7 +254,32 @@ type TypeSpecificData = {
     rooms?: Array<{
         id: number;
         name: string;
-        assigned_client?: { id: number; name: string } | null;
+        notes?: string | null;
+        is_active?: boolean;
+        sort_order?: number;
+        assigned_from?: string | null;
+        assigned_until?: string | null;
+        assigned_client?: {
+            id: number;
+            first_name?: string;
+            last_name?: string;
+            preferred_name?: string | null;
+            status?: string | null;
+            profile_photo_url?: string | null;
+            name?: string | null;
+        } | null;
+        history?: Array<{
+            id: number;
+            client: {
+                id: number;
+                first_name: string;
+                last_name: string;
+            } | null;
+            assigned_from?: string | null;
+            assigned_until?: string | null;
+            assigned_by?: string | null;
+            notes?: string | null;
+        }>;
     }>;
     resources?: Array<{
         id: number;
@@ -252,6 +288,13 @@ type TypeSpecificData = {
         capacity?: number;
     }>;
     zones?: Array<{ id: number; name: string; type?: string }>;
+};
+
+type RoomsSummary = {
+    total: number;
+    occupied: number;
+    available: number;
+    occupancy_percent: number;
 };
 
 type VendorLite = {
@@ -413,6 +456,7 @@ type Props = {
     checklist: ChecklistItem[];
     houseLedger?: SiteLedgerPanelData | null;
     typeSpecificData: TypeSpecificData;
+    roomsSummary?: RoomsSummary | null;
     vendors?: VendorLite[];
     credentials?: CredentialLite[];
     staffRequirements?: StaffRequirement[];
@@ -1049,6 +1093,7 @@ export default function SiteShow({
     checklist,
     houseLedger,
     typeSpecificData,
+    roomsSummary,
     vendors = [],
     credentials = [],
     staffRequirements = [],
@@ -1741,6 +1786,7 @@ export default function SiteShow({
                             clients={clients}
                             availableClients={availableClients}
                             summary={clientsSummary}
+                            rooms={typeSpecificData.rooms ?? []}
                             can_edit={can_edit}
                         />
                     </TabsContent>
@@ -2714,7 +2760,21 @@ export default function SiteShow({
 
                     {/* Type-Specific Tab */}
                     <TabsContent value="type-specific">
-                        <TypeSpecificTab site={site} data={typeSpecificData} />
+                        <TypeSpecificTab
+                            site={site}
+                            data={typeSpecificData}
+                            clientsForRooms={clients.map((c) => ({
+                                id: c.id,
+                                first_name: c.first_name,
+                                last_name: c.last_name,
+                                preferred_name: c.preferred_name,
+                                status: c.status,
+                                profile_photo_url: c.profile_photo_url,
+                                room: c.room ?? null,
+                            }))}
+                            summary={roomsSummary}
+                            can_edit={can_edit}
+                        />
                     </TabsContent>
 
                     {/* Staff Requirements Tab */}
@@ -3118,19 +3178,21 @@ function ContactCard({
     );
 }
 
-type ClientDialogMode = 'add' | 'show' | 'unlink' | null;
+type ClientDialogMode = 'add' | 'show' | 'unlink' | 'assign-room' | null;
 
 function ClientsTab({
     site,
     clients,
     availableClients,
     summary,
+    rooms,
     can_edit,
 }: {
     site: Site;
     clients: ClientLite[];
     availableClients: AvailableClient[];
     summary?: ClientsSummary;
+    rooms: NonNullable<TypeSpecificData['rooms']>;
     can_edit: boolean;
 }) {
     const [dialog, setDialog] = useState<{
@@ -3139,6 +3201,9 @@ function ClientsTab({
     }>({ mode: null, target: null });
 
     const closeDialog = () => setDialog({ mode: null, target: null });
+
+    const isHouse = site.type === 'house';
+    const canAssignRoom = isHouse && can_edit && rooms.length > 0;
 
     const stats = summary ?? {
         total: clients.length,
@@ -3242,6 +3307,7 @@ function ClientsTab({
                                     key={c.id}
                                     client={c}
                                     canEdit={can_edit}
+                                    canAssignRoom={canAssignRoom}
                                     onShow={() =>
                                         setDialog({
                                             mode: 'show',
@@ -3251,6 +3317,12 @@ function ClientsTab({
                                     onUnlink={() =>
                                         setDialog({
                                             mode: 'unlink',
+                                            target: c as ClientRecord,
+                                        })
+                                    }
+                                    onAssignRoom={() =>
+                                        setDialog({
+                                            mode: 'assign-room',
                                             target: c as ClientRecord,
                                         })
                                     }
@@ -3271,16 +3343,27 @@ function ClientsTab({
                 client={dialog.target}
                 siteId={site.id}
                 canManage={can_edit}
+                canAssignRoom={canAssignRoom}
                 isOpen={dialog.mode === 'show'}
                 onClose={closeDialog}
                 onUnlink={() =>
                     setDialog((prev) => ({ ...prev, mode: 'unlink' }))
+                }
+                onAssignRoom={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'assign-room' }))
                 }
             />
             <UnlinkClientDialog
                 siteId={site.id}
                 client={dialog.target}
                 isOpen={dialog.mode === 'unlink'}
+                onClose={closeDialog}
+            />
+            <AssignRoomToClientDialog
+                siteId={site.id}
+                client={dialog.target}
+                rooms={rooms as RoomRecord[]}
+                isOpen={dialog.mode === 'assign-room'}
                 onClose={closeDialog}
             />
         </>
@@ -3318,11 +3401,15 @@ function ClientCard({
     canEdit,
     onShow,
     onUnlink,
+    onAssignRoom,
+    canAssignRoom,
 }: {
     client: ClientLite;
     canEdit: boolean;
     onShow: () => void;
     onUnlink: () => void;
+    onAssignRoom?: () => void;
+    canAssignRoom: boolean;
 }) {
     const status = getClientStatusStyle(client.status);
     const risk = getClientRiskStyle(client.risk_level);
@@ -3399,12 +3486,39 @@ function ClientCard({
                         <span>{client.age} yrs</span>
                     </div>
                 )}
-                {client.room_name && (
-                    <div className="flex items-center gap-2">
-                        <DoorOpen className="h-3 w-3 shrink-0" />
-                        <span className="truncate">Room: {client.room_name}</span>
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    <DoorOpen className="h-3 w-3 shrink-0" />
+                    {client.room ? (
+                        <span className="truncate">
+                            Room: {client.room.name}
+                            {canAssignRoom && onAssignRoom && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onAssignRoom();
+                                    }}
+                                    className="ml-2 text-primary underline-offset-2 hover:underline"
+                                >
+                                    Change
+                                </button>
+                            )}
+                        </span>
+                    ) : canAssignRoom && onAssignRoom ? (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAssignRoom();
+                            }}
+                            className="text-primary underline-offset-2 hover:underline"
+                        >
+                            Assign room
+                        </button>
+                    ) : (
+                        <span className="italic">No room</span>
+                    )}
+                </div>
                 {client.key_worker?.name && (
                     <div className="flex items-center gap-2">
                         <UserCog className="h-3 w-3 shrink-0" />
@@ -3626,71 +3740,425 @@ function SiteDocumentPreviewCard({
     );
 }
 
-function TypeSpecificTab({
+type RoomDialogMode =
+    | 'add'
+    | 'edit'
+    | 'show'
+    | 'delete'
+    | 'assign'
+    | 'unassign'
+    | null;
+
+function BedroomsTab({
     site,
-    data,
+    rooms,
+    clientsForRooms,
+    summary,
+    can_edit,
 }: {
     site: Site;
-    data: TypeSpecificData;
+    rooms: NonNullable<TypeSpecificData['rooms']>;
+    clientsForRooms: ClientForPicker[];
+    summary?: RoomsSummary | null;
+    can_edit: boolean;
 }) {
-    if (site.type === 'house') {
-        return (
+    const [dialog, setDialog] = useState<{
+        mode: RoomDialogMode;
+        target: RoomRecord | null;
+    }>({ mode: null, target: null });
+
+    const closeDialog = () => setDialog({ mode: null, target: null });
+
+    const stats = summary ?? {
+        total: rooms.length,
+        occupied: rooms.filter((r) => r.assigned_client).length,
+        available: rooms.filter((r) => !r.assigned_client).length,
+        occupancy_percent:
+            rooms.length > 0
+                ? Math.round(
+                      (rooms.filter((r) => r.assigned_client).length /
+                          rooms.length) *
+                          100,
+                  )
+                : 0,
+    };
+
+    return (
+        <>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                        <BedDouble className="h-5 w-5" />
-                        Bedrooms
-                    </CardTitle>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={`/sites/${site.id}/rooms`}>
-                            Manage Rooms
-                        </Link>
-                    </Button>
-                </CardHeader>
-                <CardContent>
-                    {!data.rooms || data.rooms.length === 0 ? (
-                        <div className="py-8 text-center text-muted-foreground">
-                            <BedDouble className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                            <p>No bedrooms configured yet</p>
-                            <Button asChild className="mt-4">
-                                <Link
-                                    href={`/sites/${site.id}/edit`}
-                                >
-                                    Add Bedrooms
-                                </Link>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+                    <div>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <BedDouble className="h-4 w-4 text-primary" />
+                            Bedrooms ({stats.total})
+                        </CardTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Manage bedrooms and assignments — open a card for
+                            full history and details.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {can_edit && (
+                            <Button
+                                size="sm"
+                                onClick={() =>
+                                    setDialog({ mode: 'add', target: null })
+                                }
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
+                                Add bedroom
                             </Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {stats.total > 0 && (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            <StatChip label="Total" value={stats.total} />
+                            <StatChip
+                                label="Occupied"
+                                value={stats.occupied}
+                                tone={
+                                    stats.occupied > 0 ? 'success' : 'muted'
+                                }
+                            />
+                            <StatChip
+                                label="Available"
+                                value={stats.available}
+                                tone={
+                                    stats.available > 0 ? 'success' : 'muted'
+                                }
+                            />
+                            <StatChip
+                                label="Occupancy"
+                                value={stats.occupancy_percent}
+                                tone={
+                                    stats.occupancy_percent >= 90
+                                        ? 'warning'
+                                        : 'muted'
+                                }
+                            />
+                        </div>
+                    )}
+
+                    {rooms.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center">
+                            <div className="rounded-full bg-muted/40 p-3">
+                                <BedDouble className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <p className="mt-3 text-sm font-medium">
+                                No bedrooms yet
+                            </p>
+                            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                                Add bedrooms to track who lives where, record
+                                respite stays and keep a full assignment
+                                history.
+                            </p>
+                            {can_edit && (
+                                <Button
+                                    size="sm"
+                                    className="mt-4"
+                                    onClick={() =>
+                                        setDialog({
+                                            mode: 'add',
+                                            target: null,
+                                        })
+                                    }
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Add first bedroom
+                                </Button>
+                            )}
                         </div>
                     ) : (
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {data.rooms.map((room) => (
-                                <Card key={room.id} className="bg-muted/50">
-                                    <CardContent className="p-4">
-                                        <div className="font-medium">
-                                            {room.name}
-                                        </div>
-                                        {room.assigned_client ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="mt-2 border-primary/30 text-primary/70"
-                                            >
-                                                Assigned:{' '}
-                                                {room.assigned_client.name}
-                                            </Badge>
-                                        ) : (
-                                            <Badge
-                                                variant="outline"
-                                                className="mt-2 border-border/30 text-muted-foreground"
-                                            >
-                                                Available
-                                            </Badge>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {rooms.map((r) => (
+                                <BedroomCard
+                                    key={r.id}
+                                    room={r as RoomRecord}
+                                    canEdit={can_edit}
+                                    onShow={() =>
+                                        setDialog({
+                                            mode: 'show',
+                                            target: r as RoomRecord,
+                                        })
+                                    }
+                                    onEdit={() =>
+                                        setDialog({
+                                            mode: 'edit',
+                                            target: r as RoomRecord,
+                                        })
+                                    }
+                                    onDelete={() =>
+                                        setDialog({
+                                            mode: 'delete',
+                                            target: r as RoomRecord,
+                                        })
+                                    }
+                                    onAssign={() =>
+                                        setDialog({
+                                            mode: 'assign',
+                                            target: r as RoomRecord,
+                                        })
+                                    }
+                                    onUnassign={() =>
+                                        setDialog({
+                                            mode: 'unassign',
+                                            target: r as RoomRecord,
+                                        })
+                                    }
+                                />
                             ))}
                         </div>
                     )}
+
+                    <div className="pt-2 text-right">
+                        <Link
+                            href={`/sites/${site.id}/rooms`}
+                            className="text-xs text-muted-foreground hover:text-primary"
+                        >
+                            Open full bedroom management →
+                        </Link>
+                    </div>
                 </CardContent>
             </Card>
+
+            <AddRoomDialog
+                siteId={site.id}
+                isOpen={dialog.mode === 'add'}
+                onClose={closeDialog}
+            />
+            <EditRoomDialog
+                siteId={site.id}
+                room={dialog.target}
+                isOpen={dialog.mode === 'edit'}
+                onClose={closeDialog}
+            />
+            <DeleteRoomDialog
+                siteId={site.id}
+                room={dialog.target}
+                isOpen={dialog.mode === 'delete'}
+                onClose={closeDialog}
+            />
+            <ShowRoomDialog
+                room={dialog.target}
+                canManage={can_edit}
+                isOpen={dialog.mode === 'show'}
+                onClose={closeDialog}
+                onEdit={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'edit' }))
+                }
+                onDelete={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'delete' }))
+                }
+                onAssign={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'assign' }))
+                }
+                onUnassign={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'unassign' }))
+                }
+            />
+            <AssignClientToRoomDialog
+                siteId={site.id}
+                room={dialog.target}
+                clients={clientsForRooms}
+                isOpen={dialog.mode === 'assign'}
+                onClose={closeDialog}
+            />
+            <UnassignRoomDialog
+                siteId={site.id}
+                room={dialog.target}
+                isOpen={dialog.mode === 'unassign'}
+                onClose={closeDialog}
+            />
+        </>
+    );
+}
+
+function BedroomCard({
+    room,
+    canEdit,
+    onShow,
+    onEdit,
+    onDelete,
+    onAssign,
+    onUnassign,
+}: {
+    room: RoomRecord;
+    canEdit: boolean;
+    onShow: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+    onAssign: () => void;
+    onUnassign: () => void;
+}) {
+    const occupant = room.assigned_client ?? null;
+    const occupantName = occupant
+        ? (() => {
+              const full = `${occupant.first_name ?? ''} ${occupant.last_name ?? ''}`.trim();
+              return occupant.preferred_name &&
+                  occupant.preferred_name !== occupant.first_name
+                  ? `${occupant.preferred_name} (${full})`
+                  : full;
+          })()
+        : null;
+    const occupantInitials = occupant
+        ? (
+              (occupant.first_name?.[0] ?? '') +
+              (occupant.last_name?.[0] ?? '')
+          ).toUpperCase() || '?'
+        : null;
+
+    return (
+        <div className="group relative flex h-full flex-col gap-3 rounded-2xl border bg-card/40 p-4 transition-all hover:border-primary/50 hover:bg-card hover:shadow-md">
+            <div className="flex items-start gap-3">
+                <span className="shrink-0 rounded-xl border bg-background/60 p-2">
+                    <BedDouble className="h-5 w-5 text-primary" />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                        {room.name}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {occupant ? (
+                            <Badge
+                                variant="outline"
+                                className="border-primary/30 text-[10px] text-primary"
+                            >
+                                Assigned
+                            </Badge>
+                        ) : (
+                            <Badge
+                                variant="outline"
+                                className="border-status-success/30 text-[10px] text-status-success"
+                            >
+                                Available
+                            </Badge>
+                        )}
+                        {(room.assigned_from || room.assigned_until) && (
+                            <span className="text-[10px] text-muted-foreground">
+                                {room.assigned_from && (
+                                    <>Since {room.assigned_from}</>
+                                )}
+                                {room.assigned_until && (
+                                    <> · until {room.assigned_until}</>
+                                )}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                {canEdit && (
+                    <div
+                        className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Edit bedroom"
+                            onClick={onEdit}
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Deactivate bedroom"
+                            className="text-status-critical hover:text-status-critical"
+                            onClick={onDelete}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                )}
+            </div>
+
+            {occupant ? (
+                <div className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5">
+                    <Avatar className="size-8">
+                        {occupant.profile_photo_url && (
+                            <AvatarImage
+                                src={occupant.profile_photo_url}
+                                alt={occupantName ?? ''}
+                            />
+                        )}
+                        <AvatarFallback className="text-[10px]">
+                            {occupantInitials}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">
+                            {occupantName}
+                        </p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                            Occupant
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
+                    No occupant
+                </div>
+            )}
+
+            {room.notes && (
+                <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {room.notes}
+                </p>
+            )}
+
+            <div className="mt-auto flex items-center justify-end gap-2 pt-1">
+                {canEdit &&
+                    (occupant ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onUnassign}
+                        >
+                            Unassign
+                        </Button>
+                    ) : null)}
+                {canEdit && (
+                    <Button type="button" size="sm" onClick={onAssign}>
+                        {occupant ? 'Change occupant' : 'Assign client'}
+                    </Button>
+                )}
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onShow}
+                >
+                    View
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function TypeSpecificTab({
+    site,
+    data,
+    clientsForRooms = [],
+    summary,
+    can_edit = false,
+}: {
+    site: Site;
+    data: TypeSpecificData;
+    clientsForRooms?: ClientForPicker[];
+    summary?: RoomsSummary | null;
+    can_edit?: boolean;
+}) {
+    if (site.type === 'house') {
+        return (
+            <BedroomsTab
+                site={site}
+                rooms={data.rooms ?? []}
+                clientsForRooms={clientsForRooms}
+                summary={summary}
+                can_edit={can_edit}
+            />
         );
     }
 

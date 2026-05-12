@@ -1,0 +1,1111 @@
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { router, useForm } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    BedDouble,
+    CalendarDays,
+    History,
+    Link2Off,
+    Loader2,
+    Pencil,
+    Trash2,
+    User,
+    UserPlus,
+    UserX,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+// ── Shared types ──────────────────────────────────────────────────────────
+
+export type RoomOccupant = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    preferred_name?: string | null;
+    status?: string | null;
+    profile_photo_url?: string | null;
+    name?: string | null;
+};
+
+export type RoomHistoryEntry = {
+    id: number;
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+    } | null;
+    assigned_from?: string | null;
+    assigned_until?: string | null;
+    assigned_by?: string | null;
+    notes?: string | null;
+};
+
+export type RoomRecord = {
+    id: number;
+    name: string;
+    notes?: string | null;
+    is_active?: boolean;
+    sort_order?: number;
+    assigned_from?: string | null;
+    assigned_until?: string | null;
+    assigned_client?: RoomOccupant | null;
+    history?: RoomHistoryEntry[];
+};
+
+export type ClientForPicker = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    preferred_name?: string | null;
+    status?: string | null;
+    profile_photo_url?: string | null;
+    room?: { id: number; name: string } | null;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+export function getOccupantDisplayName(c: {
+    first_name: string;
+    last_name: string;
+    preferred_name?: string | null;
+}): string {
+    const full = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
+    if (
+        c.preferred_name &&
+        c.preferred_name.trim() &&
+        c.preferred_name !== c.first_name
+    ) {
+        return `${c.preferred_name} (${full})`;
+    }
+    return full;
+}
+
+function initials(c: { first_name?: string | null; last_name?: string | null }) {
+    return (
+        ((c.first_name?.[0] ?? '') + (c.last_name?.[0] ?? '')).toUpperCase() ||
+        '?'
+    );
+}
+
+function FieldError({ message }: { message?: string }) {
+    if (!message) return null;
+    return <p className="mt-1 text-xs text-status-critical">{message}</p>;
+}
+
+// ── Add room ──────────────────────────────────────────────────────────────
+
+type RoomFormValues = {
+    name: string;
+    notes: string;
+};
+
+export function AddRoomDialog({
+    siteId,
+    isOpen,
+    onClose,
+}: {
+    siteId: number;
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-lg">
+                {isOpen && <AddRoomBody siteId={siteId} onClose={onClose} />}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AddRoomBody({
+    siteId,
+    onClose,
+}: {
+    siteId: number;
+    onClose: () => void;
+}) {
+    const form = useForm<RoomFormValues>({ name: '', notes: '' });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(`/sites/${siteId}/rooms`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => onClose(),
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <BedDouble className="h-4 w-4 text-primary" />
+                    New bedroom
+                </DialogTitle>
+                <DialogDescription>
+                    Name the bedroom — you can assign a client to it afterwards.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="mt-3 space-y-3">
+                <div>
+                    <Label htmlFor="rm-name">
+                        Bedroom name{' '}
+                        <span className="text-status-critical">*</span>
+                    </Label>
+                    <Input
+                        id="rm-name"
+                        value={form.data.name}
+                        onChange={(e) => form.setData('name', e.target.value)}
+                        placeholder="e.g. Bedroom 1, Sunset Room"
+                        required
+                    />
+                    <FieldError message={form.errors.name} />
+                </div>
+                <div>
+                    <Label htmlFor="rm-notes">Notes</Label>
+                    <Textarea
+                        id="rm-notes"
+                        rows={3}
+                        value={form.data.notes}
+                        onChange={(e) =>
+                            form.setData('notes', e.target.value)
+                        }
+                        placeholder="Bed type, accessibility features, sensory considerations…"
+                    />
+                    <FieldError message={form.errors.notes} />
+                </div>
+            </div>
+            <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save bedroom
+                </Button>
+            </DialogFooter>
+        </form>
+    );
+}
+
+// ── Edit room ─────────────────────────────────────────────────────────────
+
+export function EditRoomDialog({
+    siteId,
+    room,
+    isOpen,
+    onClose,
+}: {
+    siteId: number;
+    room: RoomRecord | null;
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-lg">
+                {isOpen && room && (
+                    <EditRoomBody
+                        siteId={siteId}
+                        room={room}
+                        onClose={onClose}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function EditRoomBody({
+    siteId,
+    room,
+    onClose,
+}: {
+    siteId: number;
+    room: RoomRecord;
+    onClose: () => void;
+}) {
+    const form = useForm<RoomFormValues & { assigned_client_id: number | null }>({
+        name: room.name ?? '',
+        notes: room.notes ?? '',
+        // Preserve the current occupant — the assignment endpoint owns that
+        // field, but the legacy update route also accepts it.
+        assigned_client_id: room.assigned_client?.id ?? null,
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.put(`/sites/${siteId}/rooms/${room.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => onClose(),
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <DialogHeader>
+                <DialogTitle>Edit bedroom</DialogTitle>
+                <DialogDescription>
+                    Update name or notes. Use “Assign client” to change the
+                    occupant.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="mt-3 space-y-3">
+                <div>
+                    <Label htmlFor="erm-name">
+                        Bedroom name{' '}
+                        <span className="text-status-critical">*</span>
+                    </Label>
+                    <Input
+                        id="erm-name"
+                        value={form.data.name}
+                        onChange={(e) => form.setData('name', e.target.value)}
+                        required
+                    />
+                    <FieldError message={form.errors.name} />
+                </div>
+                <div>
+                    <Label htmlFor="erm-notes">Notes</Label>
+                    <Textarea
+                        id="erm-notes"
+                        rows={3}
+                        value={form.data.notes}
+                        onChange={(e) =>
+                            form.setData('notes', e.target.value)
+                        }
+                    />
+                    <FieldError message={form.errors.notes} />
+                </div>
+            </div>
+            <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save changes
+                </Button>
+            </DialogFooter>
+        </form>
+    );
+}
+
+// ── Delete (deactivate) room ──────────────────────────────────────────────
+
+export function DeleteRoomDialog({
+    siteId,
+    room,
+    isOpen,
+    onClose,
+}: {
+    siteId: number;
+    room: RoomRecord | null;
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleDelete = () => {
+        if (!room) return;
+        setSubmitting(true);
+        router.delete(`/sites/${siteId}/rooms/${room.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setSubmitting(false),
+            onSuccess: () => onClose(),
+        });
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Deactivate bedroom?</DialogTitle>
+                    <DialogDescription>
+                        {room && (
+                            <>
+                                <span className="font-medium">{room.name}</span>{' '}
+                                will be hidden from the active list. History
+                                and any current assignment are kept intact.
+                            </>
+                        )}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={submitting}
+                    >
+                        {submitting && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Deactivate
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ── Show / overview room ──────────────────────────────────────────────────
+
+export function ShowRoomDialog({
+    room,
+    canManage,
+    isOpen,
+    onClose,
+    onEdit,
+    onDelete,
+    onAssign,
+    onUnassign,
+}: {
+    room: RoomRecord | null;
+    canManage: boolean;
+    isOpen: boolean;
+    onClose: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+    onAssign: () => void;
+    onUnassign: () => void;
+}) {
+    if (!room) {
+        return (
+            <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+                <DialogContent className="max-w-md" />
+            </Dialog>
+        );
+    }
+    const occupant = room.assigned_client ?? null;
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <div className="flex items-start gap-3">
+                        <span className="shrink-0 rounded-xl border bg-background/60 p-2">
+                            <BedDouble className="h-5 w-5 text-primary" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <DialogTitle className="truncate">
+                                {room.name}
+                            </DialogTitle>
+                            <DialogDescription className="flex flex-wrap items-center gap-2">
+                                {occupant ? (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-primary/30 text-[10px] text-primary"
+                                    >
+                                        Assigned
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-status-success/30 text-[10px] text-status-success"
+                                    >
+                                        Available
+                                    </Badge>
+                                )}
+                                {(room.assigned_from || room.assigned_until) && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {room.assigned_from && (
+                                            <>Since {room.assigned_from}</>
+                                        )}
+                                        {room.assigned_until && (
+                                            <> · until {room.assigned_until}</>
+                                        )}
+                                    </span>
+                                )}
+                            </DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                {occupant ? (
+                    <div className="mt-2 flex items-center gap-3 rounded-xl border bg-card/40 p-3">
+                        <Avatar className="size-10">
+                            {occupant.profile_photo_url && (
+                                <AvatarImage
+                                    src={occupant.profile_photo_url}
+                                    alt={getOccupantDisplayName(occupant)}
+                                />
+                            )}
+                            <AvatarFallback>
+                                {initials(occupant)}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                                {getOccupantDisplayName(occupant)}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                                Current occupant
+                                {occupant.status ? ` · ${occupant.status}` : ''}
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                        >
+                            <a href={`/clients/${occupant.id}`}>Open profile</a>
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="mt-2 rounded-xl border border-dashed p-3 text-center text-sm text-muted-foreground">
+                        No client assigned yet.
+                    </div>
+                )}
+
+                {room.notes && (
+                    <div className="mt-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                        <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+                            Notes
+                        </p>
+                        <p className="whitespace-pre-wrap">{room.notes}</p>
+                    </div>
+                )}
+
+                {room.history && room.history.length > 0 && (
+                    <div className="mt-2 rounded-xl border bg-card/40 p-3">
+                        <p className="mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+                            <History className="h-3 w-3" />
+                            Assignment history
+                        </p>
+                        <ul className="space-y-1.5">
+                            {room.history.slice(0, 6).map((h) => (
+                                <li
+                                    key={h.id}
+                                    className="flex flex-wrap items-baseline justify-between gap-2 text-xs"
+                                >
+                                    <span className="font-medium">
+                                        {h.client
+                                            ? `${h.client.first_name} ${h.client.last_name}`.trim()
+                                            : 'Unknown client'}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                        {h.assigned_from ?? '—'}
+                                        {' → '}
+                                        {h.assigned_until ?? 'present'}
+                                        {h.assigned_by && (
+                                            <> · by {h.assigned_by}</>
+                                        )}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                <DialogFooter className="mt-4 flex-wrap gap-2 sm:flex-nowrap">
+                    {canManage && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="text-status-critical"
+                            onClick={onDelete}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Deactivate
+                        </Button>
+                    )}
+                    {canManage && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onEdit}
+                        >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                        </Button>
+                    )}
+                    {canManage && occupant && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onUnassign}
+                        >
+                            <Link2Off className="mr-2 h-4 w-4" />
+                            Unassign
+                        </Button>
+                    )}
+                    {canManage && (
+                        <Button type="button" onClick={onAssign}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            {occupant ? 'Change occupant' : 'Assign client'}
+                        </Button>
+                    )}
+                    <Button type="button" variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ── Assign-client-to-room dialog (used FROM the Rooms tab) ────────────────
+//
+// Fixed: room. User picks a client from the site's clients.
+
+export function AssignClientToRoomDialog({
+    siteId,
+    room,
+    clients,
+    isOpen,
+    onClose,
+}: {
+    siteId: number;
+    room: RoomRecord | null;
+    clients: ClientForPicker[];
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-xl">
+                {isOpen && room && (
+                    <AssignClientBody
+                        siteId={siteId}
+                        room={room}
+                        clients={clients}
+                        onClose={onClose}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AssignClientBody({
+    siteId,
+    room,
+    clients,
+    onClose,
+}: {
+    siteId: number;
+    room: RoomRecord;
+    clients: ClientForPicker[];
+    onClose: () => void;
+}) {
+    const currentClientId = room.assigned_client?.id ?? null;
+    const [selectedId, setSelectedId] = useState<number | null>(currentClientId);
+    const [query, setQuery] = useState('');
+    const [assignedFrom, setAssignedFrom] = useState(
+        room.assigned_from ?? '',
+    );
+    const [assignedUntil, setAssignedUntil] = useState(
+        room.assigned_until ?? '',
+    );
+    const [notes, setNotes] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return clients;
+        return clients.filter((c) => {
+            const hay =
+                `${c.first_name} ${c.last_name} ${c.preferred_name ?? ''}`.toLowerCase();
+            return hay.includes(q);
+        });
+    }, [clients, query]);
+
+    const handleAssign = () => {
+        if (!selectedId) return;
+        setSubmitting(true);
+        router.post(
+            `/sites/${siteId}/rooms/${room.id}/assign`,
+            {
+                client_id: selectedId,
+                assigned_from: assignedFrom || null,
+                assigned_until: assignedUntil || null,
+                notes: notes || null,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setSubmitting(false),
+                onSuccess: () => onClose(),
+            },
+        );
+    };
+
+    return (
+        <>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-primary" />
+                    {currentClientId
+                        ? `Change occupant of ${room.name}`
+                        : `Assign a client to ${room.name}`}
+                </DialogTitle>
+                <DialogDescription>
+                    Choose a client from this site. Use the dates to record a
+                    respite or fixed-term stay.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-3 space-y-3">
+                <div>
+                    <Label htmlFor="ac-search">Search clients at this site</Label>
+                    <Input
+                        id="ac-search"
+                        placeholder="Search by name…"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                    />
+                </div>
+
+                <div className="max-h-60 overflow-y-auto rounded-xl border bg-card/40">
+                    {filtered.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                            {clients.length === 0
+                                ? 'No clients linked to this site yet — link a client to the site first.'
+                                : `No clients match "${query}".`}
+                        </p>
+                    ) : (
+                        <ul className="divide-y">
+                            {filtered.map((c) => {
+                                const active = selectedId === c.id;
+                                const inOtherRoom =
+                                    c.room && c.room.id !== room.id;
+                                return (
+                                    <li key={c.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedId(c.id)}
+                                            className={cn(
+                                                'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors',
+                                                active
+                                                    ? 'bg-primary/10'
+                                                    : 'hover:bg-muted/50',
+                                            )}
+                                        >
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <Avatar className="size-8">
+                                                    {c.profile_photo_url && (
+                                                        <AvatarImage
+                                                            src={
+                                                                c.profile_photo_url
+                                                            }
+                                                            alt=""
+                                                        />
+                                                    )}
+                                                    <AvatarFallback className="text-[10px]">
+                                                        {initials(c)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-medium">
+                                                        {getOccupantDisplayName(
+                                                            c,
+                                                        )}
+                                                    </p>
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        {inOtherRoom
+                                                            ? `Currently in ${c.room?.name}`
+                                                            : c.room
+                                                              ? 'Already in this room'
+                                                              : 'Not in a room'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {c.status && (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[10px]"
+                                                >
+                                                    {c.status}
+                                                </Badge>
+                                            )}
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <Label htmlFor="ac-from">Assigned from</Label>
+                        <Input
+                            id="ac-from"
+                            type="date"
+                            value={assignedFrom}
+                            onChange={(e) => setAssignedFrom(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="ac-until">
+                            Until <span className="text-xs text-muted-foreground">(optional)</span>
+                        </Label>
+                        <Input
+                            id="ac-until"
+                            type="date"
+                            value={assignedUntil}
+                            onChange={(e) => setAssignedUntil(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <Label htmlFor="ac-notes">Notes</Label>
+                    <Textarea
+                        id="ac-notes"
+                        rows={2}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Respite stay, transition arrangement…"
+                    />
+                </div>
+            </div>
+
+            <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button
+                    type="button"
+                    onClick={handleAssign}
+                    disabled={!selectedId || submitting}
+                >
+                    {submitting && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {currentClientId && selectedId !== currentClientId
+                        ? 'Reassign'
+                        : 'Assign'}
+                </Button>
+            </DialogFooter>
+        </>
+    );
+}
+
+// ── Assign-room-to-client dialog (used FROM the Clients tab) ──────────────
+//
+// Fixed: client. User picks a room from the site's available rooms (+ their
+// current room).
+
+export function AssignRoomToClientDialog({
+    siteId,
+    client,
+    rooms,
+    isOpen,
+    onClose,
+}: {
+    siteId: number;
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        preferred_name?: string | null;
+        room?: { id: number; name: string } | null;
+    } | null;
+    rooms: RoomRecord[];
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-xl">
+                {isOpen && client && (
+                    <AssignRoomBody
+                        siteId={siteId}
+                        client={client}
+                        rooms={rooms}
+                        onClose={onClose}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AssignRoomBody({
+    siteId,
+    client,
+    rooms,
+    onClose,
+}: {
+    siteId: number;
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        preferred_name?: string | null;
+        room?: { id: number; name: string } | null;
+    };
+    rooms: RoomRecord[];
+    onClose: () => void;
+}) {
+    const currentRoomId = client.room?.id ?? null;
+    const pickable = useMemo(
+        () =>
+            rooms.filter(
+                (r) =>
+                    !r.assigned_client ||
+                    r.assigned_client.id === client.id ||
+                    r.id === currentRoomId,
+            ),
+        [rooms, client.id, currentRoomId],
+    );
+    const [selectedId, setSelectedId] = useState<number | null>(currentRoomId);
+    const [assignedFrom, setAssignedFrom] = useState('');
+    const [assignedUntil, setAssignedUntil] = useState('');
+    const [notes, setNotes] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleAssign = () => {
+        if (!selectedId) return;
+        setSubmitting(true);
+        router.post(
+            `/sites/${siteId}/rooms/${selectedId}/assign`,
+            {
+                client_id: client.id,
+                assigned_from: assignedFrom || null,
+                assigned_until: assignedUntil || null,
+                notes: notes || null,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setSubmitting(false),
+                onSuccess: () => onClose(),
+            },
+        );
+    };
+
+    return (
+        <>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <BedDouble className="h-4 w-4 text-primary" />
+                    {currentRoomId
+                        ? `Change room for ${getOccupantDisplayName(client)}`
+                        : `Assign a room to ${getOccupantDisplayName(client)}`}
+                </DialogTitle>
+                <DialogDescription>
+                    Pick an available bedroom. Dates are optional but useful for
+                    respite stays.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-3 space-y-3">
+                <div className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
+                    {pickable.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                            No bedrooms available — every active room already
+                            has an occupant.
+                        </p>
+                    ) : (
+                        <ul className="divide-y">
+                            {pickable.map((r) => {
+                                const active = selectedId === r.id;
+                                const isCurrent = r.id === currentRoomId;
+                                return (
+                                    <li key={r.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedId(r.id)}
+                                            className={cn(
+                                                'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors',
+                                                active
+                                                    ? 'bg-primary/10'
+                                                    : 'hover:bg-muted/50',
+                                            )}
+                                        >
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <span className="shrink-0 rounded-lg border bg-background/60 p-1.5">
+                                                    <BedDouble className="h-4 w-4 text-primary" />
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-medium">
+                                                        {r.name}
+                                                    </p>
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        {isCurrent
+                                                            ? 'Current room'
+                                                            : 'Available'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    'text-[10px]',
+                                                    isCurrent
+                                                        ? 'border-primary/30 text-primary'
+                                                        : 'border-status-success/30 text-status-success',
+                                                )}
+                                            >
+                                                {isCurrent
+                                                    ? 'Current'
+                                                    : 'Available'}
+                                            </Badge>
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <Label htmlFor="ar-from">Assigned from</Label>
+                        <Input
+                            id="ar-from"
+                            type="date"
+                            value={assignedFrom}
+                            onChange={(e) => setAssignedFrom(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="ar-until">
+                            Until{' '}
+                            <span className="text-xs text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
+                        <Input
+                            id="ar-until"
+                            type="date"
+                            value={assignedUntil}
+                            onChange={(e) => setAssignedUntil(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <Label htmlFor="ar-notes">Notes</Label>
+                    <Textarea
+                        id="ar-notes"
+                        rows={2}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Respite stay, transition arrangement…"
+                    />
+                </div>
+            </div>
+
+            <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button
+                    type="button"
+                    onClick={handleAssign}
+                    disabled={!selectedId || submitting}
+                >
+                    {submitting && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {currentRoomId && selectedId !== currentRoomId
+                        ? 'Move client'
+                        : 'Assign room'}
+                </Button>
+            </DialogFooter>
+        </>
+    );
+}
+
+// ── Unassign confirm ──────────────────────────────────────────────────────
+
+export function UnassignRoomDialog({
+    siteId,
+    room,
+    isOpen,
+    onClose,
+}: {
+    siteId: number;
+    room: RoomRecord | null;
+    isOpen: boolean;
+    onClose: () => void;
+}) {
+    const [submitting, setSubmitting] = useState(false);
+    const occupant = room?.assigned_client ?? null;
+
+    const handleUnassign = () => {
+        if (!room) return;
+        setSubmitting(true);
+        router.post(
+            `/sites/${siteId}/rooms/${room.id}/assign`,
+            { client_id: null },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setSubmitting(false),
+                onSuccess: () => onClose(),
+            },
+        );
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-status-warning" />
+                        Unassign this room?
+                    </DialogTitle>
+                    <DialogDescription>
+                        {occupant && room && (
+                            <>
+                                <span className="font-medium">
+                                    {getOccupantDisplayName(occupant)}
+                                </span>{' '}
+                                will be marked as no longer in{' '}
+                                <span className="font-medium">{room.name}</span>
+                                . The assignment is closed and archived in
+                                history.
+                            </>
+                        )}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={handleUnassign}
+                        disabled={submitting}
+                    >
+                        {submitting && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        <UserX className="mr-2 h-4 w-4" />
+                        Unassign
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// Silence unused-import warnings for icons we surface via dialogs.
+void User;
+void CalendarDays;

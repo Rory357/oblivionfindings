@@ -64,7 +64,7 @@ export type ClientRecord = {
     funding_type?: string | null;
     key_worker?: { id: number; name: string } | null;
     service_context?: { id: number; name: string; type?: string | null } | null;
-    room_name?: string | null;
+    room?: { id: number; name: string } | null;
 };
 
 export type AvailableClient = {
@@ -615,6 +615,8 @@ export function ShowClientDialog({
     isOpen,
     onClose,
     onUnlink,
+    onAssignRoom,
+    canAssignRoom = false,
 }: {
     client: ClientRecord | null;
     siteId: number;
@@ -622,6 +624,8 @@ export function ShowClientDialog({
     isOpen: boolean;
     onClose: () => void;
     onUnlink: () => void;
+    onAssignRoom?: () => void;
+    canAssignRoom?: boolean;
 }) {
     if (!client) {
         return (
@@ -708,10 +712,10 @@ export function ShowClientDialog({
                                 : client.date_of_birth ?? null
                         }
                     />
-                    <DetailRow
-                        icon={DoorOpen}
-                        label="Room"
-                        value={client.room_name}
+                    <RoomRow
+                        roomName={client.room?.name ?? null}
+                        canAssign={canAssignRoom && canManage}
+                        onAssign={onAssignRoom}
                     />
                     <DetailRow
                         icon={UserCog}
@@ -782,6 +786,41 @@ function DetailRow({
                     <p className="text-sm text-muted-foreground">—</p>
                 )}
             </div>
+        </div>
+    );
+}
+
+function RoomRow({
+    roomName,
+    canAssign,
+    onAssign,
+}: {
+    roomName: string | null;
+    canAssign: boolean;
+    onAssign?: () => void;
+}) {
+    return (
+        <div className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
+            <DoorOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">Room</p>
+                {roomName ? (
+                    <p className="truncate text-sm">{roomName}</p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                )}
+            </div>
+            {canAssign && onAssign && (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-primary"
+                    onClick={onAssign}
+                >
+                    {roomName ? 'Change' : 'Assign'}
+                </Button>
+            )}
         </div>
     );
 }

@@ -117,4 +117,60 @@ class SiteRoomController extends Controller
 
         return redirect()->back()->with('success', 'Bedroom deactivated.');
     }
+
+    /**
+     * Assign (or unassign) a client to a bedroom. Single canonical endpoint
+     * used by both the Rooms tab and the Clients tab. Records history when
+     * the occupant changes; closes the previous history row when an existing
+     * occupant is replaced or cleared.
+     */
+    public function assign(Request $request, Site $site, SiteHouseRoom $room)
+    {
+        $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
+
+        $validated = $request->validate([
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'assigned_from' => ['nullable', 'date'],
+            'assigned_until' => ['nullable', 'date', 'after_or_equal:assigned_from'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $newClientId = $validated['client_id'] ?? null;
+        $previousClientId = $room->assigned_client_id;
+        $today = now()->toDateString();
+
+        // Close the previous open history row when the occupant is being
+        // replaced or cleared.
+        if ($previousClientId && $previousClientId !== $newClientId) {
+            $room->history()
+                ->where('client_id', $previousClientId)
+                ->whereNull('assigned_until')
+                ->latest('id')
+                ->first()
+                ?->update(['assigned_until' => $today]);
+        }
+
+        $room->update([
+            'assigned_client_id' => $newClientId,
+            'assigned_from' => $newClientId ? ($validated['assigned_from'] ?? $today) : null,
+            'assigned_until' => $newClientId ? ($validated['assigned_until'] ?? null) : null,
+        ]);
+
+        if ($newClientId && $newClientId !== $previousClientId) {
+            $room->history()->create([
+                'tenant_id' => $site->tenant_id,
+                'client_id' => $newClientId,
+                'assigned_from' => $validated['assigned_from'] ?? $today,
+                'assigned_until' => $validated['assigned_until'] ?? null,
+                'assigned_by_user_id' => $request->user()->id,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+        }
+
+        return back()->with(
+            'success',
+            $newClientId ? 'Client assigned to bedroom.' : 'Bedroom unassigned.'
+        );
+    }
 }

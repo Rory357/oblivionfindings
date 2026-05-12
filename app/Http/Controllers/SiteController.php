@@ -142,18 +142,26 @@ class SiteController extends Controller
             'documents.uploadedBy:id,name,email',
             'primaryContact:id,name',
             'serviceContexts',
-            'houseRooms' => fn ($q) => $q->active()->orderBy('sort_order'),
+            'houseRooms' => fn ($q) => $q->active()->orderBy('sort_order')->with([
+                'assignedClient:id,first_name,last_name,preferred_name,profile_photo_path,status',
+                'history' => fn ($h) => $h
+                    ->orderByDesc('id')
+                    ->with(['client:id,first_name,last_name', 'assignedBy:id,name']),
+            ]),
             'hoResources' => fn ($q) => $q->active()->orderBy('name'),
             'facilityZones' => fn ($q) => $q->active()->orderBy('name'),
             'siteNotes' => fn ($q) => $q->with('createdBy:id,name')->orderByDesc('created_at'),
             'geofences' => fn ($q) => $q->where('is_active', true),
         ]);
 
-        // Build a quick map of client_id → room_name for "which room is the client in".
+        // Build a quick map of client_id → { id, name } for "which room is the client in".
         $clientRoomMap = [];
         foreach ($site->houseRooms ?? [] as $room) {
             if ($room->assigned_client_id) {
-                $clientRoomMap[(int) $room->assigned_client_id] = $room->name;
+                $clientRoomMap[(int) $room->assigned_client_id] = [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                ];
             }
         }
 
@@ -244,11 +252,34 @@ class SiteController extends Controller
                 'rooms' => $site->houseRooms->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->name,
+                    'notes' => $r->notes,
+                    'is_active' => (bool) $r->is_active,
+                    'sort_order' => $r->sort_order,
+                    'assigned_from' => $r->assigned_from?->toDateString(),
+                    'assigned_until' => $r->assigned_until?->toDateString(),
                     'assigned_client' => $r->assignedClient ? [
                         'id' => $r->assignedClient->id,
-                        'name' => $r->assignedClient->first_name.' '.$r->assignedClient->last_name,
+                        'first_name' => $r->assignedClient->first_name,
+                        'last_name' => $r->assignedClient->last_name,
+                        'preferred_name' => $r->assignedClient->preferred_name,
+                        'status' => $r->assignedClient->status,
+                        'profile_photo_url' => $r->assignedClient->profile_photo_url,
+                        // Backwards-compatible flat label for older callers.
+                        'name' => trim(($r->assignedClient->first_name ?? '') . ' ' . ($r->assignedClient->last_name ?? '')),
                     ] : null,
-                ]),
+                    'history' => $r->history->map(fn ($h) => [
+                        'id' => $h->id,
+                        'client' => $h->client ? [
+                            'id' => $h->client->id,
+                            'first_name' => $h->client->first_name,
+                            'last_name' => $h->client->last_name,
+                        ] : null,
+                        'assigned_from' => $h->assigned_from?->toDateString(),
+                        'assigned_until' => $h->assigned_until?->toDateString(),
+                        'assigned_by' => $h->assignedBy?->name,
+                        'notes' => $h->notes,
+                    ])->values(),
+                ])->values(),
             ],
             'head_office' => [
                 'resources' => $site->hoResources->map(fn ($r) => [
@@ -341,7 +372,7 @@ class SiteController extends Controller
                             'name' => $c->serviceContext->name,
                             'type' => $c->serviceContext->type,
                         ] : null,
-                        'room_name' => $clientRoomMap[(int) $c->id] ?? null,
+                        'room' => $clientRoomMap[(int) $c->id] ?? null,
                     ];
                 }),
             'availableClients' => Client::query()
@@ -368,6 +399,17 @@ class SiteController extends Controller
                 'high_risk' => $site->clients->where('risk_level', 'high')->count(),
                 'safeguarding' => $site->clients->where('safeguarding_flag', true)->count(),
             ],
+            'roomsSummary' => $site->type === 'house' ? [
+                'total' => $site->houseRooms->count(),
+                'occupied' => $site->houseRooms->whereNotNull('assigned_client_id')->count(),
+                'available' => $site->houseRooms->whereNull('assigned_client_id')->count(),
+                'occupancy_percent' => $site->houseRooms->count() > 0
+                    ? (int) round(
+                        ($site->houseRooms->whereNotNull('assigned_client_id')->count()
+                            / $site->houseRooms->count()) * 100,
+                    )
+                    : 0,
+            ] : null,
             'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn ($c) => [
                 'id' => $c->id,
                 'type' => $c->type,

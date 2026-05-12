@@ -301,6 +301,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/sites/{site}/rooms/{room}', [SiteRoomController::class, 'destroy'])
         ->name('sites.rooms.destroy')
         ->middleware('permission:sites.update');
+    Route::post('/sites/{site}/rooms/{room}/assign', [SiteRoomController::class, 'assign'])
+        ->name('sites.rooms.assign')
+        ->middleware('permission:sites.update');
 
     Route::get('/sites/{site}/resources', [SiteResourceController::class, 'index'])
         ->name('sites.resources.index')
