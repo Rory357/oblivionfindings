@@ -36,7 +36,7 @@ class SiteContactController extends Controller
 
         AuditLogger::log('sites.contacts.create', $contact, ['site_id' => $site->id]);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site_contact', $contact, $site, [
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site_contact', $contact, null, [
             'title' => 'Site contact added',
             'body' => $contact->name,
             'url' => url("/sites/{$site->id}"),
@@ -72,7 +72,7 @@ class SiteContactController extends Controller
 
         AuditLogger::log('sites.contacts.update', $contact, ['site_id' => $site->id]);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site_contact', $contact, $site, [
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site_contact', $contact, null, [
             'title' => 'Site contact updated',
             'body' => $contact->name,
             'url' => url("/sites/{$site->id}"),
@@ -91,7 +91,7 @@ class SiteContactController extends Controller
 
         AuditLogger::log('sites.contacts.delete', $site, ['site_id' => $site->id, 'name' => $name]);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'site_contact', $contact, $site, [
+        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'site_contact', $contact, null, [
             'title' => 'Site contact removed',
             'body' => $name,
             'url' => url("/sites/{$site->id}"),
