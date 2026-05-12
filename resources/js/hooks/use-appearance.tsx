@@ -1,4 +1,5 @@
 import { applyPalette, DEFAULT_BRAND_HEX } from '@/lib/derive-palette';
+import type { FormDataConvertible } from '@inertiajs/core';
 import { router, usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -241,7 +242,7 @@ export function useAppearance() {
     // hydration ({ persist: false }) and during accent picker drag (handled
     // separately via debounce in the appearance page).
     const persistField = useCallback(
-        (payload: Record<string, unknown>) => {
+        (payload: Record<string, FormDataConvertible>) => {
             if (typeof window === 'undefined') return;
             router.put('/settings/appearance', payload, {
                 preserveScroll: true,

@@ -108,6 +108,14 @@ import {
     ShowCredentialDialog,
     type CredentialRecord,
 } from './credentials/_dialogs';
+import {
+    AddContactDialog,
+    DeleteContactDialog,
+    EditContactDialog,
+    ShowContactDialog,
+    getContactType,
+    type ContactRecord,
+} from './contacts/_dialogs';
 
 type Site = {
     id: number;
@@ -2757,6 +2765,8 @@ export default function SiteShow({
 }
 
 // Sub-components for cleaner code
+type ContactDialogMode = 'add' | 'edit' | 'show' | 'delete' | null;
+
 function ContactsTab({
     site,
     contacts,
@@ -2766,239 +2776,232 @@ function ContactsTab({
     contacts: Contact[];
     can_edit: boolean;
 }) {
-    const [editingContactId, setEditingContactId] = useState<number | null>(
-        null,
-    );
-    const contactForm = useForm({
-        type: 'emergency',
-        name: '',
-        role: '',
-        phone: '',
-        email: '',
-        is_primary: false,
-        notes: '',
-    });
+    const [dialog, setDialog] = useState<{
+        mode: ContactDialogMode;
+        target: ContactRecord | null;
+    }>({ mode: null, target: null });
 
-    function startEditContact(c: Contact) {
-        setEditingContactId(c.id);
-        contactForm.setData({
-            type: c.type || '',
-            name: c.name || '',
-            role: c.role || '',
-            phone: c.phone || '',
-            email: c.email || '',
-            is_primary: !!c.is_primary,
-            notes: c.notes || '',
-        });
-    }
-
-    function resetContactForm() {
-        setEditingContactId(null);
-        contactForm.reset();
-    }
+    const closeDialog = () => setDialog({ mode: null, target: null });
 
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <>
             <Card>
-                <CardHeader>
-                    <CardTitle>Site contacts</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+                    <div>
+                        <CardTitle className="text-base">
+                            Site contacts ({contacts.length})
+                        </CardTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Key people for this site — open a card to view full
+                            details.
+                        </p>
+                    </div>
+                    {can_edit && (
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                setDialog({ mode: 'add', target: null })
+                            }
+                        >
+                            <Plus className="mr-1 h-4 w-4" />
+                            New contact
+                        </Button>
+                    )}
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent>
                     {contacts.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">
-                            No contacts yet.
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center">
+                            <div className="rounded-full bg-muted/40 p-3">
+                                <User className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <p className="mt-3 text-sm font-medium">
+                                No contacts yet
+                            </p>
+                            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                                Add team leads, emergency contacts, family /
+                                whānau, and other key people for this site.
+                            </p>
+                            {can_edit && (
+                                <Button
+                                    size="sm"
+                                    className="mt-4"
+                                    onClick={() =>
+                                        setDialog({
+                                            mode: 'add',
+                                            target: null,
+                                        })
+                                    }
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Add first contact
+                                </Button>
+                            )}
                         </div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             {contacts.map((c) => (
-                                <div
+                                <ContactCard
                                     key={c.id}
-                                    className="rounded-xl border p-3 text-sm"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div>
-                                            <div className="font-medium">
-                                                {c.name}{' '}
-                                                {c.is_primary && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="ml-2 border-status-success/30 text-status-success"
-                                                    >
-                                                        Primary
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <div className="text-muted-foreground">
-                                                {[c.type, c.role]
-                                                    .filter(Boolean)
-                                                    .join(' • ') || '—'}
-                                            </div>
-                                        </div>
-                                        {can_edit && (
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        startEditContact(c)
-                                                    }
-                                                >
-                                                    Edit
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="mt-2 grid gap-1 text-muted-foreground">
-                                        <div>{c.phone || '—'}</div>
-                                        <div>{c.email || '—'}</div>
-                                        {c.notes && (
-                                            <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                                                {c.notes}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                    contact={c}
+                                    canEdit={can_edit}
+                                    onShow={() =>
+                                        setDialog({
+                                            mode: 'show',
+                                            target: c as ContactRecord,
+                                        })
+                                    }
+                                    onEdit={() =>
+                                        setDialog({
+                                            mode: 'edit',
+                                            target: c as ContactRecord,
+                                        })
+                                    }
+                                    onDelete={() =>
+                                        setDialog({
+                                            mode: 'delete',
+                                            target: c as ContactRecord,
+                                        })
+                                    }
+                                />
                             ))}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            {can_edit && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            {editingContactId ? 'Edit contact' : 'Add contact'}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                const url = editingContactId
-                                    ? `/sites/${site.id}/contacts/${editingContactId}`
-                                    : `/sites/${site.id}/contacts`;
-                                const method = editingContactId
-                                    ? contactForm.put
-                                    : contactForm.post;
-                                method(url, {
-                                    preserveScroll: true,
-                                    onSuccess: () => resetContactForm(),
-                                });
-                            }}
-                            className="space-y-3"
-                        >
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <Label>Type</Label>
-                                    <Input
-                                        value={contactForm.data.type}
-                                        onChange={(e) =>
-                                            contactForm.setData(
-                                                'type',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Role</Label>
-                                    <Input
-                                        value={contactForm.data.role}
-                                        onChange={(e) =>
-                                            contactForm.setData(
-                                                'role',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Name</Label>
-                                    <Input
-                                        value={contactForm.data.name}
-                                        onChange={(e) =>
-                                            contactForm.setData(
-                                                'name',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Phone</Label>
-                                    <Input
-                                        value={contactForm.data.phone}
-                                        onChange={(e) =>
-                                            contactForm.setData(
-                                                'phone',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label>Email</Label>
-                                    <Input
-                                        value={contactForm.data.email}
-                                        onChange={(e) =>
-                                            contactForm.setData(
-                                                'email',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="flex items-end gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={contactForm.data.is_primary}
-                                        onChange={(e) =>
-                                            contactForm.setData(
-                                                'is_primary',
-                                                e.target.checked,
-                                            )
-                                        }
-                                    />
-                                    <span className="text-sm">Primary</span>
-                                </div>
-                            </div>
-                            <div>
-                                <Label>Notes</Label>
-                                <Textarea
-                                    value={contactForm.data.notes}
-                                    onChange={(e) =>
-                                        contactForm.setData(
-                                            'notes',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    type="submit"
-                                    disabled={contactForm.processing}
-                                >
-                                    {contactForm.processing
-                                        ? 'Saving…'
-                                        : editingContactId
-                                          ? 'Save changes'
-                                          : 'Add contact'}
-                                </Button>
-                                {editingContactId && (
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        onClick={() => resetContactForm()}
-                                    >
-                                        Cancel
-                                    </Button>
-                                )}
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
+            <AddContactDialog
+                siteId={site.id}
+                isOpen={dialog.mode === 'add'}
+                onClose={closeDialog}
+            />
+            <EditContactDialog
+                siteId={site.id}
+                contact={dialog.target}
+                isOpen={dialog.mode === 'edit'}
+                onClose={closeDialog}
+            />
+            <ShowContactDialog
+                contact={dialog.target}
+                isOpen={dialog.mode === 'show'}
+                canManage={can_edit}
+                onClose={closeDialog}
+                onEdit={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'edit' }))
+                }
+                onDelete={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'delete' }))
+                }
+            />
+            <DeleteContactDialog
+                siteId={site.id}
+                contact={dialog.target}
+                isOpen={dialog.mode === 'delete'}
+                onClose={closeDialog}
+            />
+        </>
+    );
+}
+
+function ContactCard({
+    contact,
+    canEdit,
+    onShow,
+    onEdit,
+    onDelete,
+}: {
+    contact: Contact;
+    canEdit: boolean;
+    onShow: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}) {
+    const type = getContactType(contact.type);
+    const Icon = type.icon;
+    return (
+        <div
+            role="button"
+            tabIndex={0}
+            onClick={onShow}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onShow();
+                }
+            }}
+            className="group relative flex h-full flex-col gap-3 rounded-2xl border bg-card/40 p-4 text-left transition-all hover:border-primary/50 hover:bg-card hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+            <div className="flex items-start gap-3">
+                <span className="shrink-0 rounded-xl border bg-background/60 p-2">
+                    <Icon className={`h-5 w-5 ${type.accent}`} />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold">
+                            {contact.name}
+                        </p>
+                        {contact.is_primary && (
+                            <Badge
+                                variant="outline"
+                                className="border-status-success/30 text-[10px] text-status-success"
+                            >
+                                Primary
+                            </Badge>
+                        )}
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                        {type.label}
+                        {contact.role ? ` · ${contact.role}` : ''}
+                    </p>
+                </div>
+            </div>
+
+            <div className="space-y-1 text-xs text-muted-foreground">
+                {contact.phone && (
+                    <div className="flex items-center gap-2">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{contact.phone}</span>
+                    </div>
+                )}
+                {contact.email && (
+                    <div className="flex items-center gap-2">
+                        <Mail className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{contact.email}</span>
+                    </div>
+                )}
+                {!contact.phone && !contact.email && (
+                    <p className="italic">No contact details</p>
+                )}
+            </div>
+
+            {contact.notes && (
+                <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {contact.notes}
+                </p>
+            )}
+
+            {canEdit && (
+                <div
+                    className="mt-auto flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Edit contact"
+                        onClick={onEdit}
+                    >
+                        <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Delete contact"
+                        className="text-status-critical hover:text-status-critical"
+                        onClick={onDelete}
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
             )}
         </div>
     );
