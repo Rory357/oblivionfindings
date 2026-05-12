@@ -657,14 +657,6 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.vendors?.view)
         items.push({ title: 'Vendors', href: '/vendors', icon: Package });
-    if (can?.siteHardware?.view)
-        items.push({
-            title: 'Site Hardware',
-            href: '/site-hardware',
-            icon: Settings,
-        });
-    if (can?.unifi?.manage)
-        items.push({ title: 'UniFi', href: '/unifi', icon: Settings });
 
     const groups: SubPanelGroup[] = [{ label: 'Sites & Locations', items }];
 

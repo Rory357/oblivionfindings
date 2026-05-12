@@ -228,6 +228,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('compliance.hazards')
         ->middleware('permission:hazards.view');
 
+    // Global Inspections & Maintenance — cross-site dashboard
+    Route::get('/sites/inspections', [SiteInspectionController::class, 'globalIndex'])
+        ->name('sites.inspections.global')
+        ->middleware('permission:checklists.view');
+
+    // Global Vendors & Credentials — cross-site dashboard
+    Route::get('/vendors', [SiteVendorController::class, 'globalIndex'])
+        ->name('sites.vendors.global')
+        ->middleware('permission:vendors.view');
+
     // Site Reports
     Route::get('/sites/reports', [SiteReportingController::class, 'index'])
         ->name('sites.reports.index')
