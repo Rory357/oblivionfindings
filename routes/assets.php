@@ -14,6 +14,7 @@ use App\Http\Controllers\AssetOwnershipController;
 use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\AssetGeofenceController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\SiteClientController;
 use App\Http\Controllers\SiteContactController;
 use App\Http\Controllers\SiteDocumentController;
 
@@ -81,6 +82,18 @@ Route::middleware(['auth'])->group(function () {
         // Address autocomplete (Nominatim proxy)
         Route::get('/sites/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
             ->name('sites.geocode.search');
+
+        // Site clients (link existing, quick-create, unlink)
+        Route::post('/sites/{site}/clients', [SiteClientController::class, 'store'])
+            ->whereNumber('site')
+            ->name('sites.clients.store');
+        Route::post('/sites/{site}/clients/link', [SiteClientController::class, 'link'])
+            ->whereNumber('site')
+            ->name('sites.clients.link');
+        Route::post('/sites/{site}/clients/{client}/unlink', [SiteClientController::class, 'unlink'])
+            ->whereNumber('site')
+            ->whereNumber('client')
+            ->name('sites.clients.unlink');
 
         // Site contacts
         Route::post('/sites/{site}/contacts', [SiteContactController::class, 'store'])

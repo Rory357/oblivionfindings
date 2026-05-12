@@ -129,7 +129,15 @@ class SiteController extends Controller
         $this->authorize('view', $site);
 
         $site->load([
-            'clients:id,first_name,last_name,status,site_id',
+            'clients' => fn ($q) => $q->select([
+                'id', 'first_name', 'last_name', 'preferred_name', 'status',
+                'profile_photo_path', 'date_of_birth', 'gender', 'risk_level',
+                'safeguarding_flag', 'service_start_date', 'funding_type',
+                'site_id', 'service_context_id', 'key_worker_id',
+            ])->with([
+                'keyWorker:id,name',
+                'serviceContext:id,name,type',
+            ]),
             'contacts',
             'documents.uploadedBy:id,name,email',
             'primaryContact:id,name',
@@ -140,6 +148,14 @@ class SiteController extends Controller
             'siteNotes' => fn ($q) => $q->with('createdBy:id,name')->orderByDesc('created_at'),
             'geofences' => fn ($q) => $q->where('is_active', true),
         ]);
+
+        // Build a quick map of client_id → room_name for "which room is the client in".
+        $clientRoomMap = [];
+        foreach ($site->houseRooms ?? [] as $room) {
+            if ($room->assigned_client_id) {
+                $clientRoomMap[(int) $room->assigned_client_id] = $room->name;
+            }
+        }
 
         $user = $request->user();
         $tenantId = $site->tenant_id ?? $user?->tenant_id ?? $user?->organization_id ?? 1;
@@ -295,12 +311,63 @@ class SiteController extends Controller
                 ])->values(),
             ],
             'typeSpecificData' => $typeSpecificData,
-            'clients' => $site->clients->sortBy([['first_name', 'asc'], ['last_name', 'asc']])->values()->map(fn ($c) => [
-                'id' => $c->id,
-                'first_name' => $c->first_name,
-                'last_name' => $c->last_name,
-                'status' => $c->status,
-            ]),
+            'clients' => $site->clients
+                ->sortBy([['first_name', 'asc'], ['last_name', 'asc']])
+                ->values()
+                ->map(function ($c) use ($clientRoomMap) {
+                    $dob = $c->date_of_birth;
+                    $age = $dob ? $dob->age : null;
+                    return [
+                        'id' => $c->id,
+                        'first_name' => $c->first_name,
+                        'last_name' => $c->last_name,
+                        'preferred_name' => $c->preferred_name,
+                        'full_name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                        'status' => $c->status,
+                        'profile_photo_url' => $c->profile_photo_url,
+                        'date_of_birth' => $dob?->toDateString(),
+                        'age' => $age,
+                        'gender' => $c->gender,
+                        'risk_level' => $c->risk_level ?? 'low',
+                        'safeguarding_flag' => (bool) $c->safeguarding_flag,
+                        'service_start_date' => $c->service_start_date?->toDateString(),
+                        'funding_type' => $c->funding_type,
+                        'key_worker' => $c->keyWorker ? [
+                            'id' => $c->keyWorker->id,
+                            'name' => $c->keyWorker->name,
+                        ] : null,
+                        'service_context' => $c->serviceContext ? [
+                            'id' => $c->serviceContext->id,
+                            'name' => $c->serviceContext->name,
+                            'type' => $c->serviceContext->type,
+                        ] : null,
+                        'room_name' => $clientRoomMap[(int) $c->id] ?? null,
+                    ];
+                }),
+            'availableClients' => Client::query()
+                ->whereNull('site_id')
+                ->when($user?->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->limit(200)
+                ->get(['id', 'first_name', 'last_name', 'status', 'preferred_name'])
+                ->map(fn ($c) => [
+                    'id' => $c->id,
+                    'first_name' => $c->first_name,
+                    'last_name' => $c->last_name,
+                    'preferred_name' => $c->preferred_name,
+                    'full_name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                    'status' => $c->status,
+                ])
+                ->values(),
+            'clientsSummary' => [
+                'total' => $site->clients->count(),
+                'active' => $site->clients->where('status', 'active')->count(),
+                'onboarding' => $site->clients->where('status', 'onboarding')->count(),
+                'inactive' => $site->clients->where('status', 'inactive')->count(),
+                'high_risk' => $site->clients->where('risk_level', 'high')->count(),
+                'safeguarding' => $site->clients->where('safeguarding_flag', true)->count(),
+            ],
             'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn ($c) => [
                 'id' => $c->id,
                 'type' => $c->type,

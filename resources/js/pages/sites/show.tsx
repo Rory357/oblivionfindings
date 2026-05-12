@@ -1,6 +1,7 @@
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,11 +33,13 @@ import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/fleet-utils';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Activity,
     AlertCircle,
     AlertTriangle,
     Award,
     BedDouble,
     Building2,
+    Cake,
     Calendar,
     Car,
     ClipboardCheck,
@@ -54,6 +57,7 @@ import {
     KeyRound,
     Layers,
     LayoutGrid,
+    Link2,
     Lock,
     Mail,
     MapPin,
@@ -71,6 +75,7 @@ import {
     Trash2,
     Truck,
     User,
+    UserCog,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -116,6 +121,16 @@ import {
     getContactType,
     type ContactRecord,
 } from './contacts/_dialogs';
+import {
+    AddClientDialog,
+    ShowClientDialog,
+    UnlinkClientDialog,
+    getClientDisplayName,
+    getClientInitials,
+    getClientRiskStyle,
+    getClientStatusStyle,
+    type ClientRecord,
+} from './clients/_dialogs';
 import {
     CreateTemplateDialog,
     StartRunDialog,
@@ -189,7 +204,38 @@ type ClientLite = {
     id: number;
     first_name: string;
     last_name: string;
+    preferred_name?: string | null;
+    full_name?: string | null;
     status: string;
+    profile_photo_url?: string | null;
+    date_of_birth?: string | null;
+    age?: number | null;
+    gender?: string | null;
+    risk_level?: string | null;
+    safeguarding_flag?: boolean;
+    service_start_date?: string | null;
+    funding_type?: string | null;
+    key_worker?: { id: number; name: string } | null;
+    service_context?: { id: number; name: string; type?: string | null } | null;
+    room_name?: string | null;
+};
+
+type AvailableClient = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    preferred_name?: string | null;
+    full_name?: string | null;
+    status: string;
+};
+
+type ClientsSummary = {
+    total: number;
+    active: number;
+    onboarding: number;
+    inactive: number;
+    high_risk: number;
+    safeguarding: number;
 };
 type ChecklistItem = { key: string; label: string; done: boolean };
 
@@ -359,6 +405,8 @@ type SiteFleetData = {
 type Props = {
     site: Site;
     clients: ClientLite[];
+    availableClients?: AvailableClient[];
+    clientsSummary?: ClientsSummary;
     contacts: Contact[];
     documents: Doc[];
     assets: AssetLite[];
@@ -993,6 +1041,8 @@ function SiteChecklistsTab({
 export default function SiteShow({
     site,
     clients,
+    availableClients = [],
+    clientsSummary,
     assets,
     contacts,
     documents,
@@ -1686,57 +1736,13 @@ export default function SiteShow({
 
                     {/* Clients Tab */}
                     <TabsContent value="clients">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Clients at this site</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {clients.length === 0 ? (
-                                    <div className="text-sm text-muted-foreground">
-                                        No clients linked to this site yet.
-                                    </div>
-                                ) : (
-                                    <div className="overflow-hidden rounded-xl border">
-                                        <table className="w-full text-sm">
-                                            <thead className="border-b bg-muted/5">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Client
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Status
-                                                    </th>
-                                                    <th className="px-4 py-3" />
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {clients.map((c) => (
-                                                    <tr
-                                                        key={c.id}
-                                                        className="border-b last:border-b-0 hover:bg-muted/50"
-                                                    >
-                                                        <td className="px-4 py-3 font-medium">
-                                                            {`${c.first_name} ${c.last_name}`.trim()}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {c.status}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <Link
-                                                                href={`/clients/${c.id}`}
-                                                                className="text-primary/70 hover:text-primary/70"
-                                                            >
-                                                                View
-                                                            </Link>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <ClientsTab
+                            site={site}
+                            clients={clients}
+                            availableClients={availableClients}
+                            summary={clientsSummary}
+                            can_edit={can_edit}
+                        />
                     </TabsContent>
 
                     {/* Assets Tab */}
@@ -3108,6 +3114,328 @@ function ContactCard({
                     </Button>
                 </div>
             )}
+        </div>
+    );
+}
+
+type ClientDialogMode = 'add' | 'show' | 'unlink' | null;
+
+function ClientsTab({
+    site,
+    clients,
+    availableClients,
+    summary,
+    can_edit,
+}: {
+    site: Site;
+    clients: ClientLite[];
+    availableClients: AvailableClient[];
+    summary?: ClientsSummary;
+    can_edit: boolean;
+}) {
+    const [dialog, setDialog] = useState<{
+        mode: ClientDialogMode;
+        target: ClientRecord | null;
+    }>({ mode: null, target: null });
+
+    const closeDialog = () => setDialog({ mode: null, target: null });
+
+    const stats = summary ?? {
+        total: clients.length,
+        active: clients.filter((c) => c.status === 'active').length,
+        onboarding: clients.filter((c) => c.status === 'onboarding').length,
+        inactive: clients.filter((c) => c.status === 'inactive').length,
+        high_risk: clients.filter((c) => c.risk_level === 'high').length,
+        safeguarding: clients.filter((c) => c.safeguarding_flag).length,
+    };
+
+    return (
+        <>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+                    <div>
+                        <CardTitle className="text-base">
+                            Clients at this site ({stats.total})
+                        </CardTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            People supported here — open a card for a quick
+                            overview or jump to the full profile.
+                        </p>
+                    </div>
+                    {can_edit && (
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                setDialog({ mode: 'add', target: null })
+                            }
+                        >
+                            <Plus className="mr-1 h-4 w-4" />
+                            Add client
+                        </Button>
+                    )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {stats.total > 0 && (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                            <StatChip label="Total" value={stats.total} />
+                            <StatChip
+                                label="Active"
+                                value={stats.active}
+                                tone="success"
+                            />
+                            <StatChip
+                                label="Onboarding"
+                                value={stats.onboarding}
+                                tone="warning"
+                            />
+                            <StatChip
+                                label="High risk"
+                                value={stats.high_risk}
+                                tone={
+                                    stats.high_risk > 0 ? 'critical' : 'muted'
+                                }
+                            />
+                            <StatChip
+                                label="Safeguarding"
+                                value={stats.safeguarding}
+                                tone={
+                                    stats.safeguarding > 0
+                                        ? 'critical'
+                                        : 'muted'
+                                }
+                            />
+                        </div>
+                    )}
+
+                    {clients.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center">
+                            <div className="rounded-full bg-muted/40 p-3">
+                                <User className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <p className="mt-3 text-sm font-medium">
+                                No clients linked yet
+                            </p>
+                            <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                                Link an existing client from your organisation
+                                or quick-create a new one for this site.
+                            </p>
+                            {can_edit && (
+                                <Button
+                                    size="sm"
+                                    className="mt-4"
+                                    onClick={() =>
+                                        setDialog({
+                                            mode: 'add',
+                                            target: null,
+                                        })
+                                    }
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Add first client
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {clients.map((c) => (
+                                <ClientCard
+                                    key={c.id}
+                                    client={c}
+                                    canEdit={can_edit}
+                                    onShow={() =>
+                                        setDialog({
+                                            mode: 'show',
+                                            target: c as ClientRecord,
+                                        })
+                                    }
+                                    onUnlink={() =>
+                                        setDialog({
+                                            mode: 'unlink',
+                                            target: c as ClientRecord,
+                                        })
+                                    }
+                                />
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <AddClientDialog
+                siteId={site.id}
+                availableClients={availableClients}
+                isOpen={dialog.mode === 'add'}
+                onClose={closeDialog}
+            />
+            <ShowClientDialog
+                client={dialog.target}
+                siteId={site.id}
+                canManage={can_edit}
+                isOpen={dialog.mode === 'show'}
+                onClose={closeDialog}
+                onUnlink={() =>
+                    setDialog((prev) => ({ ...prev, mode: 'unlink' }))
+                }
+            />
+            <UnlinkClientDialog
+                siteId={site.id}
+                client={dialog.target}
+                isOpen={dialog.mode === 'unlink'}
+                onClose={closeDialog}
+            />
+        </>
+    );
+}
+
+function StatChip({
+    label,
+    value,
+    tone = 'muted',
+}: {
+    label: string;
+    value: number;
+    tone?: 'muted' | 'success' | 'warning' | 'critical';
+}) {
+    const toneCls = {
+        muted: 'border-border bg-muted/30 text-foreground',
+        success:
+            'border-status-success/30 bg-status-success-bg text-status-success',
+        warning:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
+        critical:
+            'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    }[tone];
+    return (
+        <div className={`rounded-xl border px-3 py-2 ${toneCls}`}>
+            <p className="text-xs opacity-80">{label}</p>
+            <p className="text-lg font-semibold leading-none">{value}</p>
+        </div>
+    );
+}
+
+function ClientCard({
+    client,
+    canEdit,
+    onShow,
+    onUnlink,
+}: {
+    client: ClientLite;
+    canEdit: boolean;
+    onShow: () => void;
+    onUnlink: () => void;
+}) {
+    const status = getClientStatusStyle(client.status);
+    const risk = getClientRiskStyle(client.risk_level);
+    const displayName = getClientDisplayName(client);
+    const profileUrl = `/clients/${client.id}`;
+
+    return (
+        <div className="group relative flex h-full flex-col gap-3 rounded-2xl border bg-card/40 p-4 transition-all hover:border-primary/50 hover:bg-card hover:shadow-md">
+            <div className="flex items-start gap-3">
+                <Avatar
+                    className={`size-12 ring-2 ring-offset-2 ring-offset-background ${status.ring}`}
+                >
+                    {client.profile_photo_url && (
+                        <AvatarImage
+                            src={client.profile_photo_url}
+                            alt={displayName}
+                        />
+                    )}
+                    <AvatarFallback>
+                        {getClientInitials(client)}
+                    </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold">
+                            {displayName}
+                        </p>
+                        {client.safeguarding_flag && (
+                            <span
+                                title="Safeguarding flag"
+                                className="text-status-critical"
+                            >
+                                <Shield className="h-3.5 w-3.5" />
+                            </span>
+                        )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <Badge
+                            variant="outline"
+                            className={`text-[10px] ${status.cls}`}
+                        >
+                            {status.label}
+                        </Badge>
+                        {client.risk_level && (
+                            <Badge
+                                variant="outline"
+                                className={`text-[10px] ${risk.cls}`}
+                            >
+                                {risk.label}
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+                {canEdit && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUnlink();
+                        }}
+                        aria-label="Unlink client from site"
+                        title="Unlink from site"
+                        className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-status-critical group-hover:opacity-100 group-focus-within:opacity-100"
+                    >
+                        <Link2 className="h-3.5 w-3.5" />
+                    </button>
+                )}
+            </div>
+
+            <div className="space-y-1 text-xs text-muted-foreground">
+                {client.age != null && (
+                    <div className="flex items-center gap-2">
+                        <Cake className="h-3 w-3 shrink-0" />
+                        <span>{client.age} yrs</span>
+                    </div>
+                )}
+                {client.room_name && (
+                    <div className="flex items-center gap-2">
+                        <DoorOpen className="h-3 w-3 shrink-0" />
+                        <span className="truncate">Room: {client.room_name}</span>
+                    </div>
+                )}
+                {client.key_worker?.name && (
+                    <div className="flex items-center gap-2">
+                        <UserCog className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                            Key worker: {client.key_worker.name}
+                        </span>
+                    </div>
+                )}
+                {client.service_context?.name && (
+                    <div className="flex items-center gap-2">
+                        <Activity className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                            {client.service_context.name}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-auto flex items-center justify-end gap-2 pt-1">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onShow}
+                >
+                    View
+                </Button>
+                <Button asChild size="sm">
+                    <Link href={profileUrl}>View full profile</Link>
+                </Button>
+            </div>
         </div>
     );
 }
