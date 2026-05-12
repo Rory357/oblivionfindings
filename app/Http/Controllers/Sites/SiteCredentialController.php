@@ -84,12 +84,14 @@ class SiteCredentialController extends Controller
             'requires_reauth' => 'boolean',
             'is_shareable' => 'boolean',
             'password_strength' => 'nullable|integer|min:0|max:4',
+            // Operator pastes an existing TOTP secret (Base32) from the
+            // external service. Oblivion becomes the authenticator app
+            // for that secret; we never generate one ourselves.
             'totp_secret' => 'nullable|string|max:512',
-            'totp_issuer' => 'nullable|string|max:255',
-            'totp_account' => 'nullable|string|max:255',
         ]);
 
         $encrypted = $this->encryptionService->encrypt($validated['value']);
+        $totpSecret = $this->normalizeTotpSecret($validated['totp_secret'] ?? null);
 
         $credential = SiteCredential::create([
             'site_id' => $site->id,
@@ -105,11 +107,13 @@ class SiteCredentialController extends Controller
             'requires_reauth' => $validated['requires_reauth'] ?? false,
             'is_shareable' => $validated['is_shareable'] ?? false,
             'password_strength' => $validated['password_strength'] ?? null,
-            'totp_secret_encrypted' => !empty($validated['totp_secret'])
-                ? Crypt::encryptString($validated['totp_secret'])
+            'totp_secret_encrypted' => $totpSecret
+                ? Crypt::encryptString($totpSecret)
                 : null,
-            'totp_issuer' => $validated['totp_issuer'] ?? null,
-            'totp_account' => $validated['totp_account'] ?? null,
+            'totp_issuer' => $totpSecret ? $site->name : null,
+            'totp_account' => $totpSecret
+                ? ($validated['username'] ?? $validated['label'])
+                : null,
             'last_rotated_at' => now(),
             'last_rotated_by_user_id' => $request->user()->id,
         ]);
@@ -183,6 +187,9 @@ class SiteCredentialController extends Controller
             'requires_reauth' => 'boolean',
             'is_shareable' => 'boolean',
             'password_strength' => 'nullable|integer|min:0|max:4',
+            // Blank = keep existing TOTP secret; non-blank = replace.
+            // Removal is via the dedicated DELETE /totp endpoint.
+            'totp_secret' => 'nullable|string|max:512',
         ]);
 
         $updateData = [
@@ -195,6 +202,14 @@ class SiteCredentialController extends Controller
             'requires_reauth' => $validated['requires_reauth'] ?? false,
             'is_shareable' => $validated['is_shareable'] ?? false,
         ];
+
+        $newTotpSecret = $this->normalizeTotpSecret($validated['totp_secret'] ?? null);
+        if ($newTotpSecret !== null) {
+            $updateData['totp_secret_encrypted'] = Crypt::encryptString($newTotpSecret);
+            $updateData['totp_issuer'] = $credential->totp_issuer ?? $site->name;
+            $updateData['totp_account'] = $credential->totp_account
+                ?? ($validated['username'] ?? $validated['label']);
+        }
 
         // If value provided, re-encrypt
         if (!empty($validated['value'])) {
@@ -289,47 +304,6 @@ class SiteCredentialController extends Controller
         ]);
     }
 
-    public function setupTotp(Request $request, Site $site, SiteCredential $credential)
-    {
-        $this->authorize('view', $site);
-        $request->user()->canDo('credentials.manage') || abort(403);
-        $this->assertCredentialBelongsToSite($site, $credential);
-
-        $validated = $request->validate([
-            'secret' => 'required|string|min:16|max:512',
-            'issuer' => 'nullable|string|max:255',
-            'account' => 'nullable|string|max:255',
-            'verification_code' => 'required|string|size:6',
-        ]);
-
-        $secret = preg_replace('/\s+/', '', $validated['secret']);
-        $google2fa = new Google2FA();
-
-        if (!$google2fa->verifyKey($secret, $validated['verification_code'], 1)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'verification_code' => 'Verification code does not match the secret.',
-            ]);
-        }
-
-        $credential->update([
-            'totp_secret_encrypted' => Crypt::encryptString($secret),
-            'totp_issuer' => $validated['issuer'] ?? $site->name,
-            'totp_account' => $validated['account'] ?? $credential->username ?? $credential->label,
-        ]);
-
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'totp_setup',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
-
-        return back(303)->with('success', 'Authenticator configured.');
-    }
-
     public function removeTotp(Request $request, Site $site, SiteCredential $credential)
     {
         $this->authorize('view', $site);
@@ -355,38 +329,18 @@ class SiteCredentialController extends Controller
         return back(303)->with('success', 'Authenticator removed.');
     }
 
-    public function generateTotpSecret(Request $request, Site $site)
+    /**
+     * Normalize a pasted Base32 TOTP secret: strip whitespace, uppercase.
+     * Returns null when the input is empty so callers can skip update.
+     */
+    private function normalizeTotpSecret(?string $raw): ?string
     {
-        $this->authorize('view', $site);
-        $request->user()->canDo('credentials.manage') || abort(403);
+        if ($raw === null) {
+            return null;
+        }
 
-        $validated = $request->validate([
-            'account' => 'nullable|string|max:255',
-        ]);
-
-        $google2fa = new Google2FA();
-        $secret = $google2fa->generateSecretKey();
-
-        $issuer = $site->name;
-        $account = $validated['account'] ?? $site->name;
-        $otpauthUri = sprintf(
-            'otpauth://totp/%s:%s?secret=%s&issuer=%s&period=30&digits=6',
-            rawurlencode($issuer),
-            rawurlencode($account),
-            $secret,
-            rawurlencode($issuer),
-        );
-
-        // Server-side QR rendering — the secret never leaves our infrastructure.
-        $qr = new \Endroid\QrCode\QrCode($otpauthUri);
-        $writer = new \Endroid\QrCode\Writer\PngWriter();
-        $qrDataUri = $writer->write($qr)->getDataUri();
-
-        return response()->json([
-            'secret' => $secret,
-            'qr_data_uri' => $qrDataUri,
-            'otpauth_uri' => $otpauthUri,
-        ]);
+        $clean = strtoupper(preg_replace('/\s+/', '', $raw));
+        return $clean === '' ? null : $clean;
     }
 
     public function auditLog(Request $request, Site $site, SiteCredential $credential)

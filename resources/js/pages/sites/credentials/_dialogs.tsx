@@ -216,7 +216,7 @@ function EditCredentialBody({
     credential: CredentialRecord;
     onClose: () => void;
 }) {
-    const form = useForm<Omit<CredentialFormValues, 'totp_secret'>>({
+    const form = useForm<CredentialFormValues>({
         label: credential.label,
         username: credential.username ?? '',
         url: credential.url ?? '',
@@ -231,6 +231,10 @@ function EditCredentialBody({
         requires_reauth: credential.requires_reauth,
         is_shareable: credential.is_shareable,
         password_strength: credential.password_strength ?? null,
+        // Always starts blank: typing a new secret replaces; leaving
+        // it blank keeps the existing one. Removal is via the
+        // dedicated Remove authenticator button on the Show dialog.
+        totp_secret: '',
     });
 
     const strength = useMemo(
@@ -291,7 +295,6 @@ export function ShowCredentialDialog({
     onClose,
     onEdit,
     onDelete,
-    onSetupTotp,
     onRemoveTotp,
 }: {
     siteId: number;
@@ -302,7 +305,6 @@ export function ShowCredentialDialog({
     onClose: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
-    onSetupTotp?: () => void;
     onRemoveTotp?: () => void;
 }) {
     const [revealedValue, setRevealedValue] = useState<string | null>(null);
@@ -542,18 +544,14 @@ export function ShowCredentialDialog({
                 </dl>
 
                 <DialogFooter className="mt-2 flex-wrap gap-2">
-                    {canManage && (
+                    {canManage && credential.has_totp && (
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={
-                                credential.has_totp ? onRemoveTotp : onSetupTotp
-                            }
+                            onClick={onRemoveTotp}
                         >
                             <ShieldCheck className="mr-2 h-4 w-4" />
-                            {credential.has_totp
-                                ? 'Remove authenticator'
-                                : 'Add authenticator'}
+                            Remove authenticator
                         </Button>
                     )}
                     {canManage && onDelete && (
@@ -680,203 +678,6 @@ export function DeleteCredentialDialog({
     );
 }
 
-// ── Setup TOTP ────────────────────────────────────────────────────────────
-
-export function SetupTotpDialog({
-    siteId,
-    credential,
-    siteName,
-    isOpen,
-    onClose,
-}: {
-    siteId: number;
-    credential: CredentialRecord | null;
-    siteName: string;
-    isOpen: boolean;
-    onClose: () => void;
-}) {
-    const [secret, setSecret] = useState('');
-    const [qrDataUri, setQrDataUri] = useState('');
-    const [verificationCode, setVerificationCode] = useState('');
-    const [generating, setGenerating] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!isOpen) {
-            setSecret('');
-            setQrDataUri('');
-            setVerificationCode('');
-            setError(null);
-            return;
-        }
-        const account = credential?.username || credential?.label || '';
-        // Auto-generate a secret + QR on the server when the dialog opens.
-        // The TOTP secret never reaches a third-party QR-image service.
-        const generate = async () => {
-            setGenerating(true);
-            setError(null);
-            try {
-                const xsrf = decodeURIComponent(
-                    document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
-                );
-                const res = await fetch(
-                    `/sites/${siteId}/credentials/totp/generate-secret`,
-                    {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Accept: 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-XSRF-TOKEN': xsrf,
-                        },
-                        body: JSON.stringify({ account }),
-                    },
-                );
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = (await res.json()) as {
-                    secret: string;
-                    qr_data_uri: string;
-                };
-                setSecret(data.secret);
-                setQrDataUri(data.qr_data_uri);
-            } catch (e) {
-                setError(
-                    e instanceof Error
-                        ? e.message
-                        : 'Could not generate secret.',
-                );
-            } finally {
-                setGenerating(false);
-            }
-        };
-        generate();
-    }, [isOpen, siteId, credential?.id, credential?.username, credential?.label]);
-
-    if (!credential) return null;
-
-    const account = credential.username || credential.label;
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!secret || verificationCode.length !== 6) return;
-        setSubmitting(true);
-        router.post(
-            `/sites/${siteId}/credentials/${credential.id}/totp/setup`,
-            {
-                secret,
-                issuer: siteName,
-                account,
-                verification_code: verificationCode,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onFinish: () => setSubmitting(false),
-                onSuccess: () => onClose(),
-                onError: (errs) => {
-                    setError(
-                        errs.verification_code ?? 'Could not verify the code.',
-                    );
-                },
-            },
-        );
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-lg">
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>Set up authenticator</DialogTitle>
-                        <DialogDescription>
-                            Scan the QR code in Google Authenticator, 1Password,
-                            or any TOTP app, then enter the current 6-digit
-                            code to confirm.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    {generating && (
-                        <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Generating secret…
-                        </div>
-                    )}
-
-                    {!generating && secret && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <img
-                                    src={qrDataUri}
-                                    alt="QR code"
-                                    className="h-44 w-44 rounded border bg-background p-2"
-                                />
-                                <div className="text-xs">
-                                    <p className="mb-1 text-muted-foreground">
-                                        Or enter this key manually:
-                                    </p>
-                                    <code className="block break-all rounded bg-muted p-2 font-mono">
-                                        {secret}
-                                    </code>
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="totp-code">
-                                    6-digit verification code
-                                </Label>
-                                <Input
-                                    id="totp-code"
-                                    value={verificationCode}
-                                    onChange={(e) =>
-                                        setVerificationCode(
-                                            e.target.value
-                                                .replace(/\D/g, '')
-                                                .slice(0, 6),
-                                        )
-                                    }
-                                    inputMode="numeric"
-                                    autoComplete="one-time-code"
-                                    placeholder="123456"
-                                    className="font-mono tracking-widest"
-                                />
-                                {error && (
-                                    <p className="mt-1 text-xs text-status-critical">
-                                        {error}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    <DialogFooter className="mt-4">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={
-                                submitting ||
-                                !secret ||
-                                verificationCode.length !== 6
-                            }
-                        >
-                            {submitting && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            )}
-                            Verify &amp; save
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 // ── Remove TOTP confirm ───────────────────────────────────────────────────
 
@@ -1070,17 +871,6 @@ function CredentialFormFields({
                 )}
                 <FieldError message={(form.errors as any).value} />
             </div>
-            <div>
-                <Label htmlFor="c-url">URL</Label>
-                <Input
-                    id="c-url"
-                    type="url"
-                    value={(form.data as any).url}
-                    onChange={(e) => form.setData(fmt('url'), e.target.value as any)}
-                    placeholder="https://"
-                />
-                <FieldError message={(form.errors as any).url} />
-            </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <div className="flex items-center gap-2">
                     <Checkbox
@@ -1109,6 +899,57 @@ function CredentialFormFields({
                         Require re-auth to reveal
                     </Label>
                 </div>
+            </div>
+            <div>
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="c-totp">One-time Password</Label>
+                    {(form.data as any).totp_secret && (
+                        <Badge
+                            variant="outline"
+                            className="border-status-success/30 text-status-success"
+                        >
+                            <KeyRound className="mr-1 h-3 w-3" />
+                            Authenticator ready
+                        </Badge>
+                    )}
+                </div>
+                <Input
+                    id="c-totp"
+                    value={(form.data as any).totp_secret}
+                    onChange={(e) =>
+                        form.setData(
+                            fmt('totp_secret'),
+                            e.target.value
+                                .replace(/\s+/g, '')
+                                .toUpperCase() as any,
+                        )
+                    }
+                    placeholder={
+                        edit
+                            ? 'Paste secret to replace, or leave blank to keep current'
+                            : 'Enter text-based secret key'
+                    }
+                    autoComplete="off"
+                    inputMode="text"
+                    className="font-mono tracking-wide"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                    Paste the Base32 secret from the external service. Oblivion
+                    becomes the authenticator and shows the current 6-digit
+                    code when you view this credential.
+                </p>
+                <FieldError message={(form.errors as any).totp_secret} />
+            </div>
+            <div>
+                <Label htmlFor="c-url">URL</Label>
+                <Input
+                    id="c-url"
+                    type="url"
+                    value={(form.data as any).url}
+                    onChange={(e) => form.setData(fmt('url'), e.target.value as any)}
+                    placeholder="https://"
+                />
+                <FieldError message={(form.errors as any).url} />
             </div>
             <div>
                 <Label htmlFor="c-notes">Notes</Label>

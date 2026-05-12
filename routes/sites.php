@@ -133,16 +133,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.credentials.audit')
             ->middleware('permission:credentials.view');
 
-        // TOTP / Authenticator endpoints — audit-logged through the controller.
-        Route::post('/credentials/totp/generate-secret', [SiteCredentialController::class, 'generateTotpSecret'])
-            ->name('sites.credentials.totp.generate')
-            ->middleware('permission:credentials.manage');
+        // TOTP / Authenticator endpoints.
+        // Oblivion *is* the authenticator app: the operator pastes an
+        // existing Base32 secret via the credential dialog (handled by
+        // store/update); these endpoints expose the live code and the
+        // removal action. No server-side secret generation.
         Route::post('/credentials/{credential}/totp/code', [SiteCredentialController::class, 'totpCode'])
             ->name('sites.credentials.totp.code')
             ->middleware('permission:credentials.reveal');
-        Route::post('/credentials/{credential}/totp/setup', [SiteCredentialController::class, 'setupTotp'])
-            ->name('sites.credentials.totp.setup')
-            ->middleware('permission:credentials.manage');
         Route::delete('/credentials/{credential}/totp', [SiteCredentialController::class, 'removeTotp'])
             ->name('sites.credentials.totp.remove')
             ->middleware('permission:credentials.manage');

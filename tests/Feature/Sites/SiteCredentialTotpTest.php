@@ -25,89 +25,103 @@ beforeEach(function () {
         'type' => 'house',
         'is_active' => true,
     ]);
-
-    $this->credential = SiteCredential::create([
-        'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
-        'label' => 'AWS root',
-        'credential_type' => 'password',
-        'encrypted_value' => Crypt::encryptString('hunter2'),
-        'requires_reauth' => false,
-    ]);
 });
 
-test('totp generate-secret returns a base32 secret + server-rendered QR data URI', function () {
-    $response = $this->actingAs($this->admin)
-        ->postJson("/sites/{$this->site->id}/credentials/totp/generate-secret", [
-            'account' => 'root@example.test',
-        ])
-        ->assertOk();
-
-    $body = $response->json();
-    expect($body['secret'])->toBeString()->not->toBeEmpty();
-    expect(preg_match('/^[A-Z2-7]+$/', $body['secret']))->toBe(1, 'secret must be Base32');
-    expect($body['qr_data_uri'])->toStartWith('data:image/png;base64,');
-    expect($body['otpauth_uri'])->toContain('otpauth://totp/');
-    expect($body['otpauth_uri'])->toContain($body['secret']);
-});
-
-test('totp setup verifies the 6-digit code, stores an encrypted secret, and audits', function () {
+test('credential store accepts a pasted Base32 TOTP secret and persists it encrypted', function () {
     $google2fa = new Google2FA();
-    $secret = $google2fa->generateSecretKey();
-    $code = $google2fa->getCurrentOtp($secret);
+    $secret = $google2fa->generateSecretKey(); // emulating a secret from another service
 
     $this->actingAs($this->admin)
         ->from("/sites/{$this->site->id}")
-        ->post("/sites/{$this->site->id}/credentials/{$this->credential->id}/totp/setup", [
-            'secret' => $secret,
-            'issuer' => 'Acme Site',
-            'account' => 'root@example.test',
-            'verification_code' => $code,
+        ->post("/sites/{$this->site->id}/credentials", [
+            'label' => 'AWS Console',
+            'username' => 'root@example.test',
+            'credential_type' => 'password',
+            'value' => 'pw',
+            'totp_secret' => $secret,
         ])
         ->assertRedirect("/sites/{$this->site->id}");
 
-    $this->credential->refresh();
-    expect($this->credential->totp_secret_encrypted)->not->toBeNull();
-    expect(Crypt::decryptString($this->credential->totp_secret_encrypted))->toBe($secret);
-    expect($this->credential->totp_issuer)->toBe('Acme Site');
-    expect($this->credential->totp_account)->toBe('root@example.test');
-    expect($this->credential->hasTotp())->toBeTrue();
-
-    expect(
-        SiteCredentialAuditLog::query()
-            ->where('credential_id', $this->credential->id)
-            ->where('action', 'totp_setup')
-            ->exists(),
-    )->toBeTrue();
+    $credential = SiteCredential::query()->where('site_id', $this->site->id)->firstOrFail();
+    expect($credential->totp_secret_encrypted)->not->toBeNull();
+    expect(Crypt::decryptString($credential->totp_secret_encrypted))->toBe($secret);
+    expect($credential->totp_issuer)->toBe($this->site->name);
+    expect($credential->totp_account)->toBe('root@example.test');
+    expect($credential->hasTotp())->toBeTrue();
 });
 
-test('totp setup rejects an incorrect verification code', function () {
+test('credential store normalizes pasted secrets: whitespace stripped, uppercased', function () {
+    $google2fa = new Google2FA();
+    $secret = $google2fa->generateSecretKey();
+    // Many services show the secret in groups of 4 (lowercase too in some).
+    $messy = strtolower(implode(' ', str_split($secret, 4)));
+
+    $this->actingAs($this->admin)
+        ->post("/sites/{$this->site->id}/credentials", [
+            'label' => 'Router admin',
+            'credential_type' => 'password',
+            'value' => 'pw',
+            'totp_secret' => $messy,
+        ]);
+
+    $credential = SiteCredential::query()->where('site_id', $this->site->id)->firstOrFail();
+    expect(Crypt::decryptString($credential->totp_secret_encrypted))->toBe($secret);
+});
+
+test('credential update with totp_secret rotates the secret; leaving it blank keeps existing', function () {
+    $google2fa = new Google2FA();
+    $original = $google2fa->generateSecretKey();
+    $credential = SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'before',
+        'credential_type' => 'password',
+        'encrypted_value' => Crypt::encryptString('pw'),
+        'totp_secret_encrypted' => Crypt::encryptString($original),
+        'totp_issuer' => 'old',
+        'totp_account' => 'me',
+    ]);
+
+    // Blank totp_secret in payload — existing secret must be preserved.
+    $this->actingAs($this->admin)
+        ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'label' => 'still keeps old totp',
+            'credential_type' => 'password',
+            'value' => '',
+            'totp_secret' => '',
+        ]);
+    $credential->refresh();
+    expect(Crypt::decryptString($credential->totp_secret_encrypted))->toBe($original);
+
+    // Non-blank totp_secret — rotate.
+    $replacement = $google2fa->generateSecretKey();
+    $this->actingAs($this->admin)
+        ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'label' => 'rotated',
+            'credential_type' => 'password',
+            'value' => '',
+            'totp_secret' => $replacement,
+        ]);
+    $credential->refresh();
+    expect(Crypt::decryptString($credential->totp_secret_encrypted))->toBe($replacement);
+});
+
+test('totp code endpoint returns a valid 6-digit code for a pasted secret + audits', function () {
     $google2fa = new Google2FA();
     $secret = $google2fa->generateSecretKey();
 
     $this->actingAs($this->admin)
-        ->from("/sites/{$this->site->id}")
-        ->post("/sites/{$this->site->id}/credentials/{$this->credential->id}/totp/setup", [
-            'secret' => $secret,
-            'verification_code' => '000000',
-        ])
-        ->assertSessionHasErrors('verification_code');
+        ->post("/sites/{$this->site->id}/credentials", [
+            'label' => 'AWS',
+            'credential_type' => 'password',
+            'value' => 'pw',
+            'totp_secret' => $secret,
+        ]);
 
-    $this->credential->refresh();
-    expect($this->credential->totp_secret_encrypted)->toBeNull();
-});
-
-test('totp code endpoint returns a 6-digit code valid for the same secret + audits', function () {
-    $google2fa = new Google2FA();
-    $secret = $google2fa->generateSecretKey();
-    $this->credential->update([
-        'totp_secret_encrypted' => Crypt::encryptString($secret),
-        'totp_issuer' => $this->site->name,
-        'totp_account' => $this->credential->label,
-    ]);
+    $credential = SiteCredential::query()->where('site_id', $this->site->id)->firstOrFail();
 
     $response = $this->actingAs($this->admin)
-        ->postJson("/sites/{$this->site->id}/credentials/{$this->credential->id}/totp/code")
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
         ->assertOk();
 
     $body = $response->json();
@@ -118,20 +132,33 @@ test('totp code endpoint returns a 6-digit code valid for the same secret + audi
 
     expect(
         SiteCredentialAuditLog::query()
-            ->where('credential_id', $this->credential->id)
+            ->where('credential_id', $credential->id)
             ->where('action', 'totp_code')
             ->exists(),
     )->toBeTrue();
 });
 
-test('totp code endpoint returns 404 when the credential has no TOTP secret', function () {
+test('totp code endpoint returns 404 when no secret is stored', function () {
+    $credential = SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'no totp',
+        'credential_type' => 'password',
+        'encrypted_value' => Crypt::encryptString('pw'),
+    ]);
+
     $this->actingAs($this->admin)
-        ->postJson("/sites/{$this->site->id}/credentials/{$this->credential->id}/totp/code")
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
         ->assertNotFound();
 });
 
-test('removing TOTP clears the columns and audits', function () {
-    $this->credential->update([
+test('removing TOTP clears the columns and audits totp_remove', function () {
+    $credential = SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'with totp',
+        'credential_type' => 'password',
+        'encrypted_value' => Crypt::encryptString('pw'),
         'totp_secret_encrypted' => Crypt::encryptString('JBSWY3DPEHPK3PXP'),
         'totp_issuer' => 'X',
         'totp_account' => 'y',
@@ -139,19 +166,38 @@ test('removing TOTP clears the columns and audits', function () {
 
     $this->actingAs($this->admin)
         ->from("/sites/{$this->site->id}")
-        ->delete("/sites/{$this->site->id}/credentials/{$this->credential->id}/totp")
+        ->delete("/sites/{$this->site->id}/credentials/{$credential->id}/totp")
         ->assertRedirect("/sites/{$this->site->id}");
 
-    $this->credential->refresh();
-    expect($this->credential->totp_secret_encrypted)->toBeNull();
-    expect($this->credential->totp_issuer)->toBeNull();
-    expect($this->credential->totp_account)->toBeNull();
-    expect($this->credential->hasTotp())->toBeFalse();
+    $credential->refresh();
+    expect($credential->totp_secret_encrypted)->toBeNull();
+    expect($credential->hasTotp())->toBeFalse();
 
     expect(
         SiteCredentialAuditLog::query()
-            ->where('credential_id', $this->credential->id)
+            ->where('credential_id', $credential->id)
             ->where('action', 'totp_remove')
             ->exists(),
     )->toBeTrue();
+});
+
+test('removed enrollment endpoints no longer respond', function () {
+    $credential = SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'x',
+        'credential_type' => 'password',
+        'encrypted_value' => Crypt::encryptString('pw'),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/totp/generate-secret")
+        ->assertNotFound();
+
+    $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/setup", [
+            'secret' => 'JBSWY3DPEHPK3PXP',
+            'verification_code' => '123456',
+        ])
+        ->assertNotFound();
 });

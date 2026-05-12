@@ -105,7 +105,6 @@ import {
     DeleteCredentialDialog,
     EditCredentialDialog,
     RemoveTotpDialog,
-    SetupTotpDialog,
     ShowCredentialDialog,
     type CredentialRecord,
 } from './credentials/_dialogs';
@@ -922,7 +921,6 @@ export default function SiteShow({
         | 'edit'
         | 'show'
         | 'delete'
-        | 'setup-totp'
         | 'remove-totp'
         | null;
     const [vendorDialog, setVendorDialog] = useState<{
@@ -2474,12 +2472,6 @@ export default function SiteShow({
                                         mode: 'delete',
                                     }))
                                 }
-                                onSetupTotp={() =>
-                                    setCredentialDialog((prev) => ({
-                                        ...prev,
-                                        mode: 'setup-totp',
-                                    }))
-                                }
                                 onRemoveTotp={() =>
                                     setCredentialDialog((prev) => ({
                                         ...prev,
@@ -2491,13 +2483,6 @@ export default function SiteShow({
                                 siteId={site.id}
                                 credential={credentialDialog.target}
                                 isOpen={credentialDialog.mode === 'delete'}
-                                onClose={closeCredentialDialog}
-                            />
-                            <SetupTotpDialog
-                                siteId={site.id}
-                                credential={credentialDialog.target}
-                                siteName={site.name}
-                                isOpen={credentialDialog.mode === 'setup-totp'}
                                 onClose={closeCredentialDialog}
                             />
                             <RemoveTotpDialog
