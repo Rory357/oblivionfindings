@@ -66,6 +66,10 @@ type Props = {
         credential_type?: string;
         requires_reauth?: 'yes' | 'no';
     };
+    can: {
+        vendors: boolean;
+        credentials: boolean;
+    };
 };
 
 export default function GlobalVendorsCredentials({
@@ -75,6 +79,7 @@ export default function GlobalVendorsCredentials({
     serviceTypes,
     credentialTypes,
     filters,
+    can,
 }: Props) {
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<string>(filters.site_id ? String(filters.site_id) : 'all');
@@ -140,27 +145,39 @@ export default function GlobalVendorsCredentials({
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{filteredVendors.length}</div>
-                            <div className="text-sm text-muted-foreground">Vendors</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{filteredCredentials.length}</div>
-                            <div className="text-sm text-muted-foreground">Credentials</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-warning border-status-warning/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning">
-                                {filteredCredentials.filter((c) => c.requires_reauth).length}
-                            </div>
-                            <div className="text-sm text-muted-foreground">Re-auth Required</div>
-                        </CardContent>
-                    </Card>
+                <div
+                    className={
+                        can.vendors && can.credentials
+                            ? 'grid gap-4 sm:grid-cols-3'
+                            : 'grid gap-4 sm:grid-cols-1'
+                    }
+                >
+                    {can.vendors && (
+                        <Card>
+                            <CardContent className="p-4">
+                                <div className="text-2xl font-bold">{filteredVendors.length}</div>
+                                <div className="text-sm text-muted-foreground">Vendors</div>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {can.credentials && (
+                        <Card>
+                            <CardContent className="p-4">
+                                <div className="text-2xl font-bold">{filteredCredentials.length}</div>
+                                <div className="text-sm text-muted-foreground">Credentials</div>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {can.credentials && (
+                        <Card className="bg-status-warning border-status-warning/20">
+                            <CardContent className="p-4">
+                                <div className="text-2xl font-bold text-status-warning">
+                                    {filteredCredentials.filter((c) => c.requires_reauth).length}
+                                </div>
+                                <div className="text-sm text-muted-foreground">Re-auth Required</div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 <Card>
@@ -194,174 +211,204 @@ export default function GlobalVendorsCredentials({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <Label className="text-xs">Service Type</Label>
-                                <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        {serviceTypes.map((serviceType) => (
-                                            <SelectItem key={serviceType} value={serviceType}>
-                                                {serviceType}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Vendor Status</Label>
-                                <Select value={vendorStatusFilter} onValueChange={setVendorStatusFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="active">Active</SelectItem>
-                                        <SelectItem value="inactive">Inactive</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Preferred Vendor</Label>
-                                <Select value={preferredFilter} onValueChange={setPreferredFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="yes">Preferred only</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Credential Type</Label>
-                                <Select value={credentialTypeFilter} onValueChange={setCredentialTypeFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        {credentialTypes.map((credentialType) => (
-                                            <SelectItem key={credentialType} value={credentialType}>
-                                                {credentialType}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Re-auth Required</Label>
-                                <Select value={reauthFilter} onValueChange={setReauthFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="yes">Yes</SelectItem>
-                                        <SelectItem value="no">No</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            {can.vendors && (
+                                <div>
+                                    <Label className="text-xs">Service Type</Label>
+                                    <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            {serviceTypes.map((serviceType) => (
+                                                <SelectItem key={serviceType} value={serviceType}>
+                                                    {serviceType}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            {can.vendors && (
+                                <div>
+                                    <Label className="text-xs">Vendor Status</Label>
+                                    <Select value={vendorStatusFilter} onValueChange={setVendorStatusFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="inactive">Inactive</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            {can.vendors && (
+                                <div>
+                                    <Label className="text-xs">Preferred Vendor</Label>
+                                    <Select value={preferredFilter} onValueChange={setPreferredFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="yes">Preferred only</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            {can.credentials && (
+                                <div>
+                                    <Label className="text-xs">Credential Type</Label>
+                                    <Select value={credentialTypeFilter} onValueChange={setCredentialTypeFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            {credentialTypes.map((credentialType) => (
+                                                <SelectItem key={credentialType} value={credentialType}>
+                                                    {credentialType}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            {can.credentials && (
+                                <div>
+                                    <Label className="text-xs">Re-auth Required</Label>
+                                    <Select value={reauthFilter} onValueChange={setReauthFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="yes">Yes</SelectItem>
+                                            <SelectItem value="no">No</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
 
-                <Tabs defaultValue="vendors" className="space-y-4">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="vendors" className="flex items-center gap-2">
-                            <Truck className="w-4 h-4" />
-                            Vendors ({filteredVendors.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="credentials" className="flex items-center gap-2">
-                            <Lock className="w-4 h-4" />
-                            Credentials ({filteredCredentials.length})
-                        </TabsTrigger>
+                {/* Tabs render only the sections the viewer is allowed to see.
+                    Vendor-only users get the Vendors tab; credential-only users
+                    get Credentials; both-permission users get the full pair. */}
+                <Tabs
+                    defaultValue={can.vendors ? 'vendors' : 'credentials'}
+                    className="space-y-4"
+                >
+                    <TabsList
+                        className={
+                            can.vendors && can.credentials
+                                ? 'grid w-full grid-cols-2'
+                                : 'grid w-full grid-cols-1'
+                        }
+                    >
+                        {can.vendors && (
+                            <TabsTrigger value="vendors" className="flex items-center gap-2">
+                                <Truck className="w-4 h-4" />
+                                Vendors ({filteredVendors.length})
+                            </TabsTrigger>
+                        )}
+                        {can.credentials && (
+                            <TabsTrigger value="credentials" className="flex items-center gap-2">
+                                <Lock className="w-4 h-4" />
+                                Credentials ({filteredCredentials.length})
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
-                    <TabsContent value="vendors">
-                        <Card>
-                            <CardContent className="p-4">
-                                {filteredVendors.length === 0 ? (
-                                    <div className="text-center py-8 text-muted-foreground">No vendors match your filters.</div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {filteredVendors.map((vendor) => (
-                                            <div key={vendor.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
-                                                <div>
-                                                    <div className="font-medium">{vendor.company_name}</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {vendor.site_name} • {vendor.service_type}
+                    {can.vendors && (
+                        <TabsContent value="vendors">
+                            <Card>
+                                <CardContent className="p-4">
+                                    {filteredVendors.length === 0 ? (
+                                        <div className="text-center py-8 text-muted-foreground">No vendors match your filters.</div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {filteredVendors.map((vendor) => (
+                                                <div key={vendor.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-medium">{vendor.company_name}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {vendor.site_name} • {vendor.service_type}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground mt-1">
+                                                            {vendor.contact_name ? `${vendor.contact_name} • ` : ''}
+                                                            {vendor.email || vendor.phone || vendor.after_hours_phone || 'No contact details'}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        {vendor.contact_name ? `${vendor.contact_name} • ` : ''}
-                                                        {vendor.email || vendor.phone || vendor.after_hours_phone || 'No contact details'}
+                                                    <div className="flex items-center gap-2">
+                                                        {vendor.is_preferred && (
+                                                            <Badge variant="outline" className="border-status-warning/30 text-status-warning">
+                                                                Preferred
+                                                            </Badge>
+                                                        )}
+                                                        {!vendor.is_active && (
+                                                            <Badge variant="outline" className="border-border/30 text-muted-foreground">
+                                                                Inactive
+                                                            </Badge>
+                                                        )}
+                                                        <Button asChild size="sm" variant="outline">
+                                                            <Link href={`/sites/${vendor.site_id}/vendors`}>Open Site</Link>
+                                                        </Button>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {vendor.is_preferred && (
-                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
-                                                            Preferred
-                                                        </Badge>
-                                                    )}
-                                                    {!vendor.is_active && (
-                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
-                                                            Inactive
-                                                        </Badge>
-                                                    )}
-                                                    <Button asChild size="sm" variant="outline">
-                                                        <Link href={`/sites/${vendor.site_id}/vendors`}>Open Site</Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
 
-                    <TabsContent value="credentials">
-                        <Card>
-                            <CardContent className="p-4">
-                                {filteredCredentials.length === 0 ? (
-                                    <div className="text-center py-8 text-muted-foreground">No credentials match your filters.</div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {filteredCredentials.map((credential) => (
-                                            <div key={credential.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
-                                                <div>
-                                                    <div className="font-medium">{credential.label}</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {credential.site_name} • {credential.credential_type}
-                                                        {credential.vendor_name ? ` • ${credential.vendor_name}` : ''}
+                    {can.credentials && (
+                        <TabsContent value="credentials">
+                            <Card>
+                                <CardContent className="p-4">
+                                    {filteredCredentials.length === 0 ? (
+                                        <div className="text-center py-8 text-muted-foreground">No credentials match your filters.</div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {filteredCredentials.map((credential) => (
+                                                <div key={credential.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-medium">{credential.label}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {credential.site_name} • {credential.credential_type}
+                                                            {credential.vendor_name ? ` • ${credential.vendor_name}` : ''}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground mt-1">
+                                                            Last rotated: {credential.last_rotated_at ?? '—'}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        Last rotated: {credential.last_rotated_at ?? '—'}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant="outline" className="border-border/30 text-muted-foreground">
-                                                        {credential.value_preview}
-                                                    </Badge>
-                                                    {credential.requires_reauth && (
-                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
-                                                            <ShieldCheck className="w-3 h-3 mr-1" />
-                                                            Re-auth
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
+                                                            {credential.value_preview}
                                                         </Badge>
-                                                    )}
-                                                    <Button asChild size="sm" variant="outline">
-                                                        <Link href={`/sites/${credential.site_id}/credentials`}>Open Site</Link>
-                                                    </Button>
+                                                        {credential.requires_reauth && (
+                                                            <Badge variant="outline" className="border-status-warning/30 text-status-warning">
+                                                                <ShieldCheck className="w-3 h-3 mr-1" />
+                                                                Re-auth
+                                                            </Badge>
+                                                        )}
+                                                        <Button asChild size="sm" variant="outline">
+                                                            <Link href={`/sites/${credential.site_id}/credentials`}>Open Site</Link>
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </AppLayout>

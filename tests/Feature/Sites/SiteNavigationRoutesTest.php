@@ -104,6 +104,116 @@ test('legacy /sites/vendors-credentials redirects to canonical /vendors', functi
         ->assertRedirect('/vendors');
 });
 
+test('/vendors for a vendor-only user: sends vendors, empty credentials, can flags reflect scope', function () {
+    $site = \App\Models\Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    \App\Models\SiteVendor::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Sparks NZ',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    \App\Models\SiteCredential::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'label' => 'Should not be visible',
+        'credential_type' => 'password',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+    ]);
+
+    $user = siteNavUser('support_worker');
+    grantPermission($user, 'vendors.view');
+
+    expect($user->canDo('vendors.view'))->toBeTrue();
+    expect($user->canDo('credentials.view'))->toBeFalse();
+
+    $this->actingAs($user)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/vendors-credentials/global')
+            ->has('vendors', 1)
+            ->where('vendors.0.company_name', 'Sparks NZ')
+            ->has('credentials', 0)
+            ->where('can.vendors', true)
+            ->where('can.credentials', false)
+            ->has('serviceTypes', 1)
+            ->has('credentialTypes', 0)
+        );
+});
+
+test('/vendors for a credential-only user: sends credentials, empty vendors, can flags reflect scope', function () {
+    $site = \App\Models\Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    \App\Models\SiteVendor::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Sparks NZ',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    \App\Models\SiteCredential::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'label' => 'Door Code',
+        'credential_type' => 'pin',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+    ]);
+
+    $user = siteNavUser('support_worker');
+    grantPermission($user, 'credentials.view');
+
+    expect($user->canDo('vendors.view'))->toBeFalse();
+    expect($user->canDo('credentials.view'))->toBeTrue();
+
+    $this->actingAs($user)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/vendors-credentials/global')
+            ->has('vendors', 0)
+            ->has('credentials', 1)
+            ->where('credentials.0.label', 'Door Code')
+            ->where('can.vendors', false)
+            ->where('can.credentials', true)
+            ->has('serviceTypes', 0)
+            ->has('credentialTypes', 1)
+        );
+});
+
+test('/vendors for a both-permission user: sends both sides populated', function () {
+    $site = \App\Models\Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    \App\Models\SiteVendor::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Sparks NZ',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    \App\Models\SiteCredential::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'label' => 'Door Code',
+        'credential_type' => 'pin',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+    ]);
+
+    $user = siteNavUser('admin');
+
+    $this->actingAs($user)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/vendors-credentials/global')
+            ->has('vendors', 1)
+            ->has('credentials', 1)
+            ->where('can.vendors', true)
+            ->where('can.credentials', true)
+        );
+});
+
 test('removed sidebar destination /site-hardware returns 404', function () {
     $user = siteNavUser('admin');
 

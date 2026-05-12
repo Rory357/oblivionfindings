@@ -347,49 +347,58 @@ class SiteController extends Controller
             ]),
             'checklist' => $checklist,
             'houseLedger' => $houseLedger,
-            'vendors' => \App\Models\SiteVendor::where('site_id', $site->id)
-                ->where('is_active', true)
-                ->orderBy('service_type')
-                ->orderBy('company_name')
-                ->get()
-                ->map(fn ($v) => [
-                    'id' => $v->id,
-                    'company_name' => $v->company_name,
-                    'service_type' => $v->service_type,
-                    'contact_name' => $v->contact_name,
-                    'phone' => $v->phone,
-                    'after_hours_phone' => $v->after_hours_phone,
-                    'email' => $v->email,
-                    'account_number' => $v->account_number,
-                    'notes' => $v->notes,
-                    'preferred_contact_method' => $v->preferred_contact_method,
-                    'is_preferred' => (bool) $v->is_preferred,
-                    'is_active' => (bool) $v->is_active,
-                ])
-                ->values()
-                ->all(),
-            'credentials' => \App\Models\SiteCredential::where('site_id', $site->id)
-                ->with('vendor:id,company_name,service_type')
-                ->orderBy('label')
-                ->get()
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'label' => $c->label,
-                    'username' => $c->username,
-                    'url' => $c->url,
-                    'credential_type' => $c->credential_type,
-                    'vendor_id' => $c->vendor_id,
-                    'vendor_name' => $c->vendor?->company_name,
-                    'notes' => $c->notes,
-                    'requires_reauth' => (bool) $c->requires_reauth,
-                    'is_shareable' => (bool) $c->is_shareable,
-                    'password_strength' => $c->password_strength,
-                    'has_totp' => $c->hasTotp(),
-                    'last_rotated_at' => $c->last_rotated_at?->toDateTimeString(),
-                ])
-                ->values()
-                ->all(),
-            'credentialCount' => \App\Models\SiteCredential::where('site_id', $site->id)->count(),
+            // Vendors and credentials are scoped by the viewing user's
+            // per-permission rights so the in-tab dialogs only ever see
+            // data the user is allowed to see.
+            'vendors' => ($user?->canDo('vendors.view') ?? false)
+                ? \App\Models\SiteVendor::where('site_id', $site->id)
+                    ->where('is_active', true)
+                    ->orderBy('service_type')
+                    ->orderBy('company_name')
+                    ->get()
+                    ->map(fn ($v) => [
+                        'id' => $v->id,
+                        'company_name' => $v->company_name,
+                        'service_type' => $v->service_type,
+                        'contact_name' => $v->contact_name,
+                        'phone' => $v->phone,
+                        'after_hours_phone' => $v->after_hours_phone,
+                        'email' => $v->email,
+                        'account_number' => $v->account_number,
+                        'notes' => $v->notes,
+                        'preferred_contact_method' => $v->preferred_contact_method,
+                        'is_preferred' => (bool) $v->is_preferred,
+                        'is_active' => (bool) $v->is_active,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
+            'credentials' => ($user?->canDo('credentials.view') ?? false)
+                ? \App\Models\SiteCredential::where('site_id', $site->id)
+                    ->with('vendor:id,company_name,service_type')
+                    ->orderBy('label')
+                    ->get()
+                    ->map(fn ($c) => [
+                        'id' => $c->id,
+                        'label' => $c->label,
+                        'username' => $c->username,
+                        'url' => $c->url,
+                        'credential_type' => $c->credential_type,
+                        'vendor_id' => $c->vendor_id,
+                        'vendor_name' => $c->vendor?->company_name,
+                        'notes' => $c->notes,
+                        'requires_reauth' => (bool) $c->requires_reauth,
+                        'is_shareable' => (bool) $c->is_shareable,
+                        'password_strength' => $c->password_strength,
+                        'has_totp' => $c->hasTotp(),
+                        'last_rotated_at' => $c->last_rotated_at?->toDateTimeString(),
+                    ])
+                    ->values()
+                    ->all()
+                : [],
+            'credentialCount' => ($user?->canDo('credentials.view') ?? false)
+                ? \App\Models\SiteCredential::where('site_id', $site->id)->count()
+                : 0,
             'hardwareCount' => (clone $siteDevices)->count(),
             'integrationStatus' => \App\Models\Integration\IntegrationSiteConfig::where('site_id', $site->id)
                 ->where('is_active', true)

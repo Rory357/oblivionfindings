@@ -131,6 +131,118 @@ test('credential update can change metadata without rotating password', function
     )->toBeTrue();
 });
 
+test('site show for a vendor-only user: vendors populated, credentials empty', function () {
+    \App\Models\SiteVendor::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Sparks NZ',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'Should not be visible',
+        'credential_type' => 'password',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+    ]);
+
+    // team_lead has sites.viewAny + sites.type.house.view + vendors.view +
+    // credentials.view. Override-deny credentials.view to construct a
+    // "vendor-only" tester that can still load the site show page.
+    $vendorOnly = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
+    $vendorOnly->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'team_lead')->firstOrFail()->id,
+    ]);
+    $vendorOnly->permissionOverrides()->syncWithoutDetaching([
+        \App\Models\Permission::query()->where('key', 'credentials.view')->firstOrFail()->id => ['allowed' => false],
+    ]);
+
+    expect($vendorOnly->canDo('vendors.view'))->toBeTrue();
+    expect($vendorOnly->canDo('credentials.view'))->toBeFalse();
+
+    $this->actingAs($vendorOnly)
+        ->get("/sites/{$this->site->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/show')
+            ->has('vendors', 1)
+            ->where('vendors.0.company_name', 'Sparks NZ')
+            ->has('credentials', 0)
+            ->where('credentialCount', 0)
+        );
+});
+
+test('site show for a credential-only user: credentials populated, vendors empty', function () {
+    \App\Models\SiteVendor::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Sparks NZ',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'Door Code',
+        'credential_type' => 'pin',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+    ]);
+
+    // team_lead minus vendors.view = credential-only tester.
+    $credentialOnly = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
+    $credentialOnly->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'team_lead')->firstOrFail()->id,
+    ]);
+    $credentialOnly->permissionOverrides()->syncWithoutDetaching([
+        \App\Models\Permission::query()->where('key', 'vendors.view')->firstOrFail()->id => ['allowed' => false],
+    ]);
+
+    expect($credentialOnly->canDo('vendors.view'))->toBeFalse();
+    expect($credentialOnly->canDo('credentials.view'))->toBeTrue();
+
+    $this->actingAs($credentialOnly)
+        ->get("/sites/{$this->site->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/show')
+            ->has('vendors', 0)
+            ->has('credentials', 1)
+            ->where('credentials.0.label', 'Door Code')
+            ->where('credentialCount', 1)
+        );
+});
+
+test('site show for a both-permission user (admin): both sides populated', function () {
+    \App\Models\SiteVendor::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Sparks NZ',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'Door Code',
+        'credential_type' => 'pin',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get("/sites/{$this->site->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/show')
+            ->has('vendors', 1)
+            ->has('credentials', 1)
+            ->where('credentialCount', 1)
+        );
+});
+
 test('credential destroy returns back(303) and audits delete (audit row survives via nullOnDelete)', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,

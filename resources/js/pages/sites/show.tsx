@@ -2162,11 +2162,24 @@ export default function SiteShow({
                         )}
                     </TabsContent>
 
-                    {/* Vendors & Credentials Tab */}
+                    {/* Vendors & Credentials Tab.
+                        Panels are gated independently: a vendor-only user
+                        sees just the Vendors panel; a credential-only user
+                        sees just Credentials; both-permission users see the
+                        side-by-side pair. The grid switches to a single
+                        column when only one panel is visible. */}
                     {canSeeVendorsCredentials && (
                         <TabsContent value="vendors-credentials">
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div
+                                className={
+                                    canGlobal?.vendors?.view &&
+                                    canGlobal?.credentials?.view
+                                        ? 'grid gap-4 md:grid-cols-2'
+                                        : 'grid gap-4 md:grid-cols-1'
+                                }
+                            >
                                 {/* ── Vendors panel ─────────────────────── */}
+                                {canGlobal?.vendors?.view && (
                                 <Card>
                                     <CardHeader className="flex flex-row items-start justify-between gap-2">
                                         <div>
@@ -2282,8 +2295,10 @@ export default function SiteShow({
                                         )}
                                     </CardContent>
                                 </Card>
+                                )}
 
                                 {/* ── Credentials panel ─────────────────── */}
+                                {canGlobal?.credentials?.view && (
                                 <Card>
                                     <CardHeader className="flex flex-row items-start justify-between gap-2">
                                         <div>
@@ -2403,6 +2418,7 @@ export default function SiteShow({
                                         )}
                                     </CardContent>
                                 </Card>
+                                )}
                             </div>
 
                             {/* ── Dialog mounts ─────────────────────────── */}
