@@ -463,118 +463,135 @@ export default function ChecklistRun({
             <Head title={`${template.name} — Checklist Run`} />
 
             <div className="relative pb-32">
-                {/* HERO HEADER */}
-                <div className="relative overflow-hidden border-b bg-gradient-to-br from-primary/8 via-primary/4 to-background">
-                    <div
-                        className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/15 blur-3xl"
-                        aria-hidden
-                    />
-                    <div
-                        className="pointer-events-none absolute -bottom-32 -left-12 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
-                        aria-hidden
-                    />
-                    <div className="relative px-4 pb-6 pt-4 md:px-6 md:pb-8">
-                        <Button
-                            asChild
-                            variant="ghost"
-                            size="sm"
-                            className="-ml-2 mb-3 text-muted-foreground hover:text-foreground"
-                        >
-                            <Link href={`/sites/${site.id}/checklists`}>
-                                <ArrowLeft className="mr-1 h-4 w-4" />
-                                Back to checklists
-                            </Link>
-                        </Button>
+                {/* HERO HEADER — matches site show purple gradient */}
+                <div className="px-4 pt-4 md:px-6">
+                    <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="-ml-2 mb-3 text-muted-foreground hover:text-foreground"
+                    >
+                        <Link href={`/sites/${site.id}/checklists`}>
+                            <ArrowLeft className="mr-1 h-4 w-4" />
+                            Back to checklists
+                        </Link>
+                    </Button>
 
-                        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                            <div className="min-w-0 flex-1">
-                                <div className="mb-2 flex items-center gap-2">
-                                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                                        <ClipboardCheck className="h-5 w-5" />
-                                    </span>
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
+                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
+                        <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+
+                        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
+                            {/* Run icon avatar */}
+                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
+                                <ClipboardCheck className="h-12 w-12 text-white md:h-14 md:w-14" />
+                            </div>
+
+                            {/* Info */}
+                            <div className="min-w-0 flex-1 text-center md:text-left">
+                                <h1 className="text-2xl font-bold md:text-3xl">
+                                    {template.name}
+                                </h1>
+                                <p className="mt-0.5 text-sm text-white/70">
+                                    {site.name}
+                                    {run.scheduled_date && (
+                                        <>
+                                            {' · Scheduled '}
+                                            {new Date(
+                                                run.scheduled_date,
+                                            ).toLocaleDateString(undefined, {
+                                                weekday: 'short',
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric',
+                                            })}
+                                        </>
+                                    )}
+                                </p>
+
+                                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
                                     {run.status === 'in_progress' && (
-                                        <Badge className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                                        <Badge className="border-amber-200/40 bg-amber-50/15 text-amber-100">
                                             In progress
                                         </Badge>
                                     )}
                                     {run.status === 'scheduled' && (
-                                        <Badge variant="outline">Scheduled</Badge>
+                                        <Badge className="border-white/20 bg-white/10 text-white">
+                                            Scheduled
+                                        </Badge>
                                     )}
                                     {run.status === 'completed' && (
-                                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                        <Badge className="border-emerald-200/40 bg-emerald-50/15 text-emerald-100">
                                             Completed
                                         </Badge>
                                     )}
                                 </div>
-                                <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
-                                    {template.name}
-                                </h1>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    {site.name}
-                                    {run.scheduled_date && (
-                                        <>
-                                            {' · '}
-                                            Scheduled{' '}
-                                            {new Date(run.scheduled_date).toLocaleDateString(
-                                                undefined,
-                                                {
-                                                    weekday: 'short',
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric',
-                                                },
-                                            )}
-                                        </>
-                                    )}
-                                </p>
                             </div>
 
-                            <div className="flex items-center gap-5 rounded-xl border bg-card/70 px-5 py-3 backdrop-blur">
-                                <ProgressRing value={progressPercentage} size={84} strokeWidth={7} />
+                            {/* Progress ring + stats — frosted card on the purple */}
+                            <div className="flex items-center gap-5 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-white backdrop-blur">
+                                <ProgressRing
+                                    value={progressPercentage}
+                                    size={84}
+                                    strokeWidth={7}
+                                />
                                 <div className="space-y-1.5">
                                     <div className="flex items-center gap-3 text-sm">
-                                        <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                                        <span className="flex h-2 w-2 rounded-full bg-emerald-300" />
                                         <span className="tabular-nums font-medium">
-                                            {completedRequired - failedItems.filter((i) => i.is_required).length}
+                                            {completedRequired -
+                                                failedItems.filter(
+                                                    (i) => i.is_required,
+                                                ).length}
                                         </span>
-                                        <span className="text-muted-foreground">passing</span>
+                                        <span className="text-white/70">
+                                            passing
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-3 text-sm">
-                                        <span className="flex h-2 w-2 rounded-full bg-rose-500" />
+                                        <span className="flex h-2 w-2 rounded-full bg-rose-300" />
                                         <span className="tabular-nums font-medium">
                                             {failedItems.length}
                                         </span>
-                                        <span className="text-muted-foreground">failing</span>
+                                        <span className="text-white/70">
+                                            failing
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-3 text-sm">
-                                        <span className="flex h-2 w-2 rounded-full bg-muted-foreground/40" />
+                                        <span className="flex h-2 w-2 rounded-full bg-white/40" />
                                         <span className="tabular-nums font-medium">
-                                            {requiredItems.length - completedRequired}
+                                            {requiredItems.length -
+                                                completedRequired}
                                         </span>
-                                        <span className="text-muted-foreground">remaining</span>
+                                        <span className="text-white/70">
+                                            remaining
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        {/* Failed items strip */}
-                        {failedItems.length > 0 && (
-                            <div className="mt-5 flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-3 dark:border-rose-900/60 dark:bg-rose-950/30">
-                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-                                    <AlertTriangle className="h-4 w-4" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-rose-900 dark:text-rose-100">
-                                        {failedItems.length} item
-                                        {failedItems.length === 1 ? '' : 's'} failed
-                                    </p>
-                                    <p className="text-xs text-rose-700/80 dark:text-rose-300/80">
-                                        Review failures below — some may need a hazard report.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
                     </div>
+
+                    {/* Failed items strip — kept below the hero, light surface for readability */}
+                    {failedItems.length > 0 && (
+                        <div className="mt-4 flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-3 dark:border-rose-900/60 dark:bg-rose-950/30">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+                                <AlertTriangle className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-rose-900 dark:text-rose-100">
+                                    {failedItems.length} item
+                                    {failedItems.length === 1 ? '' : 's'}{' '}
+                                    failed
+                                </p>
+                                <p className="text-xs text-rose-700/80 dark:text-rose-300/80">
+                                    Review failures below — some may need a
+                                    hazard report.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid gap-6 px-4 py-6 md:grid-cols-2 md:px-6">

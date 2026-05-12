@@ -108,22 +108,63 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
             <Head title={`${site.name} - Checklists`} />
 
             <div className="m-4 space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <ClipboardCheck className="w-5 h-5" />
-                            Checklists & Walkthroughs
-                        </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="secondary" asChild>
-                            <Link href={`/sites/${site.id}/checklists/runs`}>View Runs</Link>
-                        </Button>
-                        <Button onClick={() => setAssignOpen(true)}>
-                            <Plus className="w-4 h-4 mr-1" />
-                            Assign Checklist
-                        </Button>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+
+                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
+                        {/* Icon avatar */}
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
+                            <ClipboardCheck className="h-12 w-12 text-white md:h-14 md:w-14" />
+                        </div>
+
+                        {/* Info */}
+                        <div className="min-w-0 flex-1 text-center md:text-left">
+                            <h1 className="text-2xl font-bold md:text-3xl">
+                                Checklists &amp; Walkthroughs
+                            </h1>
+                            <p className="mt-0.5 text-sm text-white/70">
+                                {site.name}
+                            </p>
+
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                                <Badge className="border-white/20 bg-white/10 text-white">
+                                    {assignments.length} assigned
+                                </Badge>
+                                <Badge className="border-white/20 bg-white/10 text-white">
+                                    {availableTemplates.length} available to
+                                    add
+                                </Badge>
+                            </div>
+                        </div>
+
+                        {/* Right: actions */}
+                        <div className="flex flex-col items-center gap-3 md:items-end">
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    asChild
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                >
+                                    <Link
+                                        href={`/sites/${site.id}/checklists/runs`}
+                                    >
+                                        View runs
+                                    </Link>
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                    onClick={() => setAssignOpen(true)}
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Assign checklist
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

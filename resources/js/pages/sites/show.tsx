@@ -914,7 +914,7 @@ function SiteChecklistsTab({
                                     return (
                                         <Link
                                             key={r.id}
-                                            href={`/sites/checklists/runs/${r.id}`}
+                                            href={`/checklists/runs/${r.id}`}
                                             className="group flex items-center gap-3 rounded-xl border bg-card/40 p-3 transition-all hover:border-primary/40 hover:bg-card hover:shadow-sm"
                                         >
                                             <span className="shrink-0 rounded-lg border bg-background/60 p-2">

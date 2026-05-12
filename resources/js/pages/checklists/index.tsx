@@ -833,7 +833,7 @@ export default function ChecklistsDashboard({
                                                                 variant="outline"
                                                             >
                                                                 <Link
-                                                                    href={`/sites/checklists/runs/${run.id}`}
+                                                                    href={`/checklists/runs/${run.id}`}
                                                                 >
                                                                     Open
                                                                 </Link>
