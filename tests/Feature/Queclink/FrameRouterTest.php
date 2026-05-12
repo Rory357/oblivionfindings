@@ -50,7 +50,7 @@ it('answers a heartbeat with +SACK even for an unpaired pending device', functio
 });
 
 it('routes a paired device into the Fleet telemetry pipeline', function () {
-    $asset = Asset::factory()->create();
+    $asset = Asset::factory()->create(['category' => 'vehicle']);
     AssetTracker::create([
         'asset_id' => $asset->id,
         'vendor' => 'queclink',
@@ -68,16 +68,14 @@ it('routes a paired device into the Fleet telemetry pipeline', function () {
 
     $this->router->handleInbound($frame, $this->state);
 
-    // FleetTelemetryEvent should have been created by the ingest service,
-    // linked to the asset. The pipeline's consent-gating may null lat/lng
-    // when no consent is on file — that's expected for default-deny privacy
-    // and is the existing fleet behaviour. The assertion here is just that
-    // the event was created and points at the right asset.
     $event = \App\Models\FleetTelemetryEvent::first();
     expect($event)->not->toBeNull()
         ->and($event->asset_id)->toBe($asset->id)
         ->and($event->vendor)->toBe('queclink')
-        ->and($event->event_type)->toBe('location_report');
+        ->and($event->event_type)->toBe('location_report')
+        ->and($event->consent_blocked)->toBeFalse()
+        ->and((float) $event->latitude)->toEqualWithDelta(-36.8485, 0.0001)
+        ->and((float) $event->longitude)->toEqualWithDelta(174.7633, 0.0001);
 });
 
 it('does not ingest telemetry for unpaired devices but still logs the frame', function () {
