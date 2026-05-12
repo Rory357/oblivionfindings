@@ -54,6 +54,7 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
+            patterns: ['routes/**/*.php'],
         }),
     ],
     esbuild: {
