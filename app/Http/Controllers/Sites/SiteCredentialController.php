@@ -124,13 +124,7 @@ class SiteCredentialController extends Controller
             'created_at' => now(),
         ]);
 
-        if ($request->wantsJson() || $request->header('X-Inertia')) {
-            return back(303);
-        }
-
-        return redirect()
-            ->route('sites.credentials.index', $site)
-            ->with('success', 'Credential added successfully.');
+        return back(303)->with('success', 'Credential added successfully.');
     }
 
     public function reveal(Request $request, Site $site, SiteCredential $credential)
@@ -312,7 +306,7 @@ class SiteCredentialController extends Controller
         $google2fa = new Google2FA();
 
         if (!$google2fa->verifyKey($secret, $validated['verification_code'], 1)) {
-            return back(422)->withErrors([
+            throw \Illuminate\Validation\ValidationException::withMessages([
                 'verification_code' => 'Verification code does not match the secret.',
             ]);
         }
@@ -366,10 +360,33 @@ class SiteCredentialController extends Controller
         $this->authorize('view', $site);
         $request->user()->canDo('credentials.manage') || abort(403);
 
+        $validated = $request->validate([
+            'account' => 'nullable|string|max:255',
+        ]);
+
         $google2fa = new Google2FA();
         $secret = $google2fa->generateSecretKey();
 
-        return response()->json(['secret' => $secret]);
+        $issuer = $site->name;
+        $account = $validated['account'] ?? $site->name;
+        $otpauthUri = sprintf(
+            'otpauth://totp/%s:%s?secret=%s&issuer=%s&period=30&digits=6',
+            rawurlencode($issuer),
+            rawurlencode($account),
+            $secret,
+            rawurlencode($issuer),
+        );
+
+        // Server-side QR rendering — the secret never leaves our infrastructure.
+        $qr = new \Endroid\QrCode\QrCode($otpauthUri);
+        $writer = new \Endroid\QrCode\Writer\PngWriter();
+        $qrDataUri = $writer->write($qr)->getDataUri();
+
+        return response()->json([
+            'secret' => $secret,
+            'qr_data_uri' => $qrDataUri,
+            'otpauth_uri' => $otpauthUri,
+        ]);
     }
 
     public function auditLog(Request $request, Site $site, SiteCredential $credential)

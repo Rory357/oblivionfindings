@@ -162,9 +162,7 @@ class SiteVendorController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()
-            ->route('sites.vendors.index', $site)
-            ->with('success', 'Vendor added successfully.');
+        return back(303)->with('success', 'Vendor added successfully.');
     }
 
     public function update(Request $request, Site $site, SiteVendor $vendor)
@@ -189,9 +187,7 @@ class SiteVendorController extends Controller
 
         $vendor->update($validated);
 
-        return redirect()
-            ->route('sites.vendors.index', $site)
-            ->with('success', 'Vendor updated successfully.');
+        return back(303)->with('success', 'Vendor updated successfully.');
     }
 
     public function destroy(Request $request, Site $site, SiteVendor $vendor)
@@ -202,16 +198,15 @@ class SiteVendorController extends Controller
 
         // Check if vendor has credentials
         if ($vendor->credentials()->count() > 0) {
-            return redirect()
-                ->route('sites.vendors.index', $site)
-                ->with('error', 'Cannot delete vendor with associated credentials. Please delete credentials first.');
+            return back(303)->with(
+                'error',
+                'Cannot delete vendor with associated credentials. Please delete credentials first.',
+            );
         }
 
         $vendor->delete();
 
-        return redirect()
-            ->route('sites.vendors.index', $site)
-            ->with('success', 'Vendor deleted successfully.');
+        return back(303)->with('success', 'Vendor deleted successfully.');
     }
 
 }

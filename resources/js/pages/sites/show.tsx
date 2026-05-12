@@ -45,13 +45,16 @@ import {
     DollarSign,
     Download,
     DoorOpen,
+    Eye,
     FileText,
     FolderOpen,
     Fuel,
     GraduationCap,
     Home,
+    KeyRound,
     Layers,
     LayoutGrid,
+    Lock,
     Mail,
     MapPin,
     Navigation,
@@ -65,6 +68,7 @@ import {
     ShieldAlert,
     Star,
     StickyNote,
+    Trash2,
     Truck,
     User,
     Users,
@@ -89,6 +93,22 @@ import {
     EditSafetyDialog,
 } from './_overview-dialogs';
 import SiteOverviewMapCard from './_overview-map-card';
+import {
+    AddVendorDialog,
+    DeleteVendorDialog,
+    EditVendorDialog,
+    ShowVendorDialog,
+    type VendorRecord,
+} from './vendors/_dialogs';
+import {
+    AddCredentialDialog,
+    DeleteCredentialDialog,
+    EditCredentialDialog,
+    RemoveTotpDialog,
+    SetupTotpDialog,
+    ShowCredentialDialog,
+    type CredentialRecord,
+} from './credentials/_dialogs';
 
 type Site = {
     id: number;
@@ -868,6 +888,7 @@ export default function SiteShow({
     houseLedger,
     typeSpecificData,
     vendors = [],
+    credentials = [],
     staffRequirements = [],
     coverageRequirements = [],
     coveragePreview = [],
@@ -893,6 +914,30 @@ export default function SiteShow({
     const [locationOpen, setLocationOpen] = useState(false);
     const [safetyOpen, setSafetyOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
+
+    // Vendors & Credentials in-tab dialogs.
+    type VendorDialogMode = 'add' | 'edit' | 'show' | 'delete' | null;
+    type CredentialDialogMode =
+        | 'add'
+        | 'edit'
+        | 'show'
+        | 'delete'
+        | 'setup-totp'
+        | 'remove-totp'
+        | null;
+    const [vendorDialog, setVendorDialog] = useState<{
+        mode: VendorDialogMode;
+        target: VendorRecord | null;
+    }>({ mode: null, target: null });
+    const [credentialDialog, setCredentialDialog] = useState<{
+        mode: CredentialDialogMode;
+        target: CredentialRecord | null;
+    }>({ mode: null, target: null });
+
+    const closeVendorDialog = () =>
+        setVendorDialog({ mode: null, target: null });
+    const closeCredentialDialog = () =>
+        setCredentialDialog({ mode: null, target: null });
 
     const handleDeleteNote = (noteId: number) => {
         if (!confirm('Delete this note?')) return;
@@ -2122,19 +2167,35 @@ export default function SiteShow({
                     {/* Vendors & Credentials Tab */}
                     {canSeeVendorsCredentials && (
                         <TabsContent value="vendors-credentials">
-                            <div className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {/* ── Vendors panel ─────────────────────── */}
                                 <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between">
-                                        <CardTitle className="text-base">
-                                            Vendors ({vendors.length})
-                                        </CardTitle>
-                                        {canGlobal?.vendors?.view && (
-                                            <Button asChild size="sm">
+                                    <CardHeader className="flex flex-row items-start justify-between gap-2">
+                                        <div>
+                                            <CardTitle className="text-base">
+                                                Vendors ({vendors.length})
+                                            </CardTitle>
+                                            {canGlobal?.vendors?.view && (
                                                 <Link
                                                     href={`/sites/${site.id}/vendors`}
+                                                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                                                 >
-                                                    Manage Vendors
+                                                    Manage vendors →
                                                 </Link>
+                                            )}
+                                        </div>
+                                        {canGlobal?.vendors?.manage && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    setVendorDialog({
+                                                        mode: 'add',
+                                                        target: null,
+                                                    })
+                                                }
+                                            >
+                                                <Plus className="mr-1 h-3 w-3" />
+                                                Add New
                                             </Button>
                                         )}
                                     </CardHeader>
@@ -2145,18 +2206,16 @@ export default function SiteShow({
                                                 site.
                                             </p>
                                         ) : (
-                                            <div className="space-y-2">
+                                            <div className="space-y-1">
                                                 {vendors.map((v) => (
                                                     <div
                                                         key={v.id}
-                                                        className="flex items-center justify-between rounded-lg border p-2"
+                                                        className="group flex items-center justify-between gap-2 rounded-md border border-transparent px-2 py-1.5 hover:border-border hover:bg-muted/40"
                                                     >
-                                                        <div>
+                                                        <div className="min-w-0 flex-1">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium">
-                                                                    {
-                                                                        v.company_name
-                                                                    }
+                                                                <span className="truncate text-sm font-medium">
+                                                                    {v.company_name}
                                                                 </span>
                                                                 {v.is_preferred && (
                                                                     <Badge
@@ -2167,18 +2226,58 @@ export default function SiteShow({
                                                                     </Badge>
                                                                 )}
                                                             </div>
-                                                            <div className="text-xs text-muted-foreground">
+                                                            <div className="truncate text-xs text-muted-foreground">
                                                                 {v.service_type}
+                                                                {v.phone &&
+                                                                    ` · ${v.phone}`}
                                                             </div>
                                                         </div>
-                                                        {v.phone && (
-                                                            <a
-                                                                href={`tel:${v.phone}`}
-                                                                className="text-sm text-primary hover:text-primary/70"
+                                                        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                aria-label="Show vendor"
+                                                                onClick={() =>
+                                                                    setVendorDialog({
+                                                                        mode: 'show',
+                                                                        target: v as VendorRecord,
+                                                                    })
+                                                                }
                                                             >
-                                                                {v.phone}
-                                                            </a>
-                                                        )}
+                                                                <Eye className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            {canGlobal?.vendors?.manage && (
+                                                                <>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        aria-label="Edit vendor"
+                                                                        onClick={() =>
+                                                                            setVendorDialog({
+                                                                                mode: 'edit',
+                                                                                target: v as VendorRecord,
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        aria-label="Delete vendor"
+                                                                        className="text-status-critical hover:text-status-critical"
+                                                                        onClick={() =>
+                                                                            setVendorDialog({
+                                                                                mode: 'delete',
+                                                                                target: v as VendorRecord,
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -2186,45 +2285,227 @@ export default function SiteShow({
                                     </CardContent>
                                 </Card>
 
+                                {/* ── Credentials panel ─────────────────── */}
                                 <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between">
-                                        <CardTitle className="text-base">
-                                            Credentials ({credentialCount})
-                                        </CardTitle>
-                                        {canGlobal?.credentials?.view && (
-                                            <Button
-                                                asChild
-                                                size="sm"
-                                                variant="secondary"
-                                            >
+                                    <CardHeader className="flex flex-row items-start justify-between gap-2">
+                                        <div>
+                                            <CardTitle className="text-base">
+                                                Credentials ({credentials.length})
+                                            </CardTitle>
+                                            {canGlobal?.credentials?.view && (
                                                 <Link
                                                     href={`/sites/${site.id}/credentials`}
+                                                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                                                 >
-                                                    Manage Credentials
+                                                    Manage credentials →
                                                 </Link>
+                                            )}
+                                        </div>
+                                        {canGlobal?.credentials?.manage && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    setCredentialDialog({
+                                                        mode: 'add',
+                                                        target: null,
+                                                    })
+                                                }
+                                            >
+                                                <Plus className="mr-1 h-3 w-3" />
+                                                Add New
                                             </Button>
                                         )}
                                     </CardHeader>
                                     <CardContent>
-                                        {credentialCount === 0 ? (
+                                        {credentials.length === 0 ? (
                                             <p className="text-sm text-muted-foreground">
                                                 No credentials stored for this
                                                 site.
                                             </p>
                                         ) : (
-                                            <p className="text-sm text-muted-foreground">
-                                                {credentialCount} credential
-                                                {credentialCount !== 1
-                                                    ? 's'
-                                                    : ''}{' '}
-                                                securely stored. Open the
-                                                Credentials Vault to view or
-                                                manage them.
-                                            </p>
+                                            <div className="space-y-1">
+                                                {credentials.map((c) => (
+                                                    <div
+                                                        key={c.id}
+                                                        className="group flex items-center justify-between gap-2 rounded-md border border-transparent px-2 py-1.5 hover:border-border hover:bg-muted/40"
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <Lock className="h-3 w-3 text-muted-foreground" />
+                                                                <span className="truncate text-sm font-medium">
+                                                                    {c.label}
+                                                                </span>
+                                                                {c.has_totp && (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="border-status-success/30 text-xs text-status-success"
+                                                                        title="Authenticator configured"
+                                                                    >
+                                                                        <KeyRound className="mr-1 h-2.5 w-2.5" />
+                                                                        OTP
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="truncate text-xs text-muted-foreground">
+                                                                {c.username
+                                                                    ? `${c.username} · `
+                                                                    : ''}
+                                                                {c.credential_type}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                aria-label="Show credential"
+                                                                onClick={() =>
+                                                                    setCredentialDialog({
+                                                                        mode: 'show',
+                                                                        target: c as CredentialRecord,
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Eye className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            {canGlobal?.credentials?.manage && (
+                                                                <>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        aria-label="Edit credential"
+                                                                        onClick={() =>
+                                                                            setCredentialDialog({
+                                                                                mode: 'edit',
+                                                                                target: c as CredentialRecord,
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        aria-label="Delete credential"
+                                                                        className="text-status-critical hover:text-status-critical"
+                                                                        onClick={() =>
+                                                                            setCredentialDialog({
+                                                                                mode: 'delete',
+                                                                                target: c as CredentialRecord,
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </CardContent>
                                 </Card>
                             </div>
+
+                            {/* ── Dialog mounts ─────────────────────────── */}
+                            <AddVendorDialog
+                                siteId={site.id}
+                                isOpen={vendorDialog.mode === 'add'}
+                                onClose={closeVendorDialog}
+                            />
+                            <EditVendorDialog
+                                siteId={site.id}
+                                vendor={vendorDialog.target}
+                                isOpen={vendorDialog.mode === 'edit'}
+                                onClose={closeVendorDialog}
+                            />
+                            <ShowVendorDialog
+                                vendor={vendorDialog.target}
+                                isOpen={vendorDialog.mode === 'show'}
+                                canManage={!!canGlobal?.vendors?.manage}
+                                onClose={closeVendorDialog}
+                                onEdit={() =>
+                                    setVendorDialog((prev) => ({
+                                        ...prev,
+                                        mode: 'edit',
+                                    }))
+                                }
+                                onDelete={() =>
+                                    setVendorDialog((prev) => ({
+                                        ...prev,
+                                        mode: 'delete',
+                                    }))
+                                }
+                            />
+                            <DeleteVendorDialog
+                                siteId={site.id}
+                                vendor={vendorDialog.target}
+                                isOpen={vendorDialog.mode === 'delete'}
+                                onClose={closeVendorDialog}
+                            />
+
+                            <AddCredentialDialog
+                                siteId={site.id}
+                                isOpen={credentialDialog.mode === 'add'}
+                                onClose={closeCredentialDialog}
+                            />
+                            <EditCredentialDialog
+                                siteId={site.id}
+                                credential={credentialDialog.target}
+                                isOpen={credentialDialog.mode === 'edit'}
+                                onClose={closeCredentialDialog}
+                            />
+                            <ShowCredentialDialog
+                                siteId={site.id}
+                                credential={credentialDialog.target}
+                                isOpen={credentialDialog.mode === 'show'}
+                                canManage={!!canGlobal?.credentials?.manage}
+                                canReveal={!!canGlobal?.credentials?.reveal}
+                                onClose={closeCredentialDialog}
+                                onEdit={() =>
+                                    setCredentialDialog((prev) => ({
+                                        ...prev,
+                                        mode: 'edit',
+                                    }))
+                                }
+                                onDelete={() =>
+                                    setCredentialDialog((prev) => ({
+                                        ...prev,
+                                        mode: 'delete',
+                                    }))
+                                }
+                                onSetupTotp={() =>
+                                    setCredentialDialog((prev) => ({
+                                        ...prev,
+                                        mode: 'setup-totp',
+                                    }))
+                                }
+                                onRemoveTotp={() =>
+                                    setCredentialDialog((prev) => ({
+                                        ...prev,
+                                        mode: 'remove-totp',
+                                    }))
+                                }
+                            />
+                            <DeleteCredentialDialog
+                                siteId={site.id}
+                                credential={credentialDialog.target}
+                                isOpen={credentialDialog.mode === 'delete'}
+                                onClose={closeCredentialDialog}
+                            />
+                            <SetupTotpDialog
+                                siteId={site.id}
+                                credential={credentialDialog.target}
+                                siteName={site.name}
+                                isOpen={credentialDialog.mode === 'setup-totp'}
+                                onClose={closeCredentialDialog}
+                            />
+                            <RemoveTotpDialog
+                                siteId={site.id}
+                                credential={credentialDialog.target}
+                                isOpen={credentialDialog.mode === 'remove-totp'}
+                                onClose={closeCredentialDialog}
+                            />
                         </TabsContent>
                     )}
 
