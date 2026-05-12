@@ -50,6 +50,7 @@ import {
     TrendingUp,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { CreateTemplateDialog } from './_dialogs';
 
 type SiteRef = { id: number; name: string; type?: string };
 type TemplateRef = { id: number; name: string; frequency?: string };
@@ -285,6 +286,7 @@ export default function ChecklistsDashboard({
     can,
 }: Props) {
     const [tab, setTab] = useState('overview');
+    const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
 
     // Runs tab filters
     const [runSearch, setRunSearch] = useState('');
@@ -408,11 +410,9 @@ export default function ChecklistsDashboard({
                                         Manage Templates
                                     </Link>
                                 </Button>
-                                <Button asChild>
-                                    <Link href="/sites/checklists/templates/create">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Template
-                                    </Link>
+                                <Button onClick={() => setCreateTemplateOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Template
                                 </Button>
                             </div>
                         ) : undefined
@@ -452,33 +452,51 @@ export default function ChecklistsDashboard({
                 </div>
 
                 <TabsRoot value={tab} onValueChange={setTab} className="flex flex-col gap-4">
-                    <TabsList>
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="runs">
+                    <TabsList className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1">
+                        <TabsTrigger
+                            value="overview"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        >
+                            <ClipboardCheck className="h-4 w-4" />
+                            Overview
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="runs"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        >
+                            <PlayCircle className="h-4 w-4" />
                             Runs
                             {(stats.runs_overdue > 0 || stats.runs_in_progress > 0) && (
                                 <Badge
                                     variant="outline"
-                                    className="ml-2 h-5 px-1.5 text-[10px] tabular-nums"
+                                    className="ml-1 h-5 px-1.5 text-[10px] tabular-nums"
                                 >
                                     {stats.runs_overdue + stats.runs_in_progress + stats.runs_scheduled}
                                 </Badge>
                             )}
                         </TabsTrigger>
-                        <TabsTrigger value="assignments">
+                        <TabsTrigger
+                            value="assignments"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        >
+                            <CalendarClock className="h-4 w-4" />
                             Assignments
                             <Badge
                                 variant="outline"
-                                className="ml-2 h-5 px-1.5 text-[10px] tabular-nums"
+                                className="ml-1 h-5 px-1.5 text-[10px] tabular-nums"
                             >
                                 {assignments.length}
                             </Badge>
                         </TabsTrigger>
-                        <TabsTrigger value="templates">
+                        <TabsTrigger
+                            value="templates"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        >
+                            <Layers className="h-4 w-4" />
                             Templates
                             <Badge
                                 variant="outline"
-                                className="ml-2 h-5 px-1.5 text-[10px] tabular-nums"
+                                className="ml-1 h-5 px-1.5 text-[10px] tabular-nums"
                             >
                                 {templates.length}
                             </Badge>
@@ -1033,14 +1051,14 @@ export default function ChecklistsDashboard({
                                         <p>No templates match your filters.</p>
                                         {can.manageTemplates && (
                                             <Button
-                                                asChild
                                                 variant="outline"
                                                 className="mt-4"
+                                                onClick={() =>
+                                                    setCreateTemplateOpen(true)
+                                                }
                                             >
-                                                <Link href="/sites/checklists/templates/create">
-                                                    <Plus className="mr-1 h-4 w-4" />
-                                                    Create your first template
-                                                </Link>
+                                                <Plus className="mr-1 h-4 w-4" />
+                                                Create your first template
                                             </Button>
                                         )}
                                     </div>
@@ -1122,6 +1140,11 @@ export default function ChecklistsDashboard({
                     </TabsContent>
                 </TabsRoot>
             </div>
+
+            <CreateTemplateDialog
+                isOpen={createTemplateOpen}
+                onClose={() => setCreateTemplateOpen(false)}
+            />
         </AppLayout>
     );
 }
