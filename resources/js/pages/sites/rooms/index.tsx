@@ -99,6 +99,12 @@ type RoomAsset = {
 type RoomPersonalAsset = {
     id: number;
     client_id: number;
+    client?: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        preferred_name?: string | null;
+    } | null;
     name: string;
     category?: string | null;
     status?: string | null;
@@ -895,17 +901,15 @@ function SortableRoomCard({
             )}
 
             <div className="flex flex-wrap items-center justify-end gap-1.5 border-t pt-2">
-                {isAssignable && (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={onAttachAsset}
-                    >
-                        <Package className="mr-1 h-3.5 w-3.5" />
-                        Asset
-                    </Button>
-                )}
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={onAttachAsset}
+                >
+                    <Package className="mr-1 h-3.5 w-3.5" />
+                    Asset
+                </Button>
                 {isAssignable && (
                     <Button type="button" size="sm" onClick={onAssign}>
                         <UserPlus className="mr-1 h-3.5 w-3.5" />
@@ -1143,17 +1147,15 @@ function RoomDrawer({
                             <DrawerSection
                                 title={`Assets (${room.assets.length})`}
                                 action={
-                                    room.is_assignable ? (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={onAttachAsset}
-                                        >
-                                            <Plus className="mr-1 h-3.5 w-3.5" />
-                                            Attach asset
-                                        </Button>
-                                    ) : undefined
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={onAttachAsset}
+                                    >
+                                        <Plus className="mr-1 h-3.5 w-3.5" />
+                                        Attach asset
+                                    </Button>
                                 }
                             >
                                 {room.assets.length === 0 ? (
@@ -1205,36 +1207,66 @@ function RoomDrawer({
                                 <DrawerSection
                                     title={`Resident's personal items (${room.personal_assets.length})`}
                                 >
+                                    <p className="-mt-1 text-[11px] text-muted-foreground">
+                                        Managed on each resident's profile —
+                                        shown here for awareness.
+                                    </p>
                                     <ul className="divide-y rounded-xl border bg-card/40">
-                                        {room.personal_assets.map((p) => (
-                                            <li
-                                                key={p.id}
-                                                className="flex items-center gap-2 px-3 py-2 text-sm"
-                                            >
-                                                <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate font-medium">
-                                                        {p.name}
-                                                    </p>
-                                                    <p className="truncate text-[11px] text-muted-foreground">
-                                                        {[
-                                                            p.category,
-                                                            p.condition,
-                                                            p.status,
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(' · ') ||
-                                                            'Personal item'}
-                                                    </p>
-                                                </div>
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-[10px]"
+                                        {room.personal_assets.map((p) => {
+                                            const ownerName = p.client
+                                                ? (() => {
+                                                      const full = `${p.client.first_name ?? ''} ${p.client.last_name ?? ''}`.trim();
+                                                      return p.client
+                                                          .preferred_name &&
+                                                          p.client
+                                                              .preferred_name !==
+                                                              p.client
+                                                                  .first_name
+                                                          ? `${p.client.preferred_name} (${full})`
+                                                          : full;
+                                                  })()
+                                                : null;
+                                            return (
+                                                <li
+                                                    key={p.id}
+                                                    className="flex items-center gap-2 px-3 py-2 text-sm"
                                                 >
-                                                    Personal
-                                                </Badge>
-                                            </li>
-                                        ))}
+                                                    <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate font-medium">
+                                                            {p.name}
+                                                        </p>
+                                                        <p className="truncate text-[11px] text-muted-foreground">
+                                                            {ownerName ? (
+                                                                <>
+                                                                    <a
+                                                                        href={`/clients/${p.client_id}`}
+                                                                        className="text-primary hover:underline"
+                                                                    >
+                                                                        {ownerName}
+                                                                    </a>
+                                                                    {' · '}
+                                                                </>
+                                                            ) : null}
+                                                            {[
+                                                                p.category,
+                                                                p.condition,
+                                                                p.status,
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(' · ') ||
+                                                                'Personal item'}
+                                                        </p>
+                                                    </div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-[10px]"
+                                                    >
+                                                        Personal
+                                                    </Badge>
+                                                </li>
+                                            );
+                                        })}
                                     </ul>
                                 </DrawerSection>
                             )}

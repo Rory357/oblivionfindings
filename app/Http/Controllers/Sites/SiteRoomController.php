@@ -44,10 +44,13 @@ class SiteRoomController extends Controller
             ])
             ->groupBy('room_id');
 
-        // Personal assets (read-only — surfaced per occupant's room).
+        // Personal assets (read-only — surfaced per occupant's room, with
+        // the owner client preloaded so the UI can link back to their
+        // profile.)
         $personalAssetsByRoom = ClientPersonalAsset::query()
             ->where('site_id', $site->id)
             ->whereNotNull('room_id')
+            ->with('client:id,first_name,last_name,preferred_name')
             ->orderBy('name')
             ->get([
                 'id', 'room_id', 'client_id', 'name', 'category', 'status',
@@ -117,6 +120,12 @@ class SiteRoomController extends Controller
                     'personal_assets' => ($personalAssetsByRoom[$r->id] ?? collect())->map(fn ($p) => [
                         'id' => $p->id,
                         'client_id' => $p->client_id,
+                        'client' => $p->client ? [
+                            'id' => $p->client->id,
+                            'first_name' => $p->client->first_name,
+                            'last_name' => $p->client->last_name,
+                            'preferred_name' => $p->client->preferred_name,
+                        ] : null,
                         'name' => $p->name,
                         'category' => $p->category,
                         'status' => $p->status,
@@ -333,14 +342,14 @@ class SiteRoomController extends Controller
     }
 
     /**
-     * Attach a site asset to a bedroom. Validates that the asset belongs to
-     * the same site.
+     * Attach a site asset to a room. Assets can live in any room — including
+     * communal spaces (kitchen TV, lounge sofa) — so the only constraint is
+     * that the asset belongs to the same site as the room.
      */
     public function attachAsset(Request $request, Site $site, SiteHouseRoom $room)
     {
         $this->authorize('update', $site);
         abort_unless($room->site_id === $site->id, 404);
-        abort_unless($room->is_assignable, 422, 'Communal spaces cannot have client-allocated assets — edit the room first if this is actually a bedroom.');
 
         $validated = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
@@ -352,7 +361,7 @@ class SiteRoomController extends Controller
         $asset->room_id = $room->id;
         $asset->save();
 
-        return back()->with('success', 'Asset attached to bedroom.');
+        return back()->with('success', 'Asset attached to room.');
     }
 
     public function detachAsset(Request $request, Site $site, SiteHouseRoom $room, Asset $asset)
