@@ -599,47 +599,66 @@ export function ShowRoomDialog({
 
                 </div>
 
-                <DialogFooter className="flex-wrap gap-2 border-t bg-muted/20 px-6 py-3 sm:flex-nowrap">
-                    {canManage && (
+                <DialogFooter className="flex flex-row flex-wrap items-center gap-2 border-t bg-muted/20 px-6 py-3 sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-1">
+                        {canManage && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-status-critical hover:text-status-critical"
+                                onClick={onDelete}
+                                aria-label="Deactivate room"
+                                title="Deactivate room"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {canManage && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onEdit}
+                                aria-label="Edit room"
+                                title="Edit room"
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {canManage && occupant && room.is_assignable !== false && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onUnassign}
+                                aria-label="Unassign occupant"
+                                title="Unassign occupant"
+                            >
+                                <Link2Off className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button
                             type="button"
                             variant="outline"
-                            className="text-status-critical"
-                            onClick={onDelete}
+                            size="sm"
+                            onClick={onClose}
                         >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Deactivate
+                            Close
                         </Button>
-                    )}
-                    {canManage && (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onEdit}
-                        >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                        </Button>
-                    )}
-                    {canManage && occupant && room.is_assignable !== false && (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onUnassign}
-                        >
-                            <Link2Off className="mr-2 h-4 w-4" />
-                            Unassign
-                        </Button>
-                    )}
-                    {canManage && room.is_assignable !== false && (
-                        <Button type="button" onClick={onAssign}>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            {occupant ? 'Change occupant' : 'Assign client'}
-                        </Button>
-                    )}
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Close
-                    </Button>
+                        {canManage && room.is_assignable !== false && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={onAssign}
+                            >
+                                <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                                {occupant ? 'Change occupant' : 'Assign client'}
+                            </Button>
+                        )}
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
