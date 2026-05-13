@@ -31,6 +31,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
+    ArrowLeft,
     BedDouble,
     GripVertical,
     History,
@@ -577,6 +578,14 @@ function BedroomsHero({
             <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
             <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
             <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+
+            <Link
+                href={`/sites/${site.id}`}
+                className="relative z-10 mb-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/90 transition-colors hover:bg-white/20 hover:text-white"
+            >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to {site.name}
+            </Link>
 
             <div className="relative flex flex-col gap-6 md:flex-row md:items-start">
                 <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">

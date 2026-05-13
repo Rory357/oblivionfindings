@@ -70,7 +70,12 @@ class SiteRoomController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        $assignableCollection = $rooms->where('is_assignable', true);
+        // Hero stats and alert chips reflect ACTIVE rooms only. Deactivated
+        // rooms can be revealed via the "Show inactive" filter but they
+        // shouldn't pad the counts (you can't assign a client to one).
+        $activeRooms = $rooms->where('is_active', true);
+        $activeCommunal = $activeRooms->where('is_assignable', false);
+        $assignableCollection = $activeRooms->where('is_assignable', true);
         $occupied = $assignableCollection->whereNotNull('assigned_client_id')->count();
         $bedrooms = $assignableCollection->count();
 
@@ -161,10 +166,10 @@ class SiteRoomController extends Controller
             ])->values(),
             'summary' => [
                 'total' => $rooms->count(),
-                'active' => $rooms->where('is_active', true)->count(),
+                'active' => $activeRooms->count(),
                 'inactive' => $rooms->where('is_active', false)->count(),
                 'bedrooms' => $bedrooms,
-                'communal' => $rooms->where('is_assignable', false)->count(),
+                'communal' => $activeCommunal->count(),
                 'occupied' => $occupied,
                 'available' => $bedrooms - $occupied,
                 'occupancy_percent' => $bedrooms > 0
