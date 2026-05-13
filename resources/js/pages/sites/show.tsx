@@ -3884,8 +3884,14 @@ function BedroomsTab({
                             )}
                         </div>
                     ) : (
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            {rooms.map((r) => (
+                        (() => {
+                            const assignableRooms = rooms.filter(
+                                (r) => r.is_assignable !== false,
+                            );
+                            const communalRooms = rooms.filter(
+                                (r) => r.is_assignable === false,
+                            );
+                            const renderCard = (r: typeof rooms[number]) => (
                                 <BedroomCard
                                     key={r.id}
                                     room={r as RoomRecord}
@@ -3921,8 +3927,47 @@ function BedroomsTab({
                                         })
                                     }
                                 />
-                            ))}
-                        </div>
+                            );
+                            return (
+                                <div className="grid gap-4 lg:grid-cols-2">
+                                    <RoomSection
+                                        icon={BedDouble}
+                                        title="Bedrooms"
+                                        count={assignableRooms.length}
+                                        accent="primary"
+                                        empty={{
+                                            label: 'No bedrooms yet',
+                                            hint: 'Tick "Assignable to client" when adding a room to make it a bedroom.',
+                                            ctaLabel:
+                                                can_edit
+                                                    ? 'Add bedroom'
+                                                    : undefined,
+                                            onCta: can_edit
+                                                ? () =>
+                                                      setDialog({
+                                                          mode: 'add',
+                                                          target: null,
+                                                      })
+                                                : undefined,
+                                        }}
+                                    >
+                                        {assignableRooms.map(renderCard)}
+                                    </RoomSection>
+                                    <RoomSection
+                                        icon={Home}
+                                        title="Communal spaces"
+                                        count={communalRooms.length}
+                                        accent="muted"
+                                        empty={{
+                                            label: 'No communal spaces',
+                                            hint: 'Add kitchens, lounges or bathrooms with the "Assignable to client" box unticked.',
+                                        }}
+                                    >
+                                        {communalRooms.map(renderCard)}
+                                    </RoomSection>
+                                </div>
+                            );
+                        })()
                     )}
 
                     <div className="pt-2 text-right">
@@ -3985,6 +4030,69 @@ function BedroomsTab({
                 onClose={closeDialog}
             />
         </>
+    );
+}
+
+function RoomSection({
+    icon: Icon,
+    title,
+    count,
+    accent,
+    empty,
+    children,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    title: string;
+    count: number;
+    accent: 'primary' | 'muted';
+    empty: {
+        label: string;
+        hint: string;
+        ctaLabel?: string;
+        onCta?: () => void;
+    };
+    children: React.ReactNode;
+}) {
+    const accentCls =
+        accent === 'primary'
+            ? 'border-primary/30 bg-primary/5'
+            : 'border-border bg-muted/20';
+    const iconCls =
+        accent === 'primary' ? 'text-primary' : 'text-muted-foreground';
+    return (
+        <section className={`flex flex-col gap-3 rounded-2xl border p-3 ${accentCls}`}>
+            <div className="flex items-center justify-between gap-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold">
+                    <Icon className={`h-4 w-4 ${iconCls}`} />
+                    {title}
+                    <span className="text-xs font-normal text-muted-foreground">
+                        ({count})
+                    </span>
+                </h4>
+            </div>
+            {count === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
+                    <Icon className={`h-5 w-5 ${iconCls} opacity-60`} />
+                    <p className="mt-2 text-xs font-medium">{empty.label}</p>
+                    <p className="mt-1 max-w-xs text-[11px] text-muted-foreground">
+                        {empty.hint}
+                    </p>
+                    {empty.ctaLabel && empty.onCta && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-3"
+                            onClick={empty.onCta}
+                        >
+                            <Plus className="mr-1 h-3.5 w-3.5" />
+                            {empty.ctaLabel}
+                        </Button>
+                    )}
+                </div>
+            ) : (
+                <div className="grid gap-3 2xl:grid-cols-2">{children}</div>
+            )}
+        </section>
     );
 }
 
