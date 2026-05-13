@@ -461,7 +461,7 @@ export function ShowRoomDialog({
     const occupant = room.assigned_client ?? null;
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <div className="flex items-start gap-3">
                         <span className="shrink-0 rounded-xl border bg-background/60 p-2">
@@ -510,8 +510,8 @@ export function ShowRoomDialog({
                 </DialogHeader>
 
                 {occupant ? (
-                    <div className="mt-2 flex items-center gap-3 rounded-xl border bg-card/40 p-3">
-                        <Avatar className="size-10">
+                    <div className="mt-3 flex items-center gap-3 rounded-xl border bg-card/40 p-3">
+                        <Avatar className="size-11 shrink-0">
                             {occupant.profile_photo_url && (
                                 <AvatarImage
                                     src={occupant.profile_photo_url}
@@ -533,21 +533,22 @@ export function ShowRoomDialog({
                         </div>
                         <Button
                             type="button"
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             asChild
+                            className="shrink-0"
                         >
                             <a href={`/clients/${occupant.id}`}>Open profile</a>
                         </Button>
                     </div>
                 ) : (
-                    <div className="mt-2 rounded-xl border border-dashed p-3 text-center text-sm text-muted-foreground">
+                    <div className="mt-3 rounded-xl border border-dashed p-3 text-center text-sm text-muted-foreground">
                         No client assigned yet.
                     </div>
                 )}
 
                 {room.notes && (
-                    <div className="mt-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                    <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-sm">
                         <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
                             Notes
                         </p>
@@ -556,32 +557,38 @@ export function ShowRoomDialog({
                 )}
 
                 {room.history && room.history.length > 0 && (
-                    <div className="mt-2 rounded-xl border bg-card/40 p-3">
-                        <p className="mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+                    <div className="mt-3 rounded-xl border bg-card/40">
+                        <p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground">
                             <History className="h-3 w-3" />
                             Assignment history
+                            <span className="ml-auto normal-case tracking-normal text-[10px] opacity-70">
+                                Most recent first
+                            </span>
                         </p>
-                        <ul className="space-y-1.5">
-                            {room.history.slice(0, 6).map((h) => (
-                                <li
-                                    key={h.id}
-                                    className="flex flex-wrap items-baseline justify-between gap-2 text-xs"
-                                >
-                                    <span className="font-medium">
-                                        {h.client
-                                            ? `${h.client.first_name} ${h.client.last_name}`.trim()
-                                            : 'Unknown client'}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                        {h.assigned_from ?? '—'}
-                                        {' → '}
-                                        {h.assigned_until ?? 'present'}
-                                        {h.assigned_by && (
-                                            <> · by {h.assigned_by}</>
-                                        )}
-                                    </span>
-                                </li>
-                            ))}
+                        <ul className="max-h-48 divide-y overflow-y-auto">
+                            {room.history.slice(0, 8).map((h) => {
+                                const range = `${h.assigned_from ?? '—'} → ${
+                                    h.assigned_until ?? 'present'
+                                }`;
+                                return (
+                                    <li
+                                        key={h.id}
+                                        className="px-3 py-2 text-xs"
+                                    >
+                                        <p className="truncate font-medium">
+                                            {h.client
+                                                ? `${h.client.first_name} ${h.client.last_name}`.trim()
+                                                : 'Unknown client'}
+                                        </p>
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                            {range}
+                                            {h.assigned_by && (
+                                                <> · by {h.assigned_by}</>
+                                            )}
+                                        </p>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
                 )}
