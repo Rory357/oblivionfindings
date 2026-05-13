@@ -304,6 +304,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/sites/{site}/rooms/{room}/assign', [SiteRoomController::class, 'assign'])
         ->name('sites.rooms.assign')
         ->middleware('permission:sites.update');
+    Route::post('/sites/{site}/rooms/{room}/assets', [SiteRoomController::class, 'attachAsset'])
+        ->name('sites.rooms.assets.attach')
+        ->middleware('permission:sites.update');
+    Route::delete('/sites/{site}/rooms/{room}/assets/{asset}', [SiteRoomController::class, 'detachAsset'])
+        ->name('sites.rooms.assets.detach')
+        ->middleware('permission:sites.update');
+    Route::patch('/sites/{site}/rooms/order', [SiteRoomController::class, 'reorder'])
+        ->name('sites.rooms.reorder')
+        ->middleware('permission:sites.update');
+    Route::post('/sites/{site}/rooms/{room}/restore', [SiteRoomController::class, 'restore'])
+        ->name('sites.rooms.restore')
+        ->middleware('permission:sites.update');
+    Route::get('/sites/{site}/rooms/{room}/door-card', [SiteRoomController::class, 'doorCard'])
+        ->name('sites.rooms.door-card')
+        ->middleware('permission:sites.viewAny');
 
     Route::get('/sites/{site}/resources', [SiteResourceController::class, 'index'])
         ->name('sites.resources.index')

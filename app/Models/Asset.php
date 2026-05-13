@@ -38,6 +38,7 @@ class Asset extends Model
 
     protected $fillable = [
         'site_id',
+        'room_id',
         'home_site_id',
         'primary_driver_user_id',
         'client_id',
@@ -99,6 +100,11 @@ class Asset extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(SiteHouseRoom::class, 'room_id');
     }
 
     public function categoryRef(): BelongsTo

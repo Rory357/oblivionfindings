@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
+use App\Models\ClientPersonalAsset;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class SiteRoomController extends Controller
 {
@@ -13,52 +17,161 @@ class SiteRoomController extends Controller
     {
         $this->authorize('view', $site);
 
-        $rooms = SiteHouseRoom::where('site_id', $site->id)
-            ->with('assignedClient:id,first_name,last_name')
-            ->with('history.client:id,first_name,last_name')
+        $rooms = SiteHouseRoom::query()
+            ->where('site_id', $site->id)
+            ->with([
+                'assignedClient:id,first_name,last_name,preferred_name,profile_photo_path,status,key_worker_id,safeguarding_flag,risk_level',
+                'assignedClient.keyWorker:id,name',
+                'history' => fn ($h) => $h
+                    ->orderByDesc('id')
+                    ->with([
+                        'client:id,first_name,last_name',
+                        'assignedBy:id,name',
+                    ]),
+            ])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
+        // Site assets in any of these rooms.
+        $siteAssetsByRoom = Asset::query()
+            ->where('site_id', $site->id)
+            ->whereNotNull('room_id')
+            ->orderBy('name')
+            ->get([
+                'id', 'room_id', 'name', 'asset_tag', 'category', 'status',
+                'risk_level', 'location',
+            ])
+            ->groupBy('room_id');
+
+        // Personal assets (read-only — surfaced per occupant's room).
+        $personalAssetsByRoom = ClientPersonalAsset::query()
+            ->where('site_id', $site->id)
+            ->whereNotNull('room_id')
+            ->orderBy('name')
+            ->get([
+                'id', 'room_id', 'client_id', 'name', 'category', 'status',
+                'condition', 'photo_path',
+            ])
+            ->groupBy('room_id');
+
+        $assignableAssetPool = Asset::query()
+            ->where('site_id', $site->id)
+            ->whereNull('room_id')
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['id', 'name', 'asset_tag', 'category', 'status']);
+
         $clients = $site->clients()
-            ->select(['id', 'first_name', 'last_name'])
+            ->select(['id', 'first_name', 'last_name', 'preferred_name', 'status'])
             ->orderBy('first_name')
             ->get();
+
+        $assignableCollection = $rooms->where('is_assignable', true);
+        $occupied = $assignableCollection->whereNotNull('assigned_client_id')->count();
+        $bedrooms = $assignableCollection->count();
 
         return inertia('sites/rooms/index', [
             'site' => [
                 'id' => $site->id,
                 'name' => $site->name,
+                'type' => $site->type,
+                'region' => $site->region,
+                'is_active' => (bool) $site->is_active,
+                'is_high_risk' => (bool) $site->is_high_risk,
             ],
-            'rooms' => $rooms->map(fn($r) => [
-                'id' => $r->id,
-                'name' => $r->name,
-                'notes' => $r->notes,
-                'is_active' => $r->is_active,
-                'assigned_client' => $r->assignedClient ? [
-                    'id' => $r->assignedClient->id,
-                    'first_name' => $r->assignedClient->first_name,
-                    'last_name' => $r->assignedClient->last_name,
-                ] : null,
-                'history' => $r->history->map(fn($h) => [
-                    'id' => $h->id,
-                    'client_id' => $h->client_id,
-                    'client' => $h->client ? [
-                        'id' => $h->client->id,
-                        'first_name' => $h->client->first_name,
-                        'last_name' => $h->client->last_name,
+            'rooms' => $rooms->map(function ($r) use ($siteAssetsByRoom, $personalAssetsByRoom) {
+                $client = $r->assignedClient;
+                return [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'notes' => $r->notes,
+                    'is_active' => (bool) $r->is_active,
+                    'is_assignable' => (bool) ($r->is_assignable ?? true),
+                    'sort_order' => $r->sort_order,
+                    'assigned_from' => $r->assigned_from?->toDateString(),
+                    'assigned_until' => $r->assigned_until?->toDateString(),
+                    'assigned_client' => $client ? [
+                        'id' => $client->id,
+                        'first_name' => $client->first_name,
+                        'last_name' => $client->last_name,
+                        'preferred_name' => $client->preferred_name,
+                        'status' => $client->status,
+                        'risk_level' => $client->risk_level,
+                        'safeguarding_flag' => (bool) $client->safeguarding_flag,
+                        'profile_photo_url' => $client->profile_photo_url,
+                        'key_worker' => $client->keyWorker ? [
+                            'id' => $client->keyWorker->id,
+                            'name' => $client->keyWorker->name,
+                        ] : null,
                     ] : null,
-                    'assigned_from' => $h->assigned_from,
-                    'assigned_until' => $h->assigned_until,
-                    'notes' => $h->notes,
-                    'created_at' => $h->created_at,
-                ]),
-            ]),
-            'clients' => $clients->map(fn($c) => [
+                    'assets' => ($siteAssetsByRoom[$r->id] ?? collect())->map(fn ($a) => [
+                        'id' => $a->id,
+                        'name' => $a->name,
+                        'asset_tag' => $a->asset_tag,
+                        'category' => $a->category,
+                        'status' => $a->status,
+                        'risk_level' => $a->risk_level,
+                        'location' => $a->location,
+                    ])->values(),
+                    'personal_assets' => ($personalAssetsByRoom[$r->id] ?? collect())->map(fn ($p) => [
+                        'id' => $p->id,
+                        'client_id' => $p->client_id,
+                        'name' => $p->name,
+                        'category' => $p->category,
+                        'status' => $p->status,
+                        'condition' => $p->condition,
+                    ])->values(),
+                    'history' => $r->history->map(fn ($h) => [
+                        'id' => $h->id,
+                        'client' => $h->client ? [
+                            'id' => $h->client->id,
+                            'first_name' => $h->client->first_name,
+                            'last_name' => $h->client->last_name,
+                        ] : null,
+                        'assigned_from' => $h->assigned_from?->toDateString(),
+                        'assigned_until' => $h->assigned_until?->toDateString(),
+                        'assigned_by' => $h->assignedBy?->name,
+                        'notes' => $h->notes,
+                    ])->values(),
+                ];
+            })->values(),
+            'clients' => $clients->map(fn ($c) => [
                 'id' => $c->id,
                 'first_name' => $c->first_name,
                 'last_name' => $c->last_name,
-            ]),
+                'preferred_name' => $c->preferred_name,
+                'status' => $c->status,
+            ])->values(),
+            'availableAssets' => $assignableAssetPool->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'asset_tag' => $a->asset_tag,
+                'category' => $a->category,
+                'status' => $a->status,
+            ])->values(),
+            'summary' => [
+                'total' => $rooms->count(),
+                'active' => $rooms->where('is_active', true)->count(),
+                'inactive' => $rooms->where('is_active', false)->count(),
+                'bedrooms' => $bedrooms,
+                'communal' => $rooms->where('is_assignable', false)->count(),
+                'occupied' => $occupied,
+                'available' => $bedrooms - $occupied,
+                'occupancy_percent' => $bedrooms > 0
+                    ? (int) round(($occupied / $bedrooms) * 100)
+                    : 0,
+                'assets_linked' => $siteAssetsByRoom->flatten()->count(),
+            ],
+            'alerts' => [
+                'empty_bedrooms' => $assignableCollection->whereNull('assigned_client_id')->count(),
+                'safeguarding' => $assignableCollection
+                    ->filter(fn ($r) => $r->assignedClient && $r->assignedClient->safeguarding_flag)
+                    ->count(),
+                'missing_key_worker' => $assignableCollection
+                    ->filter(fn ($r) => $r->assignedClient && !$r->assignedClient->key_worker_id)
+                    ->count(),
+            ],
         ]);
     }
 
@@ -217,5 +330,108 @@ class SiteRoomController extends Controller
             'success',
             $newClientId ? 'Client assigned to bedroom.' : 'Bedroom unassigned.'
         );
+    }
+
+    /**
+     * Attach a site asset to a bedroom. Validates that the asset belongs to
+     * the same site.
+     */
+    public function attachAsset(Request $request, Site $site, SiteHouseRoom $room)
+    {
+        $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
+        abort_unless($room->is_assignable, 422, 'Communal spaces cannot have client-allocated assets — edit the room first if this is actually a bedroom.');
+
+        $validated = $request->validate([
+            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+        ]);
+
+        $asset = Asset::query()->findOrFail($validated['asset_id']);
+        abort_unless($asset->site_id === $site->id, 422, 'Asset belongs to another site.');
+
+        $asset->room_id = $room->id;
+        $asset->save();
+
+        return back()->with('success', 'Asset attached to bedroom.');
+    }
+
+    public function detachAsset(Request $request, Site $site, SiteHouseRoom $room, Asset $asset)
+    {
+        $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
+        abort_unless($asset->site_id === $site->id, 404);
+        abort_unless($asset->room_id === $room->id, 404);
+
+        $asset->room_id = null;
+        $asset->save();
+
+        return back()->with('success', 'Asset removed from bedroom.');
+    }
+
+    /**
+     * Persist a new sort order for rooms after a drag-and-drop. Accepts an
+     * ordered array of room IDs; rooms not in the array keep their existing
+     * sort_order.
+     */
+    public function reorder(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $validated = $request->validate([
+            'ordered_ids' => ['required', 'array', 'min:1'],
+            'ordered_ids.*' => ['integer', 'distinct', 'exists:site_house_rooms,id'],
+        ]);
+
+        DB::transaction(function () use ($validated, $site) {
+            foreach ($validated['ordered_ids'] as $index => $id) {
+                SiteHouseRoom::query()
+                    ->where('site_id', $site->id)
+                    ->whereKey($id)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return back()->with('success', 'Bedroom order updated.');
+    }
+
+    /**
+     * Render the printable door-card view for a single bedroom. Surfaces
+     * the occupant + key worker + safeguarding/risk flags in a layout
+     * intended to be printed and tucked into the door pocket.
+     */
+    public function doorCard(Request $request, Site $site, SiteHouseRoom $room)
+    {
+        $this->authorize('view', $site);
+        abort_unless($room->site_id === $site->id, 404);
+
+        $room->load([
+            'assignedClient' => fn ($q) => $q->with([
+                'keyWorker:id,name',
+                'emergencyContacts',
+                'nextOfKins',
+                'medicalProfile',
+            ]),
+        ]);
+
+        return view('sites.rooms.door-card', [
+            'site' => $site,
+            'room' => $room,
+            'client' => $room->assignedClient,
+            'generatedAt' => now(),
+            'generatedBy' => $request->user(),
+        ]);
+    }
+
+    /**
+     * Restore a soft-deactivated room (sets is_active back to true).
+     */
+    public function restore(Request $request, Site $site, SiteHouseRoom $room)
+    {
+        $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
+
+        $room->update(['is_active' => true]);
+
+        return back()->with('success', 'Bedroom restored.');
     }
 }
