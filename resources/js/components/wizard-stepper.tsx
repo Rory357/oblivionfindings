@@ -11,37 +11,37 @@ type Props = {
 };
 
 export default function WizardStepper({ steps, current }: Props) {
-    const compact = steps.length > 4;
     return (
         <ol
-            className="flex w-full min-w-0 items-center gap-2"
+            className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8"
             aria-label="Progress"
         >
             {steps.map((step, index) => {
                 const isComplete = index < current;
                 const isCurrent = index === current;
-                // When there are many steps, only show the active label so it
-                // can never overflow its column.
-                const showLabel = compact ? isCurrent : true;
                 return (
                     <li
                         key={step.key}
-                        className={`flex min-w-0 items-center gap-2 ${showLabel ? 'flex-1' : 'shrink-0'}`}
+                        className="min-w-0"
                     >
-                        <div className="flex min-w-0 items-center gap-2">
+                        <div
+                            className={`flex h-full min-w-0 items-center gap-2 rounded-md border px-2 py-2 ${
+                                isCurrent
+                                    ? 'border-primary bg-primary/10'
+                                    : isComplete
+                                      ? 'border-status-success/30 bg-status-success-bg/40'
+                                      : 'border-border bg-background'
+                            }`}
+                        >
                             <span
                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                                     isComplete
-                                        ? 'bg-status-success text-white'
+                                        ? 'bg-status-success text-primary-foreground'
                                         : isCurrent
                                           ? 'bg-primary text-primary-foreground'
                                           : 'bg-muted text-muted-foreground'
                                 }`}
                                 aria-current={isCurrent ? 'step' : undefined}
-                                aria-label={
-                                    !showLabel ? step.label : undefined
-                                }
-                                title={!showLabel ? step.label : undefined}
                             >
                                 {isComplete ? (
                                     <Check className="h-4 w-4" />
@@ -49,25 +49,16 @@ export default function WizardStepper({ steps, current }: Props) {
                                     index + 1
                                 )}
                             </span>
-                            {showLabel && (
-                                <span
-                                    className={`hidden truncate text-xs font-medium sm:inline ${
-                                        isCurrent
-                                            ? 'text-foreground'
-                                            : 'text-muted-foreground'
-                                    }`}
-                                >
-                                    {step.label}
-                                </span>
-                            )}
-                        </div>
-                        {index < steps.length - 1 && (
                             <span
-                                className={`h-0.5 flex-1 min-w-2 rounded-full ${
-                                    isComplete ? 'bg-status-success' : 'bg-muted'
+                                className={`min-w-0 break-words text-xs font-medium leading-tight ${
+                                    isCurrent
+                                        ? 'text-foreground'
+                                        : 'text-muted-foreground'
                                 }`}
-                            />
-                        )}
+                            >
+                                {step.label}
+                            </span>
+                        </div>
                     </li>
                 );
             })}

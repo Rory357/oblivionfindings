@@ -186,7 +186,44 @@ class SiteRoomController extends Controller
                     ->filter(fn ($r) => $r->assignedClient && !$r->assignedClient->key_worker_id)
                     ->count(),
             ],
+            'can_edit' => (bool) $request->user()?->canDo('sites.update'),
         ]);
+    }
+
+    public function seedDefaults(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+        abort_unless(in_array($site->type, ['house', 'residential'], true), 404);
+
+        $defaults = [
+            ['name' => 'Bedroom 1', 'assignable' => true],
+            ['name' => 'Bedroom 2', 'assignable' => true],
+            ['name' => 'Bedroom 3', 'assignable' => true],
+            ['name' => 'Kitchen', 'assignable' => false],
+            ['name' => 'Lounge', 'assignable' => false],
+            ['name' => 'Bathroom', 'assignable' => false],
+            ['name' => 'Laundry', 'assignable' => false],
+            ['name' => 'Hallway', 'assignable' => false],
+            ['name' => 'Garage', 'assignable' => false],
+            ['name' => 'Garden / Exterior', 'assignable' => false],
+        ];
+
+        foreach ($defaults as $index => $room) {
+            SiteHouseRoom::query()->updateOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'name' => $room['name'],
+                ],
+                [
+                    'tenant_id' => $site->tenant_id,
+                    'is_active' => true,
+                    'is_assignable' => $room['assignable'],
+                    'sort_order' => $index + 1,
+                ],
+            );
+        }
+
+        return back()->with('success', 'Standard rooms added.');
     }
 
     public function store(Request $request, Site $site)

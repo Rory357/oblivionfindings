@@ -45,6 +45,17 @@ class SiteDamage extends Model
         'photos' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $damage): void {
+            if ($damage->tenant_id === null && $damage->site_id !== null) {
+                $damage->tenant_id = Site::query()
+                    ->whereKey($damage->site_id)
+                    ->value('tenant_id');
+            }
+        });
+    }
+
     // Relationships
 
     public function site(): BelongsTo

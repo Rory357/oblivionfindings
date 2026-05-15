@@ -59,6 +59,10 @@ class SiteHazardController extends Controller
             'hazardTypes' => $hazardTypes,
             'severityOptions' => SiteHazardRiskCalculator::severities(),
             'likelihoodOptions' => SiteHazardRiskCalculator::likelihoods(),
+            'prefill' => [
+                'type' => is_string($request->query('type')) ? $request->query('type') : null,
+                'label' => is_string($request->query('label')) ? $request->query('label') : null,
+            ],
         ]);
     }
 

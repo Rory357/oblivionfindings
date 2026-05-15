@@ -26,7 +26,9 @@ use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
 use App\Services\Sites\HouseLedgerPresenter;
 use App\Services\Sites\HouseLedgerService;
+use App\Services\Sites\SiteReadinessService;
 use App\Services\UserSiteAccessService;
+use App\Support\NzRegions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -38,13 +40,20 @@ class SiteController extends Controller
         $this->authorize('viewAny', Site::class);
 
         $user = $request->user();
+        $search = trim((string) $request->input('q', ''));
         $type = $request->input('type');
         $status = $request->input('status', 'all');
         $region = $request->input('region');
         $risk = $request->input('risk');
         $managerId = $request->input('manager_id');
+        $audit = $request->input('audit');
+        $hazards = $request->input('hazards');
+        $maintenance = $request->input('maintenance');
+        $readiness = $request->input('readiness');
+        $service = $request->input('service');
         $allowedTypes = $this->allowedSiteTypes($request);
         $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
+        $readinessService = app(SiteReadinessService::class);
 
         if ($type && ! in_array($type, $allowedTypes, true)) {
             abort(403);
@@ -55,16 +64,36 @@ class SiteController extends Controller
             ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds));
 
         $sites = (clone $visibleSitesQuery)
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%")
+                        ->orWhere('suburb', 'like', "%{$search}%")
+                        ->orWhere('address_line_1', 'like', "%{$search}%");
+                });
+            })
             ->when(in_array($status, ['active', 'inactive']), fn ($q) => $q->where('is_active', $status === 'active'))
             ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn ($q) => $q->where('type', $type))
-            ->when($region, fn ($q) => $q->where('region', $region))
+            ->when($region, fn ($q) => $q->where(function ($query) use ($region) {
+                $query->where('region', $region)
+                    ->orWhere(function ($derivedQuery) use ($region) {
+                        $derivedQuery->where(function ($emptyRegion) {
+                            $emptyRegion->whereNull('region')->orWhere('region', '');
+                        })->whereIn('city', $this->citiesForRegion($region));
+                    });
+            }))
             ->when($risk === 'high_risk', fn ($q) => $q->where('is_high_risk', true))
             ->when($risk === 'high_needs', fn ($q) => $q->where('is_high_needs', true))
             ->when($risk === 'both', fn ($q) => $q->where('is_high_risk', true)->where('is_high_needs', true))
             ->when($managerId, fn ($q) => $q->where('primary_contact_user_id', $managerId))
-            ->with('primaryContact:id,name')
-            ->orderBy('name')
-            ->get([
+            ->when($audit === 'overdue', fn ($q) => $q->whereHas('checklistRuns', fn ($run) => $run->overdue()))
+            ->when($hazards === 'open', fn ($q) => $q->whereHas('hazards', fn ($hazard) => $hazard->open()))
+            ->when($maintenance === 'open', fn ($q) => $q->whereHas('assets', fn ($asset) => $this->openMaintenanceQuery($asset)))
+            ->when($service === 'respite', fn ($q) => $q->whereHas('serviceContexts', fn ($context) => $context
+                ->whereIn('type', ['planned_respite', 'emergency_respite', 'community_respite'])
+                ->where('is_active', true)
+            ))
+            ->select([
                 'id',
                 'name',
                 'type',
@@ -79,33 +108,67 @@ class SiteController extends Controller
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
-            ]);
+                'manager_name',
+            ])
+            ->with('primaryContact:id,name')
+            ->withCount($this->siteOperationalCounts())
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Site $site) => $this->siteIndexPayload($site, $readinessService))
+            ->when($readiness === 'incomplete', fn ($collection) => $collection
+                ->filter(fn (array $site) => $site['readiness']['is_active_but_incomplete'])
+                ->values()
+            );
+
+        $visibleSites = (clone $visibleSitesQuery)
+            ->select([
+                'id',
+                'name',
+                'type',
+                'region',
+                'city',
+                'suburb',
+                'is_active',
+                'is_high_risk',
+                'is_high_needs',
+                'primary_contact_user_id',
+                'manager_name',
+            ])
+            ->withCount($this->siteOperationalCounts())
+            ->get();
 
         // Get filter options
-        $regions = (clone $visibleSitesQuery)
-            ->distinct()
-            ->pluck('region')
+        $regions = $visibleSites
+            ->map(fn (Site $site) => $site->resolved_region)
             ->filter()
+            ->unique()
+            ->sort()
             ->values();
-        $managerIds = (clone $visibleSitesQuery)
-            ->whereNotNull('primary_contact_user_id')
-            ->distinct()
+        $managerIds = $visibleSites
             ->pluck('primary_contact_user_id')
             ->filter()
+            ->unique()
             ->values();
         $managers = \App\Models\User::whereIn('id', $managerIds)
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
+        $savedViewCounts = $this->savedViewCounts($visibleSites, $readinessService);
 
         return inertia('sites/index', [
             'sites' => $sites,
             'filters' => [
+                'q' => $search !== '' ? $search : null,
                 'type' => $type,
                 'status' => $status,
                 'region' => $region,
                 'risk' => $risk,
                 'manager_id' => $managerId,
+                'audit' => $audit,
+                'hazards' => $hazards,
+                'maintenance' => $maintenance,
+                'readiness' => $readiness,
+                'service' => $service,
             ],
             'filterOptions' => [
                 'regions' => $regions,
@@ -121,6 +184,7 @@ class SiteController extends Controller
                     ['value' => 'both', 'label' => 'Both'],
                 ],
             ],
+            'savedViewCounts' => $savedViewCounts,
         ]);
     }
 
@@ -190,61 +254,17 @@ class SiteController extends Controller
                 'updated_at',
             ]);
 
-        // Build setup completeness checklist based on ACTUAL data
-        // (not onboarding progress - that tracks wizard completion separately)
-        $checklist = [
-            [
-                'key' => 'contact_phone',
-                'label' => 'Primary contact phone recorded',
-                'done' => filled($site->phone),
-            ],
-            [
-                'key' => 'after_hours',
-                'label' => 'After-hours phone recorded',
-                'done' => filled($site->after_hours_phone),
-            ],
-            [
-                'key' => 'emergency_plan_location',
-                'label' => 'Emergency plan location recorded',
-                'done' => filled($site->emergency_plan_location),
-            ],
-            [
-                'key' => 'med_storage',
-                'label' => 'Medication storage location recorded',
-                'done' => filled($site->medication_storage_location),
-            ],
-            [
-                'key' => 'has_emergency_contact',
-                'label' => 'At least one site contact added',
-                'done' => $site->contacts->count() > 0,
-            ],
-            [
-                'key' => 'has_documents',
-                'label' => 'At least one key document uploaded (e.g. evacuation plan)',
-                'done' => $site->documents->count() > 0,
-            ],
-        ];
-
-        // Add type-specific checklist items
-        if ($site->type === 'house') {
-            $checklist[] = [
-                'key' => 'has_rooms',
-                'label' => 'At least one bedroom configured',
-                'done' => $site->houseRooms()->count() > 0,
-            ];
-        } elseif ($site->type === 'head_office') {
-            $checklist[] = [
-                'key' => 'has_resources',
-                'label' => 'At least one room/resource configured',
-                'done' => $site->hoResources()->count() > 0,
-            ];
-        } elseif ($site->type === 'facility') {
-            $checklist[] = [
-                'key' => 'has_zones',
-                'label' => 'At least one zone configured',
-                'done' => $site->facilityZones()->count() > 0,
-            ];
-        }
+        $readiness = app(SiteReadinessService::class)->evaluate($site);
+        $checklist = collect($readiness['critical'])
+            ->merge($readiness['recommended'])
+            ->map(fn (array $item) => [
+                'key' => $item['key'],
+                'label' => $item['label'],
+                'done' => $item['done'],
+            ])
+            ->values()
+            ->all();
+        $occupancy = $this->occupancyPayload($site);
 
         // Type-specific data
         $typeSpecificData = match ($site->type) {
@@ -322,7 +342,7 @@ class SiteController extends Controller
                 'city' => $site->city,
                 'postcode' => $site->postcode,
                 'country' => $site->country,
-                'region' => $site->region,
+                'region' => $site->resolved_region,
                 'latitude' => $site->latitude,
                 'longitude' => $site->longitude,
                 'access_instructions' => $site->access_instructions,
@@ -461,6 +481,8 @@ class SiteController extends Controller
                 'updated_at' => $a->updated_at?->toDateTimeString(),
             ]),
             'checklist' => $checklist,
+            'readiness' => $readiness,
+            'occupancy' => $occupancy,
             'houseLedger' => $houseLedger,
             // Vendors and credentials are scoped by the viewing user's
             // per-permission rights so the in-tab dialogs only ever see
@@ -920,6 +942,7 @@ class SiteController extends Controller
 
         return inertia('sites/create', [
             'users' => $users,
+            'regionOptions' => NzRegions::REGIONS,
             'checklistTemplates' => $this->checklistTemplatesPayload(),
             'availableAssets' => $this->availableAssetsPayload(null),
         ]);
@@ -1113,6 +1136,7 @@ class SiteController extends Controller
                 'assigned_asset_ids' => $assignedAssetIds,
             ],
             'users' => $users,
+            'regionOptions' => NzRegions::REGIONS,
             'checklistTemplates' => $this->checklistTemplatesPayload(),
             'availableAssets' => $this->availableAssetsPayload($site->id),
         ]);
@@ -1159,12 +1183,97 @@ class SiteController extends Controller
             ->with('success', 'Site updated.');
     }
 
+    public function storeOnboardingStep(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $validated = $request->validate([
+            'step' => ['required', 'string', 'in:contacts,assets'],
+            'data' => ['nullable', 'array'],
+            'data.contacts' => ['nullable', 'array'],
+            'data.contacts.*.type' => ['nullable', 'string', 'max:60'],
+            'data.contacts.*.name' => ['required_with:data.contacts', 'string', 'max:160'],
+            'data.contacts.*.role' => ['nullable', 'string', 'max:120'],
+            'data.contacts.*.phone' => ['nullable', 'string', 'max:60'],
+            'data.contacts.*.email' => ['nullable', 'email', 'max:160'],
+            'data.contacts.*.is_primary' => ['nullable', 'boolean'],
+            'data.assets' => ['nullable', 'array'],
+            'data.assets.*.name' => ['required_with:data.assets', 'string', 'max:160'],
+            'data.assets.*.category' => ['nullable', 'string', 'max:120'],
+            'data.assets.*.quantity' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'data.assets.*.notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $payload = $validated['data'] ?? [];
+
+        if ($validated['step'] === 'contacts') {
+            $this->storeOnboardingContacts($site, $payload['contacts'] ?? []);
+        }
+
+        if ($validated['step'] === 'assets') {
+            $this->storeOnboardingAssets($site, $payload['assets'] ?? [], $request->user()?->id);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     private function checklistTemplatesPayload(): array
     {
         return SiteChecklistTemplate::active()
             ->orderBy('name')
             ->get(['id', 'name', 'description', 'applicable_to_type', 'frequency'])
             ->all();
+    }
+
+    private function storeOnboardingContacts(Site $site, array $contacts): void
+    {
+        foreach ($contacts as $contact) {
+            $name = trim((string) ($contact['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            SiteContact::updateOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'type' => $contact['type'] ?? 'other',
+                    'name' => $name,
+                ],
+                [
+                    'tenant_id' => $site->tenant_id,
+                    'role' => $contact['role'] ?? null,
+                    'phone' => $contact['phone'] ?? null,
+                    'email' => $contact['email'] ?? null,
+                    'is_primary' => (bool) ($contact['is_primary'] ?? false),
+                    'notes' => $contact['notes'] ?? null,
+                ],
+            );
+        }
+    }
+
+    private function storeOnboardingAssets(Site $site, array $assets, ?int $userId): void
+    {
+        foreach ($assets as $asset) {
+            $name = trim((string) ($asset['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $quantity = max(1, (int) ($asset['quantity'] ?? 1));
+
+            for ($index = 1; $index <= $quantity; $index++) {
+                Asset::create([
+                    'site_id' => $site->id,
+                    'created_by_user_id' => $userId,
+                    'updated_by_user_id' => $userId,
+                    'name' => $quantity > 1 ? "{$name} ({$index})" : $name,
+                    'category' => $asset['category'] ?? null,
+                    'status' => 'active',
+                    'risk_level' => 'medium',
+                    'notes' => $asset['notes'] ?? null,
+                ]);
+            }
+        }
     }
 
     private function syncContacts(Site $site, array $contacts): void
@@ -1433,6 +1542,166 @@ class SiteController extends Controller
         SiteChecklistAssignment::where('site_id', $site->id)
             ->whereNotIn('id', $keepIds)
             ->update(['is_active' => false]);
+    }
+
+    private function siteOperationalCounts(): array
+    {
+        return [
+            'clients as active_clients_count' => fn ($q) => $q->where('status', 'active'),
+            'contacts',
+            'contacts as emergency_contacts_count' => fn ($q) => $q->whereIn('type', ['emergency', 'maintenance', 'manager']),
+            'documents',
+            'houseRooms as rooms_total' => fn ($q) => $q->active()->where('is_assignable', true),
+            'houseRooms as rooms_occupied' => fn ($q) => $q->active()->where('is_assignable', true)->whereNotNull('assigned_client_id'),
+            'hazards as open_hazards_count' => fn ($q) => $q->open(),
+            'hazards as recent_hazards_count' => fn ($q) => $q->where('updated_at', '>=', now()->subDays(90)),
+            'checklistRuns as overdue_checklists_count' => fn ($q) => $q->overdue(),
+            'checklistAssignments as checklist_assignments_count' => fn ($q) => $q->active(),
+            'assets as open_maintenance_count' => fn ($q) => $this->openMaintenanceQuery($q),
+            'geofences as active_geofences_count' => fn ($q) => $q->where('is_active', true),
+            'hoResources as ho_resources_count' => fn ($q) => $q->active(),
+            'facilityZones as facility_zones_count' => fn ($q) => $q->active(),
+            'serviceContexts as respite_service_contexts_count' => fn ($q) => $q
+                ->whereIn('type', ['planned_respite', 'emergency_respite', 'community_respite'])
+                ->where('is_active', true),
+        ];
+    }
+
+    private function siteIndexPayload(Site $site, SiteReadinessService $readinessService): array
+    {
+        $roomsTotal = (int) ($site->rooms_total ?? 0);
+        $roomsOccupied = (int) ($site->rooms_occupied ?? 0);
+
+        return [
+            'id' => $site->id,
+            'name' => $site->name,
+            'type' => $site->type,
+            'region' => $site->resolved_region,
+            'address_line_1' => $site->address_line_1,
+            'address_line_2' => $site->address_line_2,
+            'suburb' => $site->suburb,
+            'city' => $site->city,
+            'postcode' => $site->postcode,
+            'country' => $site->country,
+            'is_active' => (bool) $site->is_active,
+            'is_high_risk' => (bool) $site->is_high_risk,
+            'is_high_needs' => (bool) $site->is_high_needs,
+            // A linked user is canonical; manager_name is only the manual fallback for older/manual records.
+            'primary_contact' => $site->primaryContact ? [
+                'id' => $site->primaryContact->id,
+                'name' => $site->primaryContact->name,
+            ] : (filled($site->manager_name) ? [
+                'id' => null,
+                'name' => $site->manager_name,
+            ] : null),
+            'active_clients_count' => (int) ($site->active_clients_count ?? 0),
+            'contacts_count' => (int) ($site->contacts_count ?? 0),
+            'documents_count' => (int) ($site->documents_count ?? 0),
+            'rooms_total' => $roomsTotal,
+            'rooms_occupied' => $roomsOccupied,
+            'vacancies' => max(0, $roomsTotal - $roomsOccupied),
+            'open_hazards_count' => (int) ($site->open_hazards_count ?? 0),
+            'overdue_checklists_count' => (int) ($site->overdue_checklists_count ?? 0),
+            'open_maintenance_count' => (int) ($site->open_maintenance_count ?? 0),
+            'readiness' => $readinessService->slim($site),
+        ];
+    }
+
+    private function savedViewCounts($visibleSites, SiteReadinessService $readinessService): array
+    {
+        return [
+            'high_risk' => $visibleSites->filter(fn (Site $site) => $site->is_high_risk || $site->is_high_needs)->count(),
+            'audit_overdue' => $visibleSites->filter(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0) > 0)->count(),
+            'open_hazards' => $visibleSites->filter(fn (Site $site) => (int) ($site->open_hazards_count ?? 0) > 0)->count(),
+            'open_maintenance' => $visibleSites->filter(fn (Site $site) => (int) ($site->open_maintenance_count ?? 0) > 0)->count(),
+            'active_incomplete' => $visibleSites->filter(fn (Site $site) => $readinessService->slim($site)['is_active_but_incomplete'])->count(),
+            'respite' => $visibleSites->filter(fn (Site $site) => (int) ($site->respite_service_contexts_count ?? 0) > 0)->count(),
+            'inactive' => $visibleSites->where('is_active', false)->count(),
+        ];
+    }
+
+    private function occupancyPayload(Site $site): array
+    {
+        if (in_array($site->type, ['house', 'residential'], true)) {
+            $assignable = $site->houseRooms
+                ->where('is_active', true)
+                ->where('is_assignable', true);
+            $total = $assignable->count();
+            $occupied = $assignable->whereNotNull('assigned_client_id')->count();
+
+            return [
+                'label' => 'Capacity & Occupancy',
+                'noun' => 'rooms',
+                'rooms_total' => $total,
+                'rooms_occupied' => $occupied,
+                'vacancies' => max(0, $total - $occupied),
+                'percent' => $total > 0 ? (int) round(($occupied / $total) * 100) : 0,
+            ];
+        }
+
+        if ($site->type === 'head_office') {
+            $total = $site->hoResources->where('is_active', true)->count();
+
+            return [
+                'label' => 'Resources',
+                'noun' => 'resources',
+                'rooms_total' => $total,
+                'rooms_occupied' => 0,
+                'vacancies' => $total,
+                'percent' => 0,
+            ];
+        }
+
+        if ($site->type === 'facility') {
+            $total = $site->facilityZones->where('is_active', true)->count();
+
+            return [
+                'label' => 'Zones',
+                'noun' => 'zones',
+                'rooms_total' => $total,
+                'rooms_occupied' => 0,
+                'vacancies' => $total,
+                'percent' => 0,
+            ];
+        }
+
+        return [
+            'label' => 'Capacity',
+            'noun' => 'spaces',
+            'rooms_total' => 0,
+            'rooms_occupied' => 0,
+            'vacancies' => 0,
+            'percent' => 0,
+        ];
+    }
+
+    private function openMaintenanceQuery($query)
+    {
+        return $query->where(function ($maintenance) {
+            $maintenance->where('requires_maintenance', true)
+                ->orWhereDate('maintenance_due_at', '<=', now()->toDateString());
+        });
+    }
+
+    private function citiesForRegion(string $region): array
+    {
+        return [
+            'Northland' => ['Whangarei', 'Kerikeri', 'Kaitaia'],
+            'Auckland' => ['Auckland', 'Manukau', 'North Shore', 'Waitakere', 'Papakura', 'Devonport', 'Grey Lynn', 'Ponsonby', 'Mt Eden', 'Henderson', 'Takapuna', 'Albany'],
+            'Waikato' => ['Hamilton', 'Cambridge', 'Te Awamutu', 'Huntly', 'Thames', 'Tokoroa'],
+            'Bay of Plenty' => ['Tauranga', 'Rotorua', 'Whakatane', 'Mount Maunganui'],
+            'Gisborne' => ['Gisborne'],
+            "Hawke's Bay" => ['Napier', 'Hastings'],
+            'Taranaki' => ['New Plymouth'],
+            'Manawatū-Whanganui' => ['Palmerston North', 'Whanganui'],
+            'Wellington' => ['Wellington', 'Lower Hutt', 'Porirua', 'Upper Hutt', 'Kapiti', 'Te Aro'],
+            'Nelson' => ['Nelson'],
+            'Marlborough' => ['Blenheim'],
+            'West Coast' => ['Greymouth', 'Westport'],
+            'Canterbury' => ['Christchurch', 'Rangiora', 'Ashburton', 'Timaru'],
+            'Otago' => ['Dunedin', 'Queenstown', 'Oamaru'],
+            'Southland' => ['Invercargill', 'Gore'],
+        ][$region] ?? [];
     }
 
     private function allowedSiteTypes(Request $request): array

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Site;
+use App\Support\NzRegions;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class SiteFactory extends Factory
@@ -23,6 +24,7 @@ class SiteFactory extends Factory
             'suburb' => fake()->city(),
             'city' => fake()->city(),
             'postcode' => fake()->postcode(),
+            'region' => fake()->randomElement(NzRegions::REGIONS),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->unique()->safeEmail(),
             'is_active' => true,

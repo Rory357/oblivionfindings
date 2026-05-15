@@ -73,6 +73,51 @@ const frequencyLabels: Record<string, string> = {
     quarterly: 'Quarterly',
 };
 
+const CHECKLIST_EMPTY_STATE_SUGGESTIONS = [
+    {
+        key: 'site_induction',
+        label: 'Site induction',
+        hint: 'One-off induction for workers starting at this site.',
+        frequency: 'once',
+        matches: ['site induction', 'induction'],
+    },
+    {
+        key: 'fire_drill',
+        label: 'Fire drill',
+        hint: 'Quarterly drill and evacuation readiness check.',
+        frequency: 'quarterly',
+        matches: ['fire drill', 'evacuation'],
+    },
+    {
+        key: 'medication_storage_audit',
+        label: 'Medication storage audit',
+        hint: 'Monthly check for locked storage and access controls.',
+        frequency: 'monthly',
+        matches: ['medication storage', 'medication'],
+    },
+    {
+        key: 'cleaning_food_safety',
+        label: 'Cleaning & food safety',
+        hint: 'Weekly household cleaning and food safety routine.',
+        frequency: 'weekly',
+        matches: ['cleaning', 'food safety'],
+    },
+    {
+        key: 'emergency_readiness',
+        label: 'Emergency readiness check',
+        hint: 'Monthly emergency contacts, supplies, and plan review.',
+        frequency: 'monthly',
+        matches: ['emergency readiness', 'emergency'],
+    },
+    {
+        key: 'quality_home',
+        label: 'Quality Home Checklist',
+        hint: 'Monthly quality and home environment review.',
+        frequency: 'monthly',
+        matches: ['quality home'],
+    },
+];
+
 export default function SiteChecklists({ site, assignments, templates }: Props) {
     const [assignOpen, setAssignOpen] = useState(false);
 
@@ -99,6 +144,19 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
         router.post(`/sites/${site.id}/checklists/assignments/${assignmentId}/run`);
     };
 
+    const openSuggestedAssignment = (
+        suggestion: (typeof CHECKLIST_EMPTY_STATE_SUGGESTIONS)[number],
+    ) => {
+        const template = templates.find((candidate) => {
+            const name = candidate.name.toLowerCase();
+            return suggestion.matches.some((match) => name.includes(match));
+        });
+
+        form.setData('template_id', template ? String(template.id) : '');
+        form.setData('frequency', suggestion.frequency);
+        setAssignOpen(true);
+    };
+
     // Templates not yet assigned
     const assignedTemplateIds = assignments.map(a => a.template.id);
     const availableTemplates = templates.filter(t => !assignedTemplateIds.includes(t.id));
@@ -108,7 +166,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
             <Head title={`${site.name} - Checklists`} />
 
             <div className="m-4 space-y-4">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
                     <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
@@ -116,7 +174,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                     <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                         {/* Icon avatar */}
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
-                            <ClipboardCheck className="h-12 w-12 text-white md:h-14 md:w-14" />
+                            <ClipboardCheck className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
                         </div>
 
                         {/* Info */}
@@ -124,15 +182,15 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                             <h1 className="text-2xl font-bold md:text-3xl">
                                 Checklists &amp; Walkthroughs
                             </h1>
-                            <p className="mt-0.5 text-sm text-white/70">
+                            <p className="mt-0.5 text-sm text-primary-foreground/70">
                                 {site.name}
                             </p>
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge className="border-white/20 bg-white/10 text-white">
+                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
                                     {assignments.length} assigned
                                 </Badge>
-                                <Badge className="border-white/20 bg-white/10 text-white">
+                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
                                     {availableTemplates.length} available to
                                     add
                                 </Badge>
@@ -146,7 +204,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                                     asChild
                                     size="sm"
                                     variant="outline"
-                                    className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                 >
                                     <Link
                                         href={`/sites/${site.id}/checklists/runs`}
@@ -157,7 +215,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                     onClick={() => setAssignOpen(true)}
                                 >
                                     <Plus className="mr-1 h-4 w-4" />
@@ -236,14 +294,55 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                 {/* Active Assignments */}
                 <div className="space-y-3">
                     {assignments.length === 0 ? (
-                        <Card>
-                            <CardContent className="py-8 text-center text-muted-foreground">
-                                <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                <p>No checklists scheduled for this site</p>
-                                <p className="text-sm mt-1">
-                                    Click "Assign Checklist" to add one, or{' '}
-                                    <Link href="/sites/checklists/templates" className="text-primary hover:underline">
-                                        manage templates
+                        <Card className="border-dashed">
+                            <CardContent className="space-y-4 p-6">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                        <ClipboardCheck className="h-5 w-5" />
+                                    </span>
+                                    <div>
+                                        <h3 className="font-semibold">
+                                            No checklists scheduled for this site
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Recommended for supported-living sites. Schedule these to keep this site audit-ready.
+                                        </p>
+                                    </div>
+                                </div>
+                                <ul className="grid gap-2 sm:grid-cols-2">
+                                    {CHECKLIST_EMPTY_STATE_SUGGESTIONS.map((suggestion) => (
+                                        <li
+                                            key={suggestion.key}
+                                            className="flex items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-medium">
+                                                    {suggestion.label}
+                                                </p>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {suggestion.hint}
+                                                </p>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    openSuggestedAssignment(suggestion)
+                                                }
+                                            >
+                                                Schedule this
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p className="text-sm text-muted-foreground">
+                                    Need a different routine?{' '}
+                                    <Link
+                                        href="/sites/checklists/templates"
+                                        className="text-primary hover:underline"
+                                    >
+                                        Manage templates
                                     </Link>
                                 </p>
                             </CardContent>

@@ -1,8 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import WizardStepper from '@/components/wizard-stepper';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
     ArrowLeft,
@@ -10,7 +18,8 @@ import {
     Check,
     Loader2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
     SITE_TYPES,
     STEPS,
@@ -96,6 +105,7 @@ type PageProps = {
     users: WizardUser[];
     checklistTemplates: ChecklistTemplate[];
     availableAssets: AvailableAsset[];
+    regionOptions: string[];
     labels?: Record<string, string>;
 };
 
@@ -107,7 +117,7 @@ const WORKFLOW_HELP = [
 ];
 
 export default function EditSite() {
-    const { site, users, checklistTemplates, availableAssets, labels } =
+    const { site, users, checklistTemplates, availableAssets, regionOptions, labels } =
         usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
@@ -169,7 +179,7 @@ export default function EditSite() {
         [site.checklist_assignments],
     );
 
-    const { data, setData, put, processing, errors } = useForm<WizardData>({
+    const { data, setData, put, processing, errors, isDirty } = useForm<WizardData>({
         name: site.name,
         type: site.type,
         phone: site.phone ?? '',
@@ -210,6 +220,9 @@ export default function EditSite() {
     const [existingDocs, setExistingDocs] = useState<DocumentRecord[]>(
         site.documents ?? [],
     );
+    const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+    const [deleteCandidate, setDeleteCandidate] = useState<number | null>(null);
+    const nameRef = useRef<HTMLInputElement | null>(null);
 
     const selectedType = useMemo(
         () => SITE_TYPES.find((t) => t.value === data.type) ?? SITE_TYPES[1],
@@ -231,7 +244,16 @@ export default function EditSite() {
             const e: Record<string, string> = {};
             if (!data.name.trim()) e.name = 'Please give the site a name.';
             setStepErrors(e);
-            if (Object.keys(e).length > 0) return;
+            if (Object.keys(e).length > 0) {
+                requestAnimationFrame(() => {
+                    nameRef.current?.focus();
+                    nameRef.current?.scrollIntoView({
+                        block: 'center',
+                        behavior: 'smooth',
+                    });
+                });
+                return;
+            }
         }
         setStepErrors({});
         setStep((s) => Math.min(STEPS.length - 1, s + 1));
@@ -293,20 +315,22 @@ export default function EditSite() {
                 router.reload({ only: ['site'] });
             }
         } catch {
-            alert('Failed to upload document. Please try again.');
+            toast.error('Failed to upload document. Please try again.');
         }
     };
 
-    const deleteDocument = async (id: number) => {
-        if (!confirm('Delete this document?')) return;
+    const confirmDeleteDocument = async () => {
+        if (!deleteCandidate) return;
         try {
             await axios.delete(
-                `/sites/${site.id}/documents/${id}`,
+                `/sites/${site.id}/documents/${deleteCandidate}`,
                 xhrConfig(),
             );
-            setExistingDocs((prev) => prev.filter((d) => d.id !== id));
+            setExistingDocs((prev) => prev.filter((d) => d.id !== deleteCandidate));
+            setDeleteCandidate(null);
+            toast.success('Document deleted.');
         } catch {
-            alert('Failed to delete document.');
+            toast.error('Failed to delete document.');
         }
     };
 
@@ -341,6 +365,15 @@ export default function EditSite() {
         ...stepErrors,
     };
 
+    const cancel = () => {
+        if (isDirty) {
+            setConfirmCancelOpen(true);
+            return;
+        }
+
+        router.visit(`/sites/${site.id}`);
+    };
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -362,18 +395,26 @@ export default function EditSite() {
                             else saves on submit.
                         </p>
                     </div>
-                    <Link
-                        href={`/sites/${site.id}`}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={cancel}
                         aria-label="Cancel and return to site"
-                        className="frontline-focus inline-flex min-h-10 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+                        className="shrink-0"
                     >
                         Cancel
-                    </Link>
+                    </Button>
                 </div>
 
                 <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
                     <div className="min-w-0 space-y-6 lg:space-y-8">
                         <WizardStepper steps={STEPS} current={step} />
+                        <p className="sr-only" aria-live="polite">
+                            Step {step + 1} of {STEPS.length}: {STEPS[step].label}
+                        </p>
+                        <p className="sr-only" role="alert" aria-live="assertive">
+                            {Object.values(allErrors).filter(Boolean).join('. ')}
+                        </p>
 
                         <Card className="p-4 sm:p-6 lg:p-8">
                             {step === 0 && (
@@ -381,6 +422,7 @@ export default function EditSite() {
                                     data={data}
                                     setData={setDataAdapter}
                                     errors={allErrors}
+                                    fieldRefs={{ name: nameRef }}
                                     users={users}
                                 />
                             )}
@@ -389,6 +431,7 @@ export default function EditSite() {
                                     data={data}
                                     setData={setDataAdapter}
                                     errors={allErrors}
+                                    regionOptions={regionOptions}
                                 />
                             )}
                             {step === 2 && (
@@ -423,7 +466,7 @@ export default function EditSite() {
                                     existing={existingDocs}
                                     onAddPending={uploadDocument}
                                     onRemovePending={() => undefined}
-                                    onDeleteExisting={deleteDocument}
+                                    onDeleteExisting={setDeleteCandidate}
                                 />
                             )}
                             {step === 6 && (
@@ -463,7 +506,7 @@ export default function EditSite() {
                                     onClick={goNext}
                                     className="flex-1 lg:min-w-[180px] lg:flex-none"
                                 >
-                                    Next
+                                    Next: {STEPS[step + 1].label}
                                     <ArrowRight className="ml-1.5 h-4 w-4" />
                                 </Button>
                             ) : (
@@ -487,6 +530,9 @@ export default function EditSite() {
                                 </Button>
                             )}
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                            Documents save instantly. Everything else is saved when you finish the wizard.
+                        </p>
                     </div>
 
                     <aside aria-label="Site summary" className="hidden lg:block">
@@ -585,6 +631,63 @@ export default function EditSite() {
                     </aside>
                 </div>
             </div>
+
+            <Dialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Discard unsaved changes?</DialogTitle>
+                        <DialogDescription>
+                            Any unsaved site details on this form will be lost.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setConfirmCancelOpen(false)}
+                        >
+                            Keep editing
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => router.visit(`/sites/${site.id}`)}
+                        >
+                            Discard
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={deleteCandidate !== null}
+                onOpenChange={(open) => !open && setDeleteCandidate(null)}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete this document?</DialogTitle>
+                        <DialogDescription>
+                            This removes the document from the site file list.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setDeleteCandidate(null)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={confirmDeleteDocument}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

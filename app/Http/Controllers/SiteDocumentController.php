@@ -7,6 +7,7 @@ use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
 use App\Services\AuditLogger;
 use App\Services\NotificationService;
+use App\Support\SiteRecommendedDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -48,6 +49,7 @@ class SiteDocumentController extends Controller
                 'display_type' => $site->display_type,
             ],
             'can_edit' => (bool) ($request->user()?->canDo('sites.update') && $request->user()?->can('update', $site)),
+            'recommendedDocuments' => SiteRecommendedDocuments::forType($site->type),
             'folders' => $folderNames->map(fn ($name) => [
                 'id' => $folderRecords->firstWhere('name', $name)?->id,
                 'name' => $name,

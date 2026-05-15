@@ -1,9 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SiteController;
 use App\Http\Controllers\Sites\{
     ChecklistsDashboardController,
     HouseLedgerController,
+    HouseChecklistController,
     SiteCalendarController,
     SiteComplianceController,
     SiteHazardController,
@@ -11,6 +13,7 @@ use App\Http\Controllers\Sites\{
     SiteChecklistTemplateController,
     SiteVendorController,
     SiteCredentialController,
+    SiteDamageController,
     SiteHardwareController,
     SiteIntegrationController,
     SiteInspectionController,
@@ -94,6 +97,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:checklists.schedule');
         Route::post('/checklists/assignments/{assignment}/run', [SiteChecklistController::class, 'createRun'])
             ->name('sites.checklists.createRun')
+            ->middleware('permission:checklists.run');
+
+        Route::get('/house-checklists', [HouseChecklistController::class, 'index'])
+            ->name('sites.house-checklists.index');
+        Route::post('/house-checklists/templates', [HouseChecklistController::class, 'storeTemplate'])
+            ->name('sites.house-checklists.templates.store')
+            ->middleware('permission:checklists.manage_templates');
+        Route::post('/house-checklists/{template}/start', [HouseChecklistController::class, 'startRun'])
+            ->name('sites.house-checklists.start')
+            ->middleware('permission:checklists.run');
+        Route::post('/house-checklists/runs/{run}/complete', [HouseChecklistController::class, 'completeRun'])
+            ->name('sites.house-checklists.runs.complete')
             ->middleware('permission:checklists.run');
 
         // Vendors
@@ -200,6 +215,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.integrations.updateOverrides')
             ->middleware('permission:integrations.manage_site_secrets');
 
+        Route::post('/onboarding/step', [SiteController::class, 'storeOnboardingStep'])
+            ->name('sites.onboarding.step')
+            ->middleware('permission:sites.update');
+
+        // Damage reporting
+        Route::get('/damages', [SiteDamageController::class, 'index'])
+            ->name('sites.damages.index');
+        Route::post('/damages', [SiteDamageController::class, 'store'])
+            ->name('sites.damages.store');
+        Route::put('/damages/{damage}', [SiteDamageController::class, 'update'])
+            ->name('sites.damages.update');
+        Route::delete('/damages/{damage}', [SiteDamageController::class, 'destroy'])
+            ->name('sites.damages.destroy');
+
     });
 
     // Hazard routes (not site-scoped)
@@ -294,6 +323,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:sites.viewAny');
     Route::post('/sites/{site}/rooms', [SiteRoomController::class, 'store'])
         ->name('sites.rooms.store')
+        ->middleware('permission:sites.update');
+    Route::post('/sites/{site}/rooms/seed-defaults', [SiteRoomController::class, 'seedDefaults'])
+        ->name('sites.rooms.seed-defaults')
         ->middleware('permission:sites.update');
     Route::put('/sites/{site}/rooms/{room}', [SiteRoomController::class, 'update'])
         ->name('sites.rooms.update')

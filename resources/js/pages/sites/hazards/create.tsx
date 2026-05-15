@@ -38,6 +38,10 @@ type Props = {
     }>;
     severityOptions: string[];
     likelihoodOptions: string[];
+    prefill?: {
+        type?: string | null;
+        label?: string | null;
+    };
 };
 
 const HAZARD_TYPE_ICONS: Record<string, typeof AlertTriangle> = {
@@ -198,15 +202,32 @@ const riskRatingMessages: Record<string, string> = {
 };
 
 export default function CreateHazard() {
-    const { site, hazardTypes, severityOptions, likelihoodOptions } =
+    const { site, hazardTypes, severityOptions, likelihoodOptions, prefill } =
         usePage<Props>().props;
+    const hazardTypeKeys = new Set(hazardTypes.map((type) => type.key));
+    const prefillType = prefill?.type ?? '';
+    const prefillTypeIsKnown =
+        prefillType !== '' && hazardTypeKeys.has(prefillType);
+    const prefillLabel =
+        prefill?.label ??
+        (prefillType
+            ? prefillType
+                  .split('_')
+                  .filter(Boolean)
+                  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                  .join(' ')
+            : '');
 
     const { data, setData, post, processing, errors } = useForm({
-        hazard_type: '',
-        custom_hazard_type: '',
+        hazard_type: prefillTypeIsKnown
+            ? prefillType
+            : prefillType
+              ? 'custom'
+              : '',
+        custom_hazard_type: prefillTypeIsKnown ? '' : prefillLabel,
         severity: 'medium' as string,
         likelihood: 'possible' as string,
-        description: '',
+        description: prefillLabel ? `${prefillLabel}: ` : '',
         location: '',
         witnesses: '',
         immediate_action_applied: false,

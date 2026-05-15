@@ -43,6 +43,7 @@ import {
     Printer,
     Search,
     Shield,
+    Sparkles,
     Trash2,
     UserCog,
     UserPlus,
@@ -161,6 +162,7 @@ type Props = {
     availableAssets: AssetForPicker[];
     summary: Summary;
     alerts: Alerts;
+    can_edit?: boolean;
 };
 
 type FilterKey = 'all' | 'bedrooms' | 'communal' | 'occupied' | 'available';
@@ -194,6 +196,7 @@ export default function FullBedroomManagement({
     availableAssets,
     summary,
     alerts,
+    can_edit = false,
 }: Props) {
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<FilterKey>('all');
@@ -325,6 +328,14 @@ export default function FullBedroomManagement({
                     summary={summary}
                     alerts={alerts}
                     onAdd={() => setDialog({ mode: 'add', target: null })}
+                    canEdit={can_edit}
+                    onSeedDefaults={() =>
+                        router.post(
+                            `/sites/${site.id}/rooms/seed-defaults`,
+                            {},
+                            { preserveScroll: true, preserveState: true },
+                        )
+                    }
                 />
 
                 {/* Filter bar */}
@@ -567,11 +578,15 @@ function BedroomsHero({
     summary,
     alerts,
     onAdd,
+    canEdit,
+    onSeedDefaults,
 }: {
     site: Site;
     summary: Summary;
     alerts: Alerts;
     onAdd: () => void;
+    canEdit: boolean;
+    onSeedDefaults: () => void;
 }) {
     return (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
@@ -648,6 +663,18 @@ function BedroomsHero({
                         <Plus className="mr-1 h-4 w-4" />
                         Add room
                     </Button>
+                    {canEdit && summary.total < 3 && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                            onClick={onSeedDefaults}
+                        >
+                            <Sparkles className="mr-1 h-4 w-4" />
+                            Add standard rooms
+                        </Button>
+                    )}
 
                     <div className="hidden gap-2 text-center md:flex md:flex-wrap md:justify-end">
                         <HeroStat label="Bedrooms" value={summary.bedrooms} />

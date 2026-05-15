@@ -1,15 +1,23 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import WizardStepper from '@/components/wizard-stepper';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
     Check,
     Loader2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
     SITE_TYPES,
     STEPS,
@@ -35,6 +43,7 @@ type PageProps = {
     users: WizardUser[];
     checklistTemplates: ChecklistTemplate[];
     availableAssets: AvailableAsset[];
+    regionOptions: string[];
     labels?: Record<string, string>;
 };
 
@@ -81,7 +90,7 @@ const initialData: WizardData = {
 };
 
 export default function CreateSite() {
-    const { users, checklistTemplates, availableAssets, labels } =
+    const { users, checklistTemplates, availableAssets, regionOptions, labels } =
         usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
@@ -96,6 +105,8 @@ export default function CreateSite() {
         {},
     );
     const [processing, setProcessing] = useState(false);
+    const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+    const nameRef = useRef<HTMLInputElement | null>(null);
 
     const selectedType = useMemo(
         () => SITE_TYPES.find((t) => t.value === data.type) ?? SITE_TYPES[1],
@@ -117,7 +128,16 @@ export default function CreateSite() {
             const e: Record<string, string> = {};
             if (!data.name.trim()) e.name = 'Please give the site a name.';
             setErrors(e);
-            if (Object.keys(e).length > 0) return;
+            if (Object.keys(e).length > 0) {
+                requestAnimationFrame(() => {
+                    nameRef.current?.focus();
+                    nameRef.current?.scrollIntoView({
+                        block: 'center',
+                        behavior: 'smooth',
+                    });
+                });
+                return;
+            }
         }
         setErrors({});
         setStep((s) => Math.min(STEPS.length - 1, s + 1));
@@ -172,6 +192,19 @@ export default function CreateSite() {
             })),
         );
 
+    const hasUnsavedWork =
+        JSON.stringify(data) !== JSON.stringify(initialData) ||
+        pendingDocs.length > 0;
+
+    const cancel = () => {
+        if (hasUnsavedWork) {
+            setConfirmCancelOpen(true);
+            return;
+        }
+
+        router.visit('/sites');
+    };
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -191,18 +224,26 @@ export default function CreateSite() {
                             Eight quick steps. You can update anything later.
                         </p>
                     </div>
-                    <Link
-                        href="/sites"
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={cancel}
                         aria-label="Cancel and return to sites list"
-                        className="frontline-focus inline-flex min-h-10 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+                        className="shrink-0"
                     >
                         Cancel
-                    </Link>
+                    </Button>
                 </div>
 
                 <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
                     <div className="min-w-0 space-y-6 lg:space-y-8">
                         <WizardStepper steps={STEPS} current={step} />
+                        <p className="sr-only" aria-live="polite">
+                            Step {step + 1} of {STEPS.length}: {STEPS[step].label}
+                        </p>
+                        <p className="sr-only" role="alert" aria-live="assertive">
+                            {Object.values(errors).filter(Boolean).join('. ')}
+                        </p>
 
                         <Card className="p-4 sm:p-6 lg:p-8">
                             {step === 0 && (
@@ -210,6 +251,7 @@ export default function CreateSite() {
                                     data={data}
                                     setData={setData}
                                     errors={errors}
+                                    fieldRefs={{ name: nameRef }}
                                     users={users}
                                 />
                             )}
@@ -218,6 +260,7 @@ export default function CreateSite() {
                                     data={data}
                                     setData={setData}
                                     errors={errors}
+                                    regionOptions={regionOptions}
                                 />
                             )}
                             {step === 2 && (
@@ -298,7 +341,7 @@ export default function CreateSite() {
                                     onClick={goNext}
                                     className="flex-1 lg:min-w-[180px] lg:flex-none"
                                 >
-                                    Next
+                                    Next: {STEPS[step + 1].label}
                                     <ArrowRight className="ml-1.5 h-4 w-4" />
                                 </Button>
                             ) : (
@@ -322,6 +365,9 @@ export default function CreateSite() {
                                 </Button>
                             )}
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                            Changes are saved when you finish the wizard. Documents you add are uploaded straight away.
+                        </p>
                     </div>
 
                     <aside aria-label="Site summary" className="hidden lg:block">
@@ -427,6 +473,33 @@ export default function CreateSite() {
                     </aside>
                 </div>
             </div>
+
+            <Dialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Discard this draft?</DialogTitle>
+                        <DialogDescription>
+                            Any details entered for this site will be lost.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setConfirmCancelOpen(false)}
+                        >
+                            Keep editing
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => router.visit('/sites')}
+                        >
+                            Discard
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

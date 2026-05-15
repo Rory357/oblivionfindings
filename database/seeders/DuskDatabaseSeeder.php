@@ -334,6 +334,7 @@ class DuskDatabaseSeeder extends Seeder
                 'tenant_id' => 1,
                 'type' => 'house',
                 'city' => 'Auckland',
+                'region' => 'Auckland',
                 'country' => 'New Zealand',
                 'is_active' => true,
             ])
@@ -427,6 +428,7 @@ class DuskDatabaseSeeder extends Seeder
                 'email' => null,
                 'address_line_1' => '1 QA Street',
                 'city' => 'Auckland',
+                'region' => 'Auckland',
                 'postcode' => '1010',
             ])
         );

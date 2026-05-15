@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FieldLabel } from '@/components/field-label';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -220,15 +221,84 @@ export const FREQUENCIES = [
     { value: 'annually', label: 'Annually' },
 ];
 
+export const NZ_REGION_OPTIONS = [
+    'Northland',
+    'Auckland',
+    'Waikato',
+    'Bay of Plenty',
+    'Gisborne',
+    "Hawke's Bay",
+    'Taranaki',
+    'Manawatū-Whanganui',
+    'Wellington',
+    'Tasman',
+    'Nelson',
+    'Marlborough',
+    'West Coast',
+    'Canterbury',
+    'Otago',
+    'Southland',
+];
+
+const CITY_REGION_LOOKUP: Record<string, string> = {
+    auckland: 'Auckland',
+    manukau: 'Auckland',
+    'north shore': 'Auckland',
+    waitakere: 'Auckland',
+    papakura: 'Auckland',
+    devonport: 'Auckland',
+    'grey lynn': 'Auckland',
+    ponsonby: 'Auckland',
+    'mt eden': 'Auckland',
+    henderson: 'Auckland',
+    takapuna: 'Auckland',
+    albany: 'Auckland',
+    hamilton: 'Waikato',
+    cambridge: 'Waikato',
+    'te awamutu': 'Waikato',
+    tauranga: 'Bay of Plenty',
+    rotorua: 'Bay of Plenty',
+    wellington: 'Wellington',
+    'lower hutt': 'Wellington',
+    porirua: 'Wellington',
+    'upper hutt': 'Wellington',
+    'te aro': 'Wellington',
+    christchurch: 'Canterbury',
+    rangiora: 'Canterbury',
+    dunedin: 'Otago',
+    queenstown: 'Otago',
+    whangarei: 'Northland',
+    gisborne: 'Gisborne',
+    napier: "Hawke's Bay",
+    hastings: "Hawke's Bay",
+    'new plymouth': 'Taranaki',
+    'palmerston north': 'Manawatū-Whanganui',
+    whanganui: 'Manawatū-Whanganui',
+    nelson: 'Nelson',
+    blenheim: 'Marlborough',
+    greymouth: 'West Coast',
+    invercargill: 'Southland',
+};
+
+export function deriveNzRegion(city: string): string | null {
+    const needle = city.trim().toLowerCase();
+    if (!needle) return null;
+    if (CITY_REGION_LOOKUP[needle]) return CITY_REGION_LOOKUP[needle];
+    const match = Object.entries(CITY_REGION_LOOKUP).find(([key]) =>
+        needle.includes(key),
+    );
+    return match?.[1] ?? null;
+}
+
 export const STEPS: WizardStep[] = [
     { key: 'basics', label: 'Basics' },
     { key: 'address', label: 'Address' },
-    { key: 'rooms', label: 'Rooms' },
+    { key: 'rooms', label: 'Rooms / Resources' },
     { key: 'contacts', label: 'Contacts' },
     { key: 'assets', label: 'Assets' },
     { key: 'documents', label: 'Documents' },
     { key: 'checklists', label: 'Checklists' },
-    { key: 'safety', label: 'Safety' },
+    { key: 'safety', label: 'Safety & Review' },
 ];
 
 // ── Factories ─────────────────────────────────────────────────────────────
@@ -260,6 +330,10 @@ export type StepProps = {
     data: WizardData;
     setData: SetData;
     errors: Record<string, string | undefined>;
+    fieldRefs?: Partial<
+        Record<keyof WizardData, React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>>
+    >;
+    regionOptions?: string[];
 };
 
 export type ContactsStepProps = StepProps & {
@@ -275,6 +349,7 @@ export function StepBasics({
     data,
     setData,
     errors,
+    fieldRefs,
     users,
 }: StepProps & { users: WizardUser[] }) {
     return (
@@ -285,7 +360,7 @@ export function StepBasics({
             />
 
             <div>
-                <Label className="mb-2 block">Site type</Label>
+                <FieldLabel required>Site type</FieldLabel>
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {SITE_TYPES.map((type) => {
                         const Icon = type.icon;
@@ -328,27 +403,30 @@ export function StepBasics({
             </div>
 
             <div>
-                <Label htmlFor="name">
-                    Site name <span className="text-status-critical">*</span>
-                </Label>
+                <FieldLabel htmlFor="name" required>
+                    Site name
+                </FieldLabel>
                 <Input
                     id="name"
+                    ref={fieldRefs?.name as React.RefObject<HTMLInputElement>}
                     value={data.name}
                     onChange={(e) => setData('name', e.target.value)}
                     placeholder="e.g. Aroha House"
-                    className="mt-1"
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? 'name-error' : undefined}
+                    className={`mt-1 ${errors.name ? 'border-status-critical ring-1 ring-status-critical/40' : ''}`}
                 />
                 {errors.name && (
-                    <p className="mt-1 text-sm text-status-critical">
+                    <p id="name-error" className="mt-1 text-sm text-status-critical">
                         {errors.name}
                     </p>
                 )}
             </div>
 
             <div>
-                <Label htmlFor="primary_contact_user_id">
+                <FieldLabel htmlFor="primary_contact_user_id" recommended>
                     Site Lead / Manager
-                </Label>
+                </FieldLabel>
                 <Select
                     value={data.primary_contact_user_id || undefined}
                     onValueChange={(v) =>
@@ -389,7 +467,21 @@ export function StepBasics({
 
 // ── Step: Address ────────────────────────────────────────────────────────
 
-export function StepAddress({ data, setData, errors }: StepProps) {
+export function StepAddress({
+    data,
+    setData,
+    errors,
+    regionOptions = NZ_REGION_OPTIONS,
+}: StepProps) {
+    const updateCity = (city: string) => {
+        const previousDerived = deriveNzRegion(data.city);
+        const nextDerived = deriveNzRegion(city);
+        setData('city', city);
+        if (nextDerived && (!data.region || data.region === previousDerived)) {
+            setData('region', nextDerived);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <Header
@@ -429,7 +521,7 @@ export function StepAddress({ data, setData, errors }: StepProps) {
                     <Field label="City" error={errors.city}>
                         <Input
                             value={data.city}
-                            onChange={(e) => setData('city', e.target.value)}
+                            onChange={(e) => updateCity(e.target.value)}
                         />
                     </Field>
                     <Field label="Postcode" error={errors.postcode}>
@@ -451,12 +543,22 @@ export function StepAddress({ data, setData, errors }: StepProps) {
                             }
                         />
                     </Field>
-                    <Field label="Region" error={errors.region}>
-                        <Input
-                            value={data.region}
-                            onChange={(e) => setData('region', e.target.value)}
-                            placeholder="e.g. Auckland"
-                        />
+                    <Field label="Region" recommended error={errors.region}>
+                        <Select
+                            value={data.region || undefined}
+                            onValueChange={(v) => setData('region', v)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select region..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {regionOptions.map((region) => (
+                                    <SelectItem key={region} value={region}>
+                                        {region}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </Field>
                 </div>
 
@@ -545,7 +647,13 @@ export function StepRoomsOrResources({ data, setData }: StepProps) {
                                                 )
                                             }
                                             placeholder="Room name"
+                                            aria-invalid={!!roomNameWarning(room.name)}
                                         />
+                                        {roomNameWarning(room.name) && (
+                                            <p className="text-xs text-status-warning">
+                                                {roomNameWarning(room.name)}
+                                            </p>
+                                        )}
                                         <Input
                                             value={room.notes}
                                             onChange={(e) =>
@@ -905,13 +1013,13 @@ export function StepContacts({
 
             <Section icon={Phone} title="Site contact details">
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Primary phone" error={errors.phone}>
+                    <Field label="Primary phone" recommended error={errors.phone}>
                         <Input
                             value={data.phone}
                             onChange={(e) => setData('phone', e.target.value)}
                         />
                     </Field>
-                    <Field label="Email" error={errors.email}>
+                    <Field label="Email" recommended error={errors.email}>
                         <Input
                             type="email"
                             value={data.email}
@@ -921,7 +1029,7 @@ export function StepContacts({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Manager name" error={errors.manager_name}>
+                    <Field label="Manager name" optional error={errors.manager_name}>
                         <Input
                             value={data.manager_name}
                             onChange={(e) =>
@@ -929,7 +1037,7 @@ export function StepContacts({
                             }
                         />
                     </Field>
-                    <Field label="Manager phone" error={errors.manager_phone}>
+                    <Field label="Manager phone" optional error={errors.manager_phone}>
                         <Input
                             value={data.manager_phone}
                             onChange={(e) =>
@@ -941,6 +1049,7 @@ export function StepContacts({
 
                 <Field
                     label="After-hours phone"
+                    recommended
                     error={errors.after_hours_phone}
                 >
                     <Input
@@ -1376,6 +1485,7 @@ function DocumentUploader({
     const [category, setCategory] = useState<string | undefined>(undefined);
     const [expiryDate, setExpiryDate] = useState('');
     const [notes, setNotes] = useState('');
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     const reset = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1383,6 +1493,7 @@ function DocumentUploader({
         setCategory(undefined);
         setExpiryDate('');
         setNotes('');
+        setUploadError(null);
     };
 
     return (
@@ -1450,14 +1561,26 @@ function DocumentUploader({
                 />
             </Field>
 
+            {uploadError && (
+                <p
+                    role="alert"
+                    className="rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical"
+                >
+                    {uploadError}
+                </p>
+            )}
+
             <Button
                 type="button"
                 onClick={() => {
                     const file = fileInputRef.current?.files?.[0];
                     if (!file || !title.trim()) {
-                        alert('Please choose a file and enter a title.');
+                        setUploadError(
+                            'Please choose a file and enter a title.',
+                        );
                         return;
                     }
+                    setUploadError(null);
                     onAdd({
                         file,
                         title: title.trim(),
@@ -1684,6 +1807,7 @@ export function StepSafety({ data, setData, errors }: StepProps) {
             <Section icon={Shield} title="Safety information">
                 <Field
                     label="Emergency plan location"
+                    recommended
                     error={errors.emergency_plan_location}
                 >
                     <Input
@@ -1699,6 +1823,7 @@ export function StepSafety({ data, setData, errors }: StepProps) {
                 </Field>
                 <Field
                     label="Medication storage location"
+                    recommended
                     error={errors.medication_storage_location}
                 >
                     <Input
@@ -1828,16 +1953,28 @@ export function Field({
     label,
     error,
     hint,
+    required,
+    recommended,
+    optional,
     children,
 }: {
     label: string;
     error?: string;
     hint?: string;
+    required?: boolean;
+    recommended?: boolean;
+    optional?: boolean;
     children: React.ReactNode;
 }) {
     return (
         <div>
-            <Label className="mb-1 block">{label}</Label>
+            <FieldLabel
+                required={required}
+                recommended={recommended}
+                optional={optional}
+            >
+                {label}
+            </FieldLabel>
             {children}
             {hint && !error && (
                 <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
@@ -1911,4 +2048,14 @@ function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function roomNameWarning(name: string): string | null {
+    const value = name.trim();
+    if (!value) return null;
+    if (value.length < 2) return 'Use a clear room name.';
+    if (!/[aeiou0-9 ]/i.test(value) || /^[a-z]{6,}$/i.test(value)) {
+        return 'This looks like a placeholder. Use names such as Bedroom 1, Kitchen, Bathroom, or Lounge.';
+    }
+    return null;
 }

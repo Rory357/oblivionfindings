@@ -17,7 +17,14 @@ class FleetDemoSeeder extends Seeder
     {
         $site = Site::query()->first();
         if (!$site) {
-            $site = Site::create(['name' => 'Demo Site']);
+            $site = Site::create([
+                'name' => 'Demo Site',
+                'type' => 'house',
+                'city' => 'Auckland',
+                'region' => 'Auckland',
+                'country' => 'New Zealand',
+                'is_active' => true,
+            ]);
         }
 
         $client = Client::query()->first();

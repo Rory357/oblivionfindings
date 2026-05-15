@@ -83,6 +83,7 @@ class RosteringProductionDemoSeeder extends Seeder
             'address_line_1' => "{$id} Demo Street",
             'suburb' => 'Te Aro',
             'city' => 'Wellington',
+            'region' => 'Wellington',
             'postcode' => '6011',
             'phone' => '04 555 0100',
             'email' => strtolower(str_replace(' ', '-', $name)).'@demo.test',

@@ -118,6 +118,54 @@ const statusConfig: Record<
     },
 };
 
+const HAZARD_EMPTY_STATE_SUGGESTIONS = [
+    {
+        key: 'slip_trip_fall',
+        label: 'Slip / trip hazards',
+        hint: 'Loose mats, wet floors, cluttered walkways.',
+    },
+    {
+        key: 'hot_water_temperature',
+        label: 'Hot water temperature',
+        hint: 'Scald risk above 50C in bathrooms or kitchens.',
+    },
+    {
+        key: 'medication_storage_access',
+        label: 'Medication storage access',
+        hint: 'Unlocked cabinet, key control, or access concern.',
+    },
+    {
+        key: 'fire_electrical',
+        label: 'Fire / electrical',
+        hint: 'Overloaded sockets, damaged leads, expired alarms.',
+    },
+    {
+        key: 'manual_handling',
+        label: 'Manual handling',
+        hint: 'Transfers, lifting, equipment, or room layout risk.',
+    },
+    {
+        key: 'security_behaviour',
+        label: 'Behavioural / security',
+        hint: 'Entry, privacy, aggression, or lone-worker concerns.',
+    },
+    {
+        key: 'outdoor_garden',
+        label: 'Outdoor / gardening hazards',
+        hint: 'Uneven paths, tools, weeds, or poor lighting.',
+    },
+    {
+        key: 'cleaning_chemicals',
+        label: 'Cleaning chemicals storage',
+        hint: 'COSHH-style storage, labels, and locked access.',
+    },
+    {
+        key: 'bathroom_safety',
+        label: 'Bathroom safety',
+        hint: 'Grab rails, non-slip surfaces, shower access.',
+    },
+];
+
 export default function SiteHazards({
     site,
     hazards,
@@ -539,15 +587,47 @@ export default function SiteHazards({
                     })}
 
                     {!data.length && (
-                        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-                            <AlertTriangle className="h-10 w-10 text-muted-foreground" />
-                            <div className="mt-2 text-sm font-medium text-muted-foreground">
-                                No hazards logged
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Log a hazard to get started
-                            </div>
-                        </div>
+                        <Card className="border-dashed">
+                            <CardContent className="space-y-4 p-6">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                        <AlertTriangle className="h-5 w-5" />
+                                    </span>
+                                    <div>
+                                        <h3 className="font-semibold">
+                                            No hazards yet
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Recommended checks for supported-living sites. Log anything that needs a control or follow-up.
+                                        </p>
+                                    </div>
+                                </div>
+                                <ul className="grid gap-2 sm:grid-cols-2">
+                                    {HAZARD_EMPTY_STATE_SUGGESTIONS.map((suggestion) => (
+                                        <li
+                                            key={suggestion.key}
+                                            className="flex items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-medium">
+                                                    {suggestion.label}
+                                                </p>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {suggestion.hint}
+                                                </p>
+                                            </div>
+                                            <Button size="sm" variant="outline" asChild>
+                                                <Link
+                                                    href={`/sites/${site.id}/hazards/create?type=${encodeURIComponent(suggestion.key)}&label=${encodeURIComponent(suggestion.label)}`}
+                                                >
+                                                    Log this
+                                                </Link>
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
 

@@ -110,6 +110,7 @@ function ContactInfoBody({
                 </div>
                 <div>
                     <Label htmlFor="ci-lead">Site Lead</Label>
+                    {/* Linked primary_contact_user_id is canonical when present; this free-text lead is the fallback shown on older site records. */}
                     <Input
                         id="ci-lead"
                         value={form.data.manager_name}

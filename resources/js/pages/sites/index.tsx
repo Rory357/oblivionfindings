@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import FleetHero from '@/components/fleet-hero';
 import { Head, Link, usePage, router } from '@inertiajs/react';
-import { Building2, Home, MapPin, Warehouse, AlertTriangle, AlertCircle, CheckCircle2, Plus, Search, X, Eye, Pencil, Calendar, ShieldAlert, ClipboardCheck } from 'lucide-react';
+import { Building2, Home, MapPin, Warehouse, AlertTriangle, AlertCircle, CheckCircle2, Plus, Search, X, Eye, Pencil, Calendar, ShieldAlert, ClipboardCheck, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,6 +36,19 @@ type Site = {
     is_high_risk: boolean;
     is_high_needs: boolean;
     primary_contact?: { id: number; name: string } | null;
+    active_clients_count?: number;
+    rooms_total?: number;
+    rooms_occupied?: number;
+    vacancies?: number;
+    open_hazards_count?: number;
+    overdue_checklists_count?: number;
+    open_maintenance_count?: number;
+    readiness?: {
+        score: number;
+        critical_done: number;
+        critical_total: number;
+        is_active_but_incomplete: boolean;
+    };
 };
 
 type PageProps = {
@@ -47,12 +60,26 @@ type PageProps = {
         region?: string;
         risk?: string;
         manager_id?: string;
+        audit?: string;
+        hazards?: string;
+        maintenance?: string;
+        readiness?: string;
+        service?: string;
     };
     filterOptions: {
         regions: string[];
         managers: { id: number; name: string }[];
         types: { value: string; label: string }[];
         risks: { value: string; label: string }[];
+    };
+    savedViewCounts: {
+        high_risk: number;
+        audit_overdue: number;
+        open_hazards: number;
+        open_maintenance: number;
+        active_incomplete: number;
+        respite: number;
+        inactive: number;
     };
     auth: { can?: any };
 };
@@ -148,12 +175,42 @@ function StatCard({ label, value, icon: Icon, color }: { label: string; value: n
     );
 }
 
+function SavedViewChip({
+    label,
+    count,
+    icon: Icon,
+    active,
+    onClick,
+}: {
+    label: string;
+    count: number;
+    icon: React.ElementType;
+    active: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <Button
+            type="button"
+            variant={active ? 'default' : 'outline'}
+            size="sm"
+            className="gap-1.5"
+            onClick={onClick}
+        >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
+                {count}
+            </Badge>
+        </Button>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function SitesIndex({ sites }: { sites: Site[] }) {
-    const { auth, filters, filterOptions, labels } = usePage<PageProps & { labels?: Record<string, string> }>().props;
+export default function SitesIndex() {
+    const { auth, filters, filterOptions, savedViewCounts, sites, labels } = usePage<PageProps & { labels?: Record<string, string> }>().props;
     const can = auth?.can ?? {};
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
@@ -166,10 +223,24 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
         router.get('/sites', newFilters, { preserveState: true, replace: true });
     };
 
-    const hasFilters = !!(filters.type || filters.status || filters.region || filters.risk || filters.manager_id || filters.q);
+    const applySavedView = (nextFilters: Record<string, string>) => {
+        router.get('/sites', { ...filters, ...nextFilters }, { preserveState: true, replace: true });
+    };
+
+    const hasFilters = !!(filters.type || filters.status || filters.region || filters.risk || filters.manager_id || filters.q || filters.audit || filters.hazards || filters.maintenance || filters.readiness || filters.service);
 
     const activeSites = sites.filter((s) => s.is_active).length;
-    const highRiskSites = sites.filter((s) => s.is_high_risk).length;
+    const openHazardsTotal = sites.reduce(
+        (sum, site) => sum + (site.open_hazards_count ?? 0),
+        0,
+    );
+    const overdueTotal = sites.reduce(
+        (sum, site) =>
+            sum +
+            (site.overdue_checklists_count ?? 0) +
+            (site.open_maintenance_count ?? 0),
+        0,
+    );
 
     return (
         <AppLayout breadcrumbs={[{ title: sitePlural, href: '/sites' }]}>
@@ -180,12 +251,13 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                 <FleetHero
                     title={sitePlural}
                     description={`Manage locations and facilities — ${sites.length} ${sites.length === 1 ? siteSingular.toLowerCase() : sitePlural.toLowerCase()} total`}
-                    icon={<Building2 className="h-7 w-7 text-white" />}
+                    icon={<Building2 className="h-7 w-7 text-primary-foreground" />}
                     stats={[
                         { label: 'Total', value: sites.length },
                         { label: 'Active', value: activeSites },
-                        { label: 'High Risk', value: highRiskSites },
-                        { label: 'Inactive', value: sites.length - activeSites },
+                        { label: 'Active but incomplete', value: savedViewCounts.active_incomplete },
+                        { label: 'Open hazards', value: openHazardsTotal },
+                        { label: 'Audit overdue', value: overdueTotal },
                     ]}
                     actions={
                         can?.sites?.create ? (
@@ -242,8 +314,20 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Risk Levels</SelectItem>
-                            {filterOptions.risks.map((r) => (
+                        {filterOptions.risks.map((r) => (
                                 <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={filters.region ?? 'all'} onValueChange={(v) => updateFilter('region', v === 'all' ? null : v)}>
+                        <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All Regions" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Regions</SelectItem>
+                            {filterOptions.regions.map((region) => (
+                                <SelectItem key={region} value={region}>{region}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -261,6 +345,16 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                     )}
                 </div>
 
+                <div className="flex flex-wrap items-center gap-2">
+                    <SavedViewChip label="High risk" count={savedViewCounts.high_risk} icon={AlertTriangle} onClick={() => updateFilter('risk', 'high_risk')} active={filters.risk === 'high_risk'} />
+                    <SavedViewChip label="Audit overdue" count={savedViewCounts.audit_overdue} icon={ClipboardCheck} onClick={() => applySavedView({ audit: 'overdue' })} active={filters.audit === 'overdue'} />
+                    <SavedViewChip label="Open hazards" count={savedViewCounts.open_hazards} icon={ShieldAlert} onClick={() => applySavedView({ hazards: 'open' })} active={filters.hazards === 'open'} />
+                    <SavedViewChip label="Maintenance" count={savedViewCounts.open_maintenance} icon={Wrench} onClick={() => applySavedView({ maintenance: 'open' })} active={filters.maintenance === 'open'} />
+                    <SavedViewChip label="Active incomplete" count={savedViewCounts.active_incomplete} icon={AlertCircle} onClick={() => applySavedView({ readiness: 'incomplete' })} active={filters.readiness === 'incomplete'} />
+                    <SavedViewChip label="Respite" count={savedViewCounts.respite} icon={Home} onClick={() => applySavedView({ service: 'respite' })} active={filters.service === 'respite'} />
+                    <SavedViewChip label="Inactive" count={savedViewCounts.inactive} icon={X} onClick={() => updateFilter('status', 'inactive')} active={filters.status === 'inactive'} />
+                </div>
+
                 {/* Table */}
                 <Card>
                     <CardContent className="p-0">
@@ -271,8 +365,13 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">{siteSingular} Name</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Type</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Region</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Risk</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Manager</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Capacity</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Clients</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Site Lead</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Open hazards</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Overdue</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground 2xl:table-cell">Risk</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Readiness</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                                     </tr>
@@ -280,7 +379,7 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                 <tbody className="divide-y">
                                     {sites.length === 0 ? (
                                         <tr>
-                                            <td className="px-4 py-16 text-center" colSpan={7}>
+                                            <td className="px-4 py-16 text-center" colSpan={12}>
                                                 <Building2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                                                 <p className="font-medium text-muted-foreground">No {sitePlural.toLowerCase()} found</p>
                                                 <p className="mt-1 text-sm text-muted-foreground/70">
@@ -291,6 +390,9 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                     ) : (
                                         sites.map((s) => {
                                             const TypeIcon = typeIcons[s.type] ?? Building2;
+                                            const overdueCount =
+                                                (s.overdue_checklists_count ?? 0) +
+                                                (s.open_maintenance_count ?? 0);
                                             return (
                                                 <tr
                                                     key={s.id}
@@ -321,11 +423,44 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                                     <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
                                                         {s.region || '—'}
                                                     </td>
-                                                    <td className="hidden px-4 py-3 lg:table-cell">
-                                                        <RiskBadge site={s} />
+                                                    <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
+                                                        {(s.rooms_total ?? 0) > 0
+                                                            ? `${s.rooms_occupied ?? 0}/${s.rooms_total} · ${s.vacancies ?? 0} vac.`
+                                                            : '—'}
+                                                    </td>
+                                                    <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
+                                                        {s.active_clients_count ?? 0}
                                                     </td>
                                                     <td className="hidden px-4 py-3 text-muted-foreground xl:table-cell">
                                                         {s.primary_contact?.name || '—'}
+                                                    </td>
+                                                    <td className="hidden px-4 py-3 xl:table-cell">
+                                                        {(s.open_hazards_count ?? 0) > 0 ? (
+                                                            <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                                {s.open_hazards_count} open
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="hidden px-4 py-3 xl:table-cell">
+                                                        {overdueCount > 0 ? (
+                                                            <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                                {overdueCount} overdue
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="hidden px-4 py-3 2xl:table-cell">
+                                                        <RiskBadge site={s} />
+                                                    </td>
+                                                    <td className="hidden px-4 py-3 xl:table-cell">
+                                                        {s.readiness ? (
+                                                            <Badge variant="outline" className={s.readiness.is_active_but_incomplete ? 'border-status-warning/30 bg-status-warning-bg text-status-warning' : 'border-status-success/30 bg-status-success-bg text-status-success'}>
+                                                                {s.readiness.score}% ready
+                                                            </Badge>
+                                                        ) : '—'}
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <Badge

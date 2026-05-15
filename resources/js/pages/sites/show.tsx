@@ -1,4 +1,5 @@
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
+import { MissingFieldButton } from '@/components/missing-field-button';
 import { DonutChart } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,6 +13,12 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -61,6 +68,7 @@ import {
     Lock,
     Mail,
     MapPin,
+    MoreHorizontal,
     Navigation,
     Package,
     Phone,
@@ -79,7 +87,7 @@ import {
     Users,
     Warehouse,
 } from 'lucide-react';
-import { useMemo, useState, type ComponentType } from 'react';
+import { useMemo, useRef, useState, type ComponentType } from 'react';
 import {
     formatSiteDocumentFileSize,
     getSiteDocumentCategory,
@@ -98,6 +106,7 @@ import {
     EditSafetyDialog,
 } from './_overview-dialogs';
 import SiteOverviewMapCard from './_overview-map-card';
+import { SiteReadinessPanel, type SiteReadiness } from './_readiness-panel';
 import {
     AddVendorDialog,
     DeleteVendorDialog,
@@ -150,7 +159,7 @@ import {
 type Site = {
     id: number;
     name: string;
-    type: 'head_office' | 'house' | 'facility';
+    type: 'head_office' | 'house' | 'facility' | 'residential';
     display_type: string;
     phone?: string | null;
     email?: string | null;
@@ -249,6 +258,14 @@ type ClientsSummary = {
     safeguarding: number;
 };
 type ChecklistItem = { key: string; label: string; done: boolean };
+type Occupancy = {
+    label: string;
+    noun: string;
+    rooms_total: number;
+    rooms_occupied: number;
+    vacancies: number;
+    percent: number;
+};
 
 type TypeSpecificData = {
     rooms?: Array<{
@@ -457,6 +474,8 @@ type Props = {
     documents: Doc[];
     assets: AssetLite[];
     checklist: ChecklistItem[];
+    readiness?: SiteReadiness;
+    occupancy: Occupancy;
     houseLedger?: SiteLedgerPanelData | null;
     typeSpecificData: TypeSpecificData;
     roomsSummary?: RoomsSummary | null;
@@ -506,12 +525,14 @@ type Props = {
 const typeIcons = {
     head_office: Building2,
     house: Home,
+    residential: Home,
     facility: Warehouse,
 };
 
 const typeColors = {
     head_office: 'bg-status-info-bg text-status-info border-status-info/30',
     house: 'bg-status-success-bg text-status-success border-status-success/30',
+    residential: 'bg-status-success-bg text-status-success border-status-success/30',
     facility:
         'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
@@ -529,11 +550,15 @@ function ContactRow({
     label,
     value,
     href,
+    canFix = false,
+    onFix,
 }: {
     icon: ComponentType<{ className?: string }>;
     label: string;
     value?: string | null;
     href?: string;
+    canFix?: boolean;
+    onFix?: () => void;
 }) {
     const content = (
         <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
@@ -546,9 +571,10 @@ function ContactRow({
                 </div>
                 <div className="truncate text-sm font-medium">
                     {value || (
-                        <span className="font-normal text-muted-foreground italic">
-                            Not specified
-                        </span>
+                        <MissingFieldButton
+                            label={`Add ${label.toLowerCase()}`}
+                            onClick={canFix ? onFix : undefined}
+                        />
                     )}
                 </div>
             </div>
@@ -560,6 +586,15 @@ function ContactRow({
         </a>
     ) : (
         content
+    );
+}
+
+function MiniOccupancyStat({ label, value }: { label: string; value: number }) {
+    return (
+        <div className="rounded-md border bg-muted/30 px-3 py-2">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 text-lg font-semibold">{value}</p>
+        </div>
     );
 }
 
@@ -1094,6 +1129,8 @@ export default function SiteShow({
     contacts,
     documents,
     checklist,
+    readiness,
+    occupancy,
     houseLedger,
     typeSpecificData,
     roomsSummary,
@@ -1124,6 +1161,38 @@ export default function SiteShow({
     const [locationOpen, setLocationOpen] = useState(false);
     const [safetyOpen, setSafetyOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('overview');
+    const readinessRef = useRef<HTMLDivElement | null>(null);
+
+    const handleReadinessAction = (action: string) => {
+        if (['add_phone', 'add_email', 'assign_lead', 'add_after_hours', 'add_contact'].includes(action)) {
+            setContactInfoOpen(true);
+            return;
+        }
+        if (['add_emergency_plan', 'add_med_storage'].includes(action)) {
+            setSafetyOpen(true);
+            return;
+        }
+        if (action === 'review_hazards') {
+            router.visit(`/sites/${site.id}/hazards`);
+            return;
+        }
+        if (action === 'upload_doc') {
+            router.visit(`/sites/${site.id}/documents`);
+            return;
+        }
+        if (action === 'configure_rooms') {
+            router.visit(`/sites/${site.id}/rooms`);
+            return;
+        }
+        if (action === 'schedule_checklist') {
+            router.visit(`/sites/${site.id}/checklists`);
+            return;
+        }
+        if (action === 'configure_geofence') {
+            setLocationOpen(true);
+        }
+    };
 
     // Vendors & Credentials in-tab dialogs.
     type VendorDialogMode = 'add' | 'edit' | 'show' | 'delete' | null;
@@ -1178,6 +1247,64 @@ export default function SiteShow({
         }
     };
 
+    const typeSpecificTab = {
+        value: 'type-specific',
+        label:
+            site.type === 'head_office'
+                ? 'Resources'
+                : site.type === 'facility'
+                  ? 'Zones'
+                  : 'Rooms',
+        icon:
+            site.type === 'head_office'
+                ? DoorOpen
+                : site.type === 'facility'
+                  ? LayoutGrid
+                  : BedDouble,
+    };
+    const moreTabs = [
+        { value: 'financials', label: 'Financials', icon: DollarSign },
+        ...(canSeeVendorsCredentials
+            ? [
+                  {
+                      value: 'vendors-credentials',
+                      label: 'Vendors & Credentials',
+                      icon: Truck,
+                  },
+              ]
+            : []),
+        {
+            value: 'hardware',
+            label: hardwareCount > 0 ? `Hardware (${hardwareCount})` : 'Hardware',
+            icon: Cpu,
+        },
+        typeSpecificTab,
+        {
+            value: 'staff-requirements',
+            label:
+                staffRequirements.length > 0
+                    ? `Staff Requirements (${staffRequirements.length})`
+                    : 'Staff Requirements',
+            icon: GraduationCap,
+        },
+        {
+            value: 'shift-coverage',
+            label:
+                coverageRequirements.length > 0
+                    ? `Shift Coverage (${coverageRequirements.length})`
+                    : 'Shift Coverage',
+            icon: Layers,
+        },
+        {
+            value: 'service-contexts',
+            label:
+                (site.service_contexts ?? []).length > 0
+                    ? `Services (${(site.service_contexts ?? []).length})`
+                    : 'Services',
+            icon: Layers,
+        },
+    ];
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -1189,7 +1316,7 @@ export default function SiteShow({
 
             <PageShell>
                 {/* ── Hero Header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
                     <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
@@ -1197,7 +1324,7 @@ export default function SiteShow({
                     <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                         {/* Site icon */}
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
-                            <TypeIcon className="h-12 w-12 text-white md:h-14 md:w-14" />
+                            <TypeIcon className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
                         </div>
 
                         {/* Info */}
@@ -1206,14 +1333,14 @@ export default function SiteShow({
                                 {site.name}
                             </h1>
                             {site.address && (
-                                <p className="mt-0.5 flex items-center justify-center gap-1.5 text-sm text-white/60 md:justify-start">
+                                <p className="mt-0.5 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/60 md:justify-start">
                                     <MapPin className="h-3.5 w-3.5" />
                                     {site.address}
                                 </p>
                             )}
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge className="border-white/20 bg-white/10 text-white/90">
+                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                     <TypeIcon className="mr-1 h-3 w-3" />
                                     {site.display_type}
                                 </Badge>
@@ -1233,13 +1360,29 @@ export default function SiteShow({
                                     className={
                                         site.is_active
                                             ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                            : 'border-white/20 bg-white/10 text-white/90'
+                                            : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
                                     }
                                 >
                                     {site.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
+                                {readiness?.is_active_but_incomplete && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            readinessRef.current?.scrollIntoView({
+                                                block: 'start',
+                                                behavior: 'smooth',
+                                            })
+                                        }
+                                    >
+                                        <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                            <AlertCircle className="mr-1 h-3 w-3" />
+                                            Setup incomplete
+                                        </Badge>
+                                    </button>
+                                )}
                                 {site.region && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                         {site.region}
                                     </Badge>
                                 )}
@@ -1254,7 +1397,7 @@ export default function SiteShow({
                                         asChild
                                         size="sm"
                                         variant="outline"
-                                        className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                     >
                                         <Link href={`/sites/${site.id}/edit`}>
                                             Edit
@@ -1269,7 +1412,7 @@ export default function SiteShow({
                                     <p className="text-2xl font-bold">
                                         {clients.length}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/60">
                                         Clients
                                     </p>
                                 </div>
@@ -1277,7 +1420,7 @@ export default function SiteShow({
                                     <p className="text-2xl font-bold">
                                         {assets.length}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/60">
                                         Assets
                                     </p>
                                 </div>
@@ -1285,7 +1428,7 @@ export default function SiteShow({
                                     <p className="text-2xl font-bold">
                                         {contacts.length}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/60">
                                         Contacts
                                     </p>
                                 </div>
@@ -1295,7 +1438,17 @@ export default function SiteShow({
                 </div>
 
                 {/* Main Tabs */}
-                <Tabs defaultValue="overview" className="space-y-4">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => {
+                        setActiveTab(value);
+                        if (value === 'fleet') loadFleet();
+                    }}
+                    className="space-y-4"
+                >
+                    <div className="relative">
+                        <span className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent" />
+                        <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent" />
                     <TabsList className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1">
                         <TabsTrigger
                             value="overview"
@@ -1369,9 +1522,44 @@ export default function SiteShow({
                                 </Badge>
                             )}
                         </TabsTrigger>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground 2xl:hidden"
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    More
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64">
+                                {moreTabs.map((tab) => {
+                                    const MoreIcon = tab.icon;
+
+                                    return (
+                                        <DropdownMenuItem
+                                            key={tab.value}
+                                            onSelect={(event) => {
+                                                event.preventDefault();
+                                                setActiveTab(tab.value);
+                                            }}
+                                            className={
+                                                activeTab === tab.value
+                                                    ? 'bg-primary/10 text-primary'
+                                                    : ''
+                                            }
+                                        >
+                                            <MoreIcon className="mr-2 h-4 w-4" />
+                                            {tab.label}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <TabsTrigger
                             value="financials"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
                             <DollarSign className="h-4 w-4" />
                             Financials
@@ -1379,7 +1567,7 @@ export default function SiteShow({
                         {canSeeVendorsCredentials && (
                             <TabsTrigger
                                 value="vendors-credentials"
-                                className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                                className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                             >
                                 <Truck className="h-4 w-4" />
                                 Vendors & Credentials
@@ -1387,7 +1575,7 @@ export default function SiteShow({
                         )}
                         <TabsTrigger
                             value="hardware"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
                             <Cpu className="h-4 w-4" />
                             Hardware
@@ -1402,7 +1590,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="type-specific"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
                             {site.type === 'house' && (
                                 <BedDouble className="h-4 w-4" />
@@ -1421,7 +1609,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="staff-requirements"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
                             <GraduationCap className="h-4 w-4" />
                             Staff Requirements
@@ -1436,7 +1624,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="shift-coverage"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
                             <Layers className="h-4 w-4" />
                             Shift Coverage
@@ -1451,7 +1639,7 @@ export default function SiteShow({
                         </TabsTrigger>
                         <TabsTrigger
                             value="service-contexts"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
                             <Layers className="h-4 w-4" />
                             Services
@@ -1465,9 +1653,35 @@ export default function SiteShow({
                             )}
                         </TabsTrigger>
                     </TabsList>
+                    </div>
 
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-4">
+                        {readiness && (
+                            <div ref={readinessRef}>
+                                <SiteReadinessPanel
+                                    readiness={readiness}
+                                    onAction={handleReadinessAction}
+                                />
+                            </div>
+                        )}
+
+                        <Card className="border-border/60 shadow-sm">
+                            <CardContent className="grid gap-4 p-4 sm:grid-cols-4">
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        {occupancy.label}
+                                    </p>
+                                    <p className="mt-1 text-2xl font-semibold">
+                                        {occupancy.percent}%
+                                    </p>
+                                </div>
+                                <MiniOccupancyStat label={`Total ${occupancy.noun}`} value={occupancy.rooms_total} />
+                                <MiniOccupancyStat label="Occupied" value={occupancy.rooms_occupied} />
+                                <MiniOccupancyStat label="Vacant" value={occupancy.vacancies} />
+                            </CardContent>
+                        </Card>
+
                         <div className="grid gap-4 lg:grid-cols-2">
                             {/* Contact Information */}
                             <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
@@ -1500,6 +1714,8 @@ export default function SiteShow({
                                                 ? `tel:${site.phone}`
                                                 : undefined
                                         }
+                                        canFix={can_edit}
+                                        onFix={() => setContactInfoOpen(true)}
                                     />
                                     <ContactRow
                                         icon={Mail}
@@ -1510,6 +1726,8 @@ export default function SiteShow({
                                                 ? `mailto:${site.email}`
                                                 : undefined
                                         }
+                                        canFix={can_edit}
+                                        onFix={() => setContactInfoOpen(true)}
                                     />
                                     <ContactRow
                                         icon={User}
@@ -1519,6 +1737,8 @@ export default function SiteShow({
                                             site.manager_name ||
                                             null
                                         }
+                                        canFix={can_edit}
+                                        onFix={() => setContactInfoOpen(true)}
                                     />
                                     <ContactRow
                                         icon={Phone}
@@ -1529,6 +1749,8 @@ export default function SiteShow({
                                                 ? `tel:${site.manager_phone}`
                                                 : undefined
                                         }
+                                        canFix={can_edit}
+                                        onFix={() => setContactInfoOpen(true)}
                                     />
                                     <ContactRow
                                         icon={Clock}
@@ -1539,6 +1761,8 @@ export default function SiteShow({
                                                 ? `tel:${site.after_hours_phone}`
                                                 : undefined
                                         }
+                                        canFix={can_edit}
+                                        onFix={() => setContactInfoOpen(true)}
                                     />
                                 </CardContent>
                             </Card>
@@ -1574,9 +1798,17 @@ export default function SiteShow({
                                                 </div>
                                                 <div className="mt-1 leading-relaxed">
                                                     {site.address || (
-                                                        <span className="text-muted-foreground italic">
-                                                            Not specified
-                                                        </span>
+                                                        <MissingFieldButton
+                                                            label="Add address"
+                                                            onClick={
+                                                                can_edit
+                                                                    ? () =>
+                                                                          setLocationOpen(
+                                                                              true,
+                                                                          )
+                                                                    : undefined
+                                                            }
+                                                        />
                                                     )}
                                                 </div>
                                             </div>
@@ -1668,9 +1900,17 @@ export default function SiteShow({
                                                 </div>
                                                 <div className="mt-1">
                                                     {site.emergency_plan_location || (
-                                                        <span className="text-muted-foreground italic">
-                                                            Not specified
-                                                        </span>
+                                                        <MissingFieldButton
+                                                            label="Add emergency plan"
+                                                            onClick={
+                                                                can_edit
+                                                                    ? () =>
+                                                                          setSafetyOpen(
+                                                                              true,
+                                                                          )
+                                                                    : undefined
+                                                            }
+                                                        />
                                                     )}
                                                 </div>
                                             </div>
@@ -1685,9 +1925,17 @@ export default function SiteShow({
                                                 </div>
                                                 <div className="mt-1">
                                                     {site.medication_storage_location || (
-                                                        <span className="text-muted-foreground italic">
-                                                            Not specified
-                                                        </span>
+                                                        <MissingFieldButton
+                                                            label="Add medication storage"
+                                                            onClick={
+                                                                can_edit
+                                                                    ? () =>
+                                                                          setSafetyOpen(
+                                                                              true,
+                                                                          )
+                                                                    : undefined
+                                                            }
+                                                        />
                                                     )}
                                                 </div>
                                             </div>

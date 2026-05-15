@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
+    CheckCircle2,
     Download,
     Filter,
     FolderOpen,
@@ -61,6 +62,7 @@ type Props = {
     can_edit: boolean;
     folders?: DocumentFolder[];
     documents: SiteDocumentRecord[];
+    recommendedDocuments?: RecommendedDocument[];
 };
 
 type DocumentForm = {
@@ -76,11 +78,38 @@ type DocumentForm = {
 
 type EditDocumentForm = Omit<DocumentForm, 'file'>;
 
+type RecommendedDocument = {
+    key: string;
+    label: string;
+    hint: string;
+};
+
+function suggestedDocumentCategory(key: string): string {
+    if (key.includes('evacuation') || key.includes('fire') || key.includes('hazard') || key.includes('safety')) {
+        return 'safety';
+    }
+
+    if (key.includes('policy') || key.includes('handbook') || key.includes('induction')) {
+        return 'policy';
+    }
+
+    if (key.includes('insurance')) {
+        return 'insurance';
+    }
+
+    if (key.includes('wof') || key.includes('inspection')) {
+        return 'compliance_cert';
+    }
+
+    return 'other';
+}
+
 export default function SiteDocuments({
     site,
     can_edit,
     folders = [],
     documents,
+    recommendedDocuments = [],
 }: Props) {
     const { labels } = usePage().props as {
         labels?: Record<string, string>;
@@ -210,6 +239,13 @@ export default function SiteDocuments({
 
     const openUpload = (folder: string | null = currentFolder) => {
         uploadForm.setData('folder', folder ?? '');
+        setShowUpload(true);
+    };
+
+    const openSuggestedUpload = (document: RecommendedDocument) => {
+        uploadForm.setData('folder', currentFolder ?? '');
+        uploadForm.setData('title', document.label);
+        uploadForm.setData('category', suggestedDocumentCategory(document.key));
         setShowUpload(true);
     };
 
@@ -386,21 +422,65 @@ export default function SiteDocuments({
 
                 {isEmpty ? (
                     <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                                <FolderOpen className="h-8 w-8 text-primary" />
+                        <CardContent className="space-y-4 p-6">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <FolderOpen className="h-5 w-5" />
+                                </span>
+                                <div>
+                                    <h3 className="font-semibold">
+                                        {search || categoryFilter
+                                            ? 'No matching documents'
+                                            : 'No documents yet'}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        {search || categoryFilter
+                                            ? 'No documents match your filters.'
+                                            : currentFolder
+                                              ? 'This folder is empty. Upload any records for this site here.'
+                                              : 'Recommended for supported-living sites. Add these to keep this site audit-ready.'}
+                                    </p>
+                                </div>
                             </div>
-                            <p className="font-medium">No Documents</p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {search || categoryFilter
-                                    ? 'No documents match your filters.'
-                                    : currentFolder
-                                      ? 'No documents in this folder yet.'
-                                      : `Upload documents for ${site.name}.`}
-                            </p>
+
+                            {!search && !categoryFilter && !currentFolder && (
+                                <ul className="grid gap-2 sm:grid-cols-2">
+                                    {recommendedDocuments.map((document) => (
+                                        <li
+                                            key={document.key}
+                                            className="flex items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"
+                                        >
+                                            <div className="flex min-w-0 items-start gap-2">
+                                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40" />
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium">
+                                                        {document.label}
+                                                    </p>
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        {document.hint}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {can_edit && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        openSuggestedUpload(document)
+                                                    }
+                                                >
+                                                    Upload
+                                                </Button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+
                             {can_edit && !search && !categoryFilter && (
                                 <Button
-                                    className="mt-4 gap-1.5 bg-primary hover:bg-primary"
+                                    className="gap-1.5 bg-primary hover:bg-primary/90"
                                     size="sm"
                                     onClick={() => openUpload()}
                                 >

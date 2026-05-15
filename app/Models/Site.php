@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Sites\SiteReadinessService;
+use App\Support\NzRegions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,6 +65,10 @@ class Site extends Model
         'lease_end_date' => 'date',
     ];
 
+    protected $appends = [
+        'resolved_region',
+    ];
+
     // Relationships
     public function clients(): HasMany
     {
@@ -103,6 +109,11 @@ class Site extends Model
     public function hazards(): HasMany
     {
         return $this->hasMany(SiteHazard::class);
+    }
+
+    public function damages(): HasMany
+    {
+        return $this->hasMany(SiteDamage::class);
     }
 
     public function checklistAssignments(): HasMany
@@ -261,6 +272,21 @@ class Site extends Model
             $flags[] = 'High Needs';
         }
         return $flags;
+    }
+
+    public function getResolvedRegionAttribute(): ?string
+    {
+        return $this->region ?: NzRegions::fromCity($this->city ?: $this->suburb);
+    }
+
+    public function operationalReadiness(): array
+    {
+        return app(SiteReadinessService::class)->evaluate($this);
+    }
+
+    public function operationalReadinessSlim(): array
+    {
+        return app(SiteReadinessService::class)->slim($this);
     }
 
     // Scopes
