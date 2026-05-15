@@ -464,34 +464,34 @@ export function ShowRoomDialog({
             <DialogContent className="max-w-xl overflow-hidden p-0">
                 {/* Branded gradient header — mirrors the site hero so the
                     dialog feels part of the same design system. */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-6 py-5 text-white">
-                    <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/10" />
-                    <div className="pointer-events-none absolute -bottom-12 -left-8 h-24 w-24 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-6 py-5 text-primary-foreground">
+                    <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-primary-foreground/10" />
+                    <div className="pointer-events-none absolute -bottom-12 -left-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
                     <DialogHeader className="relative space-y-0">
                         <div className="flex items-start gap-3">
-                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-white/10">
-                                <BedDouble className="h-6 w-6 text-white" />
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-primary-foreground/30 bg-primary-foreground/10">
+                                <BedDouble className="h-6 w-6 text-primary-foreground" />
                             </span>
                             <div className="min-w-0 flex-1">
-                                <DialogTitle className="truncate text-lg text-white">
+                                <DialogTitle className="truncate text-lg text-primary-foreground">
                                     {room.name}
                                 </DialogTitle>
-                                <DialogDescription className="mt-1 flex flex-wrap items-center gap-2 text-white/80">
+                                <DialogDescription className="mt-1 flex flex-wrap items-center gap-2 text-primary-foreground/80">
                                     {room.is_assignable === false ? (
-                                        <Badge className="border-white/30 bg-white/15 text-[10px] text-white">
+                                        <Badge className="border-primary-foreground/30 bg-primary-foreground/15 text-[10px] text-primary-foreground">
                                             Communal
                                         </Badge>
                                     ) : occupant ? (
-                                        <Badge className="border-white/30 bg-white/20 text-[10px] text-white">
+                                        <Badge className="border-primary-foreground/30 bg-primary-foreground/20 text-[10px] text-primary-foreground">
                                             Assigned
                                         </Badge>
                                     ) : (
-                                        <Badge className="border-status-success/40 bg-status-success-bg/30 text-[10px] text-white">
+                                        <Badge className="border-status-success/40 bg-status-success-bg/30 text-[10px] text-primary-foreground">
                                             Available
                                         </Badge>
                                     )}
                                     {(room.assigned_from || room.assigned_until) && (
-                                        <span className="text-xs text-white/70">
+                                        <span className="text-xs text-primary-foreground/70">
                                             {room.assigned_from && (
                                                 <>Since {room.assigned_from}</>
                                             )}

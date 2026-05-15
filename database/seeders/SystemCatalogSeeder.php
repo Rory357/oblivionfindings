@@ -15,7 +15,7 @@ class SystemCatalogSeeder extends Seeder
         // ----------------------
         // Sites
         // ----------------------
-        $siteA = Site::firstOrCreate(
+        $siteA = Site::updateOrCreate(
             ['name' => 'Kauri House'],
             [
                 'address_line_1' => '12 Kauri Street',
@@ -28,7 +28,7 @@ class SystemCatalogSeeder extends Seeder
             ]
         );
 
-        $siteB = Site::firstOrCreate(
+        $siteB = Site::updateOrCreate(
             ['name' => 'Harbour Respite'],
             [
                 'address_line_1' => '8 Quay Road',

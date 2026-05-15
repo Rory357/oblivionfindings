@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { generatePassword } from '@/lib/password-generator';
 import {
     checkPasswordStrength,
+    emptyPasswordStrength,
     strengthBadgeClasses,
     type StrengthResult,
 } from '@/lib/password-strength';
@@ -38,7 +39,7 @@ import {
     ShieldCheck,
     Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const CREDENTIAL_TYPES = [
     'password',
@@ -126,10 +127,23 @@ function AddCredentialBody({
         totp_secret: '',
     });
 
-    const strength = useMemo(
-        () => checkPasswordStrength(form.data.value),
-        [form.data.value],
+    const [strength, setStrength] = useState<StrengthResult>(
+        emptyPasswordStrength,
     );
+
+    useEffect(() => {
+        let cancelled = false;
+
+        checkPasswordStrength(form.data.value).then((result) => {
+            if (!cancelled) {
+                setStrength(result);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [form.data.value]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -237,10 +251,23 @@ function EditCredentialBody({
         totp_secret: '',
     });
 
-    const strength = useMemo(
-        () => checkPasswordStrength(form.data.value),
-        [form.data.value],
+    const [strength, setStrength] = useState<StrengthResult>(
+        emptyPasswordStrength,
     );
+
+    useEffect(() => {
+        let cancelled = false;
+
+        checkPasswordStrength(form.data.value).then((result) => {
+            if (!cancelled) {
+                setStrength(result);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [form.data.value]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

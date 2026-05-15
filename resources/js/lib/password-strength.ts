@@ -1,27 +1,5 @@
-// Thin wrapper around zxcvbn-ts so callers don't have to repeat the option
-// setup. Returns a 0-4 score and a human-readable label that maps to
-// existing theme tokens.
-
-import { zxcvbnOptions, zxcvbn } from '@zxcvbn-ts/core';
-import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
-
-const en = zxcvbnEnPackage as unknown as {
-    translations: any;
-    dictionary?: any;
-    adjacencyGraphs?: any;
-};
-
-let configured = false;
-
-function configure() {
-    if (configured) return;
-    zxcvbnOptions.setOptions({
-        translations: en.translations,
-        dictionary: en.dictionary,
-        graphs: en.adjacencyGraphs,
-    });
-    configured = true;
-}
+// Lightweight credential-strength hint. This intentionally avoids bundling the
+// full zxcvbn English dictionary into Sites dialogs.
 
 export type StrengthLevel = 'very-weak' | 'weak' | 'fair' | 'good' | 'strong';
 
@@ -40,23 +18,98 @@ const LEVELS: Record<number, { label: string; level: StrengthLevel }> = {
     4: { label: 'Very strong', level: 'strong' },
 };
 
-export function checkPasswordStrength(password: string): StrengthResult {
-    configure();
+function fallbackStrength(): StrengthResult {
+    return {
+        score: 0,
+        label: LEVELS[0].label,
+        level: LEVELS[0].level,
+        feedback: null,
+    };
+}
+
+export const emptyPasswordStrength: StrengthResult = fallbackStrength();
+
+export async function checkPasswordStrength(password: string): Promise<StrengthResult> {
     if (!password) {
-        return {
-            score: 0,
-            label: LEVELS[0].label,
-            level: LEVELS[0].level,
-            feedback: null,
-        };
+        return fallbackStrength();
     }
-    const result = zxcvbn(password);
-    const score = result.score as 0 | 1 | 2 | 3 | 4;
+
+    const result = estimatePasswordStrength(password);
+    const score = result.score;
+
     return {
         score,
         label: LEVELS[score].label,
         level: LEVELS[score].level,
-        feedback: result.feedback?.warning ?? result.feedback?.suggestions?.[0] ?? null,
+        feedback: result.feedback,
+    };
+}
+
+function estimatePasswordStrength(password: string): {
+    score: 0 | 1 | 2 | 3 | 4;
+    feedback: string | null;
+} {
+    const length = password.length;
+    const classes = [
+        /[a-z]/.test(password),
+        /[A-Z]/.test(password),
+        /\d/.test(password),
+        /[^A-Za-z0-9]/.test(password),
+    ].filter(Boolean).length;
+    const lower = password.toLowerCase();
+    const hasCommonWord = [
+        'password',
+        'welcome',
+        'admin',
+        'qwerty',
+        'letmein',
+        'oblivion',
+    ].some((word) => lower.includes(word));
+    const hasLongRepeat = /(.)\1{2,}/.test(password);
+    const hasSimpleSequence = /(?:0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf)/i.test(password);
+
+    let points = 0;
+    if (length >= 8) points += 1;
+    if (length >= 12) points += 1;
+    if (length >= 16) points += 1;
+    if (classes >= 3) points += 1;
+    if (classes === 4 && length >= 14) points += 1;
+    if (hasCommonWord) points -= 2;
+    if (hasLongRepeat || hasSimpleSequence) points -= 1;
+
+    const score = Math.max(0, Math.min(4, points)) as 0 | 1 | 2 | 3 | 4;
+
+    if (hasCommonWord) {
+        return {
+            score,
+            feedback: 'Avoid common words or service names.',
+        };
+    }
+
+    if (hasLongRepeat || hasSimpleSequence) {
+        return {
+            score,
+            feedback: 'Avoid repeated characters or simple sequences.',
+        };
+    }
+
+    if (length < 12) {
+        return {
+            score,
+            feedback: 'Use at least 12 characters.',
+        };
+    }
+
+    if (classes < 3) {
+        return {
+            score,
+            feedback: 'Mix upper, lower, numbers, or symbols.',
+        };
+    }
+
+    return {
+        score,
+        feedback: null,
     };
 }
 

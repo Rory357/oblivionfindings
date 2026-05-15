@@ -62,6 +62,15 @@ type Props = {
     site: Site;
     assignments: Assignment[];
     templates: Template[];
+    recommendedChecklists?: ChecklistSuggestion[];
+};
+
+type ChecklistSuggestion = {
+    key: string;
+    label: string;
+    hint: string;
+    frequency: string;
+    matches: string[];
 };
 
 const frequencyLabels: Record<string, string> = {
@@ -73,52 +82,12 @@ const frequencyLabels: Record<string, string> = {
     quarterly: 'Quarterly',
 };
 
-const CHECKLIST_EMPTY_STATE_SUGGESTIONS = [
-    {
-        key: 'site_induction',
-        label: 'Site induction',
-        hint: 'One-off induction for workers starting at this site.',
-        frequency: 'once',
-        matches: ['site induction', 'induction'],
-    },
-    {
-        key: 'fire_drill',
-        label: 'Fire drill',
-        hint: 'Quarterly drill and evacuation readiness check.',
-        frequency: 'quarterly',
-        matches: ['fire drill', 'evacuation'],
-    },
-    {
-        key: 'medication_storage_audit',
-        label: 'Medication storage audit',
-        hint: 'Monthly check for locked storage and access controls.',
-        frequency: 'monthly',
-        matches: ['medication storage', 'medication'],
-    },
-    {
-        key: 'cleaning_food_safety',
-        label: 'Cleaning & food safety',
-        hint: 'Weekly household cleaning and food safety routine.',
-        frequency: 'weekly',
-        matches: ['cleaning', 'food safety'],
-    },
-    {
-        key: 'emergency_readiness',
-        label: 'Emergency readiness check',
-        hint: 'Monthly emergency contacts, supplies, and plan review.',
-        frequency: 'monthly',
-        matches: ['emergency readiness', 'emergency'],
-    },
-    {
-        key: 'quality_home',
-        label: 'Quality Home Checklist',
-        hint: 'Monthly quality and home environment review.',
-        frequency: 'monthly',
-        matches: ['quality home'],
-    },
-];
-
-export default function SiteChecklists({ site, assignments, templates }: Props) {
+export default function SiteChecklists({
+    site,
+    assignments,
+    templates,
+    recommendedChecklists = [],
+}: Props) {
     const [assignOpen, setAssignOpen] = useState(false);
 
     const form = useForm({
@@ -145,7 +114,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
     };
 
     const openSuggestedAssignment = (
-        suggestion: (typeof CHECKLIST_EMPTY_STATE_SUGGESTIONS)[number],
+        suggestion: ChecklistSuggestion,
     ) => {
         const template = templates.find((candidate) => {
             const name = candidate.name.toLowerCase();
@@ -167,13 +136,13 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
 
             <div className="m-4 space-y-4">
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                         {/* Icon avatar */}
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
                             <ClipboardCheck className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
                         </div>
 
@@ -310,7 +279,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                                     </div>
                                 </div>
                                 <ul className="grid gap-2 sm:grid-cols-2">
-                                    {CHECKLIST_EMPTY_STATE_SUGGESTIONS.map((suggestion) => (
+                                    {recommendedChecklists.map((suggestion) => (
                                         <li
                                             key={suggestion.key}
                                             className="flex items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"

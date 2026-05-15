@@ -44,6 +44,7 @@ import {
     isSiteDocumentExpiringSoon,
     type SiteDocumentRecord,
 } from './_document-helpers';
+import { ConfirmAction } from './_confirm-action';
 
 type Site = {
     id: number;
@@ -82,27 +83,8 @@ type RecommendedDocument = {
     key: string;
     label: string;
     hint: string;
+    category: string;
 };
-
-function suggestedDocumentCategory(key: string): string {
-    if (key.includes('evacuation') || key.includes('fire') || key.includes('hazard') || key.includes('safety')) {
-        return 'safety';
-    }
-
-    if (key.includes('policy') || key.includes('handbook') || key.includes('induction')) {
-        return 'policy';
-    }
-
-    if (key.includes('insurance')) {
-        return 'insurance';
-    }
-
-    if (key.includes('wof') || key.includes('inspection')) {
-        return 'compliance_cert';
-    }
-
-    return 'other';
-}
 
 export default function SiteDocuments({
     site,
@@ -245,7 +227,7 @@ export default function SiteDocuments({
     const openSuggestedUpload = (document: RecommendedDocument) => {
         uploadForm.setData('folder', currentFolder ?? '');
         uploadForm.setData('title', document.label);
-        uploadForm.setData('category', suggestedDocumentCategory(document.key));
+        uploadForm.setData('category', document.category);
         setShowUpload(true);
     };
 
@@ -283,8 +265,6 @@ export default function SiteDocuments({
     };
 
     const deleteDocument = (document: SiteDocumentRecord) => {
-        if (!confirm('Delete this document?')) return;
-
         router.delete(`/sites/${site.id}/documents/${document.id}`, {
             preserveScroll: true,
         });
@@ -913,16 +893,22 @@ function DocumentCard({
                                 >
                                     <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-status-critical hover:text-status-critical"
-                                    onClick={() => onDelete(document)}
-                                    aria-label="Delete document"
+                                <ConfirmAction
+                                    title="Delete document?"
+                                    description={`Delete "${document.title || document.original_name}" from this site?`}
+                                    confirmLabel="Delete"
+                                    onConfirm={() => onDelete(document)}
                                 >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-status-critical hover:text-status-critical"
+                                        aria-label="Delete document"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </ConfirmAction>
                             </>
                         )}
                     </div>
@@ -1009,16 +995,22 @@ function DocumentListRow({
                             >
                                 <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-status-critical hover:text-status-critical"
-                                onClick={() => onDelete(document)}
-                                aria-label="Delete document"
+                            <ConfirmAction
+                                title="Delete document?"
+                                description={`Delete "${document.title || document.original_name}" from this site?`}
+                                confirmLabel="Delete"
+                                onConfirm={() => onDelete(document)}
                             >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-status-critical hover:text-status-critical"
+                                    aria-label="Delete document"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </ConfirmAction>
                         </>
                     )}
                 </div>

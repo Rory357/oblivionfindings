@@ -38,6 +38,7 @@ import {
     ShieldAlert,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ConfirmAction } from '../_confirm-action';
 
 type Site = {
     id: number;
@@ -238,12 +239,6 @@ export default function SiteDamages({
     };
 
     const handleStatusChange = (damage: Damage, newStatus: string) => {
-        if (
-            !confirm(
-                `Change status of "${damage.title}" to "${statusLabels[newStatus] ?? newStatus}"?`,
-            )
-        )
-            return;
         router.put(
             `/sites/${site.id}/damages/${damage.id}`,
             { status: newStatus },
@@ -465,19 +460,25 @@ export default function SiteDamages({
                                                     {canManage &&
                                                         damage.status ===
                                                             'reported' && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() =>
+                                                            <ConfirmAction
+                                                                title="Change damage status?"
+                                                                description={`Change "${damage.title}" to "${statusLabels.assessed}"?`}
+                                                                confirmLabel="Change status"
+                                                                onConfirm={() =>
                                                                     handleStatusChange(
                                                                         damage,
                                                                         'assessed',
                                                                     )
                                                                 }
-                                                                title="Mark as Assessed"
                                                             >
-                                                                <Eye className="h-4 w-4" />
-                                                            </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    title="Mark as Assessed"
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                            </ConfirmAction>
                                                         )}
                                                     {canManage && (
                                                         <Button

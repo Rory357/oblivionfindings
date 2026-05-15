@@ -45,6 +45,15 @@ class SiteDamage extends Model
         'photos' => 'array',
     ];
 
+    /**
+     * Multi-tenant safety hook.
+     *
+     * Damage reports are reachable from site-scoped routes and controllers
+     * sometimes create them with only `site_id` populated. Without this hook,
+     * such rows would land with `tenant_id = null` and bypass tenant scopes,
+     * leaking across tenants. We backfill `tenant_id` from the parent site
+     * when callers omit it.
+     */
     protected static function booted(): void
     {
         static::creating(function (self $damage): void {

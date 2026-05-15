@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DoorOpen, Plus, ArrowLeft, Users, Calendar, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmAction } from '../_confirm-action';
 
 type Site = {
     id: number;
@@ -97,9 +98,7 @@ export default function SiteResources({ site, resources }: Props) {
     };
 
     const handleDeactivate = (resource: Resource) => {
-        if (confirm(`Are you sure you want to deactivate "${resource.name}"?`)) {
-            deleteForm.delete(`/sites/${site.id}/resources/${resource.id}`);
-        }
+        deleteForm.delete(`/sites/${site.id}/resources/${resource.id}`);
     };
 
     const activeResources = resources.filter(r => r.is_active);
@@ -278,15 +277,25 @@ export default function SiteResources({ site, resources }: Props) {
                                                     <Button variant="ghost" size="sm" onClick={() => startEdit(resource)}>
                                                         Edit
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-status-critical hover:text-status-critical hover:bg-status-critical"
-                                                        onClick={() => handleDeactivate(resource)}
-                                                        disabled={deleteForm.processing}
+                                                    <ConfirmAction
+                                                        title="Deactivate resource?"
+                                                        description={`Deactivate "${resource.name}" for this site?`}
+                                                        confirmLabel="Deactivate"
+                                                        onConfirm={() =>
+                                                            handleDeactivate(
+                                                                resource,
+                                                            )
+                                                        }
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-status-critical hover:text-status-critical hover:bg-status-critical"
+                                                            disabled={deleteForm.processing}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </ConfirmAction>
                                                 </div>
                                             </div>
                                         </CardContent>

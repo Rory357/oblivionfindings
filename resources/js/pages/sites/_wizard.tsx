@@ -33,7 +33,16 @@ import {
     Users,
     Warehouse,
 } from 'lucide-react';
-import { useRef, useState, type ComponentType } from 'react';
+import {
+    Children,
+    cloneElement,
+    isValidElement,
+    useId,
+    useRef,
+    useState,
+    type ComponentType,
+    type ReactElement,
+} from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -1966,8 +1975,37 @@ export function Field({
     optional?: boolean;
     children: React.ReactNode;
 }) {
+    const reactId = useId();
+    const errorId = `${reactId}-error`;
+    const hasError = Boolean(error);
+
+    const enhancedChildren = Children.map(children, (child) => {
+        if (!isValidElement(child)) return child;
+        const element = child as ReactElement<{
+            'aria-invalid'?: boolean;
+            'aria-describedby'?: string;
+        }>;
+        const props: Record<string, unknown> = {};
+        if (hasError) {
+            props['aria-invalid'] = true;
+            const existingDescribedBy = element.props['aria-describedby'];
+            props['aria-describedby'] = existingDescribedBy
+                ? `${existingDescribedBy} ${errorId}`
+                : errorId;
+        }
+        return Object.keys(props).length > 0
+            ? cloneElement(element, props)
+            : element;
+    });
+
     return (
-        <div>
+        <div
+            className={
+                hasError
+                    ? '[&_input]:border-status-critical [&_input]:ring-1 [&_input]:ring-status-critical/40 [&_textarea]:border-status-critical [&_textarea]:ring-1 [&_textarea]:ring-status-critical/40'
+                    : undefined
+            }
+        >
             <FieldLabel
                 required={required}
                 recommended={recommended}
@@ -1975,12 +2013,12 @@ export function Field({
             >
                 {label}
             </FieldLabel>
-            {children}
+            {enhancedChildren}
             {hint && !error && (
                 <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
             )}
             {error && (
-                <p className="mt-1 text-sm text-status-critical">{error}</p>
+                <p id={errorId} className="mt-1 text-sm text-status-critical">{error}</p>
             )}
         </div>
     );
@@ -2054,7 +2092,12 @@ function roomNameWarning(name: string): string | null {
     const value = name.trim();
     if (!value) return null;
     if (value.length < 2) return 'Use a clear room name.';
-    if (!/[aeiou0-9 ]/i.test(value) || /^[a-z]{6,}$/i.test(value)) {
+    const whitelisted = /^(bedroom|kitchen|lounge|bathroom|laundry|hallway|garage|garden|office|dining|living|ensuite)/i;
+    if (whitelisted.test(value)) return null;
+    if (/^[a-z]{4,8}$/i.test(value)) {
+        return "This doesn't look like a real room name. Examples: Bedroom 1, Master bedroom, Lounge, Ensuite.";
+    }
+    if (!/[aeiou0-9 ]/i.test(value)) {
         return 'This looks like a placeholder. Use names such as Bedroom 1, Kitchen, Bathroom, or Lounge.';
     }
     return null;

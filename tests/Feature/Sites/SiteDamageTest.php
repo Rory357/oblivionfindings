@@ -71,6 +71,24 @@ class SiteDamageTest extends TestCase
         ]);
     }
 
+    public function test_creating_damage_report_inherits_tenant_id_from_site_when_omitted(): void
+    {
+        $site = Site::factory()->create(['tenant_id' => 99]);
+
+        $damage = SiteDamage::create([
+            'site_id' => $site->id,
+            'reported_by' => $this->admin->id,
+            'title' => 'Cracked window',
+            'description' => 'Window in bedroom 2 was cracked during storm.',
+            'severity' => 'moderate',
+            'status' => 'reported',
+            'damage_date' => '2026-02-18',
+            'discovered_date' => '2026-02-18',
+        ]);
+
+        $this->assertSame(99, $damage->tenant_id);
+    }
+
     public function test_admin_can_update_damage_report(): void
     {
         $damage = SiteDamage::create([

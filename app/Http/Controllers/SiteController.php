@@ -1630,8 +1630,8 @@ class SiteController extends Controller
             $occupied = $assignable->whereNotNull('assigned_client_id')->count();
 
             return [
-                'label' => 'Capacity & Occupancy',
-                'noun' => 'rooms',
+                'label' => 'Bedroom occupancy',
+                'noun' => 'bedrooms',
                 'rooms_total' => $total,
                 'rooms_occupied' => $occupied,
                 'vacancies' => max(0, $total - $occupied),

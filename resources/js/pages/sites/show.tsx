@@ -87,7 +87,16 @@ import {
     Users,
     Warehouse,
 } from 'lucide-react';
-import { useMemo, useRef, useState, type ComponentType } from 'react';
+import {
+    lazy,
+    Suspense,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentType,
+    type ReactNode,
+} from 'react';
 import {
     formatSiteDocumentFileSize,
     getSiteDocumentCategory,
@@ -105,56 +114,155 @@ import {
     EditLocationDialog,
     EditSafetyDialog,
 } from './_overview-dialogs';
+import { ConfirmAction } from './_confirm-action';
 import SiteOverviewMapCard from './_overview-map-card';
 import { SiteReadinessPanel, type SiteReadiness } from './_readiness-panel';
+import type { VendorRecord } from './vendors/_dialogs';
+import type { CredentialRecord } from './credentials/_dialogs';
+import type { ContactRecord } from './contacts/_dialogs';
+import { getContactType } from './contacts/_helpers';
+import type { ClientForPicker, RoomRecord } from './rooms/_dialogs';
+import type { ClientRecord } from './clients/_dialogs';
 import {
-    AddVendorDialog,
-    DeleteVendorDialog,
-    EditVendorDialog,
-    ShowVendorDialog,
-    type VendorRecord,
-} from './vendors/_dialogs';
-import {
-    AddCredentialDialog,
-    DeleteCredentialDialog,
-    EditCredentialDialog,
-    RemoveTotpDialog,
-    ShowCredentialDialog,
-    type CredentialRecord,
-} from './credentials/_dialogs';
-import {
-    AddContactDialog,
-    DeleteContactDialog,
-    EditContactDialog,
-    ShowContactDialog,
-    getContactType,
-    type ContactRecord,
-} from './contacts/_dialogs';
-import {
-    AddClientDialog,
-    ShowClientDialog,
-    UnlinkClientDialog,
     getClientDisplayName,
     getClientInitials,
     getClientRiskStyle,
     getClientStatusStyle,
-    type ClientRecord,
-} from './clients/_dialogs';
-import {
-    AddRoomDialog,
-    AssignClientToRoomDialog,
-    AssignRoomToClientDialog,
-    DeleteRoomDialog,
-    EditRoomDialog,
-    ShowRoomDialog,
-    UnassignRoomDialog,
-    type ClientForPicker,
-    type RoomRecord,
-} from './rooms/_dialogs';
-import {
-    CreateTemplateDialog,
-    StartRunDialog,
-} from '@/pages/checklists/_dialogs';
+} from './clients/_helpers';
+const AddVendorDialog = lazy(() =>
+    import('./vendors/_dialogs').then((module) => ({
+        default: module.AddVendorDialog,
+    })),
+);
+const EditVendorDialog = lazy(() =>
+    import('./vendors/_dialogs').then((module) => ({
+        default: module.EditVendorDialog,
+    })),
+);
+const ShowVendorDialog = lazy(() =>
+    import('./vendors/_dialogs').then((module) => ({
+        default: module.ShowVendorDialog,
+    })),
+);
+const DeleteVendorDialog = lazy(() =>
+    import('./vendors/_dialogs').then((module) => ({
+        default: module.DeleteVendorDialog,
+    })),
+);
+
+const AddCredentialDialog = lazy(() =>
+    import('./credentials/_dialogs').then((module) => ({
+        default: module.AddCredentialDialog,
+    })),
+);
+const EditCredentialDialog = lazy(() =>
+    import('./credentials/_dialogs').then((module) => ({
+        default: module.EditCredentialDialog,
+    })),
+);
+const ShowCredentialDialog = lazy(() =>
+    import('./credentials/_dialogs').then((module) => ({
+        default: module.ShowCredentialDialog,
+    })),
+);
+const DeleteCredentialDialog = lazy(() =>
+    import('./credentials/_dialogs').then((module) => ({
+        default: module.DeleteCredentialDialog,
+    })),
+);
+const RemoveTotpDialog = lazy(() =>
+    import('./credentials/_dialogs').then((module) => ({
+        default: module.RemoveTotpDialog,
+    })),
+);
+
+const AddContactDialog = lazy(() =>
+    import('./contacts/_dialogs').then((module) => ({
+        default: module.AddContactDialog,
+    })),
+);
+const EditContactDialog = lazy(() =>
+    import('./contacts/_dialogs').then((module) => ({
+        default: module.EditContactDialog,
+    })),
+);
+const ShowContactDialog = lazy(() =>
+    import('./contacts/_dialogs').then((module) => ({
+        default: module.ShowContactDialog,
+    })),
+);
+const DeleteContactDialog = lazy(() =>
+    import('./contacts/_dialogs').then((module) => ({
+        default: module.DeleteContactDialog,
+    })),
+);
+
+const AddClientDialog = lazy(() =>
+    import('./clients/_dialogs').then((module) => ({
+        default: module.AddClientDialog,
+    })),
+);
+const ShowClientDialog = lazy(() =>
+    import('./clients/_dialogs').then((module) => ({
+        default: module.ShowClientDialog,
+    })),
+);
+const UnlinkClientDialog = lazy(() =>
+    import('./clients/_dialogs').then((module) => ({
+        default: module.UnlinkClientDialog,
+    })),
+);
+const AssignRoomToClientDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.AssignRoomToClientDialog,
+    })),
+);
+
+const AddRoomDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.AddRoomDialog,
+    })),
+);
+const EditRoomDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.EditRoomDialog,
+    })),
+);
+const DeleteRoomDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.DeleteRoomDialog,
+    })),
+);
+const ShowRoomDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.ShowRoomDialog,
+    })),
+);
+const AssignClientToRoomDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.AssignClientToRoomDialog,
+    })),
+);
+const UnassignRoomDialog = lazy(() =>
+    import('./rooms/_dialogs').then((module) => ({
+        default: module.UnassignRoomDialog,
+    })),
+);
+
+const StartRunDialog = lazy(() =>
+    import('@/pages/checklists/_dialogs').then((module) => ({
+        default: module.StartRunDialog,
+    })),
+);
+const CreateTemplateDialog = lazy(() =>
+    import('@/pages/checklists/_dialogs').then((module) => ({
+        default: module.CreateTemplateDialog,
+    })),
+);
+
+function LazyDialog({ children }: { children: ReactNode }) {
+    return <Suspense fallback={null}>{children}</Suspense>;
+}
 
 type Site = {
     id: number;
@@ -1103,19 +1211,27 @@ function SiteChecklistsTab({
                 </Button>
             </div>
 
-            <StartRunDialog
-                siteId={siteId}
-                isOpen={runDialog.assignmentId !== null}
-                onClose={closeStartRun}
-                assignmentId={runDialog.assignmentId}
-                templateName={runDialog.templateName}
-                frequencyLabel={runDialog.frequencyLabel}
-            />
+            {runDialog.assignmentId !== null && (
+                <LazyDialog>
+                    <StartRunDialog
+                        siteId={siteId}
+                        isOpen
+                        onClose={closeStartRun}
+                        assignmentId={runDialog.assignmentId}
+                        templateName={runDialog.templateName}
+                        frequencyLabel={runDialog.frequencyLabel}
+                    />
+                </LazyDialog>
+            )}
 
-            <CreateTemplateDialog
-                isOpen={createTemplateOpen}
-                onClose={() => setCreateTemplateOpen(false)}
-            />
+            {createTemplateOpen && (
+                <LazyDialog>
+                    <CreateTemplateDialog
+                        isOpen
+                        onClose={() => setCreateTemplateOpen(false)}
+                    />
+                </LazyDialog>
+            )}
         </div>
     );
 }
@@ -1163,6 +1279,30 @@ export default function SiteShow({
     const [noteOpen, setNoteOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const readinessRef = useRef<HTMLDivElement | null>(null);
+    const tabsListRef = useRef<HTMLDivElement | null>(null);
+    const [tabsCanScrollLeft, setTabsCanScrollLeft] = useState(false);
+    const [tabsCanScrollRight, setTabsCanScrollRight] = useState(false);
+
+    useEffect(() => {
+        const el = tabsListRef.current;
+        if (!el) return;
+
+        const update = () => {
+            setTabsCanScrollLeft(el.scrollLeft > 1);
+            setTabsCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+        };
+
+        update();
+        el.addEventListener('scroll', update, { passive: true });
+
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+
+        return () => {
+            el.removeEventListener('scroll', update);
+            ro.disconnect();
+        };
+    }, [activeTab]);
 
     const handleReadinessAction = (action: string) => {
         if (['add_phone', 'add_email', 'assign_lead', 'add_after_hours', 'add_contact'].includes(action)) {
@@ -1218,7 +1358,6 @@ export default function SiteShow({
         setCredentialDialog({ mode: null, target: null });
 
     const handleDeleteNote = (noteId: number) => {
-        if (!confirm('Delete this note?')) return;
         router.delete(`/sites/${site.id}/notes/${noteId}`, {
             preserveScroll: true,
         });
@@ -1317,13 +1456,13 @@ export default function SiteShow({
             <PageShell>
                 {/* ── Hero Header ──────────────────────────────── */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                         {/* Site icon */}
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
                             <TypeIcon className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
                         </div>
 
@@ -1447,9 +1586,13 @@ export default function SiteShow({
                     className="space-y-4"
                 >
                     <div className="relative">
-                        <span className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent" />
-                        <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent" />
-                    <TabsList className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1">
+                        {tabsCanScrollLeft && (
+                            <span className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent" />
+                        )}
+                        {tabsCanScrollRight && (
+                            <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent" />
+                        )}
+                    <TabsList ref={tabsListRef} className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1">
                         <TabsTrigger
                             value="overview"
                             className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
@@ -1667,18 +1810,33 @@ export default function SiteShow({
                         )}
 
                         <Card className="border-border/60 shadow-sm">
-                            <CardContent className="grid gap-4 p-4 sm:grid-cols-4">
-                                <div>
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        {occupancy.label}
-                                    </p>
-                                    <p className="mt-1 text-2xl font-semibold">
-                                        {occupancy.percent}%
-                                    </p>
+                            <CardContent className="space-y-3 p-4">
+                                <div className="grid gap-4 sm:grid-cols-4">
+                                    <div>
+                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                            {occupancy.label}
+                                        </p>
+                                        <p className="mt-1 text-2xl font-semibold">
+                                            {occupancy.percent}%
+                                        </p>
+                                    </div>
+                                    <MiniOccupancyStat label={`Total ${occupancy.noun}`} value={occupancy.rooms_total} />
+                                    <MiniOccupancyStat label="Occupied" value={occupancy.rooms_occupied} />
+                                    <MiniOccupancyStat label="Vacant" value={occupancy.vacancies} />
                                 </div>
-                                <MiniOccupancyStat label={`Total ${occupancy.noun}`} value={occupancy.rooms_total} />
-                                <MiniOccupancyStat label="Occupied" value={occupancy.rooms_occupied} />
-                                <MiniOccupancyStat label="Vacant" value={occupancy.vacancies} />
+                                <div
+                                    className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                                    role="progressbar"
+                                    aria-valuemin={0}
+                                    aria-valuemax={100}
+                                    aria-valuenow={occupancy.percent}
+                                    aria-label={`${occupancy.label}: ${occupancy.percent}% occupied`}
+                                >
+                                    <div
+                                        className="h-full rounded-full bg-status-success transition-all"
+                                        style={{ width: `${Math.min(100, Math.max(0, occupancy.percent))}%` }}
+                                    />
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -2012,13 +2170,23 @@ export default function SiteShow({
                                                             {formatNoteDate(n.created_at)}
                                                         </span>
                                                         {can_edit && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteNote(n.id)}
-                                                                className="text-status-critical hover:underline"
+                                                            <ConfirmAction
+                                                                title="Delete note?"
+                                                                description="Delete this site note?"
+                                                                confirmLabel="Delete"
+                                                                onConfirm={() =>
+                                                                    handleDeleteNote(
+                                                                        n.id,
+                                                                    )
+                                                                }
                                                             >
-                                                                Delete
-                                                            </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="text-status-critical hover:underline"
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </ConfirmAction>
                                                         )}
                                                     </div>
                                                 </li>
@@ -2838,91 +3006,127 @@ export default function SiteShow({
                             </div>
 
                             {/* ── Dialog mounts ─────────────────────────── */}
-                            <AddVendorDialog
-                                siteId={site.id}
-                                isOpen={vendorDialog.mode === 'add'}
-                                onClose={closeVendorDialog}
-                            />
-                            <EditVendorDialog
-                                siteId={site.id}
-                                vendor={vendorDialog.target}
-                                isOpen={vendorDialog.mode === 'edit'}
-                                onClose={closeVendorDialog}
-                            />
-                            <ShowVendorDialog
-                                vendor={vendorDialog.target}
-                                isOpen={vendorDialog.mode === 'show'}
-                                canManage={!!canGlobal?.vendors?.manage}
-                                onClose={closeVendorDialog}
-                                onEdit={() =>
-                                    setVendorDialog((prev) => ({
-                                        ...prev,
-                                        mode: 'edit',
-                                    }))
-                                }
-                                onDelete={() =>
-                                    setVendorDialog((prev) => ({
-                                        ...prev,
-                                        mode: 'delete',
-                                    }))
-                                }
-                            />
-                            <DeleteVendorDialog
-                                siteId={site.id}
-                                vendor={vendorDialog.target}
-                                isOpen={vendorDialog.mode === 'delete'}
-                                onClose={closeVendorDialog}
-                            />
+                            {vendorDialog.mode === 'add' && (
+                                <LazyDialog>
+                                    <AddVendorDialog
+                                        siteId={site.id}
+                                        isOpen
+                                        onClose={closeVendorDialog}
+                                    />
+                                </LazyDialog>
+                            )}
+                            {vendorDialog.mode === 'edit' && (
+                                <LazyDialog>
+                                    <EditVendorDialog
+                                        siteId={site.id}
+                                        vendor={vendorDialog.target}
+                                        isOpen
+                                        onClose={closeVendorDialog}
+                                    />
+                                </LazyDialog>
+                            )}
+                            {vendorDialog.mode === 'show' && (
+                                <LazyDialog>
+                                    <ShowVendorDialog
+                                        vendor={vendorDialog.target}
+                                        isOpen
+                                        canManage={!!canGlobal?.vendors?.manage}
+                                        onClose={closeVendorDialog}
+                                        onEdit={() =>
+                                            setVendorDialog((prev) => ({
+                                                ...prev,
+                                                mode: 'edit',
+                                            }))
+                                        }
+                                        onDelete={() =>
+                                            setVendorDialog((prev) => ({
+                                                ...prev,
+                                                mode: 'delete',
+                                            }))
+                                        }
+                                    />
+                                </LazyDialog>
+                            )}
+                            {vendorDialog.mode === 'delete' && (
+                                <LazyDialog>
+                                    <DeleteVendorDialog
+                                        siteId={site.id}
+                                        vendor={vendorDialog.target}
+                                        isOpen
+                                        onClose={closeVendorDialog}
+                                    />
+                                </LazyDialog>
+                            )}
 
-                            <AddCredentialDialog
-                                siteId={site.id}
-                                isOpen={credentialDialog.mode === 'add'}
-                                onClose={closeCredentialDialog}
-                            />
-                            <EditCredentialDialog
-                                siteId={site.id}
-                                credential={credentialDialog.target}
-                                isOpen={credentialDialog.mode === 'edit'}
-                                onClose={closeCredentialDialog}
-                            />
-                            <ShowCredentialDialog
-                                siteId={site.id}
-                                credential={credentialDialog.target}
-                                isOpen={credentialDialog.mode === 'show'}
-                                canManage={!!canGlobal?.credentials?.manage}
-                                canReveal={!!canGlobal?.credentials?.reveal}
-                                onClose={closeCredentialDialog}
-                                onEdit={() =>
-                                    setCredentialDialog((prev) => ({
-                                        ...prev,
-                                        mode: 'edit',
-                                    }))
-                                }
-                                onDelete={() =>
-                                    setCredentialDialog((prev) => ({
-                                        ...prev,
-                                        mode: 'delete',
-                                    }))
-                                }
-                                onRemoveTotp={() =>
-                                    setCredentialDialog((prev) => ({
-                                        ...prev,
-                                        mode: 'remove-totp',
-                                    }))
-                                }
-                            />
-                            <DeleteCredentialDialog
-                                siteId={site.id}
-                                credential={credentialDialog.target}
-                                isOpen={credentialDialog.mode === 'delete'}
-                                onClose={closeCredentialDialog}
-                            />
-                            <RemoveTotpDialog
-                                siteId={site.id}
-                                credential={credentialDialog.target}
-                                isOpen={credentialDialog.mode === 'remove-totp'}
-                                onClose={closeCredentialDialog}
-                            />
+                            {credentialDialog.mode === 'add' && (
+                                <LazyDialog>
+                                    <AddCredentialDialog
+                                        siteId={site.id}
+                                        isOpen
+                                        onClose={closeCredentialDialog}
+                                    />
+                                </LazyDialog>
+                            )}
+                            {credentialDialog.mode === 'edit' && (
+                                <LazyDialog>
+                                    <EditCredentialDialog
+                                        siteId={site.id}
+                                        credential={credentialDialog.target}
+                                        isOpen
+                                        onClose={closeCredentialDialog}
+                                    />
+                                </LazyDialog>
+                            )}
+                            {credentialDialog.mode === 'show' && (
+                                <LazyDialog>
+                                    <ShowCredentialDialog
+                                        siteId={site.id}
+                                        credential={credentialDialog.target}
+                                        isOpen
+                                        canManage={!!canGlobal?.credentials?.manage}
+                                        canReveal={!!canGlobal?.credentials?.reveal}
+                                        onClose={closeCredentialDialog}
+                                        onEdit={() =>
+                                            setCredentialDialog((prev) => ({
+                                                ...prev,
+                                                mode: 'edit',
+                                            }))
+                                        }
+                                        onDelete={() =>
+                                            setCredentialDialog((prev) => ({
+                                                ...prev,
+                                                mode: 'delete',
+                                            }))
+                                        }
+                                        onRemoveTotp={() =>
+                                            setCredentialDialog((prev) => ({
+                                                ...prev,
+                                                mode: 'remove-totp',
+                                            }))
+                                        }
+                                    />
+                                </LazyDialog>
+                            )}
+                            {credentialDialog.mode === 'delete' && (
+                                <LazyDialog>
+                                    <DeleteCredentialDialog
+                                        siteId={site.id}
+                                        credential={credentialDialog.target}
+                                        isOpen
+                                        onClose={closeCredentialDialog}
+                                    />
+                                </LazyDialog>
+                            )}
+                            {credentialDialog.mode === 'remove-totp' && (
+                                <LazyDialog>
+                                    <RemoveTotpDialog
+                                        siteId={site.id}
+                                        credential={credentialDialog.target}
+                                        isOpen
+                                        onClose={closeCredentialDialog}
+                                    />
+                                </LazyDialog>
+                            )}
                         </TabsContent>
                     )}
 
@@ -3291,35 +3495,51 @@ function ContactsTab({
                 </CardContent>
             </Card>
 
-            <AddContactDialog
-                siteId={site.id}
-                isOpen={dialog.mode === 'add'}
-                onClose={closeDialog}
-            />
-            <EditContactDialog
-                siteId={site.id}
-                contact={dialog.target}
-                isOpen={dialog.mode === 'edit'}
-                onClose={closeDialog}
-            />
-            <ShowContactDialog
-                contact={dialog.target}
-                isOpen={dialog.mode === 'show'}
-                canManage={can_edit}
-                onClose={closeDialog}
-                onEdit={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'edit' }))
-                }
-                onDelete={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'delete' }))
-                }
-            />
-            <DeleteContactDialog
-                siteId={site.id}
-                contact={dialog.target}
-                isOpen={dialog.mode === 'delete'}
-                onClose={closeDialog}
-            />
+            {dialog.mode === 'add' && (
+                <LazyDialog>
+                    <AddContactDialog
+                        siteId={site.id}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'edit' && (
+                <LazyDialog>
+                    <EditContactDialog
+                        siteId={site.id}
+                        contact={dialog.target}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'show' && (
+                <LazyDialog>
+                    <ShowContactDialog
+                        contact={dialog.target}
+                        isOpen
+                        canManage={can_edit}
+                        onClose={closeDialog}
+                        onEdit={() =>
+                            setDialog((prev) => ({ ...prev, mode: 'edit' }))
+                        }
+                        onDelete={() =>
+                            setDialog((prev) => ({ ...prev, mode: 'delete' }))
+                        }
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'delete' && (
+                <LazyDialog>
+                    <DeleteContactDialog
+                        siteId={site.id}
+                        contact={dialog.target}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
         </>
     );
 }
@@ -3584,39 +3804,58 @@ function ClientsTab({
                 </CardContent>
             </Card>
 
-            <AddClientDialog
-                siteId={site.id}
-                availableClients={availableClients}
-                isOpen={dialog.mode === 'add'}
-                onClose={closeDialog}
-            />
-            <ShowClientDialog
-                client={dialog.target}
-                siteId={site.id}
-                canManage={can_edit}
-                canAssignRoom={canAssignRoom}
-                isOpen={dialog.mode === 'show'}
-                onClose={closeDialog}
-                onUnlink={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'unlink' }))
-                }
-                onAssignRoom={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'assign-room' }))
-                }
-            />
-            <UnlinkClientDialog
-                siteId={site.id}
-                client={dialog.target}
-                isOpen={dialog.mode === 'unlink'}
-                onClose={closeDialog}
-            />
-            <AssignRoomToClientDialog
-                siteId={site.id}
-                client={dialog.target}
-                rooms={rooms as RoomRecord[]}
-                isOpen={dialog.mode === 'assign-room'}
-                onClose={closeDialog}
-            />
+            {dialog.mode === 'add' && (
+                <LazyDialog>
+                    <AddClientDialog
+                        siteId={site.id}
+                        availableClients={availableClients}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'show' && (
+                <LazyDialog>
+                    <ShowClientDialog
+                        client={dialog.target}
+                        siteId={site.id}
+                        canManage={can_edit}
+                        canAssignRoom={canAssignRoom}
+                        isOpen
+                        onClose={closeDialog}
+                        onUnlink={() =>
+                            setDialog((prev) => ({ ...prev, mode: 'unlink' }))
+                        }
+                        onAssignRoom={() =>
+                            setDialog((prev) => ({
+                                ...prev,
+                                mode: 'assign-room',
+                            }))
+                        }
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'unlink' && (
+                <LazyDialog>
+                    <UnlinkClientDialog
+                        siteId={site.id}
+                        client={dialog.target}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'assign-room' && (
+                <LazyDialog>
+                    <AssignRoomToClientDialog
+                        siteId={site.id}
+                        client={dialog.target}
+                        rooms={rooms as RoomRecord[]}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
         </>
     );
 }
@@ -4229,54 +4468,81 @@ function BedroomsTab({
                 </CardContent>
             </Card>
 
-            <AddRoomDialog
-                siteId={site.id}
-                isOpen={dialog.mode === 'add'}
-                onClose={closeDialog}
-            />
-            <EditRoomDialog
-                siteId={site.id}
-                room={dialog.target}
-                isOpen={dialog.mode === 'edit'}
-                onClose={closeDialog}
-            />
-            <DeleteRoomDialog
-                siteId={site.id}
-                room={dialog.target}
-                isOpen={dialog.mode === 'delete'}
-                onClose={closeDialog}
-            />
-            <ShowRoomDialog
-                room={dialog.target}
-                canManage={can_edit}
-                isOpen={dialog.mode === 'show'}
-                onClose={closeDialog}
-                onEdit={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'edit' }))
-                }
-                onDelete={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'delete' }))
-                }
-                onAssign={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'assign' }))
-                }
-                onUnassign={() =>
-                    setDialog((prev) => ({ ...prev, mode: 'unassign' }))
-                }
-            />
-            <AssignClientToRoomDialog
-                siteId={site.id}
-                room={dialog.target}
-                clients={clientsForRooms}
-                isOpen={dialog.mode === 'assign'}
-                onClose={closeDialog}
-            />
-            <UnassignRoomDialog
-                siteId={site.id}
-                room={dialog.target}
-                isOpen={dialog.mode === 'unassign'}
-                onClose={closeDialog}
-            />
+            {dialog.mode === 'add' && (
+                <LazyDialog>
+                    <AddRoomDialog
+                        siteId={site.id}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'edit' && (
+                <LazyDialog>
+                    <EditRoomDialog
+                        siteId={site.id}
+                        room={dialog.target}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'delete' && (
+                <LazyDialog>
+                    <DeleteRoomDialog
+                        siteId={site.id}
+                        room={dialog.target}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'show' && (
+                <LazyDialog>
+                    <ShowRoomDialog
+                        room={dialog.target}
+                        canManage={can_edit}
+                        isOpen
+                        onClose={closeDialog}
+                        onEdit={() =>
+                            setDialog((prev) => ({ ...prev, mode: 'edit' }))
+                        }
+                        onDelete={() =>
+                            setDialog((prev) => ({ ...prev, mode: 'delete' }))
+                        }
+                        onAssign={() =>
+                            setDialog((prev) => ({ ...prev, mode: 'assign' }))
+                        }
+                        onUnassign={() =>
+                            setDialog((prev) => ({
+                                ...prev,
+                                mode: 'unassign',
+                            }))
+                        }
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'assign' && (
+                <LazyDialog>
+                    <AssignClientToRoomDialog
+                        siteId={site.id}
+                        room={dialog.target}
+                        clients={clientsForRooms}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
+            {dialog.mode === 'unassign' && (
+                <LazyDialog>
+                    <UnassignRoomDialog
+                        siteId={site.id}
+                        room={dialog.target}
+                        isOpen
+                        onClose={closeDialog}
+                    />
+                </LazyDialog>
+            )}
         </>
     );
 }
@@ -4809,17 +5075,17 @@ function CoverageRequirementsTab({
         {
             label: 'Under-covered',
             value: sitePreview?.under_covered_windows ?? 0,
-            color: '#ef4444',
+            color: 'var(--color-status-critical)',
         },
         {
             label: 'Exact',
             value: sitePreview?.exact_windows ?? 0,
-            color: '#10b981',
+            color: 'var(--color-status-success)',
         },
         {
             label: 'Overstaffed',
             value: sitePreview?.overstaffed_windows ?? 0,
-            color: '#f59e0b',
+            color: 'var(--color-status-warning)',
         },
     ];
     const stableCoverageRate =
@@ -4890,7 +5156,6 @@ function CoverageRequirementsTab({
     }
 
     function deleteRequirement(id: number) {
-        if (!confirm('Remove this coverage requirement?')) return;
         form.delete(`/sites/${site.id}/coverage-requirements/${id}`, {
             preserveScroll: true,
         });
@@ -5022,7 +5287,7 @@ function CoverageRequirementsTab({
                                     <ProgressRing
                                         value={stableCoverageRate}
                                         size={104}
-                                        color="#6366f1"
+                                        color="var(--color-primary)"
                                         label="covered"
                                     />
                                     <div className="mt-3 text-center">
@@ -5038,7 +5303,7 @@ function CoverageRequirementsTab({
                                     <ProgressRing
                                         value={shortageRate}
                                         size={104}
-                                        color="#ef4444"
+                                        color="var(--color-status-critical)"
                                         label="risk"
                                     />
                                     <div className="mt-3 text-center">
@@ -5075,8 +5340,8 @@ function CoverageRequirementsTab({
                                                     value: alert.missing_staff,
                                                     color:
                                                         alert.missing_staff > 1
-                                                            ? '#ef4444'
-                                                            : '#f59e0b',
+                                                            ? 'var(--color-status-critical)'
+                                                            : 'var(--color-status-warning)',
                                                     maxValue: Math.max(
                                                         1,
                                                         sitePreview.largest_missing_staff,
@@ -5084,7 +5349,7 @@ function CoverageRequirementsTab({
                                                 }),
                                             )}
                                             heightPerBar={24}
-                                            color="#6366f1"
+                                            color="var(--color-primary)"
                                         />
                                     </div>
                                 </div>
@@ -5119,7 +5384,7 @@ function CoverageRequirementsTab({
                                                         {
                                                             label: 'Required',
                                                             value: alert.required_staff,
-                                                            color: '#6366f1',
+                                                            color: 'var(--color-primary)',
                                                             maxValue: Math.max(
                                                                 alert.required_staff,
                                                                 alert.assigned_staff,
@@ -5128,7 +5393,7 @@ function CoverageRequirementsTab({
                                                         {
                                                             label: 'Assigned',
                                                             value: alert.assigned_staff,
-                                                            color: '#10b981',
+                                                            color: 'var(--color-status-success)',
                                                             maxValue: Math.max(
                                                                 alert.required_staff,
                                                                 alert.assigned_staff,
@@ -5136,7 +5401,7 @@ function CoverageRequirementsTab({
                                                         },
                                                     ]}
                                                     heightPerBar={22}
-                                                    color="#6366f1"
+                                                    color="var(--color-primary)"
                                                 />
                                             </div>
                                         </div>
@@ -5773,18 +6038,24 @@ function CoverageRequirementsTab({
                                                 ) : null}
                                             </div>
                                             {can_edit ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="shrink-0 text-muted-foreground hover:text-status-critical"
-                                                    onClick={() =>
+                                                <ConfirmAction
+                                                    title="Remove coverage requirement?"
+                                                    description={`Remove "${requirement.name}" from this site?`}
+                                                    confirmLabel="Remove"
+                                                    onConfirm={() =>
                                                         deleteRequirement(
                                                             requirement.id,
                                                         )
                                                     }
                                                 >
-                                                    Remove
-                                                </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="shrink-0 text-muted-foreground hover:text-status-critical"
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </ConfirmAction>
                                             ) : null}
                                         </div>
                                     </div>
@@ -5853,7 +6124,6 @@ function StaffRequirementsTab({
     }
 
     function deleteRequirement(id: number) {
-        if (!confirm('Remove this requirement?')) return;
         form.delete(`/sites/${site.id}/staff-requirements/${id}`, {
             preserveScroll: true,
         });
@@ -6079,18 +6349,24 @@ function StaffRequirementsTab({
                                                     )}
                                                 </div>
                                                 {can_edit && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="shrink-0 text-muted-foreground hover:text-status-critical"
-                                                        onClick={() =>
+                                                    <ConfirmAction
+                                                        title="Remove staff requirement?"
+                                                        description={`Remove "${req.requirement_name}" from this site?`}
+                                                        confirmLabel="Remove"
+                                                        onConfirm={() =>
                                                             deleteRequirement(
                                                                 req.id,
                                                             )
                                                         }
                                                     >
-                                                        Remove
-                                                    </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="shrink-0 text-muted-foreground hover:text-status-critical"
+                                                        >
+                                                            Remove
+                                                        </Button>
+                                                    </ConfirmAction>
                                                 )}
                                             </div>
                                         ))}

@@ -15,17 +15,16 @@ class FleetDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $site = Site::query()->first();
-        if (!$site) {
-            $site = Site::create([
-                'name' => 'Demo Site',
+        $site = Site::query()->updateOrCreate(
+            ['name' => 'Demo Site'],
+            [
                 'type' => 'house',
                 'city' => 'Auckland',
                 'region' => 'Auckland',
                 'country' => 'New Zealand',
                 'is_active' => true,
-            ]);
-        }
+            ]
+        );
 
         $client = Client::query()->first();
         if (!$client) {

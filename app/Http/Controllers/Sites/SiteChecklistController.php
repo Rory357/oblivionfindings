@@ -9,6 +9,7 @@ use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteChecklistTemplateItem;
+use App\Support\SiteRecommendedChecklists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -43,6 +44,7 @@ class SiteChecklistController extends Controller
             ],
             'assignments' => $assignments,
             'templates' => $templates,
+            'recommendedChecklists' => SiteRecommendedChecklists::forType($site->type),
         ]);
     }
 

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Lock, Eye, EyeOff, Copy, Plus, X, History, Search, Trash2, ShieldCheck, Truck } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogContent,
@@ -131,7 +132,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                 body: JSON.stringify({ password }),
             });
             if (!response.ok) {
-                alert(response.status === 403 ? 'Incorrect password.' : 'Failed to reveal credential.');
+                toast.error(response.status === 403 ? 'Incorrect password.' : 'Failed to reveal credential.');
                 return;
             }
             const data = await response.json();
@@ -141,7 +142,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                 setPassword('');
             }
         } catch {
-            alert('Failed to reveal credential. Please check your connection and try again.');
+            toast.error('Failed to reveal credential. Please check your connection and try again.');
         } finally {
             setRevealing(false);
         }
@@ -151,7 +152,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
         try {
             await navigator.clipboard.writeText(value);
         } catch {
-            alert('Failed to copy to clipboard.');
+            toast.error('Failed to copy to clipboard.');
             return;
         }
 

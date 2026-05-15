@@ -7,6 +7,7 @@ use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Services\Sites\SiteHazardRiskCalculator;
+use App\Support\SiteRecommendedHazards;
 use Illuminate\Http\Request;
 
 class SiteHazardController extends Controller
@@ -39,6 +40,7 @@ class SiteHazardController extends Controller
             'severityOptions' => SiteHazardRiskCalculator::severities(),
             'likelihoodOptions' => SiteHazardRiskCalculator::likelihoods(),
             'riskRatings' => SiteHazardRiskCalculator::riskRatings(),
+            'recommendedHazards' => SiteRecommendedHazards::forType($site->type),
         ]);
     }
 

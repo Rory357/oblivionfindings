@@ -477,15 +477,15 @@ export default function ChecklistRun({
                         </Link>
                     </Button>
 
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
-                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-                        <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
+                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                        <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
                         <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                             {/* Run icon avatar */}
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
-                                <ClipboardCheck className="h-12 w-12 text-white md:h-14 md:w-14" />
+                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
+                                <ClipboardCheck className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
                             </div>
 
                             {/* Info */}
@@ -493,7 +493,7 @@ export default function ChecklistRun({
                                 <h1 className="text-2xl font-bold md:text-3xl">
                                     {template.name}
                                 </h1>
-                                <p className="mt-0.5 text-sm text-white/70">
+                                <p className="mt-0.5 text-sm text-primary-foreground/70">
                                     {site.name}
                                     {run.scheduled_date && (
                                         <>
@@ -517,7 +517,7 @@ export default function ChecklistRun({
                                         </Badge>
                                     )}
                                     {run.status === 'scheduled' && (
-                                        <Badge className="border-white/20 bg-white/10 text-white">
+                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
                                             Scheduled
                                         </Badge>
                                     )}
@@ -530,7 +530,7 @@ export default function ChecklistRun({
                             </div>
 
                             {/* Progress ring + stats — frosted card on the purple */}
-                            <div className="flex items-center gap-5 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-white backdrop-blur">
+                            <div className="flex items-center gap-5 rounded-xl border border-primary-foreground/20 bg-primary-foreground/10 px-5 py-3 text-primary-foreground backdrop-blur">
                                 <ProgressRing
                                     value={progressPercentage}
                                     size={84}
@@ -545,7 +545,7 @@ export default function ChecklistRun({
                                                     (i) => i.is_required,
                                                 ).length}
                                         </span>
-                                        <span className="text-white/70">
+                                        <span className="text-primary-foreground/70">
                                             passing
                                         </span>
                                     </div>
@@ -554,17 +554,17 @@ export default function ChecklistRun({
                                         <span className="tabular-nums font-medium">
                                             {failedItems.length}
                                         </span>
-                                        <span className="text-white/70">
+                                        <span className="text-primary-foreground/70">
                                             failing
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3 text-sm">
-                                        <span className="flex h-2 w-2 rounded-full bg-white/40" />
+                                        <span className="flex h-2 w-2 rounded-full bg-primary-foreground/40" />
                                         <span className="tabular-nums font-medium">
                                             {requiredItems.length -
                                                 completedRequired}
                                         </span>
-                                        <span className="text-white/70">
+                                        <span className="text-primary-foreground/70">
                                             remaining
                                         </span>
                                     </div>

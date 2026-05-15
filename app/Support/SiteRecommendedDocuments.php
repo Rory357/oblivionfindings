@@ -52,6 +52,32 @@ class SiteRecommendedDocuments
 
     private static function item(string $key, string $label, string $hint): array
     {
-        return compact('key', 'label', 'hint');
+        return [
+            'key' => $key,
+            'label' => $label,
+            'hint' => $hint,
+            'category' => self::categoryForKey($key),
+        ];
+    }
+
+    private static function categoryForKey(string $key): string
+    {
+        if (str_contains($key, 'evacuation') || str_contains($key, 'fire') || str_contains($key, 'hazard') || str_contains($key, 'safety')) {
+            return 'safety';
+        }
+
+        if (str_contains($key, 'policy') || str_contains($key, 'handbook') || str_contains($key, 'induction')) {
+            return 'policy';
+        }
+
+        if (str_contains($key, 'insurance')) {
+            return 'insurance';
+        }
+
+        if (str_contains($key, 'wof') || str_contains($key, 'inspection')) {
+            return 'compliance_cert';
+        }
+
+        return 'other';
     }
 }

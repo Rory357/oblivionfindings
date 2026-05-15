@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { LayoutGrid, Plus, ArrowLeft, MapPin, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmAction } from '../_confirm-action';
 
 type Site = {
     id: number;
@@ -69,9 +70,7 @@ export default function SiteZones({ site, zones }: Props) {
     };
 
     const handleDeactivate = (zone: Zone) => {
-        if (confirm(`Are you sure you want to deactivate "${zone.name}"?`)) {
-            deleteForm.delete(`/sites/${site.id}/zones/${zone.id}`);
-        }
+        deleteForm.delete(`/sites/${site.id}/zones/${zone.id}`);
     };
 
     const activeZones = zones.filter(z => z.is_active);
@@ -200,15 +199,23 @@ export default function SiteZones({ site, zones }: Props) {
                                                     <Button variant="ghost" size="sm" onClick={() => startEdit(zone)}>
                                                         Edit
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-status-critical hover:text-status-critical hover:bg-status-critical"
-                                                        onClick={() => handleDeactivate(zone)}
-                                                        disabled={deleteForm.processing}
+                                                    <ConfirmAction
+                                                        title="Deactivate zone?"
+                                                        description={`Deactivate "${zone.name}" for this site?`}
+                                                        confirmLabel="Deactivate"
+                                                        onConfirm={() =>
+                                                            handleDeactivate(zone)
+                                                        }
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-status-critical hover:text-status-critical hover:bg-status-critical"
+                                                            disabled={deleteForm.processing}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </ConfirmAction>
                                                 </div>
                                             </div>
                                         </CardContent>

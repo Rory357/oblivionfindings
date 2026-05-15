@@ -365,7 +365,7 @@ export default function SitesIndex() {
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">{siteSingular} Name</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Type</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Region</th>
-                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Capacity</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell" title="Capacity counts assignable bedrooms only">Capacity (beds)</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Clients</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Site Lead</th>
                                         <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground xl:table-cell">Open hazards</th>

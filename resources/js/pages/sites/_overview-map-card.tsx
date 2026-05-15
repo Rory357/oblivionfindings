@@ -60,7 +60,6 @@ export default function SiteOverviewMapCard({
                         type: 'circle',
                         center: { lat: Number(shape.center.lat), lng: Number(shape.center.lng) },
                         radius_m: Number(shape.radius_m),
-                        color: '#8b5cf6',
                     };
                 }
                 if (g.type === 'polygon' && Array.isArray(shape.coordinates)) {
@@ -72,7 +71,6 @@ export default function SiteOverviewMapCard({
                             lat: Number(c.lat),
                             lng: Number(c.lng),
                         })),
-                        color: '#8b5cf6',
                     };
                 }
                 return null;

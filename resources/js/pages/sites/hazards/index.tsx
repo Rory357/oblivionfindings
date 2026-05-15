@@ -69,6 +69,13 @@ type Props = {
         risk_rating?: string;
     };
     severityOptions: string[];
+    recommendedHazards?: EmptyStateSuggestion[];
+};
+
+type EmptyStateSuggestion = {
+    key: string;
+    label: string;
+    hint: string;
 };
 
 const riskBorderColors: Record<string, string> = {
@@ -118,59 +125,12 @@ const statusConfig: Record<
     },
 };
 
-const HAZARD_EMPTY_STATE_SUGGESTIONS = [
-    {
-        key: 'slip_trip_fall',
-        label: 'Slip / trip hazards',
-        hint: 'Loose mats, wet floors, cluttered walkways.',
-    },
-    {
-        key: 'hot_water_temperature',
-        label: 'Hot water temperature',
-        hint: 'Scald risk above 50C in bathrooms or kitchens.',
-    },
-    {
-        key: 'medication_storage_access',
-        label: 'Medication storage access',
-        hint: 'Unlocked cabinet, key control, or access concern.',
-    },
-    {
-        key: 'fire_electrical',
-        label: 'Fire / electrical',
-        hint: 'Overloaded sockets, damaged leads, expired alarms.',
-    },
-    {
-        key: 'manual_handling',
-        label: 'Manual handling',
-        hint: 'Transfers, lifting, equipment, or room layout risk.',
-    },
-    {
-        key: 'security_behaviour',
-        label: 'Behavioural / security',
-        hint: 'Entry, privacy, aggression, or lone-worker concerns.',
-    },
-    {
-        key: 'outdoor_garden',
-        label: 'Outdoor / gardening hazards',
-        hint: 'Uneven paths, tools, weeds, or poor lighting.',
-    },
-    {
-        key: 'cleaning_chemicals',
-        label: 'Cleaning chemicals storage',
-        hint: 'COSHH-style storage, labels, and locked access.',
-    },
-    {
-        key: 'bathroom_safety',
-        label: 'Bathroom safety',
-        hint: 'Grab rails, non-slip surfaces, shower access.',
-    },
-];
-
 export default function SiteHazards({
     site,
     hazards,
     filters,
     severityOptions,
+    recommendedHazards = [],
 }: Props) {
     const ANY = '__any__';
 
@@ -603,7 +563,7 @@ export default function SiteHazards({
                                     </div>
                                 </div>
                                 <ul className="grid gap-2 sm:grid-cols-2">
-                                    {HAZARD_EMPTY_STATE_SUGGESTIONS.map((suggestion) => (
+                                    {recommendedHazards.map((suggestion) => (
                                         <li
                                             key={suggestion.key}
                                             className="flex items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"

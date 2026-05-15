@@ -60,6 +60,7 @@ import {
     type ClientForPicker,
     type RoomRecord,
 } from './_dialogs';
+import { ConfirmAction } from '../_confirm-action';
 import {
     AssignAssetDialog,
     type AssetForPicker,
@@ -589,25 +590,25 @@ function BedroomsHero({
     onSeedDefaults: () => void;
 }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
-            <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-            <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-            <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
+            <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+            <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+            <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
             <Link
                 href={`/sites/${site.id}`}
-                className="relative z-10 mb-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/90 transition-colors hover:bg-white/20 hover:text-white"
+                className="relative z-10 mb-4 inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1 text-xs font-medium text-primary-foreground/90 transition-colors hover:bg-primary-foreground/20 hover:text-primary-foreground"
             >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to {site.name}
             </Link>
 
             <div className="relative flex flex-col gap-6 md:flex-row md:items-start">
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/20 bg-white/10 shadow-xl md:h-28 md:w-28">
-                    <BedDouble className="h-12 w-12 text-white md:h-14 md:w-14" />
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
+                    <BedDouble className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
                 </div>
                 <div className="flex-1">
-                    <p className="text-xs uppercase tracking-wide text-white/60">
+                    <p className="text-xs uppercase tracking-wide text-primary-foreground/60">
                         <Link
                             href={`/sites/${site.id}`}
                             className="underline-offset-2 hover:underline"
@@ -620,7 +621,7 @@ function BedroomsHero({
                     <h1 className="mt-1 text-2xl font-bold md:text-3xl">
                         Bedroom management
                     </h1>
-                    <p className="mt-1 max-w-2xl text-sm text-white/70">
+                    <p className="mt-1 max-w-2xl text-sm text-primary-foreground/70">
                         Track who lives where, attach the assets that belong in
                         each room, surface safeguarding flags and print door
                         cards for night shift.
@@ -629,21 +630,21 @@ function BedroomsHero({
                     {/* Alert chips */}
                     <div className="mt-3 flex flex-wrap gap-2">
                         {alerts.empty_bedrooms > 0 && (
-                            <Badge className="border-white/20 bg-white/10 text-white">
+                            <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
                                 <BedDouble className="mr-1 h-3 w-3" />
                                 {alerts.empty_bedrooms} empty bedroom
                                 {alerts.empty_bedrooms === 1 ? '' : 's'}
                             </Badge>
                         )}
                         {alerts.safeguarding > 0 && (
-                            <Badge className="border-status-critical/40 bg-status-critical-bg/30 text-white">
+                            <Badge className="border-status-critical/40 bg-status-critical-bg/30 text-primary-foreground">
                                 <Shield className="mr-1 h-3 w-3" />
                                 {alerts.safeguarding} safeguarding flag
                                 {alerts.safeguarding === 1 ? '' : 's'}
                             </Badge>
                         )}
                         {alerts.missing_key_worker > 0 && (
-                            <Badge className="border-status-warning/40 bg-status-warning-bg/30 text-white">
+                            <Badge className="border-status-warning/40 bg-status-warning-bg/30 text-primary-foreground">
                                 <UserCog className="mr-1 h-3 w-3" />
                                 {alerts.missing_key_worker} occupant
                                 {alerts.missing_key_worker === 1 ? '' : 's'} without a key worker
@@ -657,7 +658,7 @@ function BedroomsHero({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                         onClick={onAdd}
                     >
                         <Plus className="mr-1 h-4 w-4" />
@@ -668,7 +669,7 @@ function BedroomsHero({
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                             onClick={onSeedDefaults}
                         >
                             <Sparkles className="mr-1 h-4 w-4" />
@@ -707,9 +708,9 @@ function HeroStat({
     value: number | string;
 }) {
     return (
-        <div className="min-w-[68px] rounded-xl bg-white/10 px-3 py-2">
+        <div className="min-w-[68px] rounded-xl bg-primary-foreground/10 px-3 py-2">
             <p className="text-xl font-bold leading-none">{value}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wide text-white/60">
+            <p className="mt-1 text-[10px] uppercase tracking-wide text-primary-foreground/60">
                 {label}
             </p>
         </div>
@@ -997,7 +998,6 @@ function RoomDrawer({
 }) {
     const detachAsset = (assetId: number) => {
         if (!room) return;
-        if (!confirm('Remove this asset from the room?')) return;
         router.delete(
             `/sites/${site.id}/rooms/${room.id}/assets/${assetId}`,
             { preserveScroll: true, preserveState: true },
@@ -1221,18 +1221,24 @@ function RoomDrawer({
                                                             '—'}
                                                     </p>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-muted-foreground hover:text-status-critical"
-                                                    onClick={() =>
+                                                <ConfirmAction
+                                                    title="Remove asset?"
+                                                    description={`Remove "${a.name}" from this room?`}
+                                                    confirmLabel="Remove"
+                                                    onConfirm={() =>
                                                         detachAsset(a.id)
                                                     }
-                                                    aria-label="Detach asset"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-muted-foreground hover:text-status-critical"
+                                                        aria-label="Detach asset"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </ConfirmAction>
                                             </li>
                                         ))}
                                     </ul>

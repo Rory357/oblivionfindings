@@ -18,17 +18,16 @@ class FleetManagementSeeder extends Seeder
 {
     public function run(): void
     {
-        $site = Site::query()->first();
-        if (!$site) {
-            $site = Site::create([
-                'name' => 'Main Site',
+        $site = Site::query()->updateOrCreate(
+            ['name' => 'Main Site'],
+            [
                 'type' => 'house',
                 'city' => 'Auckland',
                 'region' => 'Auckland',
                 'country' => 'New Zealand',
                 'is_active' => true,
-            ]);
-        }
+            ]
+        );
 
         $users = User::query()->take(10)->get();
         $admin = $users->first();

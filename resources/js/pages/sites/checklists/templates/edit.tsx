@@ -16,6 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ConfirmAction } from '../../_confirm-action';
 
 type Item = {
     id: number;
@@ -379,18 +380,24 @@ export default function EditTemplate({ template }: Props) {
                                                 >
                                                     Edit
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-status-critical hover:text-status-critical"
-                                                    onClick={() => {
-                                                        if (confirm('Remove this item?')) {
-                                                            itemForm.delete(`/sites/checklists/templates/items/${item.id}`);
-                                                        }
-                                                    }}
+                                                <ConfirmAction
+                                                    title="Remove checklist item?"
+                                                    description={`Remove "${item.question}" from this template?`}
+                                                    confirmLabel="Remove"
+                                                    onConfirm={() =>
+                                                        itemForm.delete(
+                                                            `/sites/checklists/templates/items/${item.id}`,
+                                                        )
+                                                    }
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-status-critical hover:text-status-critical"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </ConfirmAction>
                                             </div>
                                         </div>
                                     ))

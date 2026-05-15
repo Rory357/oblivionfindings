@@ -328,7 +328,7 @@ class DuskDatabaseSeeder extends Seeder
         // ──────────────────────────────────────────────
         // Sites & Service Contexts
         // ──────────────────────────────────────────────
-        $site = Site::query()->withoutGlobalScopes()->firstOrCreate(
+        $site = Site::query()->withoutGlobalScopes()->updateOrCreate(
             ['name' => 'QA Main Site'],
             $this->existingColumns('sites', [
                 'tenant_id' => 1,

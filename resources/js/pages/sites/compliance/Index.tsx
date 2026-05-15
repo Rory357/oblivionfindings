@@ -37,6 +37,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmAction } from '../_confirm-action';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -322,8 +323,6 @@ export default function SiteComplianceIndex({
     }
 
     function handleDeleteCert(id: number) {
-        if (!confirm('Are you sure you want to delete this certification?'))
-            return;
         router.delete(`/sites/${site.id}/compliance/certifications/${id}`, {
             preserveScroll: true,
         });
@@ -645,18 +644,24 @@ export default function SiteComplianceIndex({
                                                         >
                                                             <Pencil className="h-4 w-4" />
                                                         </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-status-critical hover:text-status-critical"
-                                                            onClick={() =>
+                                                        <ConfirmAction
+                                                            title="Delete certification?"
+                                                            description={`Delete "${cert.name || certTypeLabel(cert.certification_type)}" from this site?`}
+                                                            confirmLabel="Delete"
+                                                            onConfirm={() =>
                                                                 handleDeleteCert(
                                                                     cert.id,
                                                                 )
                                                             }
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-status-critical hover:text-status-critical"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </ConfirmAction>
                                                     </div>
                                                 </div>
                                             </div>
