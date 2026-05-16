@@ -14,135 +14,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
-import {
-    Briefcase,
-    HeartHandshake,
-    HeartPulse,
-    Loader2,
-    Mail,
-    MoreHorizontal,
-    Pencil,
-    Phone,
-    Siren,
-    Star,
-    Trash2,
-    User,
-    UserCheck,
-    Users,
-    Wrench,
-} from 'lucide-react';
+import { Loader2, Mail, Pencil, Phone, Star, Trash2 } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
+import {
+    CONTACT_TYPES,
+    getContactType,
+    type ContactTypeDef,
+    type ContactTypeKey,
+} from './_helpers';
 
-// ── Contact types catalogue ───────────────────────────────────────────────
-//
-// Each tile is rendered in the type picker. Values are stored as snake_case
-// strings on SiteContact.type and translated back into label + icon on read.
-//
-export type ContactTypeKey =
-    | 'site_contact'
-    | 'team_lead'
-    | 'emergency'
-    | 'manager'
-    | 'clinical'
-    | 'family'
-    | 'next_of_kin'
-    | 'maintenance'
-    | 'other';
-
-export type ContactTypeDef = {
-    key: ContactTypeKey;
-    label: string;
-    description: string;
-    icon: ComponentType<{ className?: string }>;
-    accent: string;
-};
-
-export const CONTACT_TYPES: ContactTypeDef[] = [
-    {
-        key: 'site_contact',
-        label: 'Site Contact',
-        description: 'Day-to-day point of contact',
-        icon: User,
-        accent: 'text-sky-400',
-    },
-    {
-        key: 'team_lead',
-        label: 'Team Lead',
-        description: 'Shift / on-floor lead',
-        icon: Users,
-        accent: 'text-indigo-400',
-    },
-    {
-        key: 'emergency',
-        label: 'Emergency',
-        description: '24/7 on-call response',
-        icon: Siren,
-        accent: 'text-rose-400',
-    },
-    {
-        key: 'manager',
-        label: 'Manager',
-        description: 'Service / house manager',
-        icon: Briefcase,
-        accent: 'text-amber-400',
-    },
-    {
-        key: 'clinical',
-        label: 'Clinical',
-        description: 'RN, clinical lead',
-        icon: HeartPulse,
-        accent: 'text-emerald-400',
-    },
-    {
-        key: 'family',
-        label: 'Family / Whānau',
-        description: "Client's family contact",
-        icon: HeartHandshake,
-        accent: 'text-pink-400',
-    },
-    {
-        key: 'next_of_kin',
-        label: 'Next of Kin',
-        description: 'Primary nominated relative',
-        icon: UserCheck,
-        accent: 'text-violet-400',
-    },
-    {
-        key: 'maintenance',
-        label: 'Maintenance',
-        description: 'Trades / property contact',
-        icon: Wrench,
-        accent: 'text-orange-400',
-    },
-    {
-        key: 'other',
-        label: 'Other',
-        description: 'Anything else',
-        icon: MoreHorizontal,
-        accent: 'text-muted-foreground',
-    },
-];
-
-const FALLBACK_TYPE: ContactTypeDef = {
-    key: 'other',
-    label: 'Other',
-    description: '',
-    icon: MoreHorizontal,
-    accent: 'text-muted-foreground',
-};
-
-export function getContactType(type?: string | null): ContactTypeDef {
-    if (!type) return FALLBACK_TYPE;
-    const normalised = type.toLowerCase().trim().replace(/[\s-]+/g, '_');
-    return (
-        CONTACT_TYPES.find((t) => t.key === normalised) ?? {
-            ...FALLBACK_TYPE,
-            label:
-                type.charAt(0).toUpperCase() +
-                type.slice(1).replaceAll('_', ' '),
-        }
-    );
-}
+// Re-export so existing call sites that imported these from `_dialogs` keep
+// working without changes. The single source of truth lives in `_helpers.ts`.
+export { CONTACT_TYPES, getContactType };
+export type { ContactTypeDef, ContactTypeKey };
 
 // ── Form value shape ──────────────────────────────────────────────────────
 
@@ -226,9 +110,14 @@ function ContactTypePicker({
 
 function ContactFields({
     form,
+    lockType = false,
 }: {
     form: ReturnType<typeof useForm<ContactFormValues>>;
+    lockType?: boolean;
 }) {
+    const selectedType = getContactType(form.data.type);
+    const SelectedIcon = selectedType.icon;
+
     return (
         <div className="space-y-4">
             <div>
@@ -236,10 +125,34 @@ function ContactFields({
                     Contact type{' '}
                     <span className="text-status-critical">*</span>
                 </Label>
-                <ContactTypePicker
-                    value={form.data.type}
-                    onChange={(v) => form.setData('type', v)}
-                />
+                {lockType ? (
+                    <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
+                        <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
+                            <SelectedIcon
+                                className={cn('h-4 w-4', selectedType.accent)}
+                            />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium">
+                                    {selectedType.label}
+                                </span>
+                                <Badge variant="outline" className="text-[10px]">
+                                    From Overview
+                                </Badge>
+                            </div>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                This role is locked for the Overview row you
+                                opened.
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <ContactTypePicker
+                        value={form.data.type}
+                        onChange={(v) => form.setData('type', v)}
+                    />
+                )}
                 <FieldError message={form.errors.type} />
             </div>
 
@@ -329,15 +242,26 @@ export function AddContactDialog({
     siteId,
     isOpen,
     onClose,
+    type,
+    lockType = false,
 }: {
     siteId: number;
     isOpen: boolean;
     onClose: () => void;
+    type?: ContactTypeKey | string | null;
+    lockType?: boolean;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-xl">
-                {isOpen && <AddContactBody siteId={siteId} onClose={onClose} />}
+                {isOpen && (
+                    <AddContactBody
+                        siteId={siteId}
+                        onClose={onClose}
+                        type={type}
+                        lockType={lockType}
+                    />
+                )}
             </DialogContent>
         </Dialog>
     );
@@ -346,12 +270,16 @@ export function AddContactDialog({
 function AddContactBody({
     siteId,
     onClose,
+    type,
+    lockType,
 }: {
     siteId: number;
     onClose: () => void;
+    type?: ContactTypeKey | string | null;
+    lockType: boolean;
 }) {
     const form = useForm<ContactFormValues>({
-        type: 'site_contact',
+        type: type ?? 'site_contact',
         name: '',
         role: '',
         phone: '',
@@ -382,7 +310,7 @@ function AddContactBody({
             </DialogHeader>
 
             <div className="mt-3">
-                <ContactFields form={form} />
+                <ContactFields form={form} lockType={lockType} />
             </div>
 
             <DialogFooter className="mt-4">

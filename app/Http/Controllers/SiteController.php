@@ -108,9 +108,11 @@ class SiteController extends Controller
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
-                'manager_name',
             ])
-            ->with('primaryContact:id,name')
+            ->with([
+                'primaryContact:id,name',
+                'primarySiteContact:id,site_id,name',
+            ])
             ->withCount($this->siteOperationalCounts())
             ->orderBy('name')
             ->get()
@@ -132,7 +134,6 @@ class SiteController extends Controller
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
-                'manager_name',
             ])
             ->withCount($this->siteOperationalCounts())
             ->get();
@@ -203,6 +204,10 @@ class SiteController extends Controller
                 'serviceContext:id,name,type',
             ]),
             'contacts',
+            'managerContact',
+            'siteLeadContact',
+            'afterHoursContact',
+            'primarySiteContact',
             'documents.uploadedBy:id,name,email',
             'primaryContact:id,name',
             'serviceContexts',
@@ -330,9 +335,10 @@ class SiteController extends Controller
                 'display_type' => $site->display_type,
                 'phone' => $site->phone,
                 'email' => $site->email,
-                'manager_name' => $site->manager_name,
-                'manager_phone' => $site->manager_phone,
-                'after_hours_phone' => $site->after_hours_phone,
+                'manager_contact' => $this->siteContactPayload($site->managerContact),
+                'site_lead_contact' => $this->siteContactPayload($site->siteLeadContact),
+                'after_hours_contact' => $this->siteContactPayload($site->afterHoursContact),
+                'primary_site_contact' => $this->siteContactPayload($site->primarySiteContact),
                 'emergency_plan_location' => $site->emergency_plan_location,
                 'medication_storage_location' => $site->medication_storage_location,
                 'notes' => $site->notes,
@@ -623,9 +629,6 @@ class SiteController extends Controller
         $data = $request->validate([
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
-            'manager_name' => ['nullable', 'string', 'max:255'],
-            'manager_phone' => ['nullable', 'string', 'max:50'],
-            'after_hours_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
         $site->update($data);
@@ -1101,9 +1104,6 @@ class SiteController extends Controller
                 'type' => $site->type,
                 'phone' => $site->phone,
                 'email' => $site->email,
-                'manager_name' => $site->manager_name,
-                'manager_phone' => $site->manager_phone,
-                'after_hours_phone' => $site->after_hours_phone,
                 'emergency_plan_location' => $site->emergency_plan_location,
                 'medication_storage_location' => $site->medication_storage_location,
                 'notes' => $site->notes,
@@ -1555,6 +1555,8 @@ class SiteController extends Controller
             'clients as active_clients_count' => fn ($q) => $q->where('status', 'active'),
             'contacts',
             'contacts as emergency_contacts_count' => fn ($q) => $q->whereIn('type', ['emergency', 'maintenance', 'manager']),
+            'contacts as site_lead_contacts_count' => fn ($q) => $q->whereIn('type', ['site_lead', 'manager']),
+            'contacts as after_hours_contacts_count' => fn ($q) => $q->where('type', 'emergency'),
             'documents',
             'houseRooms as rooms_total' => fn ($q) => $q->active()->where('is_assignable', true),
             'houseRooms as rooms_occupied' => fn ($q) => $q->active()->where('is_assignable', true)->whereNotNull('assigned_client_id'),
@@ -1591,13 +1593,12 @@ class SiteController extends Controller
             'is_active' => (bool) $site->is_active,
             'is_high_risk' => (bool) $site->is_high_risk,
             'is_high_needs' => (bool) $site->is_high_needs,
-            // A linked user is canonical; manager_name is only the manual fallback for older/manual records.
             'primary_contact' => $site->primaryContact ? [
                 'id' => $site->primaryContact->id,
                 'name' => $site->primaryContact->name,
-            ] : (filled($site->manager_name) ? [
+            ] : ($site->primarySiteContact ? [
                 'id' => null,
-                'name' => $site->manager_name,
+                'name' => $site->primarySiteContact->name,
             ] : null),
             'active_clients_count' => (int) ($site->active_clients_count ?? 0),
             'contacts_count' => (int) ($site->contacts_count ?? 0),
@@ -1609,6 +1610,24 @@ class SiteController extends Controller
             'overdue_checklists_count' => (int) ($site->overdue_checklists_count ?? 0),
             'open_maintenance_count' => (int) ($site->open_maintenance_count ?? 0),
             'readiness' => $readinessService->slim($site),
+        ];
+    }
+
+    private function siteContactPayload(?SiteContact $contact): ?array
+    {
+        if (! $contact) {
+            return null;
+        }
+
+        return [
+            'id' => $contact->id,
+            'type' => $contact->type,
+            'name' => $contact->name,
+            'role' => $contact->role,
+            'phone' => $contact->phone,
+            'email' => $contact->email,
+            'is_primary' => (bool) $contact->is_primary,
+            'notes' => $contact->notes,
         ];
     }
 

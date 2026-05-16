@@ -61,10 +61,10 @@ class ReportCatalog
                     'city' => 'City',
                     'postcode' => 'Postcode',
                     'is_active' => 'Active',
-                    'manager_name' => 'Manager',
+                    'email' => 'Email',
                     'created_at' => 'Created At',
                 ],
-                'search_columns' => ['name', 'city', 'postcode', 'manager_name'],
+                'search_columns' => ['name', 'city', 'postcode', 'email'],
             ],
             [
                 'key' => 'shifts',

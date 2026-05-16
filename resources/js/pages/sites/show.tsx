@@ -110,7 +110,7 @@ import SiteLedgerPanel, {
 } from './_ledger-panel';
 import {
     AddSiteNoteDialog,
-    EditContactInfoDialog,
+    EditSiteLineDialog,
     EditLocationDialog,
     EditSafetyDialog,
 } from './_overview-dialogs';
@@ -122,7 +122,7 @@ import SiteGeofenceDialog, {
 } from './_site-geofence-dialog';
 import type { VendorRecord } from './vendors/_dialogs';
 import type { CredentialRecord } from './credentials/_dialogs';
-import type { ContactRecord } from './contacts/_dialogs';
+import type { ContactRecord, ContactTypeKey } from './contacts/_dialogs';
 import { getContactType } from './contacts/_helpers';
 import type { ClientForPicker, RoomRecord } from './rooms/_dialogs';
 import type { ClientRecord } from './clients/_dialogs';
@@ -274,9 +274,10 @@ type Site = {
     display_type: string;
     phone?: string | null;
     email?: string | null;
-    manager_name?: string | null;
-    manager_phone?: string | null;
-    after_hours_phone?: string | null;
+    manager_contact?: Contact | null;
+    site_lead_contact?: Contact | null;
+    after_hours_contact?: Contact | null;
+    primary_site_contact?: Contact | null;
     emergency_plan_location?: string | null;
     medication_storage_location?: string | null;
     notes?: string | null;
@@ -316,6 +317,8 @@ type Contact = {
     is_primary: boolean;
     notes?: string | null;
 };
+
+type SiteContactType = ContactTypeKey;
 
 type Doc = SiteDocumentRecord;
 
@@ -657,6 +660,7 @@ function ContactRow({
     href,
     canFix = false,
     onFix,
+    testId,
 }: {
     icon: ComponentType<{ className?: string }>;
     label: string;
@@ -664,9 +668,13 @@ function ContactRow({
     href?: string;
     canFix?: boolean;
     onFix?: () => void;
+    testId?: string;
 }) {
     const content = (
-        <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+        <div
+            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
+            data-test={testId}
+        >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                 <Icon className="h-4 w-4" />
             </span>
@@ -691,6 +699,99 @@ function ContactRow({
         </a>
     ) : (
         content
+    );
+}
+
+function DerivedContactRow({
+    icon: Icon,
+    label,
+    contact,
+    emptyCta,
+    onAdd,
+    onEdit,
+    testId,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    contact?: Contact | null;
+    emptyCta?: string;
+    onAdd?: () => void;
+    onEdit?: () => void;
+    testId?: string;
+}) {
+    const phoneHref = contact?.phone ? `tel:${contact.phone}` : undefined;
+    const emailHref = contact?.email ? `mailto:${contact.email}` : undefined;
+
+    return (
+        <div
+            className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
+            data-test={testId}
+        >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Icon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </div>
+                {contact ? (
+                    <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">
+                            {contact.name}
+                        </div>
+                        <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            {contact.phone && (
+                                <a
+                                    href={phoneHref}
+                                    className="truncate hover:text-primary hover:underline"
+                                >
+                                    {contact.phone}
+                                </a>
+                            )}
+                            {contact.email && (
+                                <a
+                                    href={emailHref}
+                                    className="truncate hover:text-primary hover:underline"
+                                >
+                                    {contact.email}
+                                </a>
+                            )}
+                            {!contact.phone && !contact.email && (
+                                <span>No phone or email</span>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                            Not set
+                        </span>
+                        {emptyCta && onAdd && (
+                            <button
+                                type="button"
+                                onClick={onAdd}
+                                className="text-sm font-medium text-primary hover:underline"
+                            >
+                                {emptyCta} →
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+            {contact && onEdit && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 shrink-0 gap-1 px-2 text-xs opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                    onClick={onEdit}
+                    aria-label={`Edit ${label.toLowerCase()} in Contacts`}
+                >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Edit</span>
+                </Button>
+            )}
+        </div>
     );
 }
 
@@ -1271,6 +1372,9 @@ export default function SiteShow({
 
     // Overview-card edit dialogs
     const [contactInfoOpen, setContactInfoOpen] = useState(false);
+    const [addContactType, setAddContactType] =
+        useState<SiteContactType | null>(null);
+    const [editContactId, setEditContactId] = useState<number | null>(null);
     const [locationOpen, setLocationOpen] = useState(false);
     const [siteGeofenceOpen, setSiteGeofenceOpen] = useState(false);
     const [safetyOpen, setSafetyOpen] = useState(false);
@@ -1289,6 +1393,12 @@ export default function SiteShow({
         geofences.find((geofence) => geofence.asset_id == null) ??
         geofences[0] ??
         null;
+    const overviewEditContact =
+        editContactId != null
+            ? (contacts.find((contact) => contact.id === editContactId) as
+                  | ContactRecord
+                  | undefined) ?? null
+            : null;
 
     useEffect(() => {
         const el = tabsListRef.current;
@@ -1312,8 +1422,23 @@ export default function SiteShow({
     }, [activeTab]);
 
     const handleReadinessAction = (action: string) => {
-        if (['add_phone', 'add_email', 'assign_lead', 'add_after_hours', 'add_contact'].includes(action)) {
+        if (['add_phone', 'add_email'].includes(action)) {
             setContactInfoOpen(true);
+            return;
+        }
+        if (action === 'assign_lead') {
+            setActiveTab('overview');
+            setAddContactType('site_lead');
+            return;
+        }
+        if (action === 'add_after_hours') {
+            setActiveTab('overview');
+            setAddContactType('emergency');
+            return;
+        }
+        if (action === 'add_contact') {
+            setActiveTab('overview');
+            setAddContactType('manager');
             return;
         }
         if (['add_emergency_plan', 'add_med_storage'].includes(action)) {
@@ -1338,6 +1463,18 @@ export default function SiteShow({
         }
         if (action === 'configure_geofence') {
             setSiteGeofenceOpen(true);
+        }
+    };
+
+    const openAddContactWithType = (type: SiteContactType) => {
+        setActiveTab('overview');
+        setAddContactType(type);
+    };
+
+    const openEditContact = (id: number | undefined) => {
+        if (id) {
+            setActiveTab('overview');
+            setEditContactId(id);
         }
     };
 
@@ -1868,7 +2005,10 @@ export default function SiteShow({
 
                         <div className="grid gap-4 lg:grid-cols-2">
                             {/* Contact Information */}
-                            <Card className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
+                            <Card
+                                className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md"
+                                data-test="site-contact-information-card"
+                            >
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 bg-gradient-to-br from-primary/5 to-transparent">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -1884,7 +2024,7 @@ export default function SiteShow({
                                             onClick={() => setContactInfoOpen(true)}
                                         >
                                             <Pencil className="h-3 w-3" />
-                                            Edit
+                                            Edit site line
                                         </Button>
                                     )}
                                 </CardHeader>
@@ -1900,6 +2040,7 @@ export default function SiteShow({
                                         }
                                         canFix={can_edit}
                                         onFix={() => setContactInfoOpen(true)}
+                                        testId="site-contact-row-phone"
                                     />
                                     <ContactRow
                                         icon={Mail}
@@ -1912,41 +2053,34 @@ export default function SiteShow({
                                         }
                                         canFix={can_edit}
                                         onFix={() => setContactInfoOpen(true)}
+                                        testId="site-contact-row-email"
                                     />
-                                    <ContactRow
+                                    <DerivedContactRow
                                         icon={User}
                                         label="Site Lead"
-                                        value={
-                                            site.primary_contact?.name ||
-                                            site.manager_name ||
-                                            null
-                                        }
-                                        canFix={can_edit}
-                                        onFix={() => setContactInfoOpen(true)}
+                                        contact={site.site_lead_contact}
+                                        emptyCta={can_edit ? 'Add site lead' : undefined}
+                                        onAdd={() => openAddContactWithType('site_lead')}
+                                        onEdit={() => openEditContact(site.site_lead_contact?.id)}
+                                        testId="site-contact-row-site-lead"
                                     />
-                                    <ContactRow
+                                    <DerivedContactRow
                                         icon={Phone}
-                                        label="Manager Phone"
-                                        value={site.manager_phone}
-                                        href={
-                                            site.manager_phone
-                                                ? `tel:${site.manager_phone}`
-                                                : undefined
-                                        }
-                                        canFix={can_edit}
-                                        onFix={() => setContactInfoOpen(true)}
+                                        label="Manager"
+                                        contact={site.manager_contact}
+                                        emptyCta={can_edit ? 'Add manager' : undefined}
+                                        onAdd={() => openAddContactWithType('manager')}
+                                        onEdit={() => openEditContact(site.manager_contact?.id)}
+                                        testId="site-contact-row-manager"
                                     />
-                                    <ContactRow
+                                    <DerivedContactRow
                                         icon={Clock}
                                         label="After Hours"
-                                        value={site.after_hours_phone}
-                                        href={
-                                            site.after_hours_phone
-                                                ? `tel:${site.after_hours_phone}`
-                                                : undefined
-                                        }
-                                        canFix={can_edit}
-                                        onFix={() => setContactInfoOpen(true)}
+                                        contact={site.after_hours_contact}
+                                        emptyCta={can_edit ? 'Add after-hours contact' : undefined}
+                                        onAdd={() => openAddContactWithType('emergency')}
+                                        onEdit={() => openEditContact(site.after_hours_contact?.id)}
+                                        testId="site-contact-row-after-hours"
                                     />
                                 </CardContent>
                             </Card>
@@ -3371,16 +3505,13 @@ export default function SiteShow({
                 </Tabs>
             </PageShell>
 
-            <EditContactInfoDialog
+            <EditSiteLineDialog
                 siteId={site.id}
                 isOpen={contactInfoOpen}
                 onClose={() => setContactInfoOpen(false)}
                 initial={{
                     phone: site.phone ?? '',
                     email: site.email ?? '',
-                    manager_name: site.manager_name ?? '',
-                    manager_phone: site.manager_phone ?? '',
-                    after_hours_phone: site.after_hours_phone ?? '',
                 }}
             />
             <EditLocationDialog
@@ -3435,6 +3566,27 @@ export default function SiteShow({
                 isOpen={noteOpen}
                 onClose={() => setNoteOpen(false)}
             />
+            {addContactType && (
+                <LazyDialog>
+                    <AddContactDialog
+                        siteId={site.id}
+                        isOpen
+                        type={addContactType}
+                        lockType
+                        onClose={() => setAddContactType(null)}
+                    />
+                </LazyDialog>
+            )}
+            {overviewEditContact && (
+                <LazyDialog>
+                    <EditContactDialog
+                        siteId={site.id}
+                        contact={overviewEditContact}
+                        isOpen
+                        onClose={() => setEditContactId(null)}
+                    />
+                </LazyDialog>
+            )}
         </AppLayout>
     );
 }

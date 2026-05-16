@@ -69,8 +69,6 @@ test('site show exposes readiness and occupancy summaries for active incomplete 
         'phone' => null,
         'email' => null,
         'primary_contact_user_id' => null,
-        'manager_name' => null,
-        'after_hours_phone' => null,
         'emergency_plan_location' => null,
         'medication_storage_location' => null,
         'is_active' => true,

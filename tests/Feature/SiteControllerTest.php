@@ -448,9 +448,18 @@ class SiteControllerTest extends TestCase
                 'type' => 'house',
                 'phone' => '09 123 4567',
                 'email' => 'home@example.com',
-                'manager_name' => 'Jane Manager',
-                'manager_phone' => '021 987 6543',
-                'after_hours_phone' => '0800 111 222',
+                'contacts' => [
+                    [
+                        'type' => 'site_lead',
+                        'name' => 'Jane Lead',
+                        'phone' => '021 987 6543',
+                    ],
+                    [
+                        'type' => 'emergency',
+                        'name' => 'After-hours contact',
+                        'phone' => '0800 111 222',
+                    ],
+                ],
                 'emergency_plan_location' => 'Reception desk',
                 'medication_storage_location' => 'Locked cabinet, office',
                 'notes' => 'Test notes for the site',

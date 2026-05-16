@@ -13,6 +13,7 @@ import type { ComponentType } from 'react';
 
 export type ContactTypeKey =
     | 'site_contact'
+    | 'site_lead'
     | 'team_lead'
     | 'emergency'
     | 'manager'
@@ -36,56 +37,63 @@ export const CONTACT_TYPES: ContactTypeDef[] = [
         label: 'Site Contact',
         description: 'Day-to-day point of contact',
         icon: User,
-        accent: 'text-sky-400',
+        accent: 'text-status-info',
+    },
+    {
+        key: 'site_lead',
+        label: 'Site Lead',
+        description: 'Responsible lead for this site',
+        icon: User,
+        accent: 'text-primary',
     },
     {
         key: 'team_lead',
         label: 'Team Lead',
         description: 'Shift / on-floor lead',
         icon: Users,
-        accent: 'text-indigo-400',
+        accent: 'text-status-info',
     },
     {
         key: 'emergency',
         label: 'Emergency',
         description: '24/7 on-call response',
         icon: Siren,
-        accent: 'text-rose-400',
+        accent: 'text-status-critical',
     },
     {
         key: 'manager',
         label: 'Manager',
         description: 'Service / house manager',
         icon: Briefcase,
-        accent: 'text-amber-400',
+        accent: 'text-status-warning',
     },
     {
         key: 'clinical',
         label: 'Clinical',
         description: 'RN, clinical lead',
         icon: HeartPulse,
-        accent: 'text-emerald-400',
+        accent: 'text-status-success',
     },
     {
         key: 'family',
         label: 'Family / Whānau',
         description: "Client's family contact",
         icon: HeartHandshake,
-        accent: 'text-pink-400',
+        accent: 'text-status-info',
     },
     {
         key: 'next_of_kin',
         label: 'Next of Kin',
         description: 'Primary nominated relative',
         icon: UserCheck,
-        accent: 'text-violet-400',
+        accent: 'text-status-warning',
     },
     {
         key: 'maintenance',
         label: 'Maintenance',
         description: 'Trades / property contact',
         icon: Wrench,
-        accent: 'text-orange-400',
+        accent: 'text-status-warning',
     },
     {
         key: 'other',

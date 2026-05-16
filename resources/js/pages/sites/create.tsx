@@ -59,9 +59,6 @@ const initialData: WizardData = {
     type: 'house',
     phone: '',
     email: '',
-    manager_name: '',
-    manager_phone: '',
-    after_hours_phone: '',
     emergency_plan_location: '',
     medication_storage_location: '',
     notes: '',
@@ -521,9 +518,6 @@ function buildFormData(
     scalar('type', data.type);
     scalar('phone', data.phone);
     scalar('email', data.email);
-    scalar('manager_name', data.manager_name);
-    scalar('manager_phone', data.manager_phone);
-    scalar('after_hours_phone', data.after_hours_phone);
     scalar('emergency_plan_location', data.emergency_plan_location);
     scalar('medication_storage_location', data.medication_storage_location);
     scalar('notes', data.notes);
@@ -631,9 +625,6 @@ function jumpToFirstError(
         zones: 2,
         phone: 3,
         email: 3,
-        manager_name: 3,
-        manager_phone: 3,
-        after_hours_phone: 3,
         contacts: 3,
         assets: 4,
         checklists: 6,

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Site extends Model
@@ -23,9 +24,6 @@ class Site extends Model
         'tenant_id',
         'phone',
         'email',
-        'manager_name',
-        'manager_phone',
-        'after_hours_phone',
         'emergency_plan_location',
         'medication_storage_location',
         'notes',
@@ -78,6 +76,37 @@ class Site extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(SiteContact::class);
+    }
+
+    public function managerContact(): HasOne
+    {
+        return $this->hasOne(SiteContact::class)
+            ->where('type', 'manager')
+            ->orderByDesc('is_primary')
+            ->orderBy('id');
+    }
+
+    public function siteLeadContact(): HasOne
+    {
+        return $this->hasOne(SiteContact::class)
+            ->where('type', 'site_lead')
+            ->orderByDesc('is_primary')
+            ->orderBy('id');
+    }
+
+    public function afterHoursContact(): HasOne
+    {
+        return $this->hasOne(SiteContact::class)
+            ->where('type', 'emergency')
+            ->orderByDesc('is_primary')
+            ->orderBy('id');
+    }
+
+    public function primarySiteContact(): HasOne
+    {
+        return $this->hasOne(SiteContact::class)
+            ->where('is_primary', true)
+            ->orderBy('id');
     }
 
     public function documents(): HasMany

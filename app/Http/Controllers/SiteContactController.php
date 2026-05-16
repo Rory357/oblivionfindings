@@ -30,6 +30,7 @@ class SiteContactController extends Controller
         }
 
         $contact = SiteContact::create(array_merge($data, [
+            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'is_primary' => $isPrimary,
         ]));

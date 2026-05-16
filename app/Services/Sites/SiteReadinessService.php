@@ -12,8 +12,8 @@ class SiteReadinessService
         $critical = [
             $this->item('contact_phone', 'Site phone', 'Sites', filled($site->phone), 'add_phone'),
             $this->item('contact_email', 'Site email', 'Sites', filled($site->email), 'add_email'),
-            $this->item('site_lead', 'Site lead / manager', 'Sites', filled($site->primary_contact_user_id) || filled($site->manager_name), 'assign_lead'),
-            $this->item('after_hours', 'After-hours / on-call line', 'Sites', filled($site->after_hours_phone), 'add_after_hours'),
+            $this->item('site_lead', 'Site lead / manager', 'Sites', filled($site->primary_contact_user_id) || $this->typedContactsCount($site, 'site_lead_contacts_count', ['site_lead', 'manager']) > 0, 'assign_lead'),
+            $this->item('after_hours', 'After-hours / on-call line', 'Sites', $this->typedContactsCount($site, 'after_hours_contacts_count', ['emergency']) > 0, 'add_after_hours'),
             $this->item('emergency_plan', 'Emergency plan & assembly point', 'Sites', filled($site->emergency_plan_location), 'add_emergency_plan'),
             $this->item('med_storage', 'Medication storage details', 'Sites', filled($site->medication_storage_location), 'add_med_storage'),
             $this->item('emergency_contact', 'At least one emergency / maintenance contact', 'Sites', $this->emergencyContactsCount($site) > 0, 'add_contact'),
@@ -96,6 +96,23 @@ class SiteReadinessService
 
         return $site->contacts()
             ->whereIn('type', ['emergency', 'maintenance', 'manager'])
+            ->count();
+    }
+
+    private function typedContactsCount(Site $site, string $countAttribute, array $types): int
+    {
+        if (array_key_exists($countAttribute, $site->getAttributes())) {
+            return (int) $site->getAttribute($countAttribute);
+        }
+
+        if ($site->relationLoaded('contacts')) {
+            return $site->contacts
+                ->whereIn('type', $types)
+                ->count();
+        }
+
+        return $site->contacts()
+            ->whereIn('type', $types)
             ->count();
     }
 

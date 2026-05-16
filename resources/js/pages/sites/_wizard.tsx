@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { WizardStep } from '@/components/wizard-stepper';
+import { CONTACT_TYPES } from './contacts/_helpers';
+export { CONTACT_TYPES };
 import {
     AlertTriangle,
     BedDouble,
@@ -127,9 +129,6 @@ export type WizardData = {
     type: SiteType;
     phone: string;
     email: string;
-    manager_name: string;
-    manager_phone: string;
-    after_hours_phone: string;
     emergency_plan_location: string;
     medication_storage_location: string;
     notes: string;
@@ -191,17 +190,6 @@ export const SITE_TYPES: Array<{
         icon: Home,
         description: 'Client home for residential / home-support visits',
     },
-];
-
-export const CONTACT_TYPES = [
-    { value: 'general', label: 'General' },
-    { value: 'manager', label: 'Site Manager' },
-    { value: 'family', label: 'Family / Whānau' },
-    { value: 'medical', label: 'Medical / GP' },
-    { value: 'maintenance', label: 'Maintenance' },
-    { value: 'vendor', label: 'Vendor' },
-    { value: 'emergency', label: 'Emergency' },
-    { value: 'other', label: 'Other' },
 ];
 
 export const RESOURCE_TYPES = [
@@ -313,7 +301,7 @@ export const STEPS: WizardStep[] = [
 // ── Factories ─────────────────────────────────────────────────────────────
 
 export const emptyContact = (): Contact => ({
-    type: 'general',
+    type: 'site_contact',
     name: '',
     role: '',
     phone: '',
@@ -1037,37 +1025,11 @@ export function StepContacts({
                     </Field>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Manager name" optional error={errors.manager_name}>
-                        <Input
-                            value={data.manager_name}
-                            onChange={(e) =>
-                                setData('manager_name', e.target.value)
-                            }
-                        />
-                    </Field>
-                    <Field label="Manager phone" optional error={errors.manager_phone}>
-                        <Input
-                            value={data.manager_phone}
-                            onChange={(e) =>
-                                setData('manager_phone', e.target.value)
-                            }
-                        />
-                    </Field>
-                </div>
-
-                <Field
-                    label="After-hours phone"
-                    recommended
-                    error={errors.after_hours_phone}
-                >
-                    <Input
-                        value={data.after_hours_phone}
-                        onChange={(e) =>
-                            setData('after_hours_phone', e.target.value)
-                        }
-                    />
-                </Field>
+                <p className="text-sm text-muted-foreground">
+                    Add site leads, managers, and after-hours contacts in the
+                    people list below so the Overview and Contacts tab stay in
+                    sync.
+                </p>
             </Section>
 
             <Section icon={Users} title="Additional contacts & vendors">
@@ -1176,7 +1138,7 @@ function ContactCard({
                 </Field>
                 <Field label="Type">
                     <Select
-                        value={contact.type || 'general'}
+                        value={contact.type || 'site_contact'}
                         onValueChange={(v) => onUpdate(index, { type: v })}
                     >
                         <SelectTrigger>
@@ -1184,7 +1146,7 @@ function ContactCard({
                         </SelectTrigger>
                         <SelectContent>
                             {CONTACT_TYPES.map((t) => (
-                                <SelectItem key={t.value} value={t.value}>
+                                <SelectItem key={t.key} value={t.key}>
                                     {t.label}
                                 </SelectItem>
                             ))}

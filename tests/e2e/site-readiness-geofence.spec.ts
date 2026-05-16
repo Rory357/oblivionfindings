@@ -28,11 +28,28 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
         'longitude' => 174.7633,
         'phone' => '09 555 0100',
         'email' => 'geofence-house@example.test',
-        'manager_name' => 'Geofence Manager',
-        'after_hours_phone' => '0800 555 010',
         'emergency_plan_location' => 'Kitchen folder',
         'medication_storage_location' => 'Medication cabinet',
         'is_active' => true,
+    ],
+);
+
+\\App\\Models\\SiteContact::query()->updateOrCreate(
+    ['site_id' => $site->id, 'type' => 'site_lead', 'name' => 'Geofence Site Lead'],
+    [
+        'tenant_id' => $site->tenant_id,
+        'role' => 'Site Lead',
+        'phone' => '021 555 010',
+        'is_primary' => true,
+    ],
+);
+
+\\App\\Models\\SiteContact::query()->updateOrCreate(
+    ['site_id' => $site->id, 'type' => 'emergency', 'name' => 'Geofence After Hours'],
+    [
+        'tenant_id' => $site->tenant_id,
+        'role' => 'After hours',
+        'phone' => '0800 555 010',
     ],
 );
 

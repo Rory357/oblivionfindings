@@ -131,7 +131,7 @@ class SiteChecklistController extends Controller
 
     public function saveResponse(Request $request, SiteChecklistRun $run)
     {
-        @set_time_limit(120);
+        $this->extendChecklistExecutionWindow();
         $this->authorize('update', $run->site);
 
         $validated = $request->validate([
@@ -154,7 +154,7 @@ class SiteChecklistController extends Controller
 
     public function completeRun(Request $request, SiteChecklistRun $run)
     {
-        @set_time_limit(120);
+        $this->extendChecklistExecutionWindow();
         $this->authorize('update', $run->site);
 
         // If already completed, short-circuit so duplicate submits (page reloads,
@@ -192,6 +192,17 @@ class SiteChecklistController extends Controller
         return redirect()
             ->route('sites.checklists.index', $run->site_id)
             ->with('success', 'Checklist completed.');
+    }
+
+    private function extendChecklistExecutionWindow(): void
+    {
+        $currentLimit = (int) ini_get('max_execution_time');
+
+        if ($currentLimit === 0 || $currentLimit >= 120) {
+            return;
+        }
+
+        @set_time_limit(120);
     }
 
     /**

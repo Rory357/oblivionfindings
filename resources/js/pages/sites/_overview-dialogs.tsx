@@ -24,17 +24,14 @@ function FieldError({ message }: { message?: string }) {
     return <p className="mt-1 text-xs text-status-critical">{message}</p>;
 }
 
-// ── 1. Contact Information ────────────────────────────────────────────────
+// ── 1. Site Line ──────────────────────────────────────────────────────────
 
-type ContactInfoValues = {
+type SiteLineValues = {
     phone: string;
     email: string;
-    manager_name: string;
-    manager_phone: string;
-    after_hours_phone: string;
 };
 
-export function EditContactInfoDialog({
+export function EditSiteLineDialog({
     siteId,
     isOpen,
     onClose,
@@ -43,13 +40,13 @@ export function EditContactInfoDialog({
     siteId: number;
     isOpen: boolean;
     onClose: () => void;
-    initial: Partial<ContactInfoValues>;
+    initial: Partial<SiteLineValues>;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 {isOpen && (
-                    <ContactInfoBody
+                    <SiteLineBody
                         siteId={siteId}
                         initial={initial}
                         onClose={onClose}
@@ -60,21 +57,18 @@ export function EditContactInfoDialog({
     );
 }
 
-function ContactInfoBody({
+function SiteLineBody({
     siteId,
     initial,
     onClose,
 }: {
     siteId: number;
-    initial: Partial<ContactInfoValues>;
+    initial: Partial<SiteLineValues>;
     onClose: () => void;
 }) {
-    const form = useForm<ContactInfoValues>({
+    const form = useForm<SiteLineValues>({
         phone: initial.phone ?? '',
         email: initial.email ?? '',
-        manager_name: initial.manager_name ?? '',
-        manager_phone: initial.manager_phone ?? '',
-        after_hours_phone: initial.after_hours_phone ?? '',
     });
 
     const handleSubmit = () => {
@@ -87,7 +81,7 @@ function ContactInfoBody({
     return (
         <>
             <DialogHeader>
-                <DialogTitle>Edit Contact Information</DialogTitle>
+                <DialogTitle>Edit site line</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -111,37 +105,6 @@ function ContactInfoBody({
                         placeholder="house@example.org.nz"
                     />
                     <FieldError message={form.errors.email} />
-                </div>
-                <div>
-                    <Label htmlFor="ci-lead">Site Lead</Label>
-                    {/* Linked primary_contact_user_id is canonical when present; this free-text lead is the fallback shown on older site records. */}
-                    <Input
-                        id="ci-lead"
-                        value={form.data.manager_name}
-                        onChange={(e) => form.setData('manager_name', e.target.value)}
-                        placeholder="Lead's name"
-                    />
-                    <FieldError message={form.errors.manager_name} />
-                </div>
-                <div>
-                    <Label htmlFor="ci-mphone">Manager Phone</Label>
-                    <Input
-                        id="ci-mphone"
-                        value={form.data.manager_phone}
-                        onChange={(e) => form.setData('manager_phone', e.target.value)}
-                        placeholder="021 555 0100"
-                    />
-                    <FieldError message={form.errors.manager_phone} />
-                </div>
-                <div>
-                    <Label htmlFor="ci-after">After Hours Phone</Label>
-                    <Input
-                        id="ci-after"
-                        value={form.data.after_hours_phone}
-                        onChange={(e) => form.setData('after_hours_phone', e.target.value)}
-                        placeholder="0800 000 000"
-                    />
-                    <FieldError message={form.errors.after_hours_phone} />
                 </div>
             </div>
 

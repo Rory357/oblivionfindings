@@ -50,9 +50,6 @@ type Site = {
     type: SiteType;
     phone?: string;
     email?: string;
-    manager_name?: string;
-    manager_phone?: string;
-    after_hours_phone?: string;
     emergency_plan_location?: string;
     medication_storage_location?: string;
     notes?: string;
@@ -184,9 +181,6 @@ export default function EditSite() {
         type: site.type,
         phone: site.phone ?? '',
         email: site.email ?? '',
-        manager_name: site.manager_name ?? '',
-        manager_phone: site.manager_phone ?? '',
-        after_hours_phone: site.after_hours_phone ?? '',
         emergency_plan_location: site.emergency_plan_location ?? '',
         medication_storage_location: site.medication_storage_location ?? '',
         notes: site.notes ?? '',
