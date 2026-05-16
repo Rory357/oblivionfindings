@@ -221,7 +221,7 @@ export default function SiteGeofenceDialog({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                className="max-h-[92vh] max-w-4xl overflow-y-auto"
+                className="max-h-[92vh] overflow-y-auto sm:max-w-[min(64rem,calc(100vw-2rem))]"
                 data-test="site-geofence-dialog"
             >
                 <DialogHeader>
@@ -251,8 +251,8 @@ export default function SiteGeofenceDialog({
                         </Button>
                     </div>
                 ) : (
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-                        <div className="space-y-2">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                        <div className="min-w-0 space-y-2">
                             <GeofenceDrawMap
                                 center={center}
                                 zoom={16}
@@ -263,7 +263,7 @@ export default function SiteGeofenceDialog({
                             <FieldError message={form.errors.shape} />
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="min-w-0 space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="site-geofence-name">Name</Label>
                                 <Input
