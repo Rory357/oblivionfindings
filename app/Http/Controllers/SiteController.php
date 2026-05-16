@@ -27,6 +27,7 @@ use App\Services\ShiftCoverageService;
 use App\Services\Sites\HouseLedgerPresenter;
 use App\Services\Sites\HouseLedgerService;
 use App\Services\Sites\SiteReadinessService;
+use App\Services\Sites\SiteTypePlanService;
 use App\Services\UserSiteAccessService;
 use App\Support\NzRegions;
 use Illuminate\Http\Request;
@@ -262,6 +263,7 @@ class SiteController extends Controller
             ]);
 
         $readiness = app(SiteReadinessService::class)->evaluate($site);
+        $typePlanSummary = app(SiteTypePlanService::class)->summaryFor($site);
         $checklist = collect($readiness['critical'])
             ->merge($readiness['recommended'])
             ->map(fn (array $item) => [
@@ -490,6 +492,7 @@ class SiteController extends Controller
             ]),
             'checklist' => $checklist,
             'readiness' => $readiness,
+            'typePlan' => $typePlanSummary,
             'occupancy' => $occupancy,
             'houseLedger' => $houseLedger,
             // Vendors and credentials are scoped by the viewing user's

@@ -266,6 +266,11 @@ class Site extends Model
         return $this->hasMany(AssetGeofence::class);
     }
 
+    public function typePlans(): HasMany
+    {
+        return $this->hasMany(SiteTypePlan::class);
+    }
+
     // Accessors
     public function getAddressAttribute(): string
     {

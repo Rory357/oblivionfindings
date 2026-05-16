@@ -8,13 +8,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Models\SiteTypePlanPin;
 use App\Services\Integration\UnifiOperationalBridgeService;
+use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
 
 class SiteHardwareController extends Controller
 {
     public function __construct(
         private readonly DeviceRegistryService $registry,
+        private readonly SiteTypePlanService $typePlans,
     ) {}
 
     public function index(Request $request, Site $site)
@@ -23,6 +26,14 @@ class SiteHardwareController extends Controller
 
         $user = $request->user();
         $tenantId = $user?->tenant_id ?? $user?->organization_id ?? $site->tenant_id ?? 1;
+        $typePlan = $this->typePlans->summaryFor($site);
+        $currentPlan = $this->typePlans->currentEditable($site);
+        $devicePins = $currentPlan
+            ? $currentPlan->pins()
+                ->where('kind', SiteTypePlanPin::KIND_DEVICE)
+                ->get()
+                ->keyBy('device_id')
+            : collect();
 
         // Canonical device list (from Security & Devices).
         // This page is a read-only context view; provider config + device CRUD
@@ -32,10 +43,11 @@ class SiteHardwareController extends Controller
             ->orderBy('category')
             ->orderBy('name')
             ->get()
-            ->map(function (Device $d) {
+            ->map(function (Device $d) use ($devicePins) {
                 $active = $d->assignments->first(fn ($a) => $a->released_at === null);
                 $externalRef = is_array($d->external_ref) ? $d->external_ref : [];
                 $meta = is_array($d->meta) ? $d->meta : [];
+                $planPin = $devicePins->get($d->id);
 
                 return [
                     'id' => $d->id,
@@ -61,6 +73,7 @@ class SiteHardwareController extends Controller
                     'notes' => $d->notes,
                     'assignment_type' => $active?->assignable_type,
                     'assignment_id' => $active?->assignable_id,
+                    'plan_pin' => $planPin ? $this->typePlans->serializePin($planPin) : null,
                 ];
             });
 
@@ -96,6 +109,7 @@ class SiteHardwareController extends Controller
             'devices' => $devices,
             'rooms' => $rooms,
             'unifi' => $unifi,
+            'typePlan' => $typePlan,
             'can' => [
                 'manage_hardware' => $user?->canDo('siteHardware.manage') ?? false,
             ],
@@ -209,5 +223,71 @@ class SiteHardwareController extends Controller
         }
 
         return redirect()->back();
+    }
+
+    public function pinDevice(Request $request, Site $site, int $device)
+    {
+        $this->authorize('update', $site);
+
+        $data = $request->validate([
+            'x' => ['required', 'numeric', 'between:0,1'],
+            'y' => ['required', 'numeric', 'between:0,1'],
+            'label' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $tenantId = $request->user()?->tenant_id ?? $request->user()?->organization_id ?? $site->tenant_id ?? 1;
+        $deviceModel = Device::query()->forTenant($tenantId)->findOrFail($device);
+
+        $belongsToSite = $this->registry->forSite($tenantId, $site->id)
+            ->whereKey($deviceModel->id)
+            ->exists();
+        abort_unless($belongsToSite, 404);
+
+        $plan = $this->typePlans->currentEditable($site);
+        abort_unless($plan, 409, 'Build a plan before pinning hardware.');
+
+        $pin = $plan->pins()->updateOrCreate(
+            [
+                'kind' => SiteTypePlanPin::KIND_DEVICE,
+                'device_id' => $deviceModel->id,
+            ],
+            [
+                'tenant_id' => $plan->tenant_id,
+                'subkind' => $deviceModel->subcategory ?? $deviceModel->category,
+                'label' => $data['label'] ?? $deviceModel->name,
+                'notes' => $data['notes'] ?? null,
+                'meta' => ['stale' => false],
+                'x' => $data['x'],
+                'y' => $data['y'],
+            ],
+        );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'pin' => $this->typePlans->serializePin($pin->fresh()),
+            ]);
+        }
+
+        return back()->with('success', 'Hardware pinned to plan.');
+    }
+
+    public function unpinDevice(Request $request, Site $site, int $device)
+    {
+        $this->authorize('update', $site);
+
+        $plan = $this->typePlans->currentEditable($site);
+        abort_unless($plan, 404);
+
+        $plan->pins()
+            ->where('kind', SiteTypePlanPin::KIND_DEVICE)
+            ->where('device_id', $device)
+            ->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true]);
+        }
+
+        return back()->with('success', 'Hardware pin removed.');
     }
 }

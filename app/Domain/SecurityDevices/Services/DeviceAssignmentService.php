@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Services;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Services\Sites\SiteTypePlanPinStatusService;
 use Illuminate\Support\Facades\DB;
 
 class DeviceAssignmentService
@@ -59,10 +60,13 @@ class DeviceAssignmentService
             return null;
         }
 
+        $releasedAt = now();
+
         $active->update([
-            'released_at' => now(),
+            'released_at' => $releasedAt,
             'released_by_user_id' => $releasedByUserId,
         ]);
+        app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_released', $releasedAt);
 
         return $active->fresh();
     }
@@ -94,10 +98,13 @@ class DeviceAssignmentService
         $active = $device->assignments()->active()->first();
 
         if ($active) {
+            $releasedAt = now();
+
             $active->update([
-                'released_at' => now(),
+                'released_at' => $releasedAt,
                 'released_by_user_id' => $userId,
             ]);
+            app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_replaced', $releasedAt);
         }
     }
 

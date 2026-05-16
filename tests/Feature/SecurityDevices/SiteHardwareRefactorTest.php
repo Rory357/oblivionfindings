@@ -8,10 +8,12 @@ use App\Models\LocationHardware;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Models\SiteTypePlanPin;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -290,5 +292,185 @@ class SiteHardwareRefactorTest extends TestCase
         // The canonical DeviceAssignment is authoritative; legacy
         // LocationHardware.room_id is intentionally not synced — see
         // UnifiOperationalBridgeService::syncRoomAssignment.
+    }
+
+    public function test_release_marks_device_plan_pin_stale(): void
+    {
+        $device = Device::factory()->security()->create(['name' => 'Front Camera']);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'site',
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now()->subHour(),
+        ]);
+        $pin = $this->createDevicePlanPin($device, [
+            'meta' => ['device_id' => $device->id, 'stale' => false],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$device->id}/release")
+            ->assertRedirect();
+
+        $pin->refresh();
+        $this->assertTrue($pin->meta['stale'] ?? false);
+        $this->assertArrayHasKey('released_at', $pin->meta);
+        $this->assertSame('assignment_released', $pin->meta['stale_reason'] ?? null);
+    }
+
+    public function test_room_move_marks_device_plan_pin_stale(): void
+    {
+        $roomA = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'name' => 'Hallway',
+        ]);
+        $roomB = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'name' => 'Network Closet',
+        ]);
+
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'name' => 'Access Point',
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'room',
+            'assignable_id' => $roomA->id,
+            'assigned_at' => now()->subHour(),
+        ]);
+        $pin = $this->createDevicePlanPin($device, [
+            'meta' => ['device_id' => $device->id, 'stale' => false],
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room", [
+                'room_id' => $roomB->id,
+            ])
+            ->assertRedirect();
+
+        $pin->refresh();
+        $this->assertTrue($pin->meta['stale'] ?? false);
+        $this->assertArrayHasKey('replaced_at', $pin->meta);
+        $this->assertSame('assignment_replaced', $pin->meta['stale_reason'] ?? null);
+    }
+
+    public function test_pin_device_writes_plan_pin_for_current_plan(): void
+    {
+        $planId = DB::table('site_type_plans')->insertGetId([
+            'tenant_id' => $this->siteA->tenant_id,
+            'site_id' => $this->siteA->id,
+            'site_type' => $this->siteA->type,
+            'status' => 'published',
+            'version' => 1,
+            'layout' => json_encode([
+                'schema_version' => 1,
+                'canvas' => ['width' => 1000, 'height' => 700, 'unit' => 'rel'],
+                'rooms' => [],
+                'walls' => [],
+                'doors' => [],
+                'windows' => [],
+                'labels' => [],
+            ]),
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $device = Device::factory()->security()->create(['name' => 'Front Camera']);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'site',
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/{$device->id}/pin", [
+                'x' => 0.42,
+                'y' => 0.33,
+                'label' => 'Front door camera',
+            ])
+            ->assertOk()
+            ->assertJsonPath('pin.kind', 'device')
+            ->assertJsonPath('pin.device_id', $device->id);
+
+        $this->assertDatabaseHas('site_type_plan_pins', [
+            'tenant_id' => $this->siteA->tenant_id,
+            'site_type_plan_id' => $planId,
+            'kind' => 'device',
+            'device_id' => $device->id,
+            'label' => 'Front door camera',
+        ]);
+    }
+
+    public function test_unpin_device_removes_plan_pin(): void
+    {
+        $planId = DB::table('site_type_plans')->insertGetId([
+            'tenant_id' => $this->siteA->tenant_id,
+            'site_id' => $this->siteA->id,
+            'site_type' => $this->siteA->type,
+            'status' => 'published',
+            'version' => 1,
+            'layout' => json_encode(['schema_version' => 1, 'canvas' => ['width' => 1000, 'height' => 700]]),
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $device = Device::factory()->security()->create();
+
+        DB::table('site_type_plan_pins')->insert([
+            'tenant_id' => $this->siteA->tenant_id,
+            'site_type_plan_id' => $planId,
+            'kind' => 'device',
+            'device_id' => $device->id,
+            'label' => 'Front camera',
+            'x' => 0.5,
+            'y' => 0.5,
+            'rotation_deg' => 0,
+            'sort_order' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->deleteJson("/sites/{$this->siteA->id}/hardware/{$device->id}/pin")
+            ->assertOk();
+
+        $this->assertDatabaseMissing('site_type_plan_pins', [
+            'site_type_plan_id' => $planId,
+            'kind' => 'device',
+            'device_id' => $device->id,
+        ]);
+    }
+
+    private function createDevicePlanPin(Device $device, array $overrides = []): SiteTypePlanPin
+    {
+        $planId = DB::table('site_type_plans')->insertGetId([
+            'tenant_id' => $this->siteA->tenant_id,
+            'site_id' => $this->siteA->id,
+            'site_type' => $this->siteA->type,
+            'status' => 'published',
+            'version' => 1,
+            'layout' => json_encode(['schema_version' => 1, 'canvas' => ['width' => 1000, 'height' => 700]]),
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return SiteTypePlanPin::create(array_merge([
+            'tenant_id' => $this->siteA->tenant_id,
+            'site_type_plan_id' => $planId,
+            'kind' => SiteTypePlanPin::KIND_DEVICE,
+            'device_id' => $device->id,
+            'label' => $device->name,
+            'meta' => ['stale' => false],
+            'x' => 0.5,
+            'y' => 0.5,
+            'rotation_deg' => 0,
+            'sort_order' => 0,
+        ], $overrides));
     }
 }

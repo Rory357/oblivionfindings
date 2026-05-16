@@ -15168,6 +15168,65 @@ CREATE TABLE `site_compliance_templates` (
   CONSTRAINT `site_compliance_templates_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `site_type_plans`;
+CREATE TABLE `site_type_plans` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned DEFAULT NULL,
+  `site_id` bigint unsigned NOT NULL,
+  `site_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(24) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `version` int unsigned NOT NULL DEFAULT '1',
+  `layout` json NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `published_at` timestamp NULL DEFAULT NULL,
+  `published_by_user_id` bigint unsigned DEFAULT NULL,
+  `created_by_user_id` bigint unsigned DEFAULT NULL,
+  `archived_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `site_type_plans_tenant_id_index` (`tenant_id`),
+  KEY `site_type_plans_site_id_status_index` (`site_id`,`status`),
+  KEY `site_type_plans_tenant_id_site_id_index` (`tenant_id`,`site_id`),
+  KEY `site_type_plans_published_by_user_id_foreign` (`published_by_user_id`),
+  KEY `site_type_plans_created_by_user_id_foreign` (`created_by_user_id`),
+  CONSTRAINT `site_type_plans_created_by_user_id_foreign` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `site_type_plans_published_by_user_id_foreign` FOREIGN KEY (`published_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `site_type_plans_site_id_foreign` FOREIGN KEY (`site_id`) REFERENCES `sites` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `site_type_plan_pins`;
+CREATE TABLE `site_type_plan_pins` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned DEFAULT NULL,
+  `site_type_plan_id` bigint unsigned NOT NULL,
+  `kind` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subkind` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `device_id` bigint unsigned DEFAULT NULL,
+  `room_ref_type` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `room_ref_id` bigint unsigned DEFAULT NULL,
+  `label` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `meta` json DEFAULT NULL,
+  `x` decimal(10,4) NOT NULL,
+  `y` decimal(10,4) NOT NULL,
+  `rotation_deg` smallint NOT NULL DEFAULT '0',
+  `width` decimal(10,4) DEFAULT NULL,
+  `height` decimal(10,4) DEFAULT NULL,
+  `path_points` json DEFAULT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `site_type_plan_pins_tenant_id_index` (`tenant_id`),
+  KEY `site_type_plan_pins_site_type_plan_id_kind_index` (`site_type_plan_id`,`kind`),
+  KEY `site_type_plan_pins_device_id_index` (`device_id`),
+  KEY `site_type_plan_pins_tenant_id_kind_index` (`tenant_id`,`kind`),
+  CONSTRAINT `site_type_plan_pins_device_id_foreign` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `site_type_plan_pins_site_type_plan_id_foreign` FOREIGN KEY (`site_type_plan_id`) REFERENCES `site_type_plans` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `site_contacts`;
 CREATE TABLE `site_contacts` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -17359,7 +17418,8 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
     (519, '2026_05_13_120000_add_is_assignable_to_site_house_rooms', 1),
     (520, '2026_05_13_140000_add_room_id_to_assets', 1),
     (521, '2026_05_14_000001_backfill_sites_region', 1),
-    (522, '2026_05_16_000001_create_asset_geofence_assignments_table', 1);
+    (522, '2026_05_16_000001_create_asset_geofence_assignments_table', 1),
+    (523, '2026_05_16_120000_create_site_type_plans_and_pins', 1);
 
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE,'system') */;
