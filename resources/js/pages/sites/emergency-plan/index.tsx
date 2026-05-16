@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, FileDown, Phone, ShieldAlert, Users } from 'lucide-react';
+import { ArrowLeft, FileDown, Pencil, Phone, ShieldAlert, Users } from 'lucide-react';
+import { useState } from 'react';
+import SiteTypePlanBuilderDialog from '../plan/_builder-dialog';
 import { PlanThumbnail, type PlanLayout, type PlanPin } from '../plan/_thumbnail';
+import type { BuilderMode, Inventory, Taxonomy } from '../plan/_types';
 
 type Site = {
     id: number;
@@ -37,6 +40,18 @@ type LegendItem = {
     count: number;
 };
 
+type TypePlanSummary = {
+    tab_label: string;
+    inventory_label: string;
+    inventory_href: string;
+    draft?: { layout: PlanLayout; notes?: string | null; pins: PlanPin[] } | null;
+    published?: { layout: PlanLayout; notes?: string | null; pins: PlanPin[] } | null;
+    inventory?: Inventory | null;
+    taxonomy?: Taxonomy | null;
+    emergency_pin_kinds?: string[];
+    has_emergency_layer?: boolean;
+};
+
 type Props = {
     site: Site;
     organisation: { name: string; logo_url?: string | null };
@@ -47,6 +62,8 @@ type Props = {
     procedures: string[];
     support_notes?: string | null;
     footer?: string | null;
+    typePlan: TypePlanSummary;
+    can: { update: boolean };
 };
 
 export default function SiteEmergencyPlanIndex({
@@ -59,10 +76,14 @@ export default function SiteEmergencyPlanIndex({
     procedures,
     support_notes,
     footer,
+    typePlan,
+    can,
 }: Props) {
-    const emergencyPins = plan.pins.filter((pin) =>
-        ['assembly_point', 'emergency_exit', 'evacuation_route', 'you_are_here', 'fire_extinguisher'].includes(pin.kind),
-    );
+    const [builderOpen, setBuilderOpen] = useState(false);
+    const [builderMode, setBuilderMode] = useState<BuilderMode>('emergency');
+    const [builderFocus, setBuilderFocus] = useState<string | undefined>();
+    const emergencyKinds = typePlan.emergency_pin_kinds ?? [];
+    const emergencyPins = plan.pins.filter((pin) => emergencyKinds.includes(pin.kind));
 
     return (
         <AppLayout>
@@ -87,6 +108,20 @@ export default function SiteEmergencyPlanIndex({
                                     </Link>
                                 </Button>
                             ))}
+                            {can.update && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setBuilderMode('emergency');
+                                        setBuilderFocus(ready ? undefined : 'assembly_point');
+                                        setBuilderOpen(true);
+                                    }}
+                                >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit emergency plan
+                                </Button>
+                            )}
                         </div>
                     }
                 />
@@ -106,6 +141,7 @@ export default function SiteEmergencyPlanIndex({
                             <PlanThumbnail
                                 layout={plan.layout}
                                 pins={emergencyPins}
+                                taxonomy={typePlan.taxonomy ?? null}
                                 className="min-h-[480px]"
                             />
                         </CardContent>
@@ -184,6 +220,20 @@ export default function SiteEmergencyPlanIndex({
                     </div>
                 </div>
             </PageShell>
+            <SiteTypePlanBuilderDialog
+                site={site}
+                typePlan={typePlan}
+                open={builderOpen}
+                onOpenChange={(open) => {
+                    setBuilderOpen(open);
+                    if (!open) {
+                        setBuilderMode('emergency');
+                        setBuilderFocus(undefined);
+                    }
+                }}
+                focusTool={builderFocus}
+                mode={builderMode}
+            />
         </AppLayout>
     );
 }

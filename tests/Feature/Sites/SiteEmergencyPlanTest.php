@@ -162,3 +162,90 @@ test('emergency contacts payload includes site contacts and NZ 111 line', functi
         );
 });
 
+test('emergency plan page includes type plan summary and emergency kind source', function () {
+    $user = siteEmergencyPlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+
+    publishedPlanForSite($site, [
+        ['kind' => 'assembly_point', 'label' => 'Mailbox', 'x' => 0.8, 'y' => 0.8],
+        ['kind' => 'emergency_exit', 'label' => 'Front door', 'x' => 0.1, 'y' => 0.9],
+    ]);
+
+    $this->actingAs($user)
+        ->get("/sites/{$site->id}/emergency-plan")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/emergency-plan/index')
+            ->where('can.update', true)
+            ->has('typePlan.published')
+            ->where('typePlan.emergency_pin_kinds.0', 'emergency_exit')
+            ->where('typePlan.has_emergency_layer', true)
+        );
+});
+
+test('direct emergency plan update uses scoped draft replacement without mutating published plan', function () {
+    $user = siteEmergencyPlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+
+    $publishedId = publishedPlanForSite($site, [
+        ['kind' => 'medication_storage', 'label' => 'Medication safe', 'x' => 0.2, 'y' => 0.2],
+        ['kind' => 'assembly_point', 'label' => 'Published assembly', 'x' => 0.8, 'y' => 0.8],
+    ]);
+
+    $this->actingAs($user)
+        ->putJson("/sites/{$site->id}/emergency-plan", [
+            'pins' => [
+                ['kind' => 'emergency_exit', 'label' => 'Draft exit', 'x' => 0.12, 'y' => 0.91],
+            ],
+        ])
+        ->assertOk()
+        ->assertJsonPath('ready', false);
+
+    $draftId = DB::table('site_type_plans')
+        ->where('site_id', $site->id)
+        ->where('status', 'draft')
+        ->value('id');
+
+    expect($draftId)->not()->toBeNull()->and($draftId)->not()->toBe($publishedId);
+
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $publishedId,
+        'kind' => 'assembly_point',
+        'label' => 'Published assembly',
+    ]);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $draftId,
+        'kind' => 'medication_storage',
+        'label' => 'Medication safe',
+    ]);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $draftId,
+        'kind' => 'emergency_exit',
+        'label' => 'Draft exit',
+    ]);
+    $this->assertDatabaseMissing('site_type_plan_pins', [
+        'site_type_plan_id' => $draftId,
+        'kind' => 'assembly_point',
+        'label' => 'Published assembly',
+    ]);
+});
+
+test('direct emergency plan update rejects non emergency pins without creating a draft', function () {
+    $user = siteEmergencyPlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+
+    publishedPlanForSite($site, [
+        ['kind' => 'assembly_point', 'label' => 'Published assembly', 'x' => 0.8, 'y' => 0.8],
+    ]);
+
+    $this->actingAs($user)
+        ->putJson("/sites/{$site->id}/emergency-plan", [
+            'pins' => [
+                ['kind' => 'device', 'label' => 'Not allowed', 'x' => 0.12, 'y' => 0.91],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.kind');
+
+    expect(DB::table('site_type_plans')->where('site_id', $site->id)->where('status', 'draft')->exists())->toBeFalse();
+});

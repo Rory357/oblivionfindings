@@ -1,56 +1,212 @@
 import { Button } from '@/components/ui/button';
-import { DoorOpen, Flame, MapPin, PanelTop, Pencil, Pill, Square, Type, Video } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import * as Lucide from 'lucide-react';
+import { useMemo, type CSSProperties } from 'react';
+import { SELECT_TOOL, isEmergencyPlanKind, type BuilderMode, type Taxonomy } from './_types';
 
-export type BuilderTool =
-    | 'room'
-    | 'wall'
-    | 'door'
-    | 'window'
-    | 'label'
-    | 'medication_storage'
-    | 'assembly_point'
-    | 'emergency_exit'
-    | 'fire_extinguisher'
-    | 'device';
-
-const tools: Array<{ value: BuilderTool; label: string; icon: typeof Square }> = [
-    { value: 'room', label: 'Room', icon: Square },
-    { value: 'wall', label: 'Wall', icon: Pencil },
-    { value: 'door', label: 'Door', icon: DoorOpen },
-    { value: 'window', label: 'Window', icon: PanelTop },
-    { value: 'label', label: 'Label', icon: Type },
-    { value: 'medication_storage', label: 'Medication', icon: Pill },
-    { value: 'assembly_point', label: 'Assembly', icon: MapPin },
-    { value: 'emergency_exit', label: 'Exit', icon: DoorOpen },
-    { value: 'fire_extinguisher', label: 'Fire', icon: Flame },
-    { value: 'device', label: 'Device', icon: Video },
-];
+export type ToolValue = string; // '__room' | '__wall' | ... | kind value
+// Re-exported for legacy consumers (sites/show.tsx); the type is now permissive.
+export type BuilderTool = string;
 
 type Props = {
-    value: BuilderTool;
-    onChange: (tool: BuilderTool) => void;
+    taxonomy: Taxonomy | null;
+    activeKind: string | null;
+    activeSubkind: string | null;
+    mode?: BuilderMode;
+    emergencyKinds?: string[];
+    onPickTool: (kind: string | null, subkind?: string | null) => void;
+    onRequestCalibration: () => void;
 };
 
-export default function ToolPalette({ value, onChange }: Props) {
+type IconProps = { className?: string; style?: CSSProperties };
+
+function resolveIcon(name: string): React.ComponentType<IconProps> {
+    const candidate = (Lucide as unknown as Record<string, React.ComponentType<IconProps>>)[name];
+    return candidate ?? (Lucide.Circle as unknown as React.ComponentType<IconProps>);
+}
+
+export default function ToolPalette({
+    taxonomy,
+    activeKind,
+    activeSubkind,
+    mode = 'full',
+    emergencyKinds = [],
+    onPickTool,
+    onRequestCalibration,
+}: Props) {
+    const groups = useMemo(
+        () =>
+            (taxonomy?.groups ?? [])
+                .map((group) => ({
+                    ...group,
+                    kinds: group.kinds.filter((kind) => {
+                        if (mode === 'full') return true;
+                        if (kind.startsWith('__')) return false;
+                        return isEmergencyPlanKind(kind, emergencyKinds);
+                    }),
+                }))
+                .filter((group) => group.kinds.length > 0),
+        [emergencyKinds, mode, taxonomy],
+    );
+
+    if (!taxonomy) {
+        return (
+            <div className="rounded-md border bg-amber-50 p-3 text-xs text-amber-900">
+                Taxonomy unavailable — the plan builder needs server-provided configuration.
+            </div>
+        );
+    }
+
     return (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {tools.map((tool) => {
-                const Icon = tool.icon;
-                return (
+        <div className="space-y-2 rounded-md border bg-white p-2">
+            <div>
+                <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Selection
+                </div>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant={activeKind === SELECT_TOOL || activeKind === null ? 'default' : 'outline'}
+                    className={cn('h-8 gap-1.5 px-2', (activeKind === SELECT_TOOL || activeKind === null) && 'ring-2 ring-blue-300')}
+                    onClick={() => onPickTool(SELECT_TOOL)}
+                    title="Select and marquee (Q)"
+                    data-test="site-plan-select-tool"
+                >
+                    <Lucide.MousePointer2 className="h-3.5 w-3.5" />
+                    <span className="text-xs">Select</span>
+                </Button>
+            </div>
+            {groups.map((group) => (
+                <div key={group.id}>
+                    <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        {group.label}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {group.kinds.map((kindKey) => {
+                            if (kindKey.startsWith('__')) {
+                                const shape = taxonomy.shapes[kindKey];
+                                if (!shape) return null;
+                                const Icon = resolveIcon(shape.icon);
+                                const active = activeKind === kindKey;
+                                return (
+                                    <Button
+                                        key={kindKey}
+                                        type="button"
+                                        size="sm"
+                                        variant={active ? 'default' : 'outline'}
+                                        className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
+                                        onClick={() => onPickTool(kindKey)}
+                                        title={`${shape.label}${kindKey === '__wall' ? ' (W)' : ''}`}
+                                        data-test={kindKey === '__wall' ? 'site-plan-wall-tool' : undefined}
+                                    >
+                                        <Icon className="h-3.5 w-3.5" />
+                                        <span className="text-xs">{shape.label}</span>
+                                    </Button>
+                                );
+                            }
+
+                            const kind = taxonomy.kinds[kindKey];
+                            if (!kind) return null;
+                            const Icon = resolveIcon(kind.icon);
+                            const active = activeKind === kindKey;
+                            const subkinds = kind.subkinds ?? [];
+
+                            if (subkinds.length === 0) {
+                                return (
+                                    <Button
+                                        key={kindKey}
+                                        type="button"
+                                        size="sm"
+                                        variant={active ? 'default' : 'outline'}
+                                        className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
+                                        style={active ? undefined : { borderColor: kind.color }}
+                                        onClick={() => onPickTool(kindKey)}
+                                        title={kind.label}
+                                    >
+                                        <Icon className="h-3.5 w-3.5" style={{ color: active ? undefined : kind.color }} />
+                                        <span className="text-xs">{kind.label}</span>
+                                    </Button>
+                                );
+                            }
+
+                            const subLabel =
+                                active && activeSubkind
+                                    ? subkinds.find((s) => s.value === activeSubkind)?.label ?? kind.label
+                                    : kind.label;
+
+                            return (
+                                <Popover key={kindKey}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={active ? 'default' : 'outline'}
+                                            className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
+                                            style={active ? undefined : { borderColor: kind.color }}
+                                            title={kind.label}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" style={{ color: active ? undefined : kind.color }} />
+                                            <span className="text-xs">{subLabel}</span>
+                                            <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-56 p-1" align="start">
+                                        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                            {kind.label} type
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className={cn(
+                                                'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                active && !activeSubkind && 'bg-slate-100 font-medium',
+                                            )}
+                                            onClick={() => onPickTool(kindKey, null)}
+                                        >
+                                            Generic
+                                        </button>
+                                        {subkinds.map((sub) => (
+                                            <button
+                                                key={sub.value}
+                                                type="button"
+                                                className={cn(
+                                                    'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                    active && activeSubkind === sub.value && 'bg-slate-100 font-medium',
+                                                )}
+                                                onClick={() => onPickTool(kindKey, sub.value)}
+                                            >
+                                                {sub.label}
+                                            </button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+
+            {mode === 'full' && (
+            <div className="border-t pt-2">
+                <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Measure</div>
+                <div className="flex flex-wrap gap-1.5">
                     <Button
-                        key={tool.value}
                         type="button"
                         size="sm"
-                        variant={value === tool.value ? 'default' : 'outline'}
-                        className="justify-start gap-2"
-                        onClick={() => onChange(tool.value)}
+                        variant={activeKind === '__scale' ? 'default' : 'outline'}
+                        className="h-8 gap-1.5 px-2"
+                        title="Set scale (S)"
+                        onClick={() => {
+                            onPickTool('__scale');
+                            onRequestCalibration();
+                        }}
                     >
-                        <Icon className="h-4 w-4" />
-                        {tool.label}
+                        <Lucide.Ruler className="h-3.5 w-3.5" />
+                        <span className="text-xs">Set scale</span>
                     </Button>
-                );
-            })}
+                </div>
+            </div>
+            )}
         </div>
     );
 }
-

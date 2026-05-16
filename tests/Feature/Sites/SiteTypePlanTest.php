@@ -3,6 +3,8 @@
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -49,6 +51,40 @@ function sampleSitePlanLayout(string $label = 'Bedroom 1'): array
         'windows' => [],
         'labels' => [],
     ];
+}
+
+function createSiteTypePlanForTest(Site $site, string $status = 'draft', array $pins = []): int
+{
+    $planId = DB::table('site_type_plans')->insertGetId([
+        'tenant_id' => $site->tenant_id,
+        'site_id' => $site->id,
+        'site_type' => $site->type,
+        'status' => $status,
+        'version' => 1,
+        'layout' => json_encode(sampleSitePlanLayout()),
+        'published_at' => $status === 'published' ? now() : null,
+        'published_by_user_id' => null,
+        'created_by_user_id' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    foreach ($pins as $index => $pin) {
+        DB::table('site_type_plan_pins')->insert(array_merge([
+            'tenant_id' => $site->tenant_id,
+            'site_type_plan_id' => $planId,
+            'kind' => 'custom_marker',
+            'label' => 'Marker',
+            'x' => 0.5,
+            'y' => 0.5,
+            'rotation_deg' => 0,
+            'sort_order' => $index,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $pin));
+    }
+
+    return $planId;
 }
 
 test('site plan draft can be saved published duplicated and republished', function () {
@@ -189,6 +225,252 @@ test('pin batch endpoint reconciles draft pins', function () {
     ]);
 });
 
+test('emergency mode pin replacement preserves non emergency pins on draft', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $planId = createSiteTypePlanForTest($site, 'draft', [
+        ['kind' => 'medication_storage', 'label' => 'Medication safe', 'x' => 0.2, 'y' => 0.3],
+        ['kind' => 'device', 'label' => 'Front camera', 'x' => 0.3, 'y' => 0.4],
+        ['kind' => 'assembly_point', 'label' => 'Old assembly', 'x' => 0.8, 'y' => 0.8],
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'mode' => 'emergency',
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'emergency_exit', 'label' => 'Kitchen exit', 'x' => 0.15, 'y' => 0.92],
+            ],
+        ])
+        ->assertOk()
+        ->assertJsonCount(3, 'pins');
+
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $planId,
+        'kind' => 'medication_storage',
+        'label' => 'Medication safe',
+    ]);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $planId,
+        'kind' => 'device',
+        'label' => 'Front camera',
+    ]);
+    $this->assertDatabaseMissing('site_type_plan_pins', [
+        'site_type_plan_id' => $planId,
+        'kind' => 'assembly_point',
+        'label' => 'Old assembly',
+    ]);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $planId,
+        'kind' => 'emergency_exit',
+        'label' => 'Kitchen exit',
+    ]);
+});
+
+test('emergency mode pin replacement clones published plan before replacing emergency pins', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $publishedId = createSiteTypePlanForTest($site, 'published', [
+        ['kind' => 'medication_storage', 'label' => 'Published medication safe', 'x' => 0.2, 'y' => 0.3],
+        ['kind' => 'assembly_point', 'label' => 'Published assembly', 'x' => 0.8, 'y' => 0.8],
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'mode' => 'emergency',
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'emergency_exit', 'label' => 'Draft exit', 'x' => 0.15, 'y' => 0.92],
+            ],
+        ])
+        ->assertOk()
+        ->assertJsonPath('typePlan.status', 'draft_over_published');
+
+    $draftId = DB::table('site_type_plans')
+        ->where('site_id', $site->id)
+        ->where('status', 'draft')
+        ->value('id');
+
+    expect($draftId)->not()->toBeNull()->and($draftId)->not()->toBe($publishedId);
+
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $publishedId,
+        'kind' => 'assembly_point',
+        'label' => 'Published assembly',
+    ]);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $draftId,
+        'kind' => 'medication_storage',
+        'label' => 'Published medication safe',
+    ]);
+    $this->assertDatabaseMissing('site_type_plan_pins', [
+        'site_type_plan_id' => $draftId,
+        'kind' => 'assembly_point',
+        'label' => 'Published assembly',
+    ]);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $draftId,
+        'kind' => 'emergency_exit',
+        'label' => 'Draft exit',
+    ]);
+});
+
+test('emergency mode pin replacement rejects non emergency kinds without altering pins', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $planId = createSiteTypePlanForTest($site, 'draft', [
+        ['kind' => 'medication_storage', 'label' => 'Medication safe', 'x' => 0.2, 'y' => 0.3],
+        ['kind' => 'assembly_point', 'label' => 'Assembly', 'x' => 0.8, 'y' => 0.8],
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'mode' => 'emergency',
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'device', 'label' => 'Not allowed', 'x' => 0.15, 'y' => 0.92],
+            ],
+        ])
+        ->assertUnprocessable();
+
+    expect(DB::table('site_type_plan_pins')->where('site_type_plan_id', $planId)->count())->toBe(2);
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'site_type_plan_id' => $planId,
+        'kind' => 'assembly_point',
+        'label' => 'Assembly',
+    ]);
+});
+
+test('pin validation accepts only taxonomy allowed subkinds', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    createSiteTypePlanForTest($site);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'fire_extinguisher', 'subkind' => 'co2', 'label' => 'CO2', 'x' => 0.2, 'y' => 0.3],
+            ],
+        ])
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'smoke_alarm', 'subkind' => 'co2', 'label' => 'Bad subkind', 'x' => 0.2, 'y' => 0.3],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.subkind');
+});
+
+test('device pin validation requires a current assignment to the site', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    createSiteTypePlanForTest($site);
+
+    $assignedDevice = Device::factory()->security()->create(['tenant_id' => $site->tenant_id]);
+    DeviceAssignment::query()->create([
+        'device_id' => $assignedDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assigned_at' => now(),
+    ]);
+
+    $otherDevice = Device::factory()->security()->create(['tenant_id' => $site->tenant_id]);
+    DeviceAssignment::query()->create([
+        'device_id' => $otherDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $otherSite->id,
+        'assigned_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'device', 'device_id' => $assignedDevice->id, 'label' => 'Assigned', 'x' => 0.2, 'y' => 0.3],
+            ],
+        ])
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'device', 'device_id' => $otherDevice->id, 'label' => 'Other site', 'x' => 0.2, 'y' => 0.3],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.device_id');
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                ['kind' => 'smoke_alarm', 'device_id' => $assignedDevice->id, 'label' => 'Not device', 'x' => 0.2, 'y' => 0.3],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.device_id');
+});
+
+test('path points are validated for evacuation routes only', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    createSiteTypePlanForTest($site);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                [
+                    'kind' => 'evacuation_route',
+                    'label' => 'Route',
+                    'x' => 0.4,
+                    'y' => 0.4,
+                    'path_points' => [['x' => 0.1, 'y' => 0.1], ['x' => 0.9, 'y' => 0.9]],
+                ],
+            ],
+        ])
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                [
+                    'kind' => 'evacuation_route',
+                    'label' => 'Too short',
+                    'x' => 0.4,
+                    'y' => 0.4,
+                    'path_points' => [['x' => 0.1, 'y' => 0.1]],
+                ],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.path_points');
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [
+                [
+                    'kind' => 'smoke_alarm',
+                    'label' => 'Bad points',
+                    'x' => 0.4,
+                    'y' => 0.4,
+                    'path_points' => [['x' => 0.1, 'y' => 0.1], ['x' => 0.9, 'y' => 0.9]],
+                ],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.path_points');
+});
+
 test('plan write routes require site update permission', function () {
     $user = User::factory()->create(['approved_at' => now()]);
     $site = Site::factory()->create();
@@ -199,4 +481,3 @@ test('plan write routes require site update permission', function () {
         ])
         ->assertForbidden();
 });
-

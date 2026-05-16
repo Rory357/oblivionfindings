@@ -2,7 +2,12 @@
 
 namespace App\Services\Sites;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Site;
+use App\Models\SiteFacilityZone;
+use App\Models\SiteHoResource;
+use App\Models\SiteHouseRoom;
 use App\Models\SiteTypePlan;
 use App\Models\SiteTypePlanPin;
 use Illuminate\Database\Eloquent\Collection;
@@ -159,6 +164,34 @@ class SiteTypePlanService
         });
     }
 
+    public function draftForEmergencyPins(Site $site, ?int $userId = null): SiteTypePlan
+    {
+        if ($draft = $this->currentDraft($site)) {
+            return $draft->load('pins');
+        }
+
+        if ($this->currentPublished($site)) {
+            return $this->cloneToDraft($site, $userId);
+        }
+
+        return $this->storeDraft($site, $this->seedDefaultLayout($site->type), null, $userId);
+    }
+
+    public function replaceEmergencyPins(SiteTypePlan $plan, array $pins): Collection
+    {
+        return DB::transaction(function () use ($plan, $pins) {
+            $plan->pins()
+                ->whereIn('kind', SiteTypePlanPin::EMERGENCY_KINDS)
+                ->delete();
+
+            foreach (array_values($pins) as $index => $pinData) {
+                $plan->pins()->create($this->pinPayload($plan, $pinData, $index));
+            }
+
+            return $plan->fresh(['pins'])->pins;
+        });
+    }
+
     public function summaryFor(Site $site): array
     {
         $draft = $this->currentDraft($site)?->load('pins');
@@ -170,14 +203,128 @@ class SiteTypePlanService
             'inventory_label' => $this->inventoryLabel($site),
             'inventory_href' => $this->inventoryHref($site),
             'status' => $draft && $published ? 'draft_over_published' : ($draft ? 'draft' : ($published ? 'published' : 'empty')),
-            'draft' => $this->serializePlan($draft, false),
+            'draft' => $this->serializePlan($draft, true),
             'published' => $this->serializePlan($published, true),
             'has_plan' => (bool) $summaryPlan,
             'has_published' => (bool) $published,
             'has_emergency_layer' => $published ? $this->hasEmergencyLayer($published) : false,
             'has_medication_pin' => $published ? $this->hasMedicationPin($published) : false,
             'pin_counts' => $summaryPlan ? $summaryPlan->pins->countBy('kind')->all() : [],
+            'inventory' => $this->siteInventory($site),
+            'taxonomy' => $this->taxonomy(),
+            'emergency_pin_kinds' => SiteTypePlanPin::EMERGENCY_KINDS,
         ];
+    }
+
+    /**
+     * Surface the rooms and devices that the builder is allowed to reference.
+     */
+    public function siteInventory(Site $site): array
+    {
+        return [
+            'rooms' => $this->siteRooms($site),
+            'devices' => $this->siteDevices($site),
+        ];
+    }
+
+    public function siteRooms(Site $site): array
+    {
+        $rooms = [];
+
+        SiteHouseRoom::query()
+            ->where('site_id', $site->id)
+            ->when($site->tenant_id, fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->each(function (SiteHouseRoom $room) use (&$rooms) {
+                $rooms[] = [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'type' => 'house_room',
+                    'type_label' => 'Bedroom',
+                    'is_active' => (bool) $room->is_active,
+                    'is_assigned' => $room->assigned_client_id !== null,
+                ];
+            });
+
+        SiteHoResource::query()
+            ->where('site_id', $site->id)
+            ->when($site->tenant_id, fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
+            ->orderBy('name')
+            ->get()
+            ->each(function (SiteHoResource $resource) use (&$rooms) {
+                $rooms[] = [
+                    'id' => $resource->id,
+                    'name' => $resource->name,
+                    'type' => 'ho_resource',
+                    'type_label' => $this->humanise($resource->resource_type ?? 'Space'),
+                    'is_active' => (bool) $resource->is_active,
+                    'is_assigned' => false,
+                ];
+            });
+
+        SiteFacilityZone::query()
+            ->where('site_id', $site->id)
+            ->when($site->tenant_id, fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
+            ->orderBy('name')
+            ->get()
+            ->each(function (SiteFacilityZone $zone) use (&$rooms) {
+                $rooms[] = [
+                    'id' => $zone->id,
+                    'name' => $zone->name,
+                    'type' => 'facility_zone',
+                    'type_label' => $this->humanise($zone->zone_type ?? 'Zone'),
+                    'is_active' => (bool) $zone->is_active,
+                    'is_assigned' => false,
+                ];
+            });
+
+        return $rooms;
+    }
+
+    public function siteDevices(Site $site): array
+    {
+        return DeviceAssignment::query()
+            ->where('assignable_type', DeviceAssignment::TARGET_SITE)
+            ->where('assignable_id', $site->id)
+            ->whereNull('released_at')
+            ->with('device')
+            ->get()
+            ->map(function (DeviceAssignment $assignment) {
+                $device = $assignment->device;
+                if (! $device) {
+                    return null;
+                }
+
+                return [
+                    'id' => $device->id,
+                    'name' => $device->name ?? $device->device_uid,
+                    'uid' => $device->device_uid,
+                    'category' => $device->category,
+                    'subcategory' => $device->subcategory,
+                    'manufacturer' => $device->manufacturer,
+                    'model' => $device->model,
+                    'status' => $device->status?->value ?? null,
+                    'health' => $device->health_status?->value ?? null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Plan-builder taxonomy shared with the frontend.
+     */
+    public function taxonomy(): array
+    {
+        return config('site_plan_taxonomy', []);
+    }
+
+    private function humanise(string $value): string
+    {
+        return ucwords(str_replace(['_', '-'], ' ', $value));
     }
 
     public function serializePlan(?SiteTypePlan $plan, bool $includePins = true): ?array
@@ -245,7 +392,7 @@ class SiteTypePlanService
         return $this->normaliseLayout([
             'schema_version' => 1,
             'canvas' => ['width' => 1000, 'height' => 700, 'unit' => 'rel'],
-            'grid' => ['enabled' => true, 'size' => 20, 'snap' => true],
+            'grid' => ['enabled' => true, 'size' => 10, 'snap' => true],
             'rooms' => [
                 ['id' => 'room-1', 'label' => $label, 'shape' => 'rect', 'x' => 0.08, 'y' => 0.12, 'width' => 0.28, 'height' => 0.24],
                 ['id' => 'room-2', 'label' => 'Kitchen', 'shape' => 'rect', 'x' => 0.38, 'y' => 0.12, 'width' => 0.24, 'height' => 0.24],
@@ -348,8 +495,15 @@ class SiteTypePlanService
     {
         return array_replace_recursive([
             'schema_version' => 1,
-            'canvas' => ['width' => 1000, 'height' => 700, 'unit' => 'rel'],
-            'grid' => ['enabled' => true, 'size' => 20, 'snap' => true],
+            'canvas' => [
+                'width' => 1000,
+                'height' => 700,
+                'unit' => 'rel',
+                // 25 mm per virtual canvas unit → the 1000×700 canvas covers
+                // a 25 m × 17.5 m plan by default. Calibrated via the scale tool.
+                'meters_per_unit' => 0.025,
+            ],
+            'grid' => ['enabled' => true, 'size' => 10, 'snap' => true],
             'scale' => null,
             'walls' => [],
             'rooms' => [],
@@ -400,4 +554,3 @@ class SiteTypePlanService
         };
     }
 }
-

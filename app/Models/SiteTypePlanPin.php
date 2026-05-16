@@ -16,9 +16,16 @@ class SiteTypePlanPin extends Model
     public const KIND_YOU_ARE_HERE = 'you_are_here';
     public const KIND_FIRE_EXTINGUISHER = 'fire_extinguisher';
     public const KIND_FIRE_BLANKET = 'fire_blanket';
+    public const KIND_FIRE_HOSE_REEL = 'fire_hose_reel';
+    public const KIND_FIRE_PANEL = 'fire_panel';
+    public const KIND_FIRE_DOOR = 'fire_door';
+    public const KIND_SPRINKLER_HEAD = 'sprinkler_head';
+    public const KIND_MANUAL_CALL_POINT = 'manual_call_point';
+    public const KIND_HYDRANT = 'hydrant';
     public const KIND_FIRST_AID_KIT = 'first_aid_kit';
     public const KIND_SMOKE_ALARM = 'smoke_alarm';
     public const KIND_DEFIBRILLATOR = 'defibrillator';
+    public const KIND_EVACUATION_DIAGRAM = 'evacuation_diagram';
     public const KIND_GAS_SHUTOFF = 'gas_shutoff';
     public const KIND_WATER_SHUTOFF = 'water_shutoff';
     public const KIND_ELECTRICAL_PANEL = 'electrical_panel';
@@ -33,9 +40,16 @@ class SiteTypePlanPin extends Model
         self::KIND_YOU_ARE_HERE,
         self::KIND_FIRE_EXTINGUISHER,
         self::KIND_FIRE_BLANKET,
+        self::KIND_FIRE_HOSE_REEL,
+        self::KIND_FIRE_PANEL,
+        self::KIND_FIRE_DOOR,
+        self::KIND_SPRINKLER_HEAD,
+        self::KIND_MANUAL_CALL_POINT,
+        self::KIND_HYDRANT,
         self::KIND_FIRST_AID_KIT,
         self::KIND_SMOKE_ALARM,
         self::KIND_DEFIBRILLATOR,
+        self::KIND_EVACUATION_DIAGRAM,
         self::KIND_GAS_SHUTOFF,
         self::KIND_WATER_SHUTOFF,
         self::KIND_ELECTRICAL_PANEL,
@@ -49,9 +63,16 @@ class SiteTypePlanPin extends Model
         self::KIND_YOU_ARE_HERE,
         self::KIND_FIRE_EXTINGUISHER,
         self::KIND_FIRE_BLANKET,
+        self::KIND_FIRE_HOSE_REEL,
+        self::KIND_FIRE_PANEL,
+        self::KIND_FIRE_DOOR,
+        self::KIND_SPRINKLER_HEAD,
+        self::KIND_MANUAL_CALL_POINT,
+        self::KIND_HYDRANT,
         self::KIND_FIRST_AID_KIT,
         self::KIND_SMOKE_ALARM,
         self::KIND_DEFIBRILLATOR,
+        self::KIND_EVACUATION_DIAGRAM,
         self::KIND_CUSTOM_MARKER,
     ];
 

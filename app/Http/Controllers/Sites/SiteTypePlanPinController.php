@@ -5,25 +5,32 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteTypePlanPin;
+use App\Services\Sites\SiteTypePlanPinPayloadValidator;
 use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class SiteTypePlanPinController extends Controller
 {
     public function __construct(
         private readonly SiteTypePlanService $plans,
+        private readonly SiteTypePlanPinPayloadValidator $pinValidator,
     ) {}
 
     public function storeBatch(Request $request, Site $site)
     {
         $this->authorize('update', $site);
 
-        $data = $this->validatePins($request);
-        $plan = $this->plans->currentDraft($site)
-            ?? $this->plans->storeDraft($site, $this->plans->seedDefaultLayout($site->type), null, $request->user()?->id);
+        $data = $this->pinValidator->validateBatch($request, $site);
 
-        $pins = $this->plans->replacePins($plan, $data['pins'], (bool) ($data['replace'] ?? false));
+        if (($data['mode'] ?? 'full') === 'emergency') {
+            $plan = $this->plans->draftForEmergencyPins($site, $request->user()?->id);
+            $pins = $this->plans->replaceEmergencyPins($plan, $data['pins']);
+        } else {
+            $plan = $this->plans->currentDraft($site)
+                ?? $this->plans->storeDraft($site, $this->plans->seedDefaultLayout($site->type), null, $request->user()?->id);
+
+            $pins = $this->plans->replacePins($plan, $data['pins'], (bool) ($data['replace'] ?? false));
+        }
 
         return response()->json([
             'pins' => $pins->map(fn (SiteTypePlanPin $pin) => $this->plans->serializePin($pin))->values()->all(),
@@ -54,30 +61,6 @@ class SiteTypePlanPinController extends Controller
         return response()->json(['deleted' => true]);
     }
 
-    private function validatePins(Request $request): array
-    {
-        return $request->validate([
-            'replace' => ['nullable', 'boolean'],
-            'pins' => ['required', 'array'],
-            'pins.*.id' => ['nullable', 'integer'],
-            'pins.*.kind' => ['required', 'string', Rule::in(SiteTypePlanPin::KINDS)],
-            'pins.*.subkind' => ['nullable', 'string', 'max:64'],
-            'pins.*.device_id' => ['nullable', 'integer', 'exists:devices,id'],
-            'pins.*.room_ref_type' => ['nullable', 'string', 'max:64'],
-            'pins.*.room_ref_id' => ['nullable', 'integer'],
-            'pins.*.label' => ['nullable', 'string', 'max:120'],
-            'pins.*.notes' => ['nullable', 'string', 'max:5000'],
-            'pins.*.meta' => ['nullable', 'array'],
-            'pins.*.x' => ['required', 'numeric', 'between:0,1'],
-            'pins.*.y' => ['required', 'numeric', 'between:0,1'],
-            'pins.*.rotation_deg' => ['nullable', 'integer', 'between:-360,360'],
-            'pins.*.width' => ['nullable', 'numeric', 'between:0,1'],
-            'pins.*.height' => ['nullable', 'numeric', 'between:0,1'],
-            'pins.*.path_points' => ['nullable', 'array'],
-            'pins.*.sort_order' => ['nullable', 'integer'],
-        ]);
-    }
-
     private function validateSinglePin(Request $request): array
     {
         return $request->validate([
@@ -105,4 +88,3 @@ class SiteTypePlanPinController extends Controller
         abort_unless((int) $pin->plan->site_id === (int) $site->id, 404);
     }
 }
-

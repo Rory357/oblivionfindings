@@ -135,6 +135,7 @@ import {
 import SiteTypePlanBuilderDialog from './plan/_builder-dialog';
 import type { BuilderTool } from './plan/_tool-palette';
 import { PlanThumbnail, type PlanLayout, type PlanPin } from './plan/_thumbnail';
+import type { BuilderMode, Inventory, Taxonomy } from './plan/_types';
 const AddVendorDialog = lazy(() =>
     import('./vendors/_dialogs').then((module) => ({
         default: module.AddVendorDialog,
@@ -447,6 +448,9 @@ type SiteTypePlanSummary = {
     has_emergency_layer: boolean;
     has_medication_pin: boolean;
     pin_counts: Record<string, number>;
+    inventory?: Inventory | null;
+    taxonomy?: Taxonomy | null;
+    emergency_pin_kinds?: string[];
 };
 
 type RoomsSummary = {
@@ -705,6 +709,9 @@ function fallbackTypePlan(site: Site): SiteTypePlanSummary {
         has_emergency_layer: false,
         has_medication_pin: false,
         pin_counts: {},
+        inventory: null,
+        taxonomy: null,
+        emergency_pin_kinds: [],
     };
 }
 
@@ -1454,6 +1461,7 @@ export default function SiteShow({
     const [noteOpen, setNoteOpen] = useState(false);
     const [planBuilderOpen, setPlanBuilderOpen] = useState(false);
     const [planBuilderFocus, setPlanBuilderFocus] = useState<BuilderTool | undefined>();
+    const [planBuilderMode, setPlanBuilderMode] = useState<BuilderMode>('full');
     const initialTabFromQuery =
         typeof window !== 'undefined'
             ? new URLSearchParams(window.location.search).get('tab')
@@ -1682,13 +1690,7 @@ export default function SiteShow({
     const TypePlanTabIcon = typePlanTab.icon;
     const publishedEmergencyPins =
         typePlanSummary.published?.pins.filter((pin) =>
-            [
-                'assembly_point',
-                'emergency_exit',
-                'evacuation_route',
-                'you_are_here',
-                'fire_extinguisher',
-            ].includes(pin.kind),
+            (typePlanSummary.emergency_pin_kinds ?? []).includes(pin.kind),
         ) ?? [];
 
     return (
@@ -1946,8 +1948,7 @@ export default function SiteShow({
                                     return (
                                         <DropdownMenuItem
                                             key={tab.value}
-                                            onSelect={(event) => {
-                                                event.preventDefault();
+                                            onSelect={() => {
                                                 setActiveTab(tab.value);
                                             }}
                                             className={
@@ -3570,7 +3571,13 @@ export default function SiteShow({
                                         {planStatusLabel(typePlanSummary.status)}
                                     </Badge>
                                     {can_edit && (
-                                        <Button onClick={() => setPlanBuilderOpen(true)}>
+                                        <Button
+                                            onClick={() => {
+                                                setPlanBuilderMode('full');
+                                                setPlanBuilderFocus(undefined);
+                                                setPlanBuilderOpen(true);
+                                            }}
+                                        >
                                             {activePlan ? (
                                                 <Pencil className="mr-2 h-4 w-4" />
                                             ) : (
@@ -3586,6 +3593,7 @@ export default function SiteShow({
                                     <PlanThumbnail
                                         layout={activePlan.layout}
                                         pins={activePlan.pins}
+                                        taxonomy={typePlanSummary.taxonomy ?? null}
                                         className="min-h-[420px]"
                                     />
                                 ) : (
@@ -3596,7 +3604,13 @@ export default function SiteShow({
                                                 No plan has been started for this site.
                                             </p>
                                             {can_edit && (
-                                                <Button onClick={() => setPlanBuilderOpen(true)}>
+                                                <Button
+                                                    onClick={() => {
+                                                        setPlanBuilderMode('full');
+                                                        setPlanBuilderFocus(undefined);
+                                                        setPlanBuilderOpen(true);
+                                                    }}
+                                                >
                                                     <Plus className="mr-2 h-4 w-4" />
                                                     Build Plan
                                                 </Button>
@@ -3682,6 +3696,7 @@ export default function SiteShow({
                                         <PlanThumbnail
                                             layout={typePlanSummary.published.layout}
                                             pins={publishedEmergencyPins}
+                                            taxonomy={typePlanSummary.taxonomy ?? null}
                                             className="min-h-[420px]"
                                         />
                                         <div className="space-y-3">
@@ -3705,11 +3720,12 @@ export default function SiteShow({
                                                     variant="outline"
                                                     className="w-full justify-start"
                                                     onClick={() => {
-                                                        setPlanBuilderFocus('assembly_point');
+                                                        setPlanBuilderMode('emergency');
+                                                        setPlanBuilderFocus(typePlanSummary.has_emergency_layer ? undefined : 'assembly_point');
                                                         setPlanBuilderOpen(true);
                                                     }}
                                                 >
-                                                    Edit emergency pins
+                                                    Edit emergency plan
                                                 </Button>
                                             )}
                                         </div>
@@ -3721,6 +3737,8 @@ export default function SiteShow({
                                             <div className="mt-4">
                                                 <Button onClick={() => {
                                                     setActiveTab('type-plan');
+                                                    setPlanBuilderMode('full');
+                                                    setPlanBuilderFocus(undefined);
                                                     setPlanBuilderOpen(true);
                                                 }}>
                                                     <Plus className="mr-2 h-4 w-4" />
@@ -3851,9 +3869,13 @@ export default function SiteShow({
                 open={planBuilderOpen}
                 onOpenChange={(open) => {
                     setPlanBuilderOpen(open);
-                    if (!open) setPlanBuilderFocus(undefined);
+                    if (!open) {
+                        setPlanBuilderFocus(undefined);
+                        setPlanBuilderMode('full');
+                    }
                 }}
                 focusTool={planBuilderFocus}
+                mode={planBuilderMode}
             />
             <EditSiteLineDialog
                 siteId={site.id}

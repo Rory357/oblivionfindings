@@ -8,7 +8,8 @@ import { Head, Link } from '@inertiajs/react';
 import { ArrowRight, FileDown, MapPinned, Pencil, Plus, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import SiteTypePlanBuilderDialog from './_builder-dialog';
-import { PlanThumbnail, type PlanLayout, type PlanPin } from './_thumbnail';
+import { PlanThumbnail } from './_thumbnail';
+import type { Inventory, PlanLayout, PlanPin, Taxonomy } from './_types';
 
 type Site = {
     id: number;
@@ -39,6 +40,8 @@ type TypePlanSummary = {
     has_emergency_layer: boolean;
     has_medication_pin: boolean;
     pin_counts: Record<string, number>;
+    inventory?: Inventory | null;
+    taxonomy?: Taxonomy | null;
 };
 
 type Props = {
@@ -109,6 +112,8 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
                                 <PlanThumbnail
                                     layout={activePlan.layout}
                                     pins={activePlan.pins}
+                                    taxonomy={typePlan.taxonomy ?? null}
+                                    showScale
                                     className="min-h-[420px]"
                                 />
                             ) : (
