@@ -6,6 +6,7 @@ use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -26,6 +27,19 @@ function sitesModulePlanUser(string $roleName = 'admin'): User
     }
 
     return $user;
+}
+
+function siteOperationalReadinessPlanLayout(): array
+{
+    return [
+        'schema_version' => 1,
+        'canvas' => ['width' => 1000, 'height' => 700, 'unit' => 'rel'],
+        'rooms' => [],
+        'walls' => [],
+        'doors' => [],
+        'windows' => [],
+        'labels' => [],
+    ];
 }
 
 test('sites index derives region payload and filter options from city when region is missing', function () {
@@ -241,4 +255,97 @@ test('standard rooms endpoint adds missing defaults and is idempotent', function
         ->assertRedirect();
 
     expect($site->houseRooms()->count())->toBe($afterFirstRun);
+});
+
+test('published plan emergency markers satisfy emergency plan readiness without legacy text', function () {
+    $site = Site::factory()->create([
+        'type' => 'house',
+        'emergency_plan_location' => null,
+        'medication_storage_location' => null,
+        'is_active' => true,
+    ]);
+
+    $planId = DB::table('site_type_plans')->insertGetId([
+        'tenant_id' => $site->tenant_id,
+        'site_id' => $site->id,
+        'site_type' => $site->type,
+        'status' => 'published',
+        'version' => 1,
+        'layout' => json_encode(siteOperationalReadinessPlanLayout()),
+        'published_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('site_type_plan_pins')->insert([
+        [
+            'tenant_id' => $site->tenant_id,
+            'site_type_plan_id' => $planId,
+            'kind' => 'assembly_point',
+            'label' => 'Driveway',
+            'x' => 0.8,
+            'y' => 0.8,
+            'rotation_deg' => 0,
+            'sort_order' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'tenant_id' => $site->tenant_id,
+            'site_type_plan_id' => $planId,
+            'kind' => 'emergency_exit',
+            'label' => 'Front exit',
+            'x' => 0.2,
+            'y' => 0.9,
+            'rotation_deg' => 0,
+            'sort_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    $readiness = $site->fresh()->operationalReadiness();
+
+    $emergency = collect($readiness['critical'])->firstWhere('key', 'emergency_plan');
+
+    expect($emergency['done'])->toBeTrue();
+});
+
+test('published medication storage pin satisfies med storage readiness without legacy text', function () {
+    $site = Site::factory()->create([
+        'type' => 'house',
+        'medication_storage_location' => null,
+        'is_active' => true,
+    ]);
+
+    $planId = DB::table('site_type_plans')->insertGetId([
+        'tenant_id' => $site->tenant_id,
+        'site_id' => $site->id,
+        'site_type' => $site->type,
+        'status' => 'published',
+        'version' => 1,
+        'layout' => json_encode(siteOperationalReadinessPlanLayout()),
+        'published_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('site_type_plan_pins')->insert([
+        'tenant_id' => $site->tenant_id,
+        'site_type_plan_id' => $planId,
+        'kind' => 'medication_storage',
+        'label' => 'Locked cabinet',
+        'x' => 0.35,
+        'y' => 0.45,
+        'rotation_deg' => 0,
+        'sort_order' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $readiness = $site->fresh()->operationalReadiness();
+
+    $medication = collect($readiness['critical'])->firstWhere('key', 'med_storage');
+
+    expect($medication['done'])->toBeTrue();
 });

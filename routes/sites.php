@@ -21,7 +21,10 @@ use App\Http\Controllers\Sites\{
     SiteReportingController,
     SiteRoomController,
     SiteResourceController,
-    SiteZoneController
+    SiteZoneController,
+    SiteTypePlanController,
+    SiteTypePlanPinController,
+    SiteEmergencyPlanController
 };
 
 /*
@@ -197,9 +200,54 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/hardware/{hardware}/assign-room', [SiteHardwareController::class, 'assignRoom'])
             ->name('sites.hardware.assignRoom')
             ->middleware('permission:siteHardware.manage');
+        Route::post('/hardware/{device}/pin', [SiteHardwareController::class, 'pinDevice'])
+            ->whereNumber('device')
+            ->name('sites.hardware.pin')
+            ->middleware('permission:siteHardware.manage');
+        Route::delete('/hardware/{device}/pin', [SiteHardwareController::class, 'unpinDevice'])
+            ->whereNumber('device')
+            ->name('sites.hardware.unpin')
+            ->middleware('permission:siteHardware.manage');
         Route::post('/hardware/rooms', [SiteHardwareController::class, 'manageRooms'])
             ->name('sites.hardware.manageRooms')
             ->middleware('permission:siteHardware.manage');
+
+        // Site type plan and emergency plan
+        Route::get('/plan', [SiteTypePlanController::class, 'show'])
+            ->name('sites.plan.show');
+        Route::post('/plan/draft', [SiteTypePlanController::class, 'storeDraft'])
+            ->name('sites.plan.draft.store')
+            ->middleware('permission:sites.update');
+        Route::put('/plan/draft', [SiteTypePlanController::class, 'updateDraft'])
+            ->name('sites.plan.draft.update')
+            ->middleware('permission:sites.update');
+        Route::post('/plan/publish', [SiteTypePlanController::class, 'publish'])
+            ->name('sites.plan.publish')
+            ->middleware('permission:sites.update');
+        Route::post('/plan/duplicate-to-draft', [SiteTypePlanController::class, 'duplicate'])
+            ->name('sites.plan.duplicate')
+            ->middleware('permission:sites.update');
+        Route::delete('/plan/draft', [SiteTypePlanController::class, 'discardDraft'])
+            ->name('sites.plan.draft.destroy')
+            ->middleware('permission:sites.update');
+        Route::post('/plan/pins', [SiteTypePlanPinController::class, 'storeBatch'])
+            ->name('sites.plan.pins.store')
+            ->middleware('permission:sites.update');
+        Route::put('/plan/pins/{pin}', [SiteTypePlanPinController::class, 'update'])
+            ->whereNumber('pin')
+            ->name('sites.plan.pins.update')
+            ->middleware('permission:sites.update');
+        Route::delete('/plan/pins/{pin}', [SiteTypePlanPinController::class, 'destroy'])
+            ->whereNumber('pin')
+            ->name('sites.plan.pins.destroy')
+            ->middleware('permission:sites.update');
+        Route::get('/emergency-plan', [SiteEmergencyPlanController::class, 'show'])
+            ->name('sites.emergency-plan.show');
+        Route::put('/emergency-plan', [SiteEmergencyPlanController::class, 'update'])
+            ->name('sites.emergency-plan.update')
+            ->middleware('permission:sites.update');
+        Route::get('/emergency-plan.pdf', [SiteEmergencyPlanController::class, 'download'])
+            ->name('sites.emergency-plan.download');
 
         // Site Integrations
         Route::get('/integrations', [SiteIntegrationController::class, 'index'])

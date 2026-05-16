@@ -132,6 +132,9 @@ import {
     getClientRiskStyle,
     getClientStatusStyle,
 } from './clients/_helpers';
+import SiteTypePlanBuilderDialog from './plan/_builder-dialog';
+import type { BuilderTool } from './plan/_tool-palette';
+import { PlanThumbnail, type PlanLayout, type PlanPin } from './plan/_thumbnail';
 const AddVendorDialog = lazy(() =>
     import('./vendors/_dialogs').then((module) => ({
         default: module.AddVendorDialog,
@@ -422,6 +425,30 @@ type TypeSpecificData = {
     zones?: Array<{ id: number; name: string; type?: string }>;
 };
 
+type SiteTypePlanRecord = {
+    id: number;
+    status: string;
+    version: number;
+    layout: PlanLayout;
+    notes?: string | null;
+    pins: PlanPin[];
+    published_at?: string | null;
+};
+
+type SiteTypePlanSummary = {
+    tab_label: string;
+    inventory_label: string;
+    inventory_href: string;
+    status: 'empty' | 'draft' | 'published' | 'draft_over_published';
+    draft?: SiteTypePlanRecord | null;
+    published?: SiteTypePlanRecord | null;
+    has_plan: boolean;
+    has_published: boolean;
+    has_emergency_layer: boolean;
+    has_medication_pin: boolean;
+    pin_counts: Record<string, number>;
+};
+
 type RoomsSummary = {
     total: number;
     bedrooms: number;
@@ -616,6 +643,7 @@ type Props = {
     }>;
     credentialCount?: number;
     hardwareCount?: number;
+    typePlan?: SiteTypePlanSummary | null;
     integrationStatus?: Array<{ provider: string; status: string }>;
     can_edit: boolean;
     can?: { createAsset?: boolean };
@@ -644,6 +672,48 @@ const typeColors = {
     facility:
         'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
+
+function fallbackTypePlan(site: Site): SiteTypePlanSummary {
+    const tabLabel =
+        site.type === 'head_office'
+            ? 'Office Plan'
+            : site.type === 'facility'
+              ? 'Facility Plan'
+              : 'House Plan';
+    const inventoryLabel =
+        site.type === 'head_office'
+            ? 'Manage resources'
+            : site.type === 'facility'
+              ? 'Manage zones'
+              : 'Manage rooms';
+    const inventoryHref =
+        site.type === 'head_office'
+            ? `/sites/${site.id}/resources`
+            : site.type === 'facility'
+              ? `/sites/${site.id}/zones`
+              : `/sites/${site.id}/rooms`;
+
+    return {
+        tab_label: tabLabel,
+        inventory_label: inventoryLabel,
+        inventory_href: inventoryHref,
+        status: 'empty',
+        draft: null,
+        published: null,
+        has_plan: false,
+        has_published: false,
+        has_emergency_layer: false,
+        has_medication_pin: false,
+        pin_counts: {},
+    };
+}
+
+function planStatusLabel(status: SiteTypePlanSummary['status']) {
+    if (status === 'draft_over_published') return 'Draft changes';
+    if (status === 'draft') return 'Draft';
+    if (status === 'published') return 'Published';
+    return 'Not started';
+}
 
 function bytes(n?: number | null): string {
     if (!n || n <= 0) return '—';
@@ -1355,6 +1425,7 @@ export default function SiteShow({
     coveragePreview = [],
     credentialCount = 0,
     hardwareCount = 0,
+    typePlan = null,
     integrationStatus = [],
     can_edit,
     can: assetCan,
@@ -1366,6 +1437,8 @@ export default function SiteShow({
     const TypeIcon = typeIcons[site.type];
     const page = usePage<any>();
     const canGlobal = page.props?.auth?.can;
+    const typePlanSummary = typePlan ?? fallbackTypePlan(site);
+    const activePlan = typePlanSummary.draft ?? typePlanSummary.published;
     const canSeeVendorsCredentials = !!(
         canGlobal?.vendors?.view || canGlobal?.credentials?.view
     );
@@ -1379,8 +1452,15 @@ export default function SiteShow({
     const [siteGeofenceOpen, setSiteGeofenceOpen] = useState(false);
     const [safetyOpen, setSafetyOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
+    const [planBuilderOpen, setPlanBuilderOpen] = useState(false);
+    const [planBuilderFocus, setPlanBuilderFocus] = useState<BuilderTool | undefined>();
+    const initialTabFromQuery =
+        typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('tab')
+            : null;
     const [activeTab, setActiveTab] = useState(
-        readiness?.is_active_but_incomplete ? 'readiness' : 'overview',
+        initialTabFromQuery ??
+            (readiness?.is_active_but_incomplete ? 'readiness' : 'overview'),
     );
     const readinessRef = useRef<HTMLDivElement | null>(null);
     const tabsListRef = useRef<HTMLDivElement | null>(null);
@@ -1441,8 +1521,20 @@ export default function SiteShow({
             setAddContactType('manager');
             return;
         }
-        if (['add_emergency_plan', 'add_med_storage'].includes(action)) {
-            setSafetyOpen(true);
+        if (action === 'add_emergency_plan') {
+            if (typePlanSummary.has_published) {
+                setActiveTab('emergency-plan');
+                return;
+            }
+            setPlanBuilderFocus('assembly_point');
+            setActiveTab('type-plan');
+            setPlanBuilderOpen(true);
+            return;
+        }
+        if (action === 'add_med_storage') {
+            setPlanBuilderFocus('medication_storage');
+            setActiveTab('type-plan');
+            setPlanBuilderOpen(true);
             return;
         }
         if (action === 'review_hazards') {
@@ -1530,20 +1622,15 @@ export default function SiteShow({
         }
     };
 
-    const typeSpecificTab = {
-        value: 'type-specific',
-        label:
-            site.type === 'head_office'
-                ? 'Resources'
-                : site.type === 'facility'
-                  ? 'Zones'
-                  : 'Rooms',
+    const typePlanTab = {
+        value: 'type-plan',
+        label: typePlanSummary.tab_label,
         icon:
             site.type === 'head_office'
-                ? DoorOpen
+                ? Building2
                 : site.type === 'facility'
                   ? LayoutGrid
-                  : BedDouble,
+                  : Home,
     };
     const moreTabs = [
         { value: 'financials', label: 'Financials', icon: DollarSign },
@@ -1561,7 +1648,12 @@ export default function SiteShow({
             label: hardwareCount > 0 ? `Hardware (${hardwareCount})` : 'Hardware',
             icon: Cpu,
         },
-        typeSpecificTab,
+        typePlanTab,
+        {
+            value: 'emergency-plan',
+            label: 'Emergency Plan',
+            icon: ShieldAlert,
+        },
         {
             value: 'staff-requirements',
             label:
@@ -1587,6 +1679,17 @@ export default function SiteShow({
             icon: Layers,
         },
     ];
+    const TypePlanTabIcon = typePlanTab.icon;
+    const publishedEmergencyPins =
+        typePlanSummary.published?.pins.filter((pin) =>
+            [
+                'assembly_point',
+                'emergency_exit',
+                'evacuation_route',
+                'you_are_here',
+                'fire_extinguisher',
+            ].includes(pin.kind),
+        ) ?? [];
 
     return (
         <AppLayout
@@ -1892,23 +1995,18 @@ export default function SiteShow({
                             )}
                         </TabsTrigger>
                         <TabsTrigger
-                            value="type-specific"
+                            value="type-plan"
                             className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
                         >
-                            {site.type === 'house' && (
-                                <BedDouble className="h-4 w-4" />
-                            )}
-                            {site.type === 'head_office' && (
-                                <DoorOpen className="h-4 w-4" />
-                            )}
-                            {site.type === 'facility' && (
-                                <LayoutGrid className="h-4 w-4" />
-                            )}
-                            {site.type === 'house'
-                                ? 'Rooms'
-                                : site.type === 'head_office'
-                                  ? 'Resources'
-                                  : 'Zones'}
+                            <TypePlanTabIcon className="h-4 w-4" />
+                            {typePlanTab.label}
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="emergency-plan"
+                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
+                        >
+                            <ShieldAlert className="h-4 w-4" />
+                            Emergency Plan
                         </TabsTrigger>
                         <TabsTrigger
                             value="staff-requirements"
@@ -2203,31 +2301,89 @@ export default function SiteShow({
                                             variant="outline"
                                             size="sm"
                                             className="h-8 gap-1.5 text-xs"
-                                            onClick={() => setSafetyOpen(true)}
+                                            onClick={() => setPlanBuilderOpen(true)}
                                         >
                                             <Pencil className="h-3 w-3" />
-                                            Edit
+                                            Plan
                                         </Button>
                                     )}
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
                                     <div className="rounded-lg border border-border/60 p-3">
                                         <div className="flex items-start gap-2.5">
+                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                        {typePlanSummary.tab_label}
+                                                    </div>
+                                                    <Badge variant="outline">
+                                                        {planStatusLabel(typePlanSummary.status)}
+                                                    </Badge>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => setActiveTab('type-plan')}
+                                                    >
+                                                        Open plan
+                                                    </Button>
+                                                    <Button asChild size="sm" variant="ghost">
+                                                        <Link href={typePlanSummary.inventory_href}>
+                                                            {typePlanSummary.inventory_label}
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg border border-border/60 p-3">
+                                        <div className="flex items-start gap-2.5">
                                             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
                                             <div className="min-w-0 flex-1">
-                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                                    Emergency Plan
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                        Emergency Plan
+                                                    </div>
+                                                    <Badge variant={typePlanSummary.has_emergency_layer ? 'default' : 'outline'}>
+                                                        {typePlanSummary.has_emergency_layer ? 'Ready' : 'Needs pins'}
+                                                    </Badge>
                                                 </div>
-                                                <div className="mt-1">
-                                                    {site.emergency_plan_location || (
+                                                {site.emergency_plan_location && (
+                                                    <div className="mt-2 text-muted-foreground">
+                                                        Legacy note: {site.emergency_plan_location}
+                                                    </div>
+                                                )}
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {typePlanSummary.has_published ? (
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => setActiveTab('emergency-plan')}
+                                                            >
+                                                                Open emergency plan
+                                                            </Button>
+                                                            {typePlanSummary.has_emergency_layer && (
+                                                                <Button asChild size="sm" variant="ghost">
+                                                                    <Link href={`/sites/${site.id}/emergency-plan.pdf?paper=a4`}>
+                                                                        <Download className="mr-1 h-3.5 w-3.5" />
+                                                                        Export A4
+                                                                    </Link>
+                                                                </Button>
+                                                            )}
+                                                        </>
+                                                    ) : (
                                                         <MissingFieldButton
-                                                            label="Add emergency plan"
+                                                            label="Build plan first"
                                                             onClick={
                                                                 can_edit
-                                                                    ? () =>
-                                                                          setSafetyOpen(
-                                                                              true,
-                                                                          )
+                                                                    ? () => {
+                                                                          setPlanBuilderFocus('assembly_point');
+                                                                          setActiveTab('type-plan');
+                                                                          setPlanBuilderOpen(true);
+                                                                      }
                                                                     : undefined
                                                             }
                                                         />
@@ -2240,19 +2396,38 @@ export default function SiteShow({
                                         <div className="flex items-start gap-2.5">
                                             <Pill className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                                             <div className="min-w-0 flex-1">
-                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                                    Medication Storage
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                        Medication Storage
+                                                    </div>
+                                                    <Badge variant={typePlanSummary.has_medication_pin ? 'default' : 'outline'}>
+                                                        {typePlanSummary.has_medication_pin ? 'Pinned' : 'Not pinned'}
+                                                    </Badge>
                                                 </div>
-                                                <div className="mt-1">
-                                                    {site.medication_storage_location || (
+                                                {site.medication_storage_location && (
+                                                    <div className="mt-2 text-muted-foreground">
+                                                        Legacy note: {site.medication_storage_location}
+                                                    </div>
+                                                )}
+                                                <div className="mt-2">
+                                                    {typePlanSummary.has_medication_pin ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => setActiveTab('type-plan')}
+                                                        >
+                                                            Open plan
+                                                        </Button>
+                                                    ) : (
                                                         <MissingFieldButton
                                                             label="Add medication storage"
                                                             onClick={
                                                                 can_edit
-                                                                    ? () =>
-                                                                          setSafetyOpen(
-                                                                              true,
-                                                                          )
+                                                                    ? () => {
+                                                                          setPlanBuilderFocus('medication_storage');
+                                                                          setActiveTab('type-plan');
+                                                                          setPlanBuilderOpen(true);
+                                                                      }
                                                                     : undefined
                                                             }
                                                         />
@@ -3375,23 +3550,188 @@ export default function SiteShow({
                         </Card>
                     </TabsContent>
 
-                    {/* Type-Specific Tab */}
-                    <TabsContent value="type-specific">
-                        <TypeSpecificTab
-                            site={site}
-                            data={typeSpecificData}
-                            clientsForRooms={clients.map((c) => ({
-                                id: c.id,
-                                first_name: c.first_name,
-                                last_name: c.last_name,
-                                preferred_name: c.preferred_name,
-                                status: c.status,
-                                profile_photo_url: c.profile_photo_url,
-                                room: c.room ?? null,
-                            }))}
-                            summary={roomsSummary}
-                            can_edit={can_edit}
-                        />
+                    {/* Type Plan Tab */}
+                    <TabsContent value="type-plan" className="space-y-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <TypePlanTabIcon className="h-5 w-5 text-primary" />
+                                        {typePlanSummary.tab_label}
+                                    </CardTitle>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {typePlanSummary.has_published
+                                            ? `Published version ${typePlanSummary.published?.version ?? 1}`
+                                            : 'No published plan yet'}
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge variant="outline">
+                                        {planStatusLabel(typePlanSummary.status)}
+                                    </Badge>
+                                    {can_edit && (
+                                        <Button onClick={() => setPlanBuilderOpen(true)}>
+                                            {activePlan ? (
+                                                <Pencil className="mr-2 h-4 w-4" />
+                                            ) : (
+                                                <Plus className="mr-2 h-4 w-4" />
+                                            )}
+                                            {activePlan ? 'Edit Plan' : 'Build Plan'}
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {activePlan ? (
+                                    <PlanThumbnail
+                                        layout={activePlan.layout}
+                                        pins={activePlan.pins}
+                                        className="min-h-[420px]"
+                                    />
+                                ) : (
+                                    <div className="flex min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/30 p-8 text-center">
+                                        <div className="max-w-sm space-y-3">
+                                            <TypePlanTabIcon className="mx-auto h-10 w-10 text-muted-foreground" />
+                                            <p className="text-sm text-muted-foreground">
+                                                No plan has been started for this site.
+                                            </p>
+                                            {can_edit && (
+                                                <Button onClick={() => setPlanBuilderOpen(true)}>
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Build Plan
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                            <TypeSpecificTab
+                                site={site}
+                                data={typeSpecificData}
+                                clientsForRooms={clients.map((c) => ({
+                                    id: c.id,
+                                    first_name: c.first_name,
+                                    last_name: c.last_name,
+                                    preferred_name: c.preferred_name,
+                                    status: c.status,
+                                    profile_photo_url: c.profile_photo_url,
+                                    room: c.room ?? null,
+                                }))}
+                                summary={roomsSummary}
+                                can_edit={can_edit}
+                            />
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Plan Layers</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3 text-sm">
+                                    <div className="flex items-center justify-between rounded-md border p-3">
+                                        <span>Medication storage</span>
+                                        <Badge variant={typePlanSummary.has_medication_pin ? 'default' : 'outline'}>
+                                            {typePlanSummary.has_medication_pin ? 'Pinned' : 'Not pinned'}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between rounded-md border p-3">
+                                        <span>Emergency layer</span>
+                                        <Badge variant={typePlanSummary.has_emergency_layer ? 'default' : 'outline'}>
+                                            {typePlanSummary.has_emergency_layer ? 'Ready' : 'Needs pins'}
+                                        </Badge>
+                                    </div>
+                                    <Button asChild variant="outline" className="w-full justify-start">
+                                        <Link href={typePlanSummary.inventory_href}>
+                                            {typePlanSummary.inventory_label}
+                                        </Link>
+                                    </Button>
+                                    <Button asChild variant="outline" className="w-full justify-start">
+                                        <Link href={`/sites/${site.id}/hardware`}>
+                                            Manage hardware pins
+                                        </Link>
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="emergency-plan" className="space-y-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <ShieldAlert className="h-5 w-5 text-primary" />
+                                        Emergency Plan
+                                    </CardTitle>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Exportable from the published {typePlanSummary.tab_label.toLowerCase()}.
+                                    </p>
+                                </div>
+                                {typePlanSummary.has_emergency_layer && (
+                                    <Button asChild>
+                                        <Link href={`/sites/${site.id}/emergency-plan.pdf?paper=a4`}>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Export A4
+                                        </Link>
+                                    </Button>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {typePlanSummary.published ? (
+                                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                                        <PlanThumbnail
+                                            layout={typePlanSummary.published.layout}
+                                            pins={publishedEmergencyPins}
+                                            className="min-h-[420px]"
+                                        />
+                                        <div className="space-y-3">
+                                            <div className="rounded-md border p-3">
+                                                <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                    Status
+                                                </div>
+                                                <Badge className="mt-2" variant={typePlanSummary.has_emergency_layer ? 'default' : 'outline'}>
+                                                    {typePlanSummary.has_emergency_layer
+                                                        ? 'Ready to export'
+                                                        : 'Needs assembly point and exit'}
+                                                </Badge>
+                                            </div>
+                                            <Button asChild variant="outline" className="w-full justify-start">
+                                                <Link href={`/sites/${site.id}/emergency-plan`}>
+                                                    Open emergency plan page
+                                                </Link>
+                                            </Button>
+                                            {can_edit && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full justify-start"
+                                                    onClick={() => {
+                                                        setPlanBuilderFocus('assembly_point');
+                                                        setPlanBuilderOpen(true);
+                                                    }}
+                                                >
+                                                    Edit emergency pins
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-md border border-dashed bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+                                        Publish a site plan before creating the emergency export.
+                                        {can_edit && (
+                                            <div className="mt-4">
+                                                <Button onClick={() => {
+                                                    setActiveTab('type-plan');
+                                                    setPlanBuilderOpen(true);
+                                                }}>
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Build Plan
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </TabsContent>
 
                     {/* Staff Requirements Tab */}
@@ -3505,6 +3845,16 @@ export default function SiteShow({
                 </Tabs>
             </PageShell>
 
+            <SiteTypePlanBuilderDialog
+                site={site}
+                typePlan={typePlanSummary}
+                open={planBuilderOpen}
+                onOpenChange={(open) => {
+                    setPlanBuilderOpen(open);
+                    if (!open) setPlanBuilderFocus(undefined);
+                }}
+                focusTool={planBuilderFocus}
+            />
             <EditSiteLineDialog
                 siteId={site.id}
                 isOpen={contactInfoOpen}

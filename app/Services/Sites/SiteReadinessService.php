@@ -14,8 +14,8 @@ class SiteReadinessService
             $this->item('contact_email', 'Site email', 'Sites', filled($site->email), 'add_email'),
             $this->item('site_lead', 'Site lead / manager', 'Sites', filled($site->primary_contact_user_id) || $this->typedContactsCount($site, 'site_lead_contacts_count', ['site_lead', 'manager']) > 0, 'assign_lead'),
             $this->item('after_hours', 'After-hours / on-call line', 'Sites', $this->typedContactsCount($site, 'after_hours_contacts_count', ['emergency']) > 0, 'add_after_hours'),
-            $this->item('emergency_plan', 'Emergency plan & assembly point', 'Sites', filled($site->emergency_plan_location), 'add_emergency_plan'),
-            $this->item('med_storage', 'Medication storage details', 'Sites', filled($site->medication_storage_location), 'add_med_storage'),
+            $this->item('emergency_plan', 'Emergency plan & assembly point', 'Sites', filled($site->emergency_plan_location) || $this->planEmergencyReady($site), 'add_emergency_plan'),
+            $this->item('med_storage', 'Medication storage details', 'Sites', filled($site->medication_storage_location) || $this->planMedicationReady($site), 'add_med_storage'),
             $this->item('emergency_contact', 'At least one emergency / maintenance contact', 'Sites', $this->emergencyContactsCount($site) > 0, 'add_contact'),
         ];
 
@@ -76,6 +76,20 @@ class SiteReadinessService
             'facility' => $this->count($site, 'facility_zones_count', 'facilityZones', fn () => $site->facilityZones()->active()->count()) > 0,
             default => true,
         };
+    }
+
+    private function planEmergencyReady(Site $site): bool
+    {
+        $plan = app(SiteTypePlanService::class)->currentPublished($site);
+
+        return $plan ? app(SiteTypePlanService::class)->hasEmergencyLayer($plan) : false;
+    }
+
+    private function planMedicationReady(Site $site): bool
+    {
+        $plan = app(SiteTypePlanService::class)->currentPublished($site);
+
+        return $plan ? app(SiteTypePlanService::class)->hasMedicationPin($plan) : false;
     }
 
     private function hazardsReviewed(Site $site): bool

@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,13 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -33,6 +40,7 @@ import {
     DoorOpen,
     ExternalLink,
     HelpCircle,
+    MapPin,
     Pencil,
     Plus,
     Search,
@@ -42,6 +50,7 @@ import {
     WifiOff,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { PlanThumbnail, type PlanLayout, type PlanPin } from '../plan/_thumbnail';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,10 +89,19 @@ type DeviceItem = {
     notes: string | null;
     assignment_type: string | null;
     assignment_id: number | null;
+    plan_pin?: PlanPin | null;
 };
 
 type Permissions = {
     manage_hardware?: boolean;
+};
+
+type TypePlanSummary = {
+    tab_label: string;
+    status: string;
+    draft?: { layout: PlanLayout; pins: PlanPin[] } | null;
+    published?: { layout: PlanLayout; pins: PlanPin[] } | null;
+    has_plan: boolean;
 };
 
 type Props = {
@@ -91,6 +109,7 @@ type Props = {
     devices: DeviceItem[];
     rooms: Room[];
     can: Permissions;
+    typePlan?: TypePlanSummary | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -174,7 +193,7 @@ function formatDateTime(value?: string | null): string {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function SiteHardware({ site, devices, rooms, can }: Props) {
+export default function SiteHardware({ site, devices, rooms, can, typePlan = null }: Props) {
     // ── filter / search state ──────────────────────────────────────
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -190,6 +209,9 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
 
     // ── device → room assignment (row-level only; physical placement) ─
     const [assigningDeviceId, setAssigningDeviceId] = useState<number | null>(null);
+    const [pinningDevice, setPinningDevice] = useState<DeviceItem | null>(null);
+    const [pinDraft, setPinDraft] = useState<{ x: number; y: number } | null>(null);
+    const [savingPin, setSavingPin] = useState(false);
     const [deviceRoomDraft, setDeviceRoomDraft] = useState<Record<number, string>>(() =>
         devices.reduce<Record<number, string>>((acc, d) => {
             acc[d.id] =
@@ -255,6 +277,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
     }, [devices, search, filterStatus, filterCategory, filterProvider]);
 
     const canManageHardware = !!can?.manage_hardware;
+    const planForPins = typePlan?.published ?? typePlan?.draft ?? null;
 
     // ── handlers ───────────────────────────────────────────────────
     function submitRoom(e: React.FormEvent) {
@@ -321,6 +344,45 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
         );
     }
 
+    function openPinDialog(device: DeviceItem) {
+        setPinningDevice(device);
+        setPinDraft(device.plan_pin ? { x: device.plan_pin.x, y: device.plan_pin.y } : null);
+    }
+
+    function savePlanPin() {
+        if (!pinningDevice || !pinDraft) return;
+
+        setSavingPin(true);
+        router.post(
+            `/sites/${site.id}/hardware/${pinningDevice.id}/pin`,
+            {
+                x: pinDraft.x,
+                y: pinDraft.y,
+                label: pinningDevice.name || pinningDevice.device_uid,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSavingPin(false),
+                onSuccess: () => {
+                    setPinningDevice(null);
+                    setPinDraft(null);
+                },
+            },
+        );
+    }
+
+    function removePlanPin(device: DeviceItem) {
+        setSavingPin(true);
+        router.delete(`/sites/${site.id}/hardware/${device.id}/pin`, {
+            preserveScroll: true,
+            onFinish: () => setSavingPin(false),
+            onSuccess: () => {
+                setPinningDevice(null);
+                setPinDraft(null);
+            },
+        });
+    }
+
     function deviceCountInRoom(roomId: number) {
         return devices.filter(
             (d) => d.assignment_type === 'room' && d.assignment_id === roomId,
@@ -347,6 +409,14 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                             <Badge variant="outline">
                                 {stats.total} device{stats.total !== 1 ? 's' : ''}
                             </Badge>
+                            {planForPins && (
+                                <Button asChild variant="outline">
+                                    <Link href={`/sites/${site.id}?tab=type-plan`}>
+                                        <MapPin className="mr-1 h-4 w-4" />
+                                        Open {typePlan?.tab_label ?? 'Plan'}
+                                    </Link>
+                                </Button>
+                            )}
                             <Button asChild variant="outline">
                                 <a href={`/security-devices/devices?site_id=${site.id}`}>
                                     Manage in Security &amp; Devices
@@ -525,6 +595,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                                         <TableHead>Provider</TableHead>
                                         <TableHead>Model</TableHead>
                                         <TableHead>Room</TableHead>
+                                        <TableHead>Plan Pin</TableHead>
                                         <TableHead>Last seen</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -617,6 +688,36 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                                                             )}
                                                     </div>
                                                 </TableCell>
+                                                <TableCell>
+                                                    {d.plan_pin ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="outline">
+                                                                <MapPin className="mr-1 h-3 w-3" />
+                                                                Pinned
+                                                            </Badge>
+                                                            {canManageHardware && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => openPinDialog(d)}
+                                                                >
+                                                                    Move
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    ) : canManageHardware && planForPins ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => openPinDialog(d)}
+                                                        >
+                                                            <MapPin className="mr-1 h-3.5 w-3.5" />
+                                                            Pin
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-sm text-muted-foreground">-</span>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">
                                                     {formatDateTime(d.last_seen_at)}
                                                 </TableCell>
@@ -636,7 +737,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                                     {filteredDevices.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={8}
+                                                colSpan={9}
                                                 className="py-8 text-center text-sm text-muted-foreground"
                                             >
                                                 {devices.length === 0
@@ -843,6 +944,97 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                     </CardContent>
                 </Card>
             </PageShell>
+
+            <Dialog
+                open={pinningDevice !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setPinningDevice(null);
+                        setPinDraft(null);
+                    }
+                }}
+            >
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>
+                            Pin {pinningDevice?.name ?? 'device'} to {typePlan?.tab_label ?? 'plan'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {planForPins ? (
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                            <PlanThumbnail
+                                layout={planForPins.layout}
+                                pins={[
+                                    ...planForPins.pins.filter(
+                                        (pin) =>
+                                            pin.kind !== 'device' ||
+                                            pin.device_id !== pinningDevice?.id,
+                                    ),
+                                    ...(pinDraft && pinningDevice
+                                        ? [
+                                              {
+                                                  kind: 'device',
+                                                  device_id: pinningDevice.id,
+                                                  label: pinningDevice.name || pinningDevice.device_uid,
+                                                  x: pinDraft.x,
+                                                  y: pinDraft.y,
+                                              },
+                                          ]
+                                        : []),
+                                ]}
+                                onCanvasClick={setPinDraft}
+                                className="min-h-[420px]"
+                            />
+                            <div className="space-y-3 text-sm">
+                                <div className="rounded-md border p-3">
+                                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                        Coordinates
+                                    </div>
+                                    <div className="mt-2 font-mono">
+                                        {pinDraft
+                                            ? `${Math.round(pinDraft.x * 100)}%, ${Math.round(pinDraft.y * 100)}%`
+                                            : 'Not set'}
+                                    </div>
+                                </div>
+                                {pinningDevice?.plan_pin && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="w-full justify-start"
+                                        onClick={() => removePlanPin(pinningDevice)}
+                                        disabled={savingPin}
+                                    >
+                                        Remove pin
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                            Build a site plan before pinning devices.
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setPinningDevice(null);
+                                setPinDraft(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={savePlanPin}
+                            disabled={!pinDraft || savingPin || !planForPins}
+                        >
+                            Save pin
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

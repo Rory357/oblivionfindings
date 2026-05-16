@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\LocationHardware;
 use App\Models\SiteRoom;
+use App\Services\Sites\SiteTypePlanPinStatusService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -171,14 +172,18 @@ class UnifiOperationalBridgeService
     private function replaceActiveAssignment(Device $device, string $targetType, int $targetId, ?int $userId): DeviceAssignment
     {
         return DB::transaction(function () use ($device, $targetType, $targetId, $userId) {
-            DeviceAssignment::query()
+            $releasedAt = now();
+            $released = DeviceAssignment::query()
                 ->where('device_id', $device->id)
                 ->whereNull('released_at')
                 ->update([
-                    'released_at' => now(),
+                    'released_at' => $releasedAt,
                     'released_by_user_id' => $userId,
                     'updated_at' => now(),
                 ]);
+            if ($released > 0) {
+                app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_replaced', $releasedAt);
+            }
 
             return DeviceAssignment::create([
                 'device_id' => $device->id,
