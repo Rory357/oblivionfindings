@@ -215,7 +215,9 @@ class SiteController extends Controller
             'hoResources' => fn ($q) => $q->active()->orderBy('name'),
             'facilityZones' => fn ($q) => $q->active()->orderBy('name'),
             'siteNotes' => fn ($q) => $q->with('createdBy:id,name')->orderByDesc('created_at'),
-            'geofences' => fn ($q) => $q->where('is_active', true),
+            'geofences' => fn ($q) => $q
+                ->where('is_active', true)
+                ->with('assignedAssets:id'),
         ]);
 
         // Build a quick map of client_id → { id, name } for "which room is the client in".
@@ -607,6 +609,9 @@ class SiteController extends Controller
                 'type' => $g->type,
                 'shape' => $g->shape,
                 'breach_type' => $g->breach_type,
+                'is_active' => (bool) $g->is_active,
+                'asset_id' => $g->asset_id,
+                'assigned_asset_ids' => $g->assignedAssets->pluck('id')->values(),
             ])->values(),
         ]);
     }

@@ -239,7 +239,11 @@ export default function ChecklistRun({
     const toggleNotesExpanded = (itemId: number) => {
         setExpandedNotes((prev) => {
             const next = new Set(prev);
-            next.has(itemId) ? next.delete(itemId) : next.add(itemId);
+            if (next.has(itemId)) {
+                next.delete(itemId);
+            } else {
+                next.add(itemId);
+            }
             return next;
         });
     };

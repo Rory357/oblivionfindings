@@ -1,3 +1,7 @@
+import LeafletMap, {
+    type MapGeofence,
+    type MapMarker,
+} from '@/components/leaflet-map';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -10,8 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from '@inertiajs/react';
-import { Check, Loader2, MapPin, Search } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Check, Loader2, MapPin, MapPinned, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 // ── Shared helpers ────────────────────────────────────────────────────────
 
@@ -180,16 +184,33 @@ type GeocodeResult = {
     region: string | null;
 };
 
+type LocationGeofence = {
+    id: number;
+    name: string;
+    type: 'circle' | 'polygon';
+    shape: {
+        center?: { lat: number; lng: number };
+        radius_m?: number;
+        coordinates?: { lat: number; lng: number }[];
+    } | null;
+};
+
 export function EditLocationDialog({
     siteId,
+    siteName,
     isOpen,
     onClose,
     initial,
+    geofences = [],
+    onOpenGeofence,
 }: {
     siteId: number;
+    siteName: string;
     isOpen: boolean;
     onClose: () => void;
     initial: Partial<LocationValues>;
+    geofences?: LocationGeofence[];
+    onOpenGeofence?: () => void;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -197,8 +218,11 @@ export function EditLocationDialog({
                 {isOpen && (
                     <LocationBody
                         siteId={siteId}
+                        siteName={siteName}
                         initial={initial}
                         onClose={onClose}
+                        geofences={geofences}
+                        onOpenGeofence={onOpenGeofence}
                     />
                 )}
             </DialogContent>
@@ -208,12 +232,18 @@ export function EditLocationDialog({
 
 function LocationBody({
     siteId,
+    siteName,
     initial,
     onClose,
+    geofences,
+    onOpenGeofence,
 }: {
     siteId: number;
+    siteName: string;
     initial: Partial<LocationValues>;
     onClose: () => void;
+    geofences: LocationGeofence[];
+    onOpenGeofence?: () => void;
 }) {
     const form = useForm<LocationValues>({
         address_line_1: initial.address_line_1 ?? '',
@@ -313,6 +343,81 @@ function LocationBody({
     };
 
     const hasCoords = form.data.latitude !== '' && form.data.longitude !== '';
+    const mapLat = hasCoords ? Number(form.data.latitude) : null;
+    const mapLng = hasCoords ? Number(form.data.longitude) : null;
+    const hasValidCoords =
+        mapLat != null &&
+        mapLng != null &&
+        !Number.isNaN(mapLat) &&
+        !Number.isNaN(mapLng);
+
+    const markers = useMemo<MapMarker[]>(() => {
+        if (!hasValidCoords || mapLat == null || mapLng == null) return [];
+
+        return [
+            {
+                id: `site-${siteId}`,
+                lat: mapLat,
+                lng: mapLng,
+                title: siteName,
+                type: 'house',
+                status: 'online',
+            },
+        ];
+    }, [hasValidCoords, mapLat, mapLng, siteId, siteName]);
+
+    const mapGeofences = useMemo<MapGeofence[]>(() => {
+        return geofences
+            .map((geofence): MapGeofence | null => {
+                const shape = geofence.shape ?? {};
+
+                if (geofence.type === 'circle' && shape.center && shape.radius_m) {
+                    return {
+                        id: geofence.id,
+                        name: geofence.name,
+                        type: 'circle',
+                        center: {
+                            lat: Number(shape.center.lat),
+                            lng: Number(shape.center.lng),
+                        },
+                        radius_m: Number(shape.radius_m),
+                    };
+                }
+
+                if (geofence.type === 'polygon' && Array.isArray(shape.coordinates)) {
+                    return {
+                        id: geofence.id,
+                        name: geofence.name,
+                        type: 'polygon',
+                        coordinates: shape.coordinates.map((point) => ({
+                            lat: Number(point.lat),
+                            lng: Number(point.lng),
+                        })),
+                    };
+                }
+
+                return null;
+            })
+            .filter((geofence): geofence is MapGeofence => geofence !== null);
+    }, [geofences]);
+
+    const openGeofence = () => {
+        if (!onOpenGeofence) return;
+
+        if (form.isDirty) {
+            form.patch(`/sites/${siteId}/location`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    onClose();
+                    onOpenGeofence();
+                },
+            });
+            return;
+        }
+
+        onClose();
+        onOpenGeofence();
+    };
 
     return (
         <>
@@ -471,6 +576,46 @@ function LocationBody({
                         className="min-h-[80px]"
                     />
                     <FieldError message={form.errors.access_instructions} />
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <Label className="flex items-center gap-1.5">
+                                <MapPinned className="h-3.5 w-3.5" />
+                                Map & site geofence
+                            </Label>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Save the address here, then set the site boundary.
+                            </p>
+                        </div>
+                        {onOpenGeofence && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!hasValidCoords || form.processing}
+                                onClick={openGeofence}
+                                data-test="location-geofence-button"
+                            >
+                                Set / Edit Site Geofence
+                            </Button>
+                        )}
+                    </div>
+
+                    {hasValidCoords && mapLat != null && mapLng != null ? (
+                        <LeafletMap
+                            center={{ lat: mapLat, lng: mapLng }}
+                            zoom={16}
+                            markers={markers}
+                            geofences={mapGeofences}
+                            height={180}
+                        />
+                    ) : (
+                        <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+                            Pick an address result to preview the site on the map.
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Site;
 use App\Services\AuditLogger;
+use App\Services\Fleet\GeofenceStateCleanupService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -206,33 +207,6 @@ class GeofenceController extends Controller
 
     private function cleanupGeofenceStates(AssetGeofence $geofence): void
     {
-        $insideStates = \App\Models\FleetGeofenceState::query()
-            ->where('geofence_id', $geofence->id)
-            ->where('status', 'inside')
-            ->get();
-
-        $signalService = app(\App\Services\Fleet\FleetSignalService::class);
-
-        foreach ($insideStates as $state) {
-            try {
-                $signalService->emit([
-                    'asset_id' => $state->asset_id,
-                    'geofence_id' => $geofence->id,
-                    'signal_type' => 'geofence.exit',
-                    'severity_hint' => 'low',
-                    'occurred_at' => now(),
-                    'payload' => [
-                        'geofence_name' => $geofence->name,
-                        'reason' => 'geofence_removed',
-                    ],
-                ]);
-            } catch (\Throwable $e) {
-                \Log::warning("Failed to emit exit signal for geofence {$geofence->id}, asset {$state->asset_id}: {$e->getMessage()}");
-            }
-        }
-
-        \App\Models\FleetGeofenceState::query()
-            ->where('geofence_id', $geofence->id)
-            ->delete();
+        app(GeofenceStateCleanupService::class)->cleanup($geofence);
     }
 }

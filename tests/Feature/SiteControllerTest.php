@@ -215,7 +215,7 @@ class SiteControllerTest extends TestCase
             ->get("/sites/{$site->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('checklist', 6)
+                ->has('checklist', 12)
             );
     }
 
@@ -391,31 +391,35 @@ class SiteControllerTest extends TestCase
 
     public function test_site_store_creates_site(): void
     {
-        $this->actingAs($this->admin)
+        $response = $this->actingAs($this->admin)
             ->post('/sites', [
                 'name' => 'New Care Home',
                 'type' => 'house',
                 'is_active' => true,
-            ])
-            ->assertRedirect(route('sites.index'));
+            ]);
 
         $this->assertDatabaseHas('sites', ['name' => 'New Care Home']);
+
+        $site = Site::where('name', 'New Care Home')->firstOrFail();
+        $response->assertRedirect(route('sites.show', $site));
     }
 
     public function test_site_store_accepts_residential_type(): void
     {
-        $this->actingAs($this->admin)
+        $response = $this->actingAs($this->admin)
             ->post('/sites', [
                 'name' => 'Residential Home',
                 'type' => 'residential',
                 'is_active' => true,
-            ])
-            ->assertRedirect(route('sites.index'));
+            ]);
 
         $this->assertDatabaseHas('sites', [
             'name' => 'Residential Home',
             'type' => 'residential',
         ]);
+
+        $site = Site::where('name', 'Residential Home')->firstOrFail();
+        $response->assertRedirect(route('sites.show', $site));
     }
 
     public function test_site_store_validates_required_name(): void
@@ -438,7 +442,7 @@ class SiteControllerTest extends TestCase
 
     public function test_site_store_with_full_details(): void
     {
-        $this->actingAs($this->admin)
+        $response = $this->actingAs($this->admin)
             ->post('/sites', [
                 'name' => 'Full Details Home',
                 'type' => 'house',
@@ -456,8 +460,7 @@ class SiteControllerTest extends TestCase
                 'postcode' => '1010',
                 'country' => 'New Zealand',
                 'is_active' => true,
-            ])
-            ->assertRedirect(route('sites.index'));
+            ]);
 
         $this->assertDatabaseHas('sites', [
             'name' => 'Full Details Home',
@@ -465,6 +468,9 @@ class SiteControllerTest extends TestCase
             'email' => 'home@example.com',
             'city' => 'Auckland',
         ]);
+
+        $site = Site::where('name', 'Full Details Home')->firstOrFail();
+        $response->assertRedirect(route('sites.show', $site));
     }
 
     public function test_site_store_blocked_for_support_worker(): void
@@ -517,7 +523,7 @@ class SiteControllerTest extends TestCase
                 'type' => $site->type,
                 'is_active' => true,
             ])
-            ->assertRedirect(route('sites.index'));
+            ->assertRedirect(route('sites.show', $site));
 
         $site->refresh();
         $this->assertEquals('Updated Name', $site->name);
@@ -554,7 +560,7 @@ class SiteControllerTest extends TestCase
                 'type' => $site->type,
                 'is_active' => false,
             ])
-            ->assertRedirect(route('sites.index'));
+            ->assertRedirect(route('sites.show', $site));
 
         $site->refresh();
         $this->assertFalse((bool) $site->is_active);

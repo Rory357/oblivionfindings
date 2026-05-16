@@ -3,16 +3,18 @@ import LeafletMap, {
     type MapMarker,
 } from '@/components/leaflet-map';
 import { Button } from '@/components/ui/button';
-import { Link } from '@inertiajs/react';
-import { Plus, Shield } from 'lucide-react';
+import { MapPinned, Shield } from 'lucide-react';
 import { useMemo } from 'react';
 
-type SiteGeofence = {
+export type SiteOverviewGeofence = {
     id: number;
     name: string;
     type: 'circle' | 'polygon';
     shape: any;
     breach_type: 'enter' | 'exit' | 'both';
+    is_active?: boolean;
+    asset_id?: number | null;
+    assigned_asset_ids?: number[];
 };
 
 export default function SiteOverviewMapCard({
@@ -22,13 +24,15 @@ export default function SiteOverviewMapCard({
     longitude,
     geofences,
     canManage,
+    onEditGeofence,
 }: {
     siteId: number;
     siteName: string;
     latitude?: string | number | null;
     longitude?: string | number | null;
-    geofences: SiteGeofence[];
+    geofences: SiteOverviewGeofence[];
     canManage: boolean;
+    onEditGeofence: () => void;
 }) {
     const lat = latitude != null ? Number(latitude) : null;
     const lng = longitude != null ? Number(longitude) : null;
@@ -106,23 +110,16 @@ export default function SiteOverviewMapCard({
                         : `${geofences.length} active geofence${geofences.length === 1 ? '' : 's'}`}
                 </div>
                 {canManage && (
-                    <div className="flex gap-2">
-                        {geofences.length > 0 && (
-                            <Button asChild size="sm" variant="outline">
-                                <Link href={`/fleet-assets/geofences?site_id=${siteId}`}>
-                                    Manage
-                                </Link>
-                            </Button>
-                        )}
-                        <Button asChild size="sm">
-                            <Link
-                                href={`/fleet-assets/geofences/create?site_id=${siteId}`}
-                            >
-                                <Plus className="mr-1 h-3.5 w-3.5" />
-                                Add geofence
-                            </Link>
-                        </Button>
-                    </div>
+                    <Button
+                        size="sm"
+                        onClick={onEditGeofence}
+                        data-test="site-map-geofence-button"
+                    >
+                        <MapPinned className="mr-1 h-3.5 w-3.5" />
+                        {geofences.length === 0
+                            ? 'Set Up Geofence'
+                            : 'Edit Site Geofence'}
+                    </Button>
                 )}
             </div>
         </div>

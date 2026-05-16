@@ -117,6 +117,9 @@ import {
 import { ConfirmAction } from './_confirm-action';
 import SiteOverviewMapCard from './_overview-map-card';
 import { SiteReadinessPanel, type SiteReadiness } from './_readiness-panel';
+import SiteGeofenceDialog, {
+    type SiteGeofenceRecord,
+} from './_site-geofence-dialog';
 import type { VendorRecord } from './vendors/_dialogs';
 import type { CredentialRecord } from './credentials/_dialogs';
 import type { ContactRecord } from './contacts/_dialogs';
@@ -621,13 +624,7 @@ type Props = {
         created_at: string | null;
         created_by: { id: number; name: string } | null;
     }>;
-    geofences?: Array<{
-        id: number;
-        name: string;
-        type: 'circle' | 'polygon';
-        shape: any;
-        breach_type: 'enter' | 'exit' | 'both';
-    }>;
+    geofences?: SiteGeofenceRecord[];
 };
 
 const typeIcons = {
@@ -1275,13 +1272,23 @@ export default function SiteShow({
     // Overview-card edit dialogs
     const [contactInfoOpen, setContactInfoOpen] = useState(false);
     const [locationOpen, setLocationOpen] = useState(false);
+    const [siteGeofenceOpen, setSiteGeofenceOpen] = useState(false);
     const [safetyOpen, setSafetyOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState(
+        readiness?.is_active_but_incomplete ? 'readiness' : 'overview',
+    );
     const readinessRef = useRef<HTMLDivElement | null>(null);
     const tabsListRef = useRef<HTMLDivElement | null>(null);
     const [tabsCanScrollLeft, setTabsCanScrollLeft] = useState(false);
     const [tabsCanScrollRight, setTabsCanScrollRight] = useState(false);
+    const canManageGeofences = !!(
+        canGlobal?.assets?.geofencesManage ?? can_edit
+    );
+    const siteGeofence =
+        geofences.find((geofence) => geofence.asset_id == null) ??
+        geofences[0] ??
+        null;
 
     useEffect(() => {
         const el = tabsListRef.current;
@@ -1330,7 +1337,7 @@ export default function SiteShow({
             return;
         }
         if (action === 'configure_geofence') {
-            setLocationOpen(true);
+            setSiteGeofenceOpen(true);
         }
     };
 
@@ -1507,12 +1514,15 @@ export default function SiteShow({
                                 {readiness?.is_active_but_incomplete && (
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            readinessRef.current?.scrollIntoView({
-                                                block: 'start',
-                                                behavior: 'smooth',
-                                            })
-                                        }
+                                        onClick={() => {
+                                            setActiveTab('readiness');
+                                            window.requestAnimationFrame(() => {
+                                                readinessRef.current?.scrollIntoView({
+                                                    block: 'start',
+                                                    behavior: 'smooth',
+                                                });
+                                            });
+                                        }}
                                     >
                                         <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                             <AlertCircle className="mr-1 h-3 w-3" />
@@ -1599,6 +1609,19 @@ export default function SiteShow({
                         >
                             <LayoutGrid className="h-4 w-4" />
                             Overview
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="readiness"
+                            data-test="site-readiness-tab"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        >
+                            <ShieldAlert className="h-4 w-4" />
+                            Readiness
+                            {readiness && (
+                                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                                    {readiness.score}%
+                                </Badge>
+                            )}
                         </TabsTrigger>
                         <TabsTrigger
                             value="clients"
@@ -1798,8 +1821,8 @@ export default function SiteShow({
                     </TabsList>
                     </div>
 
-                    {/* Overview Tab */}
-                    <TabsContent value="overview" className="space-y-4">
+                    {/* Readiness Tab */}
+                    <TabsContent value="readiness" className="space-y-4">
                         {readiness && (
                             <div ref={readinessRef}>
                                 <SiteReadinessPanel
@@ -1808,7 +1831,10 @@ export default function SiteShow({
                                 />
                             </div>
                         )}
+                    </TabsContent>
 
+                    {/* Overview Tab */}
+                    <TabsContent value="overview" className="space-y-4">
                         <Card className="border-border/60 shadow-sm">
                             <CardContent className="space-y-3 p-4">
                                 <div className="grid gap-4 sm:grid-cols-4">
@@ -1940,6 +1966,7 @@ export default function SiteShow({
                                             size="sm"
                                             className="h-8 gap-1.5 text-xs"
                                             onClick={() => setLocationOpen(true)}
+                                            data-test="site-edit-location-button"
                                         >
                                             <Pencil className="h-3 w-3" />
                                             Edit
@@ -2022,7 +2049,8 @@ export default function SiteShow({
                                         latitude={site.latitude}
                                         longitude={site.longitude}
                                         geofences={geofences}
-                                        canManage={can_edit}
+                                        canManage={canManageGeofences}
+                                        onEditGeofence={() => setSiteGeofenceOpen(true)}
                                     />
                                 </CardContent>
                             </Card>
@@ -3357,6 +3385,7 @@ export default function SiteShow({
             />
             <EditLocationDialog
                 siteId={site.id}
+                siteName={site.name}
                 isOpen={locationOpen}
                 onClose={() => setLocationOpen(false)}
                 initial={{
@@ -3370,6 +3399,26 @@ export default function SiteShow({
                     latitude: site.latitude ?? '',
                     longitude: site.longitude ?? '',
                     access_instructions: site.access_instructions ?? '',
+                }}
+                geofences={geofences}
+                onOpenGeofence={
+                    canManageGeofences
+                        ? () => setSiteGeofenceOpen(true)
+                        : undefined
+                }
+            />
+            <SiteGeofenceDialog
+                siteId={site.id}
+                siteName={site.name}
+                siteLat={site.latitude}
+                siteLng={site.longitude}
+                existing={siteGeofence}
+                assets={assets}
+                isOpen={siteGeofenceOpen}
+                onClose={() => setSiteGeofenceOpen(false)}
+                onOpenLocation={() => {
+                    setSiteGeofenceOpen(false);
+                    setLocationOpen(true);
                 }}
             />
             <EditSafetyDialog

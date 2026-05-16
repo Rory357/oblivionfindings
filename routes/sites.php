@@ -17,6 +17,7 @@ use App\Http\Controllers\Sites\{
     SiteHardwareController,
     SiteIntegrationController,
     SiteInspectionController,
+    SiteGeofenceController,
     SiteReportingController,
     SiteRoomController,
     SiteResourceController,
@@ -73,6 +74,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/calendar/events/{event}', [SiteCalendarController::class, 'destroy'])
             ->name('sites.calendar.destroy')
             ->middleware('permission:calendar.create');
+
+        Route::middleware('permission:assets.geofences.manage')->group(function () {
+            Route::post('/geofence', [SiteGeofenceController::class, 'store'])
+                ->name('sites.geofence.store');
+            Route::put('/geofence/{geofence}', [SiteGeofenceController::class, 'update'])
+                ->whereNumber('geofence')
+                ->name('sites.geofence.update');
+            Route::delete('/geofence/{geofence}', [SiteGeofenceController::class, 'destroy'])
+                ->whereNumber('geofence')
+                ->name('sites.geofence.destroy');
+        });
         
         // Hazards
         Route::get('/hazards', [SiteHazardController::class, 'index'])

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use App\Models\FleetChecklistRun;
@@ -197,6 +198,12 @@ class Asset extends Model
     public function geofences(): HasMany
     {
         return $this->hasMany(AssetGeofence::class);
+    }
+
+    public function assignedGeofences(): BelongsToMany
+    {
+        return $this->belongsToMany(AssetGeofence::class, 'asset_geofence_assignments')
+            ->withTimestamps();
     }
 
     public function fleetState()

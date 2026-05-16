@@ -16,8 +16,12 @@ class AssetGeofenceEvaluator
         $breaches = [];
 
         $geofences = AssetGeofence::query()
-            ->where('asset_id', $asset->id)
             ->where('is_active', true)
+            ->where(function ($query) use ($asset) {
+                $query
+                    ->where('asset_id', $asset->id)
+                    ->orWhereHas('assignedAssets', fn ($assets) => $assets->whereKey($asset->id));
+            })
             ->get();
 
         foreach ($geofences as $geofence) {
@@ -34,11 +38,12 @@ class AssetGeofenceEvaluator
     {
         $shape = $geofence->shape ?? [];
         if ($geofence->type === 'polygon') {
-            return $this->pointInPolygon($lat, $lon, $shape['points'] ?? []);
+            return $this->pointInPolygon($lat, $lon, $shape['points'] ?? $shape['coordinates'] ?? []);
         }
 
-        $centerLat = $shape['lat'] ?? null;
-        $centerLon = $shape['lon'] ?? null;
+        $center = $shape['center'] ?? [];
+        $centerLat = $shape['lat'] ?? $center['lat'] ?? null;
+        $centerLon = $shape['lon'] ?? $shape['lng'] ?? $center['lon'] ?? $center['lng'] ?? null;
         $radius = $shape['radius_m'] ?? null;
 
         if ($centerLat === null || $centerLon === null || $radius === null) {
@@ -68,9 +73,9 @@ class AssetGeofenceEvaluator
 
         for ($i = 0, $j = $count - 1; $i < $count; $j = $i++) {
             $xi = $points[$i]['lat'] ?? null;
-            $yi = $points[$i]['lon'] ?? null;
+            $yi = $points[$i]['lon'] ?? $points[$i]['lng'] ?? null;
             $xj = $points[$j]['lat'] ?? null;
-            $yj = $points[$j]['lon'] ?? null;
+            $yj = $points[$j]['lon'] ?? $points[$j]['lng'] ?? null;
 
             if ($xi === null || $yi === null || $xj === null || $yj === null) {
                 continue;

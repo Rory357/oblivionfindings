@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AssetGeofence extends Model
 {
@@ -35,5 +36,11 @@ class AssetGeofence extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function assignedAssets(): BelongsToMany
+    {
+        return $this->belongsToMany(Asset::class, 'asset_geofence_assignments')
+            ->withTimestamps();
     }
 }

@@ -99,6 +99,7 @@ function ReadinessList({
                 {items.map((item) => (
                     <li
                         key={item.key}
+                        data-test={`readiness-item-${item.key}`}
                         className="flex items-center gap-3 rounded-md border bg-background px-3 py-2"
                     >
                         {item.done ? (
@@ -123,6 +124,7 @@ function ReadinessList({
                                 size="sm"
                                 className="shrink-0 gap-1"
                                 onClick={() => onAction(item.action)}
+                                data-test={`readiness-fix-${item.key}`}
                             >
                                 <ExternalLink className="h-3.5 w-3.5" />
                                 Fix
