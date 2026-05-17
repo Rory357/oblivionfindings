@@ -19,6 +19,7 @@ export type PlanRoom = {
     y: number;
     width: number;
     height: number;
+    rotation_deg?: number;
     room_ref_type?: RoomRefType | null;
     room_ref_id?: number | null;
 };
@@ -52,6 +53,7 @@ export type PlanLabel = {
     y: number;
     text: string;
     size?: number;
+    rotation_deg?: number;
 };
 
 export type PlanLayout = {

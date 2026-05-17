@@ -554,6 +554,15 @@ function SelectionDetails({
                             </div>
                         </div>
                     )}
+                    {pin.kind !== 'evacuation_route' && (
+                        <RotationField
+                            rotation={pin.rotation_deg ?? 0}
+                            onChange={(next) => {
+                                dispatch({ type: 'commit' });
+                                dispatch({ type: 'update_pin', pinId: single.id, patch: { rotation_deg: next } });
+                            }}
+                        />
+                    )}
                 </div>
                 {single.type === 'pin' && (
                     <div className="grid grid-cols-2 gap-1">
@@ -596,7 +605,92 @@ function SelectionDetails({
         );
     }
 
+    if (single.type === 'door' || single.type === 'window' || single.type === 'label') {
+        const list = single.type === 'door' ? layout.doors : single.type === 'window' ? layout.windows : layout.labels;
+        const item = list?.find((entry) => entry.id === single.id);
+        if (!item) return null;
+        const rotation = (item as { rotation_deg?: number }).rotation_deg ?? 0;
+        const titleLabel = single.type === 'door' ? 'Door' : single.type === 'window' ? 'Window' : 'Label';
+        return (
+            <div className="space-y-2 rounded-md border p-3">
+                <h3 className="text-sm font-medium">{titleLabel}</h3>
+                <RotationField
+                    rotation={rotation}
+                    onChange={(next) => {
+                        dispatch({ type: 'commit' });
+                        if (single.type === 'door') {
+                            dispatch({ type: 'update_door', id: String(single.id), patch: { rotation_deg: next } });
+                        } else if (single.type === 'window') {
+                            dispatch({ type: 'update_window', id: String(single.id), patch: { rotation_deg: next } });
+                        } else {
+                            dispatch({ type: 'update_label', id: String(single.id), patch: { rotation_deg: next } });
+                        }
+                    }}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-full gap-1 text-xs"
+                    onClick={() => {
+                        dispatch({ type: 'commit' });
+                        dispatch({ type: 'delete_selected' });
+                    }}
+                >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete {titleLabel.toLowerCase()}
+                </Button>
+            </div>
+        );
+    }
+
     return null;
+}
+
+function RotationField({
+    rotation,
+    onChange,
+}: {
+    rotation: number;
+    onChange: (next: number) => void;
+}) {
+    const presets = [0, 45, 90, 135, 180, 225, 270, 315];
+    return (
+        <div className="space-y-1.5">
+            <Label className="text-xs">Rotation</Label>
+            <div className="flex items-center gap-2">
+                <Input
+                    type="number"
+                    value={rotation}
+                    step={1}
+                    min={-180}
+                    max={360}
+                    className="h-7 text-xs"
+                    onChange={(event) => {
+                        const value = Number.parseFloat(event.target.value);
+                        if (!Number.isFinite(value)) return;
+                        onChange(Math.round(value));
+                    }}
+                />
+                <span className="text-[10px] text-muted-foreground">°</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+                {presets.map((angle) => (
+                    <Button
+                        key={angle}
+                        type="button"
+                        variant={rotation === angle ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-6 px-1.5 text-[10px]"
+                        onClick={() => onChange(angle)}
+                    >
+                        {angle}°
+                    </Button>
+                ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">Drag the blue handle on the canvas to rotate freely · Shift snaps to 15°.</p>
+        </div>
+    );
 }
 
 function PinKindPicker({

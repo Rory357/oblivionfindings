@@ -96,6 +96,15 @@ type DragRef =
           base: PlanWall;
           index: number;
           committed: boolean;
+      }
+    | {
+          mode: 'rotate';
+          pointerId: number;
+          ref: SelectionRef;
+          centre: { x: number; y: number };
+          baseRotation: number;
+          startAngle: number;
+          committed: boolean;
       };
 
 type CanvasPoint = { x: number; y: number };
@@ -673,6 +682,32 @@ export default function PlanCanvas(props: Props) {
         [canvasHeight, canvasWidth, layout, pointFromEvent, shouldSnap, structureInteractive],
     );
 
+    const beginRotateDrag = useCallback(
+        (
+            event: React.PointerEvent,
+            ref: SelectionRef,
+            centre: { x: number; y: number },
+            baseRotation: number,
+        ) => {
+            event.stopPropagation();
+            const raw = pointFromEvent(event);
+            const dx = (raw.x - centre.x) * canvasWidth;
+            const dy = (raw.y - centre.y) * canvasHeight;
+            const startAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+            (event.target as Element).setPointerCapture(event.pointerId);
+            dragRef.current = {
+                mode: 'rotate',
+                pointerId: event.pointerId,
+                ref,
+                centre,
+                baseRotation,
+                startAngle,
+                committed: false,
+            };
+        },
+        [canvasHeight, canvasWidth, pointFromEvent],
+    );
+
     const handlePointerMove = useCallback(
         (event: React.PointerEvent<SVGElement>) => {
             const activeMarquee = marqueeRef.current;
@@ -709,8 +744,8 @@ export default function PlanCanvas(props: Props) {
             }
             const raw = pointFromEvent(event);
             const snapped = snapToGrid(raw, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
-            const dx = snapped.x - drag.origin.x;
-            const dy = snapped.y - drag.origin.y;
+            const dx = drag.mode !== 'rotate' ? snapped.x - drag.origin.x : 0;
+            const dy = drag.mode !== 'rotate' ? snapped.y - drag.origin.y : 0;
 
             if (drag.mode === 'move') {
                 for (const [, base] of drag.bases) {
@@ -779,8 +814,34 @@ export default function PlanCanvas(props: Props) {
                 dispatch({ type: 'update_wall', id: drag.wallId, patch: { points } });
                 return;
             }
+
+            if (drag.mode === 'rotate') {
+                const dxR = (raw.x - drag.centre.x) * canvasWidth;
+                const dyR = (raw.y - drag.centre.y) * canvasHeight;
+                const currentAngle = (Math.atan2(dyR, dxR) * 180) / Math.PI;
+                let next = drag.baseRotation + (currentAngle - drag.startAngle);
+                // Normalise to [-180, 180] then optionally snap to 15° when Shift is held.
+                next = ((((next + 180) % 360) + 360) % 360) - 180;
+                if (shiftHeld) next = Math.round(next / 15) * 15;
+                const rounded = Math.round(next);
+                switch (drag.ref.type) {
+                    case 'door':
+                        dispatch({ type: 'update_door', id: String(drag.ref.id), patch: { rotation_deg: rounded } });
+                        break;
+                    case 'window':
+                        dispatch({ type: 'update_window', id: String(drag.ref.id), patch: { rotation_deg: rounded } });
+                        break;
+                    case 'label':
+                        dispatch({ type: 'update_label', id: String(drag.ref.id), patch: { rotation_deg: rounded } });
+                        break;
+                    case 'pin':
+                        dispatch({ type: 'update_pin', pinId: drag.ref.id, patch: { rotation_deg: rounded } });
+                        break;
+                }
+                return;
+            }
         },
-        [canvasHeight, canvasWidth, dispatch, isVisible, layout, pins, pointFromEvent, shouldSnap, showStructure, structureInteractive],
+        [canvasHeight, canvasWidth, dispatch, isVisible, layout, pins, pointFromEvent, shiftHeld, shouldSnap, showStructure, structureInteractive],
     );
 
     const completeMarquee = useCallback(
@@ -1092,27 +1153,51 @@ export default function PlanCanvas(props: Props) {
                     layout.doors?.map((door) => {
                         const selected = isRefInSelection(selection, { type: 'door', id: door.id });
                         const pending = hasPendingRef({ type: 'door', id: door.id });
+                        const onlySelected = selected && selection.length === 1;
                         const x = door.x * canvasWidth;
                         const y = door.y * canvasHeight;
                         const w = (door.width ?? 0.06) * canvasWidth;
+                        const h = 10;
+                        const rotation = door.rotation_deg ?? 0;
+                        const cx = x + w / 2;
+                        const cy = y + h / 2;
                         return (
-                            <rect
+                            <g
                                 key={door.id}
-                                x={x}
-                                y={y}
-                                width={w}
-                                height={10}
-                                fill="#92400e"
-                                stroke={selected || pending ? '#2563eb' : 'none'}
-                                strokeWidth={selected || pending ? 3 : 0}
-                                strokeDasharray={pending && !selected ? '6 4' : undefined}
+                                transform={rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined}
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
-                                onPointerDown={(event) => beginMoveDrag(event, { type: 'door', id: door.id })}
-                                onClick={(event) => event.stopPropagation()}
-                                onContextMenu={(event) => openContextMenu(event, { type: 'door', id: door.id }, structureInteractive)}
-                                style={{ cursor: selected ? 'grab' : 'move' }}
-                            />
+                            >
+                                <rect
+                                    x={x}
+                                    y={y}
+                                    width={w}
+                                    height={h}
+                                    fill="#92400e"
+                                    stroke={selected || pending ? '#2563eb' : 'none'}
+                                    strokeWidth={selected || pending ? 3 : 0}
+                                    strokeDasharray={pending && !selected ? '6 4' : undefined}
+                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'door', id: door.id })}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onContextMenu={(event) => openContextMenu(event, { type: 'door', id: door.id }, structureInteractive)}
+                                    style={{ cursor: selected ? 'grab' : 'move' }}
+                                />
+                                {onlySelected && structureInteractive && (
+                                    <RotationHandle
+                                        cx={cx}
+                                        cy={cy}
+                                        offset={26}
+                                        onBegin={(event) =>
+                                            beginRotateDrag(
+                                                event,
+                                                { type: 'door', id: door.id },
+                                                { x: door.x + (door.width ?? 0.06) / 2, y: door.y + h / (2 * canvasHeight) },
+                                                rotation,
+                                            )
+                                        }
+                                    />
+                                )}
+                            </g>
                         );
                     })}
 
@@ -1121,27 +1206,51 @@ export default function PlanCanvas(props: Props) {
                     layout.windows?.map((win) => {
                         const selected = isRefInSelection(selection, { type: 'window', id: win.id });
                         const pending = hasPendingRef({ type: 'window', id: win.id });
+                        const onlySelected = selected && selection.length === 1;
                         const x = win.x * canvasWidth;
                         const y = win.y * canvasHeight;
                         const w = (win.width ?? 0.08) * canvasWidth;
+                        const h = 8;
+                        const rotation = win.rotation_deg ?? 0;
+                        const cx = x + w / 2;
+                        const cy = y + h / 2;
                         return (
-                            <rect
+                            <g
                                 key={win.id}
-                                x={x}
-                                y={y}
-                                width={w}
-                                height={8}
-                                fill="#38bdf8"
-                                stroke={selected || pending ? '#2563eb' : 'none'}
-                                strokeWidth={selected || pending ? 3 : 0}
-                                strokeDasharray={pending && !selected ? '6 4' : undefined}
+                                transform={rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined}
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
-                                onPointerDown={(event) => beginMoveDrag(event, { type: 'window', id: win.id })}
-                                onClick={(event) => event.stopPropagation()}
-                                onContextMenu={(event) => openContextMenu(event, { type: 'window', id: win.id }, structureInteractive)}
-                                style={{ cursor: selected ? 'grab' : 'move' }}
-                            />
+                            >
+                                <rect
+                                    x={x}
+                                    y={y}
+                                    width={w}
+                                    height={h}
+                                    fill="#38bdf8"
+                                    stroke={selected || pending ? '#2563eb' : 'none'}
+                                    strokeWidth={selected || pending ? 3 : 0}
+                                    strokeDasharray={pending && !selected ? '6 4' : undefined}
+                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'window', id: win.id })}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onContextMenu={(event) => openContextMenu(event, { type: 'window', id: win.id }, structureInteractive)}
+                                    style={{ cursor: selected ? 'grab' : 'move' }}
+                                />
+                                {onlySelected && structureInteractive && (
+                                    <RotationHandle
+                                        cx={cx}
+                                        cy={cy}
+                                        offset={26}
+                                        onBegin={(event) =>
+                                            beginRotateDrag(
+                                                event,
+                                                { type: 'window', id: win.id },
+                                                { x: win.x + (win.width ?? 0.08) / 2, y: win.y + h / (2 * canvasHeight) },
+                                                rotation,
+                                            )
+                                        }
+                                    />
+                                )}
+                            </g>
                         );
                     })}
 
@@ -1180,8 +1289,15 @@ export default function PlanCanvas(props: Props) {
                                 </foreignObject>
                             );
                         }
+                        const rotation = label.rotation_deg ?? 0;
+                        const onlySelected = selected && selection.length === 1;
                         return (
-                            <g key={label.id} opacity={structureInteractive ? 1 : 0.45} pointerEvents={structureInteractive ? 'auto' : 'none'}>
+                            <g
+                                key={label.id}
+                                transform={rotation ? `rotate(${rotation} ${x} ${y})` : undefined}
+                                opacity={structureInteractive ? 1 : 0.45}
+                                pointerEvents={structureInteractive ? 'auto' : 'none'}
+                            >
                                 <text
                                     x={x}
                                     y={y}
@@ -1198,6 +1314,16 @@ export default function PlanCanvas(props: Props) {
                                 >
                                     {label.text}
                                 </text>
+                                {onlySelected && structureInteractive && (
+                                    <RotationHandle
+                                        cx={x}
+                                        cy={y - 12}
+                                        offset={20}
+                                        onBegin={(event) =>
+                                            beginRotateDrag(event, { type: 'label', id: label.id }, { x: label.x, y: label.y }, rotation)
+                                        }
+                                    />
+                                )}
                             </g>
                         );
                     })}
@@ -1225,6 +1351,7 @@ export default function PlanCanvas(props: Props) {
                     if (!isVisible(pin.kind)) return null;
                     const id = pinIdOf(pin, index);
                     const selected = isRefInSelection(selection, { type: 'pin', id });
+                    const onlySelected = selected && selection.length === 1;
                     const pending = hasPendingRef({ type: 'pin', id });
                     const isEditing = editing?.type === 'pin' && String(editing.id) === id;
                     const style = pinStyle(pin.kind, taxonomy);
@@ -1233,6 +1360,8 @@ export default function PlanCanvas(props: Props) {
                     const y = pin.y * canvasHeight;
                     const editable = isEditablePinKind(pin.kind);
                     const hasError = Boolean(validationErrors[`pin:${id}`]);
+                    const rotation = pin.rotation_deg ?? 0;
+                    const canRotate = pin.kind !== 'evacuation_route';
                     return (
                         <g
                             key={`pin-${id}`}
@@ -1246,17 +1375,29 @@ export default function PlanCanvas(props: Props) {
                             onContextMenu={(event) => openContextMenu(event, { type: 'pin', id }, editable)}
                             style={{ cursor: editable ? (selected ? 'grab' : 'move') : 'default' }}
                         >
-                            <circle
-                                r={selected ? 18 : 14}
-                                fill={style.color}
-                                stroke={hasError ? '#dc2626' : pending && !selected ? '#2563eb' : '#fff'}
-                                strokeWidth={hasError ? 5 : 4}
-                                strokeDasharray={pending && !selected ? '5 4' : undefined}
-                            />
-                            {hasError && <circle r={23} fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 3" />}
-                            <foreignObject x={-8} y={-8} width={16} height={16}>
-                                <Icon className="h-4 w-4 text-white" />
-                            </foreignObject>
+                            <g transform={rotation ? `rotate(${rotation})` : undefined}>
+                                <circle
+                                    r={selected ? 18 : 14}
+                                    fill={style.color}
+                                    stroke={hasError ? '#dc2626' : pending && !selected ? '#2563eb' : '#fff'}
+                                    strokeWidth={hasError ? 5 : 4}
+                                    strokeDasharray={pending && !selected ? '5 4' : undefined}
+                                />
+                                {hasError && <circle r={23} fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 3" />}
+                                <foreignObject x={-8} y={-8} width={16} height={16}>
+                                    <Icon className="h-4 w-4 text-white" />
+                                </foreignObject>
+                                {onlySelected && editable && canRotate && (
+                                    <RotationHandle
+                                        cx={0}
+                                        cy={0}
+                                        offset={32}
+                                        onBegin={(event) =>
+                                            beginRotateDrag(event, { type: 'pin', id }, { x: pin.x, y: pin.y }, rotation)
+                                        }
+                                    />
+                                )}
+                            </g>
                             {isEditing ? (
                                 <foreignObject x={20} y={-12} width={180} height={24}>
                                     <input
@@ -1511,6 +1652,35 @@ export default function PlanCanvas(props: Props) {
                 </DropdownMenu>
             )}
         </div>
+    );
+}
+
+function RotationHandle({
+    cx,
+    cy,
+    offset,
+    onBegin,
+}: {
+    cx: number;
+    cy: number;
+    offset: number;
+    onBegin: (event: React.PointerEvent) => void;
+}) {
+    return (
+        <g pointerEvents="auto">
+            <line x1={cx} y1={cy} x2={cx} y2={cy - offset} stroke="#2563eb" strokeWidth={1.5} pointerEvents="none" />
+            <circle
+                cx={cx}
+                cy={cy - offset}
+                r={6}
+                fill="#ffffff"
+                stroke="#2563eb"
+                strokeWidth={2}
+                style={{ cursor: 'grab' }}
+                onPointerDown={onBegin}
+                onClick={(event) => event.stopPropagation()}
+            />
+        </g>
     );
 }
 
