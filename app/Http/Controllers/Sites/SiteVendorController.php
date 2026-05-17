@@ -151,6 +151,7 @@ class SiteVendorController extends Controller
             'vendors' => $vendors,
             'serviceTypes' => $serviceTypes,
             'filters' => $request->only(['service_type', 'status']),
+            'canManage' => $request->user()->canDo('vendors.manage'),
         ]);
     }
 
