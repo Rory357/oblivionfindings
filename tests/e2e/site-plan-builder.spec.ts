@@ -71,7 +71,8 @@ test('site plan builder supports select, retyping, and emergency mode', async ({
     await expect(page.getByTestId('site-plan-marquee-count')).toContainText(/items selected/i);
 
     await clickCanvasAt(page, 0.22, 0.35);
-    await page.getByTestId('site-plan-pin-kind-picker').selectOption('smoke_alarm');
+    await page.getByTestId('site-plan-pin-kind-picker').click();
+    await page.getByTestId('site-plan-pin-kind-option-smoke_alarm').click();
     await expect(dialog).toContainText(/smoke alarm/i);
 
     await page.getByRole('button', { name: /Save Draft/i }).click();

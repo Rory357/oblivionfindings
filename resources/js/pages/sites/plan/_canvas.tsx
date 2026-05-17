@@ -1,3 +1,11 @@
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import * as Lucide from 'lucide-react';
 import {
@@ -292,7 +300,21 @@ export default function PlanCanvas(props: Props) {
     const [altHeld, setAltHeld] = useState(false);
     const [groupDragging, setGroupDragging] = useState(false);
     const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; ref: SelectionRef } | null>(null);
     const shouldSnap = layout.grid?.snap !== false && !altHeld;
+
+    const openContextMenu = useCallback(
+        (event: React.MouseEvent, ref: SelectionRef, editable: boolean) => {
+            if (!editable) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (!isRefInSelection(selection, ref)) {
+                dispatch({ type: 'select', ref, additive: false });
+            }
+            setContextMenu({ x: event.clientX, y: event.clientY, ref });
+        },
+        [dispatch, selection],
+    );
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -947,6 +969,7 @@ export default function PlanCanvas(props: Props) {
                                             dispatch({ type: 'begin_edit', target: { type: 'room', id: room.id } });
                                         }
                                     }}
+                                    onContextMenu={(event) => openContextMenu(event, { type: 'room', id: room.id }, structureInteractive)}
                                     style={{ cursor: selected ? 'grab' : 'move' }}
                                 />
                                 {isEditing ? (
@@ -1037,6 +1060,7 @@ export default function PlanCanvas(props: Props) {
                                     strokeLinecap="round"
                                     onPointerDown={(event) => beginMoveDrag(event, { type: 'wall', id: wall.id })}
                                     onClick={(event) => event.stopPropagation()}
+                                    onContextMenu={(event) => openContextMenu(event, { type: 'wall', id: wall.id }, structureInteractive)}
                                     style={{ cursor: selected ? 'grab' : 'move' }}
                                 />
                                 <g transform={`translate(${mid.x} ${mid.y - 8})`} pointerEvents="none">
@@ -1086,6 +1110,7 @@ export default function PlanCanvas(props: Props) {
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
                                 onPointerDown={(event) => beginMoveDrag(event, { type: 'door', id: door.id })}
                                 onClick={(event) => event.stopPropagation()}
+                                onContextMenu={(event) => openContextMenu(event, { type: 'door', id: door.id }, structureInteractive)}
                                 style={{ cursor: selected ? 'grab' : 'move' }}
                             />
                         );
@@ -1114,6 +1139,7 @@ export default function PlanCanvas(props: Props) {
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
                                 onPointerDown={(event) => beginMoveDrag(event, { type: 'window', id: win.id })}
                                 onClick={(event) => event.stopPropagation()}
+                                onContextMenu={(event) => openContextMenu(event, { type: 'window', id: win.id }, structureInteractive)}
                                 style={{ cursor: selected ? 'grab' : 'move' }}
                             />
                         );
@@ -1167,6 +1193,7 @@ export default function PlanCanvas(props: Props) {
                                         event.stopPropagation();
                                         dispatch({ type: 'begin_edit', target: { type: 'label', id: label.id } });
                                     }}
+                                    onContextMenu={(event) => openContextMenu(event, { type: 'label', id: label.id }, structureInteractive)}
                                     style={{ cursor: selected ? 'grab' : 'move' }}
                                 >
                                     {label.text}
@@ -1216,6 +1243,7 @@ export default function PlanCanvas(props: Props) {
                                 event.stopPropagation();
                                 if (editable) dispatch({ type: 'begin_edit', target: { type: 'pin', id } });
                             }}
+                            onContextMenu={(event) => openContextMenu(event, { type: 'pin', id }, editable)}
                             style={{ cursor: editable ? (selected ? 'grab' : 'move') : 'default' }}
                         >
                             <circle
@@ -1419,6 +1447,69 @@ export default function PlanCanvas(props: Props) {
                     </div>
                 )}
             </div>
+
+            {contextMenu && (
+                <DropdownMenu open onOpenChange={(next) => !next && setContextMenu(null)}>
+                    <DropdownMenuTrigger asChild>
+                        <span
+                            aria-hidden
+                            style={{
+                                position: 'fixed',
+                                left: contextMenu.x,
+                                top: contextMenu.y,
+                                width: 1,
+                                height: 1,
+                                pointerEvents: 'none',
+                            }}
+                        />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" data-test="site-plan-context-menu">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-slate-500">
+                            {contextMenu.ref.type === 'pin'
+                                ? 'Pin'
+                                : contextMenu.ref.type.charAt(0).toUpperCase() + contextMenu.ref.type.slice(1)}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {contextMenu.ref.type === 'pin' && (
+                            <>
+                                <DropdownMenuItem
+                                    data-test="site-plan-context-bring-to-front"
+                                    onSelect={() => {
+                                        dispatch({ type: 'bring_to_front', ref: contextMenu.ref });
+                                        setContextMenu(null);
+                                    }}
+                                >
+                                    <Lucide.BringToFront className="mr-2 h-4 w-4" />
+                                    Bring to front
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    data-test="site-plan-context-send-to-back"
+                                    onSelect={() => {
+                                        dispatch({ type: 'send_to_back', ref: contextMenu.ref });
+                                        setContextMenu(null);
+                                    }}
+                                >
+                                    <Lucide.SendToBack className="mr-2 h-4 w-4" />
+                                    Send to back
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                            </>
+                        )}
+                        <DropdownMenuItem
+                            data-test="site-plan-context-delete"
+                            onSelect={() => {
+                                dispatch({ type: 'commit' });
+                                dispatch({ type: 'set_selection', refs: [contextMenu.ref] });
+                                dispatch({ type: 'delete_selected' });
+                                setContextMenu(null);
+                            }}
+                        >
+                            <Lucide.Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
         </div>
     );
 }

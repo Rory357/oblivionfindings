@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import { BringToFront, ExternalLink, Link2, Link2Off, Search, SendToBack, Trash2 } from 'lucide-react';
-import { type Dispatch } from 'react';
+import * as Lucide from 'lucide-react';
+import { BringToFront, ChevronDown, ExternalLink, Link2, Link2Off, MapPin, Search, SendToBack, Trash2 } from 'lucide-react';
+import { useState, type CSSProperties, type Dispatch } from 'react';
 import {
     isEmergencyPlanKind,
     formatMeters,
@@ -21,6 +23,13 @@ import {
 } from './_types';
 import EmergencyChecklist from './_emergency-checklist';
 import type { EditorAction, LayerKey } from './_use-plan-editor';
+
+type IconProps = { className?: string; style?: CSSProperties };
+
+function resolveIcon(name: string): React.ComponentType<IconProps> {
+    const candidate = (Lucide as unknown as Record<string, React.ComponentType<IconProps>>)[name];
+    return candidate ?? (MapPin as unknown as React.ComponentType<IconProps>);
+}
 
 type Props = {
     layout: PlanLayout;
@@ -605,63 +614,96 @@ function PinKindPicker({
     emergencyKinds: string[];
     dispatch: Dispatch<EditorAction>;
 }) {
-    const options =
-        taxonomy?.groups.flatMap((group) =>
-            group.kinds
-                .filter((kind) => !kind.startsWith('__'))
-                .filter((kind) => mode === 'full' || isEmergencyPlanKind(kind, emergencyKinds))
-                .map((kind) => ({ group: group.label, kind, label: taxonomy.kinds[kind]?.label ?? kind.replaceAll('_', ' ') })),
-        ) ?? [];
+    const [open, setOpen] = useState(false);
+    const currentKindMeta = taxonomy?.kinds?.[pin.kind] ?? null;
+    const currentLabel = currentKindMeta?.label ?? pin.kind.replaceAll('_', ' ');
+    const CurrentIcon = resolveIcon(currentKindMeta?.icon ?? 'MapPin');
 
-    const currentLabel = taxonomy?.kinds?.[pin.kind]?.label ?? pin.kind.replaceAll('_', ' ');
+    const groups =
+        taxonomy?.groups
+            .map((group) => ({
+                ...group,
+                kinds: group.kinds.filter(
+                    (kind) =>
+                        !kind.startsWith('__') && (mode === 'full' || isEmergencyPlanKind(kind, emergencyKinds)),
+                ),
+            }))
+            .filter((group) => group.kinds.length > 0) ?? [];
+
+    function changeKind(nextKind: string) {
+        if (!nextKind || nextKind === pin.kind) {
+            setOpen(false);
+            return;
+        }
+        const currentFallbacks = [currentLabel, pin.kind.replaceAll('_', ' ')];
+        const shouldResetLabel = !pin.label || currentFallbacks.includes(pin.label);
+
+        dispatch({ type: 'commit' });
+        dispatch({
+            type: 'update_pin',
+            pinId,
+            patch: {
+                kind: nextKind,
+                subkind: null,
+                device_id: nextKind === 'device' ? pin.device_id ?? null : null,
+                label: shouldResetLabel ? null : pin.label,
+                path_points: nextKind === 'evacuation_route' ? (pin.path_points ?? null) : null,
+            },
+        });
+        setOpen(false);
+    }
 
     return (
-        <select
-            value={pin.kind}
-            data-test="site-plan-pin-kind-picker"
-            className="col-span-2 h-7 rounded border bg-white px-1 text-xs"
-            onChange={(event) => {
-                const nextKind = event.target.value;
-                if (!nextKind || nextKind === pin.kind) return;
-
-                const nextLabel = taxonomy?.kinds?.[nextKind]?.label ?? nextKind.replaceAll('_', ' ');
-                const currentFallbacks = [currentLabel, pin.kind.replaceAll('_', ' ')];
-                const shouldResetLabel = !pin.label || currentFallbacks.includes(pin.label);
-
-                dispatch({ type: 'commit' });
-                dispatch({
-                    type: 'update_pin',
-                    pinId,
-                    patch: {
-                        kind: nextKind,
-                        subkind: null,
-                        device_id: nextKind === 'device' ? pin.device_id ?? null : null,
-                        label: shouldResetLabel ? null : pin.label,
-                        path_points: nextKind === 'evacuation_route' ? (pin.path_points ?? null) : null,
-                    },
-                });
-
-                if (shouldResetLabel && nextLabel === pin.label) {
-                    dispatch({ type: 'update_pin', pinId, patch: { label: null } });
-                }
-            }}
-        >
-            {Object.entries(
-                options.reduce<Record<string, typeof options>>((acc, option) => {
-                    acc[option.group] = acc[option.group] ?? [];
-                    acc[option.group].push(option);
-                    return acc;
-                }, {}),
-            ).map(([group, groupOptions]) => (
-                <optgroup key={group} label={group}>
-                    {groupOptions.map((option) => (
-                        <option key={option.kind} value={option.kind}>
-                            {option.label}
-                        </option>
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="col-span-2 h-7 justify-start gap-1.5 px-2 text-xs"
+                    data-test="site-plan-pin-kind-picker"
+                >
+                    <CurrentIcon className="h-3.5 w-3.5" style={{ color: currentKindMeta?.color ?? '#475569' }} />
+                    <span className="flex-1 truncate text-left">{currentLabel}</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-2" align="start">
+                <div className="max-h-[360px] space-y-2 overflow-y-auto">
+                    {groups.map((group) => (
+                        <div key={group.id}>
+                            <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                {group.label}
+                            </div>
+                            <div className="grid grid-cols-3 gap-1">
+                                {group.kinds.map((kindKey) => {
+                                    const kind = taxonomy!.kinds[kindKey];
+                                    if (!kind) return null;
+                                    const Icon = resolveIcon(kind.icon);
+                                    const active = pin.kind === kindKey;
+                                    return (
+                                        <button
+                                            key={kindKey}
+                                            type="button"
+                                            onClick={() => changeKind(kindKey)}
+                                            data-test={`site-plan-pin-kind-option-${kindKey}`}
+                                            title={kind.label}
+                                            className={cn(
+                                                'flex flex-col items-center gap-1 rounded border bg-white p-1.5 text-[10px] text-slate-700 transition hover:bg-slate-50',
+                                                active && 'border-blue-500 bg-blue-50 text-blue-900',
+                                            )}
+                                        >
+                                            <Icon className="h-4 w-4 shrink-0" style={{ color: kind.color }} />
+                                            <span className="line-clamp-2 text-center leading-tight">{kind.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     ))}
-                </optgroup>
-            ))}
-        </select>
+                </div>
+            </PopoverContent>
+        </Popover>
     );
 }
 
