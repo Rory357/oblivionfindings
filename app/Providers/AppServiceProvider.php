@@ -72,6 +72,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // On Windows + Herd, the `mysql` client binary isn't on PATH by
+        // default, but Laravel's MigrateCommand shells out to it when
+        // loading a schema dump. Prepend the standard install dirs to
+        // PATH so `php artisan migrate` finds it. No-op on Linux/Mac
+        // (the binary is already on PATH there) and harmless if no
+        // candidate dir exists.
+        if (PHP_OS_FAMILY === 'Windows' && $this->app->runningInConsole()) {
+            $this->prependMysqlClientToPath();
+        }
+
         $this->app->singleton(IntegrationAdapterRegistry::class, function () {
             $registry = new IntegrationAdapterRegistry;
             $registry->register('unifi', UnifiAdapter::class);
@@ -113,6 +123,8 @@ class AppServiceProvider extends ServiceProvider
                 default => new FailingPushProvider('Unsupported push provider: '.$provider),
             };
         });
+
+        $this->app->singleton(\App\Services\Catering\DeliveryProviders\DeliveryProviderManager::class);
     }
 
     /**
@@ -269,5 +281,38 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('registration', function (Request $request) {
             return Limit::perHour(5)->by($request->ip());
         });
+    }
+
+    /**
+     * Mirror of `tests/TestCase::configureMysqlClientPath()` for runtime
+     * CLI use. Locates `mysql.exe` in the standard install dirs and
+     * prepends its directory to PATH so `php artisan migrate` can load
+     * the schema dump on Herd Windows installs.
+     */
+    private function prependMysqlClientToPath(): void
+    {
+        $candidates = array_filter([
+            getenv('MYSQL_BINARY') ?: null,
+            'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin',
+            'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin',
+            'C:\\Program Files\\MariaDB 11.4\\bin',
+            'C:\\Program Files\\MariaDB 11.3\\bin',
+        ]);
+
+        $currentPath = (string) (getenv('PATH') ?: '');
+
+        foreach ($candidates as $candidate) {
+            $directory = is_dir($candidate) ? $candidate : dirname($candidate);
+            if (! is_dir($directory)) {
+                continue;
+            }
+            if (str_contains(strtolower($currentPath), strtolower($directory))) {
+                return; // already on PATH
+            }
+            putenv('PATH=' . $directory . PATH_SEPARATOR . $currentPath);
+            $_ENV['PATH'] = $directory . PATH_SEPARATOR . $currentPath;
+            $_SERVER['PATH'] = $directory . PATH_SEPARATOR . $currentPath;
+            return;
+        }
     }
 }

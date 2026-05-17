@@ -15,6 +15,7 @@ use App\Http\Controllers\ClientMarController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\ClientIncidentController;
+use App\Http\Controllers\ClientMealPreferencesController;
 use App\Http\Controllers\ClientRiskController;
 
 /**
@@ -55,6 +56,25 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:clients.viewAny|clients.viewAssigned|clients.viewPortal')
         ->whereNumber('client')
         ->name('clients.show');
+
+    // Meal preferences (food allergies, dietary tags, dislikes) — kitchen-side data,
+    // gated by sites.meals.view so kitchen / care staff can edit even without full
+    // client update rights.
+    Route::middleware('permission:sites.meals.view|clients.update')->group(function () {
+        Route::get('/clients/{client}/meal-preferences', [ClientMealPreferencesController::class, 'show'])
+            ->whereNumber('client')
+            ->name('clients.meal-preferences.show');
+        Route::put('/clients/{client}/meal-preferences/tags', [ClientMealPreferencesController::class, 'syncTags'])
+            ->whereNumber('client')
+            ->name('clients.meal-preferences.tags.sync');
+        Route::post('/clients/{client}/meal-preferences/dislikes', [ClientMealPreferencesController::class, 'storeDislike'])
+            ->whereNumber('client')
+            ->name('clients.meal-preferences.dislikes.store');
+        Route::delete('/clients/{client}/meal-preferences/dislikes/{dislike}', [ClientMealPreferencesController::class, 'destroyDislike'])
+            ->whereNumber('client')
+            ->whereNumber('dislike')
+            ->name('clients.meal-preferences.dislikes.destroy');
+    });
 
     // Client creation
     Route::middleware('permission:clients.create')->group(function () {

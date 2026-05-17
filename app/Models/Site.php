@@ -271,6 +271,26 @@ class Site extends Model
         return $this->hasMany(SiteTypePlan::class);
     }
 
+    public function mealPlanEntries(): HasMany
+    {
+        return $this->hasMany(SiteMealPlanEntry::class);
+    }
+
+    public function mealInventoryItems(): HasMany
+    {
+        return $this->hasMany(SiteMealInventoryItem::class);
+    }
+
+    public function mealInventoryMovements(): HasMany
+    {
+        return $this->hasMany(SiteMealInventoryMovement::class);
+    }
+
+    public function mealShoppingLists(): HasMany
+    {
+        return $this->hasMany(SiteMealShoppingList::class);
+    }
+
     // Accessors
     public function getAddressAttribute(): string
     {

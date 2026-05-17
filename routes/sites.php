@@ -24,7 +24,10 @@ use App\Http\Controllers\Sites\{
     SiteZoneController,
     SiteTypePlanController,
     SiteTypePlanPinController,
-    SiteEmergencyPlanController
+    SiteEmergencyPlanController,
+    SiteMealPlanController,
+    SiteMealInventoryController,
+    SiteMealShoppingListController
 };
 
 /*
@@ -248,6 +251,84 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:sites.update');
         Route::get('/emergency-plan.pdf', [SiteEmergencyPlanController::class, 'download'])
             ->name('sites.emergency-plan.download');
+
+        // Meal Planner
+        Route::middleware('permission:sites.meals.view')->group(function () {
+            Route::get('/meal-planner/bootstrap', [SiteMealPlanController::class, 'bootstrap'])
+                ->name('sites.meals.bootstrap');
+            Route::post('/meal-planner/check-conflicts', [SiteMealPlanController::class, 'checkConflicts'])
+                ->name('sites.meals.checkConflicts');
+            Route::get('/meal-planner/takeaway-vendors', [SiteMealPlanController::class, 'takeawayVendors'])
+                ->name('sites.meals.takeawayVendors');
+            Route::get('/meal-plan', [SiteMealPlanController::class, 'index'])
+                ->name('sites.meals.plan.index');
+            Route::get('/meal-plan/week-summary', [SiteMealPlanController::class, 'weekSummary'])
+                ->name('sites.meals.plan.weekSummary');
+            Route::post('/meal-plan', [SiteMealPlanController::class, 'store'])
+                ->name('sites.meals.plan.store')
+                ->middleware('permission:sites.meals.plan');
+            Route::put('/meal-plan/{entry}', [SiteMealPlanController::class, 'update'])
+                ->whereNumber('entry')
+                ->name('sites.meals.plan.update')
+                ->middleware('permission:sites.meals.plan');
+            Route::delete('/meal-plan/{entry}', [SiteMealPlanController::class, 'destroy'])
+                ->whereNumber('entry')
+                ->name('sites.meals.plan.destroy')
+                ->middleware('permission:sites.meals.plan');
+            Route::post('/meal-plan/{entry}/serve', [SiteMealPlanController::class, 'markServed'])
+                ->whereNumber('entry')
+                ->name('sites.meals.plan.serve')
+                ->middleware('permission:sites.meals.plan');
+
+            Route::get('/meal-inventory', [SiteMealInventoryController::class, 'index'])
+                ->name('sites.meals.inventory.index');
+            Route::post('/meal-inventory/items', [SiteMealInventoryController::class, 'storeItem'])
+                ->name('sites.meals.inventory.items.store')
+                ->middleware('permission:sites.meals.inventory.adjust');
+            Route::put('/meal-inventory/items/{item}', [SiteMealInventoryController::class, 'updateItem'])
+                ->whereNumber('item')
+                ->name('sites.meals.inventory.items.update')
+                ->middleware('permission:sites.meals.inventory.adjust');
+            Route::delete('/meal-inventory/items/{item}', [SiteMealInventoryController::class, 'destroyItem'])
+                ->whereNumber('item')
+                ->name('sites.meals.inventory.items.destroy')
+                ->middleware('permission:sites.meals.inventory.adjust');
+            Route::post('/meal-inventory/adjust', [SiteMealInventoryController::class, 'adjust'])
+                ->name('sites.meals.inventory.adjust')
+                ->middleware('permission:sites.meals.inventory.adjust');
+            Route::post('/meal-inventory/stocktake', [SiteMealInventoryController::class, 'stocktake'])
+                ->name('sites.meals.inventory.stocktake')
+                ->middleware('permission:sites.meals.inventory.adjust');
+            Route::get('/meal-inventory/movements', [SiteMealInventoryController::class, 'movements'])
+                ->name('sites.meals.inventory.movements');
+
+            Route::get('/meal-shopping-lists', [SiteMealShoppingListController::class, 'index'])
+                ->name('sites.meals.shopping.index');
+            Route::post('/meal-shopping-lists/generate', [SiteMealShoppingListController::class, 'generate'])
+                ->name('sites.meals.shopping.generate')
+                ->middleware('permission:sites.meals.shopping.manage');
+            Route::put('/meal-shopping-lists/{list}', [SiteMealShoppingListController::class, 'update'])
+                ->whereNumber('list')
+                ->name('sites.meals.shopping.update')
+                ->middleware('permission:sites.meals.shopping.manage');
+            Route::post('/meal-shopping-lists/{list}/items', [SiteMealShoppingListController::class, 'addItem'])
+                ->whereNumber('list')
+                ->name('sites.meals.shopping.addItem')
+                ->middleware('permission:sites.meals.shopping.manage');
+            Route::delete('/meal-shopping-lists/{list}/items/{item}', [SiteMealShoppingListController::class, 'removeItem'])
+                ->whereNumber('list')
+                ->whereNumber('item')
+                ->name('sites.meals.shopping.removeItem')
+                ->middleware('permission:sites.meals.shopping.manage');
+            Route::post('/meal-shopping-lists/{list}/receive', [SiteMealShoppingListController::class, 'markReceived'])
+                ->whereNumber('list')
+                ->name('sites.meals.shopping.receive')
+                ->middleware('permission:sites.meals.shopping.manage');
+            Route::delete('/meal-shopping-lists/{list}', [SiteMealShoppingListController::class, 'destroy'])
+                ->whereNumber('list')
+                ->name('sites.meals.shopping.destroy')
+                ->middleware('permission:sites.meals.shopping.manage');
+        });
 
         // Site Integrations
         Route::get('/integrations', [SiteIntegrationController::class, 'index'])

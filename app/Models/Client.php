@@ -320,4 +320,16 @@ class Client extends Model
     {
         return $this->hasMany(FleetMedicationTransitLog::class);
     }
+
+    public function mealDietaryTags()
+    {
+        return $this->belongsToMany(MealDietaryTag::class, 'client_meal_dietary_tag', 'client_id', 'tag_id')
+            ->withPivot('notes')
+            ->withTimestamps();
+    }
+
+    public function mealDislikes()
+    {
+        return $this->hasMany(ClientMealDislike::class);
+    }
 }

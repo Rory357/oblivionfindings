@@ -85,6 +85,7 @@ import {
     User,
     UserCog,
     Users,
+    Utensils,
     Warehouse,
 } from 'lucide-react';
 import {
@@ -203,6 +204,8 @@ const DeleteContactDialog = lazy(() =>
         default: module.DeleteContactDialog,
     })),
 );
+
+const MealPlannerSubTabs = lazy(() => import('./meal-planner'));
 
 const AddClientDialog = lazy(() =>
     import('./clients/_dialogs').then((module) => ({
@@ -1641,6 +1644,7 @@ export default function SiteShow({
                   : Home,
     };
     const moreTabs = [
+        { value: 'meal-planner', label: 'Meal Planner', icon: Utensils },
         { value: 'financials', label: 'Financials', icon: DollarSign },
         ...(canSeeVendorsCredentials
             ? [
@@ -1929,6 +1933,13 @@ export default function SiteShow({
                                     {fleet.vehicles.length}
                                 </Badge>
                             )}
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="meal-planner"
+                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        >
+                            <Utensils className="h-4 w-4" />
+                            Meal Planner
                         </TabsTrigger>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -3082,6 +3093,13 @@ export default function SiteShow({
                                 <p className="text-sm">Loading fleet data...</p>
                             </div>
                         )}
+                    </TabsContent>
+
+                    {/* Meal Planner Tab */}
+                    <TabsContent value="meal-planner" className="space-y-4">
+                        <Suspense fallback={<div className="rounded-md border p-8 text-center text-sm text-muted-foreground">Loading meal planner…</div>}>
+                            <MealPlannerSubTabs site={{ id: site.id, name: site.name, type: site.type }} />
+                        </Suspense>
                     </TabsContent>
 
                     {/* Vendors & Credentials Tab.

@@ -52,6 +52,9 @@ class DatabaseSeeder extends Seeder
         $this->call(GovernanceSeeder::class);
         $this->call(HrSeeder::class);
         $this->call(RoleCatalogSeeder::class);
+        $this->call(CateringPermissionsSeeder::class);
+        $this->call(CateringSeeder::class);
+        $this->call(CateringDemoSeeder::class);
 
         // Additional demo/debug seeders kept in main seeding flow for full dataset coverage.
         $this->call(DemoSeeder::class);

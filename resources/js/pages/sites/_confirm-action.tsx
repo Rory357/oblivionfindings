@@ -39,7 +39,7 @@ export function ConfirmAction({
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                        className="bg-status-critical text-status-critical-foreground hover:bg-status-critical/90"
+                        className="bg-status-critical font-medium text-white hover:bg-status-critical/90 focus-visible:ring-status-critical"
                         onClick={onConfirm}
                     >
                         {confirmLabel}

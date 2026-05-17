@@ -89,8 +89,10 @@ import {
     Truck,
     User,
     Users,
+    Utensils,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FoodMealPreferences } from './_food-meal-preferences';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -419,6 +421,7 @@ type TabKey =
     | 'onboarding'
     | 'medical'
     | 'mar'
+    | 'meal_prefs'
     | 'care_plans'
     | 'observations'
     | 'calendar'
@@ -571,6 +574,7 @@ export default function ClientShow({
             },
             { key: 'medical', label: 'Medical', icon: Heart, show: true },
             { key: 'mar', label: 'MAR', icon: Pill, show: true },
+            { key: 'meal_prefs', label: 'Food & Meal', icon: Utensils, show: true },
             {
                 key: 'observations',
                 label: 'Observations',
@@ -871,10 +875,14 @@ export default function ClientShow({
                                     </Badge>
                                 )}
                                 {client.site && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Link
+                                        href={`/sites/${client.site.id}`}
+                                        className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/90 transition hover:bg-white/20"
+                                        title={`Open ${client.site.name}`}
+                                    >
                                         <Home className="mr-1 h-3 w-3" />
                                         {client.site.name}
-                                    </Badge>
+                                    </Link>
                                 )}
                                 {client.risk_level &&
                                     client.risk_level !== 'low' && (
@@ -2480,6 +2488,7 @@ export default function ClientShow({
                                         )}
                                     </div>
                                 )}
+
 
                                 {/* Row 4: Identity & Culture */}
                                 {(client.ethnicity ||
@@ -4099,6 +4108,15 @@ export default function ClientShow({
                             </div>
                         );
                     })()}
+
+                {tab === 'meal_prefs' && (
+                    <div className="space-y-4">
+                        <FoodMealPreferences
+                            clientId={client.id}
+                            canEdit={!!can?.edit}
+                        />
+                    </div>
+                )}
 
                 {tab === 'observations' && (
                     <ClientObservationsTab

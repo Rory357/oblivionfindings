@@ -88,6 +88,7 @@ import {
     UserCheck,
     Users,
     UserSearch,
+    Utensils,
     Wrench,
     X,
     type LucideIcon,
@@ -661,6 +662,11 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/vendors',
             icon: Package,
         });
+    items.push({
+        title: 'Meal Planner',
+        href: '/catering',
+        icon: Utensils,
+    });
 
     const groups: SubPanelGroup[] = [{ label: 'Sites & Locations', items }];
 
