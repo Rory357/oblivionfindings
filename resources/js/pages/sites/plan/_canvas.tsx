@@ -24,7 +24,9 @@ import {
     distanceCanvasUnits,
     formatMeters,
     metersPerUnit,
+    normaliseDoor,
     normaliseLayout,
+    type DoorSubkind,
     type PlanDoor,
     type PlanLabel,
     type PlanLayout,
@@ -36,6 +38,7 @@ import {
     type SelectionRef,
     type Taxonomy,
 } from './_types';
+import { DoorSymbol } from './_door';
 import {
     refKey,
     sameRef,
@@ -480,10 +483,20 @@ export default function PlanCanvas(props: Props) {
             }
             if (activeKind === '__door') {
                 const id = `door-${Date.now()}`;
+                const subkind = (activeSubkind as DoorSubkind | null) ?? 'single_swing';
                 dispatch({ type: 'commit' });
                 dispatch({
                     type: 'add_door',
-                    door: { id, x: point.x, y: point.y, width: 0.08, swing: 'right' },
+                    door: {
+                        id,
+                        x: point.x,
+                        y: point.y,
+                        width: 0.08,
+                        swing: 'right',
+                        subkind,
+                        swing_side: 'right',
+                        swing_direction: 'in',
+                    },
                     selectAfter: true,
                 });
                 return;
@@ -1154,13 +1167,13 @@ export default function PlanCanvas(props: Props) {
                         const selected = isRefInSelection(selection, { type: 'door', id: door.id });
                         const pending = hasPendingRef({ type: 'door', id: door.id });
                         const onlySelected = selected && selection.length === 1;
-                        const x = door.x * canvasWidth;
-                        const y = door.y * canvasHeight;
-                        const w = (door.width ?? 0.06) * canvasWidth;
-                        const h = 10;
-                        const rotation = door.rotation_deg ?? 0;
+                        const normalised = normaliseDoor(door);
+                        const x = normalised.x * canvasWidth;
+                        const w = normalised.width * canvasWidth;
+                        const rotation = normalised.rotation_deg ?? 0;
+                        // Rotation pivot: centre of the opening (matches existing rotation-handle math).
                         const cx = x + w / 2;
-                        const cy = y + h / 2;
+                        const cy = normalised.y * canvasHeight;
                         return (
                             <g
                                 key={door.id}
@@ -1168,19 +1181,15 @@ export default function PlanCanvas(props: Props) {
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
                             >
-                                <rect
-                                    x={x}
-                                    y={y}
-                                    width={w}
-                                    height={h}
-                                    fill="#92400e"
-                                    stroke={selected || pending ? '#2563eb' : 'none'}
-                                    strokeWidth={selected || pending ? 3 : 0}
-                                    strokeDasharray={pending && !selected ? '6 4' : undefined}
+                                <DoorSymbol
+                                    door={door}
+                                    canvasWidth={canvasWidth}
+                                    canvasHeight={canvasHeight}
+                                    selected={selected}
+                                    pending={pending}
                                     onPointerDown={(event) => beginMoveDrag(event, { type: 'door', id: door.id })}
                                     onClick={(event) => event.stopPropagation()}
                                     onContextMenu={(event) => openContextMenu(event, { type: 'door', id: door.id }, structureInteractive)}
-                                    style={{ cursor: selected ? 'grab' : 'move' }}
                                 />
                                 {onlySelected && structureInteractive && (
                                     <RotationHandle
@@ -1191,7 +1200,7 @@ export default function PlanCanvas(props: Props) {
                                             beginRotateDrag(
                                                 event,
                                                 { type: 'door', id: door.id },
-                                                { x: door.x + (door.width ?? 0.06) / 2, y: door.y + h / (2 * canvasHeight) },
+                                                { x: normalised.x + normalised.width / 2, y: normalised.y },
                                                 rotation,
                                             )
                                         }

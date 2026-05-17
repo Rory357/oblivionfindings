@@ -9,6 +9,7 @@ import {
     type PlanPin,
     type Taxonomy,
 } from './_types';
+import { DoorSymbol } from './_door';
 
 // Re-export for backwards compatibility with importers that pulled types from
 // this module before the dedicated `_types.ts` existed.
@@ -103,9 +104,19 @@ export function PlanThumbnail({ layout, pins = [], className, onCanvasClick, sel
                         strokeLinecap="round"
                     />
                 ))}
-                {resolved.doors.map((door) => (
-                    <rect key={door.id} x={door.x * width} y={door.y * height} width={(door.width ?? 0.06) * width} height={8} fill="#92400e" />
-                ))}
+                {resolved.doors.map((door) => {
+                    const rotation = door.rotation_deg ?? 0;
+                    const cx = (door.x + (door.width ?? 0.06) / 2) * width;
+                    const cy = door.y * height;
+                    return (
+                        <g
+                            key={door.id}
+                            transform={rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined}
+                        >
+                            <DoorSymbol door={door} canvasWidth={width} canvasHeight={height} />
+                        </g>
+                    );
+                })}
                 {resolved.windows.map((win) => (
                     <rect key={win.id} x={win.x * width} y={win.y * height} width={(win.width ?? 0.08) * width} height={6} fill="#38bdf8" />
                 ))}

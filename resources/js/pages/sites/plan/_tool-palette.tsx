@@ -3,7 +3,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import * as Lucide from 'lucide-react';
 import { useMemo, type CSSProperties } from 'react';
-import { SELECT_TOOL, isEmergencyPlanKind, type BuilderMode, type Taxonomy } from './_types';
+import { DOOR_SUBKIND_LABELS, SELECT_TOOL, isEmergencyPlanKind, type BuilderMode, type DoorSubkind, type Taxonomy } from './_types';
 
 export type ToolValue = string; // '__room' | '__wall' | ... | kind value
 // Re-exported for legacy consumers (sites/show.tsx); the type is now permissive.
@@ -117,6 +117,54 @@ export default function ToolPalette({
                                 if (!shape) return null;
                                 const Icon = resolveIcon(shape.icon);
                                 const active = activeKind === kindKey;
+
+                                if (kindKey === '__door') {
+                                    const activeDoorSubkind = (activeSubkind as DoorSubkind | null) ?? 'single_swing';
+                                    const tileLabel = active
+                                        ? DOOR_SUBKIND_LABELS[activeDoorSubkind] ?? shape.label
+                                        : shape.label;
+                                    return (
+                                        <Popover key={kindKey}>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={active ? 'default' : 'outline'}
+                                                    className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
+                                                    title={`${shape.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
+                                                    data-test="site-plan-door-tool"
+                                                >
+                                                    <Icon className="h-3.5 w-3.5" />
+                                                    <span className="text-xs">{tileLabel}</span>
+                                                    <ShortcutChip keyName={SHORTCUTS[kindKey]} />
+                                                    <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-56 p-1" align="start">
+                                                <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                                    Door style
+                                                </div>
+                                                {(Object.entries(DOOR_SUBKIND_LABELS) as [DoorSubkind, string][]).map(
+                                                    ([value, label]) => (
+                                                        <button
+                                                            key={value}
+                                                            type="button"
+                                                            className={cn(
+                                                                'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                                active && activeDoorSubkind === value && 'bg-slate-100 font-medium',
+                                                            )}
+                                                            onClick={() => onPickTool(kindKey, value)}
+                                                            data-test={`site-plan-door-subkind-${value}`}
+                                                        >
+                                                            {label}
+                                                        </button>
+                                                    ),
+                                                )}
+                                            </PopoverContent>
+                                        </Popover>
+                                    );
+                                }
+
                                 return (
                                     <Button
                                         key={kindKey}

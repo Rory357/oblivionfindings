@@ -30,14 +30,64 @@ export type PlanWall = {
     thickness?: number;
 };
 
+export type DoorSubkind =
+    | 'single_swing'
+    | 'double_swing'
+    | 'sliding'
+    | 'pocket'
+    | 'bifold'
+    | 'folding'
+    | 'garage'
+    | 'revolving';
+
+export type DoorSwingSide = 'left' | 'right';
+export type DoorSwingDirection = 'in' | 'out';
+
 export type PlanDoor = {
     id: string;
     x: number;
     y: number;
     width?: number;
-    swing?: string;
     rotation_deg?: number;
+    subkind?: DoorSubkind;
+    swing_side?: DoorSwingSide;
+    swing_direction?: DoorSwingDirection;
+    /** @deprecated retained for backwards compatibility; use `swing_side` instead. */
+    swing?: string;
 };
+
+export type NormalisedDoor = PlanDoor & {
+    subkind: DoorSubkind;
+    swing_side: DoorSwingSide;
+    swing_direction: DoorSwingDirection;
+    width: number;
+};
+
+export function normaliseDoor(door: PlanDoor): NormalisedDoor {
+    return {
+        ...door,
+        subkind: door.subkind ?? 'single_swing',
+        swing_side: door.swing_side ?? (door.swing === 'left' ? 'left' : 'right'),
+        swing_direction: door.swing_direction ?? 'in',
+        width: door.width ?? 0.06,
+    };
+}
+
+export const DOOR_SUBKIND_LABELS: Record<DoorSubkind, string> = {
+    single_swing: 'Single swing',
+    double_swing: 'Double (French)',
+    sliding: 'Sliding',
+    pocket: 'Pocket',
+    bifold: 'Bifold',
+    folding: 'Folding',
+    garage: 'Garage',
+    revolving: 'Revolving',
+};
+
+/** Subkinds where swing_side / swing_direction controls make sense. */
+export function doorHasSwing(subkind: DoorSubkind): boolean {
+    return subkind === 'single_swing' || subkind === 'double_swing';
+}
 
 export type PlanWindow = {
     id: string;

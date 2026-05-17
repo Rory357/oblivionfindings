@@ -87,6 +87,22 @@ return [
         '__label' => ['label' => 'Label', 'icon' => 'Type', 'tool' => 'label'],
     ],
 
+    // Door symbol subkinds — drawn by the React `DoorSymbol` component and the
+    // PHP `renderDoorSvg()` method. Listed here so future server-rendered UIs
+    // (e.g. printable legends) can share the canonical labels.
+    'doors' => [
+        'subkinds' => [
+            ['value' => 'single_swing', 'label' => 'Single swing'],
+            ['value' => 'double_swing', 'label' => 'Double (French)'],
+            ['value' => 'sliding', 'label' => 'Sliding'],
+            ['value' => 'pocket', 'label' => 'Pocket'],
+            ['value' => 'bifold', 'label' => 'Bifold'],
+            ['value' => 'folding', 'label' => 'Folding'],
+            ['value' => 'garage', 'label' => 'Garage'],
+            ['value' => 'revolving', 'label' => 'Revolving'],
+        ],
+    ],
+
     'kinds' => [
 
         // Fire safety -----------------------------------------------------

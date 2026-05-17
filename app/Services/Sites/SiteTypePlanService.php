@@ -438,6 +438,10 @@ class SiteTypePlanService
             }
         }
 
+        foreach (($layout['doors'] ?? []) as $door) {
+            $svg[] = $this->renderDoorSvg($this->normaliseDoor($door), $width, $height);
+        }
+
         foreach ($pinList as $pin) {
             $pin = $pin instanceof SiteTypePlanPin ? $this->serializePin($pin) : $pin;
             $x = (float) ($pin['x'] ?? 0.5) * $width;
@@ -552,5 +556,208 @@ class SiteTypePlanService
             SiteTypePlanPin::KIND_FIRST_AID_KIT, SiteTypePlanPin::KIND_DEFIBRILLATOR => '#0891b2',
             default => '#475569',
         };
+    }
+
+    /**
+     * Apply default values to a door so legacy entries (no subkind, swing string only)
+     * still render as a meaningful symbol. Mirrors `normaliseDoor()` in TypeScript.
+     */
+    private function normaliseDoor(array $door): array
+    {
+        $swingSide = $door['swing_side'] ?? (($door['swing'] ?? '') === 'left' ? 'left' : 'right');
+
+        return array_merge([
+            'subkind' => 'single_swing',
+            'swing_side' => $swingSide,
+            'swing_direction' => 'in',
+            'width' => 0.06,
+            'rotation_deg' => 0,
+        ], $door, ['swing_side' => $swingSide]);
+    }
+
+    /**
+     * Emit an architectural door symbol matching the React `DoorSymbol` component.
+     */
+    private function renderDoorSvg(array $door, int $canvasWidth, int $canvasHeight): string
+    {
+        $x = (float) ($door['x'] ?? 0) * $canvasWidth;
+        $y = (float) ($door['y'] ?? 0) * $canvasHeight;
+        $w = (float) ($door['width'] ?? 0.06) * $canvasWidth;
+        $rotation = (int) ($door['rotation_deg'] ?? 0);
+        $cx = $x + $w / 2;
+        $cy = $y;
+
+        $paths = match ($door['subkind']) {
+            'double_swing' => $this->doorDoubleSwingPaths($door, $x, $y, $w),
+            'sliding' => $this->doorSlidingPaths($x, $y, $w),
+            'pocket' => $this->doorPocketPaths($door, $x, $y, $w),
+            'bifold' => $this->doorBifoldPaths($x, $y, $w),
+            'folding' => $this->doorFoldingPaths($x, $y, $w),
+            'garage' => $this->doorGaragePaths($x, $y, $w),
+            'revolving' => $this->doorRevolvingPaths($x, $y, $w),
+            default => $this->doorSingleSwingPaths($door, $x, $y, $w),
+        };
+
+        $open = $rotation !== 0
+            ? sprintf('<g transform="rotate(%d %.2f %.2f)">', $rotation, $cx, $cy)
+            : '<g>';
+
+        return $open.implode('', $paths).'</g>';
+    }
+
+    private function doorWallStops(float $x, float $y, float $w): array
+    {
+        return [
+            sprintf('<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2"/>', $x, $y - 3, $x, $y + 3),
+            sprintf('<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2"/>', $x + $w, $y - 3, $x + $w, $y + 3),
+        ];
+    }
+
+    private function doorSingleSwingPaths(array $door, float $x, float $y, float $w): array
+    {
+        $side = $door['swing_side'] ?? 'right';
+        $dir = $door['swing_direction'] ?? 'in';
+        $hingeX = $side === 'right' ? $x + $w : $x;
+        $endY = $dir === 'in' ? $y + $w : $y - $w;
+        $arcTargetX = $side === 'right' ? $x : $x + $w;
+
+        // Sweep flag mapping (matches the JS SWING_PATHS table):
+        // right-in => 1, right-out => 0, left-in => 0, left-out => 1
+        $sweep = match ("$side-$dir") {
+            'right-in', 'left-out' => 1,
+            default => 0,
+        };
+
+        $paths = $this->doorWallStops($x, $y, $w);
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2" stroke-linecap="round" fill="none"/>',
+            $hingeX, $y, $hingeX, $endY,
+        );
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f A %.2f,%.2f 0 0 %d %.2f,%.2f" stroke="#1f2937" stroke-width="1.5" fill="none"/>',
+            $hingeX, $endY, $w, $w, $sweep, $arcTargetX, $y,
+        );
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $hingeX, $y);
+
+        return $paths;
+    }
+
+    private function doorDoubleSwingPaths(array $door, float $x, float $y, float $w): array
+    {
+        $out = ($door['swing_direction'] ?? 'in') === 'out';
+        $leafEndY = $out ? $y - $w / 2 : $y + $w / 2;
+        $leftSweep = $out ? 0 : 1;
+        $rightSweep = $out ? 1 : 0;
+
+        $paths = $this->doorWallStops($x, $y, $w);
+        // Left leaf
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2" stroke-linecap="round" fill="none"/>',
+            $x, $y, $x, $leafEndY,
+        );
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f A %.2f,%.2f 0 0 %d %.2f,%.2f" stroke="#1f2937" stroke-width="1.5" fill="none"/>',
+            $x, $leafEndY, $w / 2, $w / 2, $leftSweep, $x + $w / 2, $y,
+        );
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $x, $y);
+        // Right leaf
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2" stroke-linecap="round" fill="none"/>',
+            $x + $w, $y, $x + $w, $leafEndY,
+        );
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f A %.2f,%.2f 0 0 %d %.2f,%.2f" stroke="#1f2937" stroke-width="1.5" fill="none"/>',
+            $x + $w, $leafEndY, $w / 2, $w / 2, $rightSweep, $x + $w / 2, $y,
+        );
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $x + $w, $y);
+
+        return $paths;
+    }
+
+    private function doorSlidingPaths(float $x, float $y, float $w): array
+    {
+        return [
+            sprintf('<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="1"/>', $x, $y - 2, $x + $w, $y - 2),
+            sprintf('<rect x="%.2f" y="%.2f" width="%.2f" height="3" fill="#1f2937"/>', $x, $y - 1, $w * 0.55),
+            sprintf('<rect x="%.2f" y="%.2f" width="%.2f" height="3" fill="#1f2937"/>', $x + $w * 0.45, $y + 3, $w * 0.55),
+            sprintf(
+                '<path d="M %.2f,%.2f L %.2f,%.2f M %.2f,%.2f L %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="1.2" fill="none"/>',
+                $x + $w - 6, $y + 4.5, $x + $w - 2, $y + 4.5,
+                $x + $w - 4, $y + 3, $x + $w - 2, $y + 4.5, $x + $w - 4, $y + 6,
+            ),
+        ];
+    }
+
+    private function doorPocketPaths(array $door, float $x, float $y, float $w): array
+    {
+        $pocketLeft = ($door['swing_side'] ?? 'right') === 'left';
+        $pocketX = $pocketLeft ? $x - $w * 0.9 : $x + $w;
+        $stubX = $pocketLeft ? $x + $w : $x;
+        $leafX = $pocketLeft ? $x - $w * 0.7 : $x + $w * 0.1;
+
+        return [
+            sprintf('<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2"/>', $stubX, $y - 3, $stubX, $y + 3),
+            sprintf(
+                '<rect x="%.2f" y="%.2f" width="%.2f" height="8" fill="none" stroke="#1f2937" stroke-width="1" stroke-dasharray="3 3"/>',
+                $pocketX, $y - 4, $w * 0.9,
+            ),
+            sprintf('<rect x="%.2f" y="%.2f" width="%.2f" height="3" fill="#1f2937"/>', $leafX, $y - 1, $w * 0.6),
+        ];
+    }
+
+    private function doorBifoldPaths(float $x, float $y, float $w): array
+    {
+        $paths = $this->doorWallStops($x, $y, $w);
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f L %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2" fill="none" stroke-linecap="round"/>',
+            $x, $y, $x + $w / 2, $y + $w / 2, $x + $w, $y,
+        );
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $x, $y);
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $x + $w, $y);
+
+        return $paths;
+    }
+
+    private function doorFoldingPaths(float $x, float $y, float $w): array
+    {
+        $paths = $this->doorWallStops($x, $y, $w);
+        $paths[] = sprintf(
+            '<path d="M %.2f,%.2f L %.2f,%.2f L %.2f,%.2f L %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="2" fill="none" stroke-linecap="round"/>',
+            $x, $y,
+            $x + $w * 0.25, $y + $w * 0.25,
+            $x + $w * 0.5, $y,
+            $x + $w * 0.75, $y + $w * 0.25,
+            $x + $w, $y,
+        );
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $x, $y);
+        $paths[] = sprintf('<circle cx="%.2f" cy="%.2f" r="2" fill="#1f2937"/>', $x + $w, $y);
+
+        return $paths;
+    }
+
+    private function doorGaragePaths(float $x, float $y, float $w): array
+    {
+        $paths = [
+            sprintf('<rect x="%.2f" y="%.2f" width="%.2f" height="6" fill="#1f2937" stroke="#1f2937" stroke-width="1"/>', $x, $y - 1, $w),
+        ];
+        for ($i = 1; $i < 6; $i++) {
+            $lx = $x + ($w * $i) / 6;
+            $paths[] = sprintf('<line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" stroke="#ffffff" stroke-width="1"/>', $lx, $y - 1, $lx, $y + 5);
+        }
+
+        return $paths;
+    }
+
+    private function doorRevolvingPaths(float $x, float $y, float $w): array
+    {
+        $cx = $x + $w / 2;
+        $cy = $y;
+        $r = $w / 2;
+
+        return [
+            sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="#1f2937" stroke-width="1.5"/>', $cx, $cy, $r),
+            sprintf('<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="1.5"/>', $cx - $r, $cy, $cx + $r, $cy),
+            sprintf('<path d="M %.2f,%.2f L %.2f,%.2f" stroke="#1f2937" stroke-width="1.5"/>', $cx, $cy - $r, $cx, $cy + $r),
+        ];
     }
 }

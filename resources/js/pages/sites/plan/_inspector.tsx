@@ -11,10 +11,16 @@ import * as Lucide from 'lucide-react';
 import { BringToFront, ChevronDown, ExternalLink, Link2, Link2Off, MapPin, Search, SendToBack, Trash2 } from 'lucide-react';
 import { useState, type CSSProperties, type Dispatch } from 'react';
 import {
+    DOOR_SUBKIND_LABELS,
+    doorHasSwing,
     isEmergencyPlanKind,
     formatMeters,
     metersPerUnit,
+    normaliseDoor,
     type BuilderMode,
+    type DoorSubkind,
+    type DoorSwingDirection,
+    type DoorSwingSide,
     type Inventory,
     type PlanLayout,
     type PlanPin,
@@ -605,12 +611,147 @@ function SelectionDetails({
         );
     }
 
-    if (single.type === 'door' || single.type === 'window' || single.type === 'label') {
-        const list = single.type === 'door' ? layout.doors : single.type === 'window' ? layout.windows : layout.labels;
+    if (single.type === 'door') {
+        const door = layout.doors?.find((entry) => entry.id === single.id);
+        if (!door) return null;
+        const normalised = normaliseDoor(door);
+        const canvasWidth = layout.canvas?.width ?? 1000;
+        const widthMetres = normalised.width * canvasWidth * mpu;
+        const showSwingControls = doorHasSwing(normalised.subkind);
+        return (
+            <div className="space-y-2 rounded-md border p-3">
+                <h3 className="text-sm font-medium">Door</h3>
+                <div className="grid grid-cols-3 items-center gap-2">
+                    <Label className="text-xs">Style</Label>
+                    <select
+                        value={normalised.subkind}
+                        onChange={(event) => {
+                            dispatch({ type: 'commit' });
+                            dispatch({
+                                type: 'update_door',
+                                id: String(single.id),
+                                patch: { subkind: event.target.value as DoorSubkind },
+                            });
+                        }}
+                        className="col-span-2 h-7 rounded border bg-white px-1 text-xs"
+                        data-test="site-plan-door-subkind"
+                    >
+                        {(Object.entries(DOOR_SUBKIND_LABELS) as [DoorSubkind, string][]).map(([value, label]) => (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {showSwingControls && (
+                    <>
+                        <div className="grid grid-cols-3 items-center gap-2">
+                            <Label className="text-xs">Hinge</Label>
+                            <div className="col-span-2 flex gap-1">
+                                {(['left', 'right'] as DoorSwingSide[]).map((side) => (
+                                    <Button
+                                        key={side}
+                                        type="button"
+                                        variant={normalised.swing_side === side ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="h-7 flex-1 text-xs capitalize"
+                                        onClick={() => {
+                                            dispatch({ type: 'commit' });
+                                            dispatch({
+                                                type: 'update_door',
+                                                id: String(single.id),
+                                                patch: { swing_side: side, swing: side },
+                                            });
+                                        }}
+                                    >
+                                        {side}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-2">
+                            <Label className="text-xs">Opens</Label>
+                            <div className="col-span-2 flex gap-1">
+                                {(
+                                    [
+                                        { value: 'in' as DoorSwingDirection, label: 'Inward' },
+                                        { value: 'out' as DoorSwingDirection, label: 'Outward' },
+                                    ]
+                                ).map((option) => (
+                                    <Button
+                                        key={option.value}
+                                        type="button"
+                                        variant={normalised.swing_direction === option.value ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="h-7 flex-1 text-xs"
+                                        onClick={() => {
+                                            dispatch({ type: 'commit' });
+                                            dispatch({
+                                                type: 'update_door',
+                                                id: String(single.id),
+                                                patch: { swing_direction: option.value },
+                                            });
+                                        }}
+                                    >
+                                        {option.label}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
+                <div className="grid grid-cols-3 items-center gap-2">
+                    <Label className="text-xs">Width</Label>
+                    <Input
+                        type="number"
+                        step="0.05"
+                        min="0.4"
+                        value={Math.round(widthMetres * 100) / 100}
+                        onChange={(event) => {
+                            const m = Number.parseFloat(event.target.value);
+                            if (!Number.isFinite(m) || m <= 0) return;
+                            const nextWidth = m / (mpu * canvasWidth);
+                            dispatch({ type: 'commit' });
+                            dispatch({
+                                type: 'update_door',
+                                id: String(single.id),
+                                patch: { width: nextWidth },
+                            });
+                        }}
+                        className="col-span-2 h-7 text-xs"
+                    />
+                    <span className="col-span-3 -mt-1 text-[10px] text-muted-foreground">Metres</span>
+                </div>
+                <RotationField
+                    rotation={normalised.rotation_deg ?? 0}
+                    onChange={(next) => {
+                        dispatch({ type: 'commit' });
+                        dispatch({ type: 'update_door', id: String(single.id), patch: { rotation_deg: next } });
+                    }}
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-full gap-1 text-xs"
+                    onClick={() => {
+                        dispatch({ type: 'commit' });
+                        dispatch({ type: 'delete_selected' });
+                    }}
+                >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete door
+                </Button>
+            </div>
+        );
+    }
+
+    if (single.type === 'window' || single.type === 'label') {
+        const list = single.type === 'window' ? layout.windows : layout.labels;
         const item = list?.find((entry) => entry.id === single.id);
         if (!item) return null;
         const rotation = (item as { rotation_deg?: number }).rotation_deg ?? 0;
-        const titleLabel = single.type === 'door' ? 'Door' : single.type === 'window' ? 'Window' : 'Label';
+        const titleLabel = single.type === 'window' ? 'Window' : 'Label';
         return (
             <div className="space-y-2 rounded-md border p-3">
                 <h3 className="text-sm font-medium">{titleLabel}</h3>
@@ -618,9 +759,7 @@ function SelectionDetails({
                     rotation={rotation}
                     onChange={(next) => {
                         dispatch({ type: 'commit' });
-                        if (single.type === 'door') {
-                            dispatch({ type: 'update_door', id: String(single.id), patch: { rotation_deg: next } });
-                        } else if (single.type === 'window') {
+                        if (single.type === 'window') {
                             dispatch({ type: 'update_window', id: String(single.id), patch: { rotation_deg: next } });
                         } else {
                             dispatch({ type: 'update_label', id: String(single.id), patch: { rotation_deg: next } });
