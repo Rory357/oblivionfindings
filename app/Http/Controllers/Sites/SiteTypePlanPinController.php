@@ -8,6 +8,7 @@ use App\Models\SiteTypePlanPin;
 use App\Services\Sites\SiteTypePlanPinPayloadValidator;
 use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SiteTypePlanPinController extends Controller
 {

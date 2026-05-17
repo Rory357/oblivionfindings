@@ -9,6 +9,33 @@ export type ToolValue = string; // '__room' | '__wall' | ... | kind value
 // Re-exported for legacy consumers (sites/show.tsx); the type is now permissive.
 export type BuilderTool = string;
 
+// Mirrors the keyboard shortcuts in _builder-dialog.tsx. Visible chips on the
+// tool tiles make these discoverable without opening a help screen.
+const SHORTCUTS: Record<string, string> = {
+    [SELECT_TOOL]: 'Q',
+    __room: 'R',
+    __wall: 'W',
+    __door: 'D',
+    __window: 'N',
+    __label: 'T',
+    __scale: 'S',
+    fire_extinguisher: 'F',
+    assembly_point: 'A',
+    emergency_exit: 'X',
+    evacuation_route: 'E',
+    medication_storage: 'M',
+    device: 'V',
+};
+
+function ShortcutChip({ keyName }: { keyName: string | undefined }) {
+    if (!keyName) return null;
+    return (
+        <kbd className="ml-auto hidden rounded border bg-slate-100 px-1 text-[10px] font-mono leading-none text-slate-600 sm:inline">
+            {keyName}
+        </kbd>
+    );
+}
+
 type Props = {
     taxonomy: Taxonomy | null;
     activeKind: string | null;
@@ -75,6 +102,7 @@ export default function ToolPalette({
                 >
                     <Lucide.MousePointer2 className="h-3.5 w-3.5" />
                     <span className="text-xs">Select</span>
+                    <ShortcutChip keyName={SHORTCUTS[SELECT_TOOL]} />
                 </Button>
             </div>
             {groups.map((group) => (
@@ -97,11 +125,12 @@ export default function ToolPalette({
                                         variant={active ? 'default' : 'outline'}
                                         className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
                                         onClick={() => onPickTool(kindKey)}
-                                        title={`${shape.label}${kindKey === '__wall' ? ' (W)' : ''}`}
+                                        title={`${shape.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
                                         data-test={kindKey === '__wall' ? 'site-plan-wall-tool' : undefined}
                                     >
                                         <Icon className="h-3.5 w-3.5" />
                                         <span className="text-xs">{shape.label}</span>
+                                        <ShortcutChip keyName={SHORTCUTS[kindKey]} />
                                     </Button>
                                 );
                             }
@@ -122,10 +151,11 @@ export default function ToolPalette({
                                         className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
                                         style={active ? undefined : { borderColor: kind.color }}
                                         onClick={() => onPickTool(kindKey)}
-                                        title={kind.label}
+                                        title={`${kind.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
                                     >
                                         <Icon className="h-3.5 w-3.5" style={{ color: active ? undefined : kind.color }} />
                                         <span className="text-xs">{kind.label}</span>
+                                        <ShortcutChip keyName={SHORTCUTS[kindKey]} />
                                     </Button>
                                 );
                             }
@@ -144,10 +174,11 @@ export default function ToolPalette({
                                             variant={active ? 'default' : 'outline'}
                                             className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
                                             style={active ? undefined : { borderColor: kind.color }}
-                                            title={kind.label}
+                                            title={`${kind.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
                                         >
                                             <Icon className="h-3.5 w-3.5" style={{ color: active ? undefined : kind.color }} />
                                             <span className="text-xs">{subLabel}</span>
+                                            <ShortcutChip keyName={SHORTCUTS[kindKey]} />
                                             <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
                                         </Button>
                                     </PopoverTrigger>
@@ -203,6 +234,7 @@ export default function ToolPalette({
                     >
                         <Lucide.Ruler className="h-3.5 w-3.5" />
                         <span className="text-xs">Set scale</span>
+                        <ShortcutChip keyName={SHORTCUTS['__scale']} />
                     </Button>
                 </div>
             </div>

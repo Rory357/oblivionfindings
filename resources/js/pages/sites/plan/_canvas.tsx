@@ -846,7 +846,7 @@ export default function PlanCanvas(props: Props) {
         }
     }, [completeMarquee]);
 
-    const cursor = isSelectMode(activeKind) ? 'cursor-crosshair' : 'cursor-crosshair';
+    const cursor = isSelectMode(activeKind) ? 'cursor-default' : 'cursor-crosshair';
     const pendingRefs = interaction.mode === 'marquee' ? interaction.pendingRefs : [];
     const groupBounds = groupDragging ? selectionBounds(layout, pins, selection) : null;
     const orderedPins = useMemo(
@@ -947,7 +947,7 @@ export default function PlanCanvas(props: Props) {
                                             dispatch({ type: 'begin_edit', target: { type: 'room', id: room.id } });
                                         }
                                     }}
-                                    style={{ cursor: 'move' }}
+                                    style={{ cursor: selected ? 'grab' : 'move' }}
                                 />
                                 {isEditing ? (
                                     <foreignObject x={x + 4} y={y + 4} width={Math.max(60, w - 8)} height={28}>
@@ -1037,7 +1037,7 @@ export default function PlanCanvas(props: Props) {
                                     strokeLinecap="round"
                                     onPointerDown={(event) => beginMoveDrag(event, { type: 'wall', id: wall.id })}
                                     onClick={(event) => event.stopPropagation()}
-                                    style={{ cursor: 'move' }}
+                                    style={{ cursor: selected ? 'grab' : 'move' }}
                                 />
                                 <g transform={`translate(${mid.x} ${mid.y - 8})`} pointerEvents="none">
                                     <rect x={-26} y={-12} width={52} height={16} rx={3} fill="#ffffff" stroke="#cbd5e1" />
@@ -1086,7 +1086,7 @@ export default function PlanCanvas(props: Props) {
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
                                 onPointerDown={(event) => beginMoveDrag(event, { type: 'door', id: door.id })}
                                 onClick={(event) => event.stopPropagation()}
-                                style={{ cursor: 'move' }}
+                                style={{ cursor: selected ? 'grab' : 'move' }}
                             />
                         );
                     })}
@@ -1114,7 +1114,7 @@ export default function PlanCanvas(props: Props) {
                                 pointerEvents={structureInteractive ? 'auto' : 'none'}
                                 onPointerDown={(event) => beginMoveDrag(event, { type: 'window', id: win.id })}
                                 onClick={(event) => event.stopPropagation()}
-                                style={{ cursor: 'move' }}
+                                style={{ cursor: selected ? 'grab' : 'move' }}
                             />
                         );
                     })}
@@ -1167,7 +1167,7 @@ export default function PlanCanvas(props: Props) {
                                         event.stopPropagation();
                                         dispatch({ type: 'begin_edit', target: { type: 'label', id: label.id } });
                                     }}
-                                    style={{ cursor: 'move' }}
+                                    style={{ cursor: selected ? 'grab' : 'move' }}
                                 >
                                     {label.text}
                                 </text>
@@ -1216,7 +1216,7 @@ export default function PlanCanvas(props: Props) {
                                 event.stopPropagation();
                                 if (editable) dispatch({ type: 'begin_edit', target: { type: 'pin', id } });
                             }}
-                            style={{ cursor: editable ? 'move' : 'default' }}
+                            style={{ cursor: editable ? (selected ? 'grab' : 'move') : 'default' }}
                         >
                             <circle
                                 r={selected ? 18 : 14}
