@@ -9,7 +9,6 @@ use App\Services\Fleet\FleetTelemetryIngestService;
 use App\Services\Queclink\AckBuilder;
 use App\Services\Queclink\AtTrackFrame;
 use App\Services\Queclink\AtTrackProtocolParser;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -17,7 +16,7 @@ use Illuminate\Support\Facades\Log;
  *   1. Persist raw frame for the debug console.
  *   2. Upsert QueclinkDevice (auto-add unknown IMEIs to pending tray).
  *   3. If paired, forward to FleetTelemetryIngestService for full ingest.
- *   4. Build outbound responses: heartbeat SACKs + any queued commands.
+ *   4. Build outbound responses: server SACKs + any queued commands.
  *
  * Returns a list of raw bytes the caller should write back to the socket.
  */
@@ -27,11 +26,10 @@ class FrameRouter
         protected AtTrackProtocolParser $parser,
         protected AckBuilder $acks,
         protected FleetTelemetryIngestService $ingest,
-    ) {
-    }
+    ) {}
 
     /**
-     * @return list<string>  Raw frames to send back to the device.
+     * @return list<string> Raw frames to send back to the device.
      */
     /**
      * Cap on outbound commands dispatched per inbound frame. Prevents one
@@ -53,6 +51,7 @@ class FrameRouter
         // SACK, no ingest, no command dispatch.
         if ($queclinkDevice && $queclinkDevice->status === QueclinkDevice::STATUS_REJECTED) {
             $this->logRaw($frame, $state, $queclinkDevice, 'inbound');
+
             return [];
         }
 
@@ -64,14 +63,16 @@ class FrameRouter
 
         $outbound = [];
 
-        // 1. Heartbeat ACK — send for pending + paired devices alike so the
+        // 1. Server ACK — send for pending + paired devices alike so the
         //    device keeps the connection alive while waiting for adoption.
         //    Rejected devices already returned above.
-        if ($frame->isHeartbeat()) {
-            $ack = $this->acks->heartbeatAck($frame);
-            if ($ack !== null) {
-                $outbound[] = $ack;
-                $this->logRaw($this->parser->parse($ack), $state, $queclinkDevice, 'outbound');
+        $ack = $this->acks->serverAck($frame);
+        if ($ack !== null) {
+            $outbound[] = $ack;
+            if ($queclinkDevice) {
+                $this->logRawOutbound($ack, $state, $queclinkDevice, $frame->isHeartbeat() ? 'GTHBD' : null);
+            } else {
+                $this->logRaw($this->parser->parse($ack), $state, null, 'outbound');
             }
         }
 
@@ -106,6 +107,7 @@ class FrameRouter
         }
 
         $state->framesOut += count($outbound);
+
         return $outbound;
     }
 
@@ -146,6 +148,7 @@ class FrameRouter
         // state for rejected devices — they should look "dormant" in the UI.
         if ($device->exists && $device->status === QueclinkDevice::STATUS_REJECTED) {
             $state->bind($frame->imei, $device->id);
+
             return $device;
         }
 
@@ -167,6 +170,7 @@ class FrameRouter
         $device->save();
 
         $state->bind($frame->imei, $device->id);
+
         return $device;
     }
 

@@ -4,16 +4,16 @@ use App\Services\Queclink\AckBuilder;
 use App\Services\Queclink\AtTrackProtocolParser;
 
 beforeEach(function () {
-    $this->parser = new AtTrackProtocolParser();
-    $this->acks = new AckBuilder();
+    $this->parser = new AtTrackProtocolParser;
+    $this->acks = new AckBuilder;
 });
 
 // ─── Frame splitting ─────────────────────────────────────────────────
 
 it('splits multiple complete frames from a single buffer flush', function () {
     $buffer = '';
-    $incoming = "+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF\$" .
-        "+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075752,09D0\$";
+    $incoming = '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$'.
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075752,09D0$';
     $frames = $this->parser->splitFrames($incoming, $buffer);
 
     expect($frames)->toHaveCount(2)
@@ -22,11 +22,11 @@ it('splits multiple complete frames from a single buffer flush', function () {
 
 it('buffers a partial trailing frame for the next read', function () {
     $buffer = '';
-    $first = $this->parser->splitFrames("+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF\$+RESP:GTFRI,802", $buffer);
+    $first = $this->parser->splitFrames('+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$+RESP:GTFRI,802', $buffer);
     expect($first)->toHaveCount(1)
         ->and($buffer)->toBe('+RESP:GTFRI,802');
 
-    $second = $this->parser->splitFrames("0090100,864696060004173,GV500CG,11985,10,1,1,0.0,0,0,1.0,1.0,20230811075800,0460,0001,DF5C,02A90902,01,15,0.0,20230811075801,09D0\$", $buffer);
+    $second = $this->parser->splitFrames('0090100,864696060004173,GV500CG,11985,10,1,1,0.0,0,0,1.0,1.0,20230811075800,0460,0001,DF5C,02A90902,01,15,0.0,20230811075801,09D0$', $buffer);
     expect($second)->toHaveCount(1)
         ->and($buffer)->toBe('');
 });
@@ -58,9 +58,11 @@ it('builds a +SACK:GTHBD response that echoes the heartbeat count number', funct
     expect($ack)->toBe('+SACK:GTHBD,8020090100,09CF$');
 });
 
-it('does not build a heartbeat ack for non-heartbeat frames', function () {
+it('builds a generic +SACK response for non-heartbeat device messages', function () {
     $fri = $this->parser->parse('+RESP:GTFRI,8020090100,864696060004173,GV500CG,11985,10,1,1,0.0,0,118.5,117.129306,31.839292,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0119$');
-    expect($this->acks->heartbeatAck($fri))->toBeNull();
+
+    expect($this->acks->heartbeatAck($fri))->toBeNull()
+        ->and($this->acks->serverAck($fri))->toBe('+SACK:0119$');
 });
 
 // ─── Generic Location Report (GTFRI) ─────────────────────────────────

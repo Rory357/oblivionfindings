@@ -2,6 +2,7 @@
 
 use App\Models\Asset;
 use App\Models\AssetTracker;
+use App\Models\FleetTelemetryEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
@@ -16,12 +17,12 @@ beforeEach(function () {
     $this->state = new ConnectionState('192.0.2.10:54321');
 });
 
-it('auto-creates an unknown IMEI in the pending tray with no SACK side effects on a report frame', function () {
+it('auto-creates an unknown IMEI in the pending tray and acknowledges a report frame', function () {
     $frame = '+RESP:GTFRI,8020090100,864696060004173,GV500CG,11985,10,1,1,0.0,0,118.5,117.129306,31.839292,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0119$';
 
     $responses = $this->router->handleInbound($frame, $this->state);
 
-    expect($responses)->toBeEmpty();
+    expect($responses)->toBe(['+SACK:0119$']);
 
     $device = QueclinkDevice::firstWhere('imei', '864696060004173');
     expect($device)->not->toBeNull()
@@ -30,9 +31,10 @@ it('auto-creates an unknown IMEI in the pending tray with no SACK side effects o
         ->and($device->first_seen_at)->not->toBeNull()
         ->and($device->model_hint)->toBe('GV500CG');
 
-    expect(QueclinkRawFrame::count())->toBe(1)
+    expect(QueclinkRawFrame::count())->toBe(2)
         ->and(QueclinkRawFrame::first()->parse_ok)->toBeTrue()
         ->and(QueclinkRawFrame::first()->command_word)->toBe('GTFRI');
+    expect(QueclinkRawFrame::outbound()->first()->raw_frame)->toBe('+SACK:0119$');
 });
 
 it('answers a heartbeat with +SACK even for an unpaired pending device', function () {
@@ -68,7 +70,7 @@ it('routes a paired device into the Fleet telemetry pipeline', function () {
 
     $this->router->handleInbound($frame, $this->state);
 
-    $event = \App\Models\FleetTelemetryEvent::first();
+    $event = FleetTelemetryEvent::first();
     expect($event)->not->toBeNull()
         ->and($event->asset_id)->toBe($asset->id)
         ->and($event->vendor)->toBe('queclink')
@@ -83,8 +85,9 @@ it('does not ingest telemetry for unpaired devices but still logs the frame', fu
 
     $this->router->handleInbound($frame, $this->state);
 
-    expect(\App\Models\FleetTelemetryEvent::count())->toBe(0)
-        ->and(QueclinkRawFrame::count())->toBe(1);
+    expect(FleetTelemetryEvent::count())->toBe(0)
+        ->and(QueclinkRawFrame::count())->toBe(2);
+    expect(QueclinkRawFrame::outbound()->first()->raw_frame)->toBe('+SACK:0119$');
 });
 
 it('marks the device disconnected when the connection drops', function () {
