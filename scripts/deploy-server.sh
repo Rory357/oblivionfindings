@@ -37,22 +37,35 @@ done
 
 cd "$(dirname "$0")/.."
 
+APP_RUN_USER="${APP_RUN_USER:-${SUDO_USER:-}}"
+if [ -z "$APP_RUN_USER" ] || [ "$APP_RUN_USER" = "root" ]; then
+    APP_RUN_USER="$(stat -c '%U' .)"
+fi
+
+run_app() {
+    if [ "$(id -u)" -eq 0 ] && [ -n "$APP_RUN_USER" ] && [ "$APP_RUN_USER" != "root" ]; then
+        runuser -u "$APP_RUN_USER" -- "$@"
+    else
+        "$@"
+    fi
+}
+
 echo "▶ composer install"
-composer install --no-dev --optimize-autoloader --no-interaction
+run_app composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "▶ npm ci && npm run build"
-npm ci
+run_app npm ci
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
-npm run build
+run_app env NODE_OPTIONS="$NODE_OPTIONS" npm run build
 
 echo "▶ php artisan migrate --force"
-php artisan migrate --force
+run_app php artisan migrate --force
 
 echo "▶ php artisan storage:link"
-php artisan storage:link 2>/dev/null || true
+run_app php artisan storage:link 2>/dev/null || true
 
 echo "▶ php artisan optimize:clear"
-php artisan optimize:clear
+run_app php artisan optimize:clear
 
 if [ "$SKIP_NOMINATIM" -eq 1 ]; then
     echo "▶ skipping geocoder health check (--skip-nominatim)"
@@ -61,10 +74,10 @@ elif [ "$INSTALL_NOMINATIM" -eq 1 ]; then
     bash scripts/nominatim/install-nominatim.sh
 
     echo "▶ php artisan fleet:geocoder:status --fail-if-enabled"
-    php artisan fleet:geocoder:status --fail-if-enabled
+    run_app php artisan fleet:geocoder:status --fail-if-enabled
 else
     echo "▶ php artisan fleet:geocoder:status --fail-if-enabled"
-    php artisan fleet:geocoder:status --fail-if-enabled
+    run_app php artisan fleet:geocoder:status --fail-if-enabled
 fi
 
 if [ "$SKIP_QUECLINK" -eq 0 ]; then
@@ -82,7 +95,7 @@ else
 fi
 
 echo "▶ php artisan queue:restart"
-php artisan queue:restart
+run_app php artisan queue:restart
 
 echo
 echo "✓ Server provisioning complete."
