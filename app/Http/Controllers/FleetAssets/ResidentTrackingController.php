@@ -95,6 +95,10 @@ class ResidentTrackingController extends Controller
             $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
             $battery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
+            $batteryThreshold = (int) ($meta['battery_low_threshold'] ?? 20);
+            $batteryStatus = $meta['battery_status'] ?? (
+                $battery === null ? 'unknown' : ((float) $battery <= $batteryThreshold ? 'low' : 'normal')
+            );
 
             // Determine geofence status.
             $geofenceStatus = 'unknown';
@@ -142,6 +146,13 @@ class ResidentTrackingController extends Controller
                 'lat' => $lat !== null ? (float) $lat : null,
                 'lng' => $lng !== null ? (float) $lng : null,
                 'battery' => $battery,
+                'battery_status' => $batteryStatus,
+                'battery_voltage_mv' => $meta['battery_voltage_mv'] ?? null,
+                'battery_low_threshold' => $batteryThreshold,
+                'charging_status' => $meta['charging_status'] ?? null,
+                'external_power' => $this->isTruthy($meta['external_power'] ?? false),
+                'last_power_event' => $meta['power_event'] ?? null,
+                'last_safety_event' => $meta['last_safety_event'] ?? null,
                 'speed' => $meta['speed'] ?? null,
                 'geofence_status' => $geofenceStatus,
                 'on_outing' => $onOuting,
@@ -157,7 +168,7 @@ class ResidentTrackingController extends Controller
         $offline = $residents->where('status', 'offline')->count();
         $inGeofence = $residents->where('geofence_status', 'in_zone')->count();
         $outsideGeofence = $residents->where('geofence_status', 'outside_zone')->count();
-        $lowBattery = $residents->filter(fn ($r) => ($r['battery'] ?? 100) < 20)->count();
+        $lowBattery = $residents->filter(fn ($r) => ($r['battery_status'] ?? null) === 'low')->count();
         $safetyScore = $totalTracked > 0 ? round(($inGeofence / max($totalTracked, 1)) * 100, 1) : 0;
         $avgBattery = $totalTracked > 0 ? round($residents->avg(fn ($r) => $r['battery'] ?? 0), 0) : 0;
 
@@ -448,6 +459,15 @@ class ResidentTrackingController extends Controller
             ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
             ->latest()
             ->value('status');
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        return $value === true
+            || $value === 1
+            || $value === '1'
+            || $value === 'true'
+            || $value === 'yes';
     }
 
     private function buildMapGeofences($geofences): array

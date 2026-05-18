@@ -10,6 +10,7 @@ import { Link, router } from '@inertiajs/react';
 import {
     Battery,
     BatteryLow,
+    BatteryWarning,
     Calendar,
     Clock,
     Download,
@@ -19,6 +20,7 @@ import {
     Radio,
     RotateCcw,
     Shield,
+    ShieldAlert,
     ShieldOff,
     Wifi,
     WifiOff,
@@ -55,6 +57,13 @@ export type ClientLocationData = {
         status: string;
         last_seen_at: string | null;
         battery: number | null;
+        battery_status?: 'low' | 'normal' | 'unknown' | string | null;
+        battery_voltage_mv?: number | null;
+        battery_low_threshold?: number | null;
+        charging_status?: string | null;
+        external_power?: boolean | null;
+        last_power_event?: string | null;
+        last_safety_event?: string | null;
         locate_now_url?: string;
         last_command_status?: CommandStatus;
     } | null;
@@ -98,6 +107,63 @@ function commandStatusLabel(status?: CommandStatus): string | null {
     }
 }
 
+function getBatteryState(tracker: ClientLocationData['tracker']) {
+    const battery = tracker?.battery ?? null;
+    const threshold = tracker?.battery_low_threshold ?? 20;
+    const isCharging =
+        tracker?.charging_status === 'charging' || tracker?.external_power === true;
+
+    if (isCharging) {
+        return {
+            label: 'Charging',
+            detail: battery != null ? `${battery}%` : undefined,
+            icon: Battery,
+            textClass: 'text-status-success',
+            bgClass: 'bg-status-success-bg',
+        };
+    }
+
+    if (battery == null) {
+        return {
+            label: 'Battery not reported',
+            detail: undefined,
+            icon: BatteryWarning,
+            textClass: 'text-status-warning',
+            bgClass: 'bg-status-warning-bg',
+        };
+    }
+
+    if (tracker?.battery_status === 'low' || battery <= threshold) {
+        return {
+            label: 'Low battery',
+            detail: `${battery}%`,
+            icon: BatteryLow,
+            textClass: 'text-status-critical',
+            bgClass: 'bg-status-critical-bg',
+        };
+    }
+
+    return {
+        label: `${battery}%`,
+        detail: undefined,
+        icon: Battery,
+        textClass: 'text-status-success',
+        bgClass: 'bg-status-success-bg',
+    };
+}
+
+function safetyEventLabel(event?: string | null): string | null {
+    switch (event) {
+        case 'vehicle_sos':
+        case 'sos':
+            return 'SOS received';
+        case 'man_down':
+            return 'Man down alert';
+        default:
+            return null;
+    }
+}
+
 export default function ClientLocationTab({ clientId, clientName, location }: Props) {
     const { tracker, currentLocation, trackingConsent, geofences } = location;
 
@@ -122,6 +188,9 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
 
     const markers: MapMarker[] = useMemo(() => {
         if (!currentLocation) return [];
+        const battery = getBatteryState(tracker);
+        const safety = safetyEventLabel(tracker?.last_safety_event);
+
         return [{
             id: `client-${clientId}`,
             lat: currentLocation.lat,
@@ -133,7 +202,8 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
             speed: currentLocation.speed ?? undefined,
             popup: `<strong>${clientName}</strong><br/>
                 ${currentLocation.speed != null ? `Speed: ${currentLocation.speed} km/h<br/>` : ''}
-                ${tracker?.battery != null ? `Battery: ${tracker.battery}%<br/>` : ''}
+                Battery: ${battery.label}${battery.detail ? ` (${battery.detail})` : ''}<br/>
+                ${safety ? `Safety: ${safety}<br/>` : ''}
                 ${currentLocation.accuracy != null ? `Accuracy: ${currentLocation.accuracy}m<br/>` : ''}
                 Last seen: ${formatRelativeTime(tracker?.last_seen_at)}`,
         }];
@@ -181,6 +251,9 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
     const hasTracker = tracker !== null;
     const isOnline = tracker?.status === 'online';
     const commandLabel = commandStatusLabel(tracker?.last_command_status);
+    const batteryState = getBatteryState(tracker);
+    const BatteryIcon = batteryState.icon;
+    const safetyLabel = safetyEventLabel(tracker?.last_safety_event);
     const locateNowUrl = tracker?.locate_now_url ?? `/operations/clients/${clientId}/location/locate-now`;
     const handleLocateNow = useCallback(() => {
         router.post(locateNowUrl, {}, { preserveScroll: true });
@@ -252,6 +325,15 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                                             {commandLabel}
                                         </Badge>
                                     )}
+                                    {safetyLabel && (
+                                        <Badge
+                                            variant="outline"
+                                            className="gap-1 border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
+                                        >
+                                            <ShieldAlert className="h-3 w-3" />
+                                            {safetyLabel}
+                                        </Badge>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -276,22 +358,19 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                     {/* Battery */}
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                                (tracker.battery ?? 100) < 20
-                                    ? 'bg-status-critical-bg'
-                                    : 'bg-status-success-bg'
-                            }`}>
-                                {(tracker.battery ?? 100) < 20 ? (
-                                    <BatteryLow className="h-5 w-5 text-status-critical dark:text-status-critical" />
-                                ) : (
-                                    <Battery className="h-5 w-5 text-status-success dark:text-status-success" />
-                                )}
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${batteryState.bgClass}`}>
+                                <BatteryIcon className={`h-5 w-5 ${batteryState.textClass}`} />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Battery</p>
-                                <p className="text-lg font-semibold">
-                                    {tracker.battery != null ? `${tracker.battery}%` : '---'}
+                                <p className={`text-sm font-semibold ${batteryState.textClass}`}>
+                                    {batteryState.label}
                                 </p>
+                                {batteryState.detail && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {batteryState.detail}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

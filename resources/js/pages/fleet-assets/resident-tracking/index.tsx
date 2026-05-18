@@ -52,6 +52,13 @@ type Resident = {
     lat: number | null;
     lng: number | null;
     battery: number | null;
+    battery_status?: 'low' | 'normal' | 'unknown' | string | null;
+    battery_voltage_mv?: number | null;
+    battery_low_threshold?: number | null;
+    charging_status?: string | null;
+    external_power?: boolean | null;
+    last_power_event?: string | null;
+    last_safety_event?: string | null;
     speed: number | null;
     geofence_status: 'in_zone' | 'outside_zone' | 'unknown';
     on_outing: boolean;
@@ -110,7 +117,8 @@ type Props = {
 function getStatusDotColor(resident: Resident): string {
     if (resident.on_outing) return 'bg-status-info';
     if (resident.geofence_status === 'outside_zone') return 'bg-status-critical';
-    if ((resident.battery ?? 100) < 20) return 'bg-status-warning';
+    if (getBatteryState(resident).tone === 'warning') return 'bg-status-warning';
+    if (getBatteryState(resident).tone === 'critical') return 'bg-status-critical';
     if (resident.status === 'online') return 'bg-status-success';
     if (resident.status === 'offline') return 'bg-status-critical';
     return 'bg-muted';
@@ -142,6 +150,71 @@ function getBatteryBarColor(battery: number | null): string {
     if (battery < 20) return 'bg-status-critical animate-pulse';
     if (battery <= 40) return 'bg-status-warning';
     return 'bg-primary';
+}
+
+function getBatteryState(resident: Resident) {
+    const threshold = resident.battery_low_threshold ?? 20;
+    const battery = resident.battery;
+    const isCharging =
+        resident.charging_status === 'charging' || resident.external_power === true;
+
+    if (isCharging) {
+        return {
+            label: 'Charging',
+            detail: battery != null ? `${battery}%` : undefined,
+            icon: Battery,
+            tone: 'success' as const,
+            textClass: 'text-status-success',
+            barClass: 'bg-status-success',
+            barWidth: battery ?? 100,
+        };
+    }
+
+    if (battery == null) {
+        return {
+            label: 'Battery not reported',
+            detail: undefined,
+            icon: BatteryWarning,
+            tone: 'warning' as const,
+            textClass: 'text-status-warning',
+            barClass: 'bg-status-warning',
+            barWidth: 100,
+        };
+    }
+
+    if (resident.battery_status === 'low' || battery <= threshold) {
+        return {
+            label: 'Low battery',
+            detail: `${battery}%`,
+            icon: BatteryLow,
+            tone: 'critical' as const,
+            textClass: 'text-status-critical',
+            barClass: 'bg-status-critical animate-pulse',
+            barWidth: battery,
+        };
+    }
+
+    return {
+        label: `${battery}%`,
+        detail: undefined,
+        icon: Battery,
+        tone: 'normal' as const,
+        textClass: 'text-muted-foreground',
+        barClass: getBatteryBarColor(battery),
+        barWidth: battery,
+    };
+}
+
+function safetyEventLabel(event?: string | null): string | null {
+    switch (event) {
+        case 'vehicle_sos':
+        case 'sos':
+            return 'SOS received';
+        case 'man_down':
+            return 'Man down alert';
+        default:
+            return null;
+    }
 }
 
 function formatAlertType(alertType: string): string {
@@ -235,15 +308,20 @@ export default function ResidentTrackingIndex({
     const mapMarkers: MapMarker[] = useMemo(() => {
         return safeResidents
             .filter((r) => r.lat != null && r.lng != null)
-            .map((r) => ({
-                id: r.client_id,
-                lat: r.lat!,
-                lng: r.lng!,
-                title: r.preferred_name ?? r.name,
-                type: 'default' as const,
-                status: getMarkerStatus(r),
-                popup: `${r.name}<br/>${r.house}<br/>Zone: ${getZoneBadge(r).text}<br/>Last seen: ${formatRelativeTime(r.last_seen_at)}`,
-            }));
+            .map((r) => {
+                const battery = getBatteryState(r);
+                const safety = safetyEventLabel(r.last_safety_event);
+
+                return {
+                    id: r.client_id,
+                    lat: r.lat!,
+                    lng: r.lng!,
+                    title: r.preferred_name ?? r.name,
+                    type: 'default' as const,
+                    status: getMarkerStatus(r),
+                    popup: `${r.name}<br/>${r.house}<br/>Zone: ${getZoneBadge(r).text}<br/>Battery: ${battery.label}${battery.detail ? ` (${battery.detail})` : ''}${safety ? `<br/>Safety: ${safety}` : ''}<br/>Last seen: ${formatRelativeTime(r.last_seen_at)}`,
+                };
+            });
     }, [safeResidents]);
 
     // Map geofences
@@ -441,8 +519,10 @@ export default function ResidentTrackingIndex({
                                     ) : (
                                         filteredResidents.map((resident) => {
                                             const zone = getZoneBadge(resident);
-                                            const batteryColor = getBatteryBarColor(resident.battery);
+                                            const battery = getBatteryState(resident);
+                                            const BatteryIcon = battery.icon;
                                             const commandLabel = commandStatusLabel(resident.last_command_status);
+                                            const safety = safetyEventLabel(resident.last_safety_event);
 
                                             return (
                                                 <div
@@ -480,6 +560,17 @@ export default function ResidentTrackingIndex({
                                                             <div className="text-xs text-muted-foreground">
                                                                 {resident.house} &middot; {formatRelativeTime(resident.last_seen_at)}
                                                             </div>
+                                                            {safety && (
+                                                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="gap-1 border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
+                                                                    >
+                                                                        <ShieldAlert className="h-3 w-3" />
+                                                                        {safety}
+                                                                    </Badge>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </Link>
                                                     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -502,13 +593,19 @@ export default function ResidentTrackingIndex({
                                                         </div>
                                                         {/* Battery bar */}
                                                         <div className="flex flex-col items-end gap-0.5">
-                                                            <span className="text-[10px] tabular-nums">
-                                                                {resident.battery != null ? `${resident.battery}%` : '--'}
+                                                            <span className={`flex max-w-32 items-center gap-1 truncate text-[10px] tabular-nums ${battery.textClass}`}>
+                                                                <BatteryIcon className="h-3 w-3 shrink-0" />
+                                                                <span className="truncate">{battery.label}</span>
+                                                                {battery.detail && (
+                                                                    <span className="shrink-0 text-muted-foreground">
+                                                                        {battery.detail}
+                                                                    </span>
+                                                                )}
                                                             </span>
                                                             <div className="h-1.5 w-10 overflow-hidden rounded-full bg-muted">
                                                                 <div
-                                                                    className={`h-full rounded-full ${batteryColor}`}
-                                                                    style={{ width: `${resident.battery ?? 0}%` }}
+                                                                    className={`h-full rounded-full ${battery.barClass}`}
+                                                                    style={{ width: `${battery.barWidth}%` }}
                                                                 />
                                                             </div>
                                                         </div>

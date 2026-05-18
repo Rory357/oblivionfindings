@@ -42,6 +42,12 @@ it('queues Locate Now from the client location tab and shows command state', asy
                     status: 'online',
                     last_seen_at: '2026-05-18T04:00:00Z',
                     battery: 84,
+                    battery_status: 'normal',
+                    battery_low_threshold: 20,
+                    charging_status: 'charging',
+                    external_power: true,
+                    last_power_event: 'power_on',
+                    last_safety_event: 'vehicle_sos',
                     locate_now_url: '/operations/clients/9012/location/locate-now',
                     last_command_status: 'acked',
                 },
@@ -63,6 +69,8 @@ it('queues Locate Now from the client location tab and shows command state', asy
     );
 
     expect(screen.getAllByText('Acknowledged')[0]).toBeVisible();
+    expect(screen.getByText('Charging')).toBeVisible();
+    expect(screen.getByText('SOS received')).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
 

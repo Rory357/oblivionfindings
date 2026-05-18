@@ -1652,6 +1652,11 @@ class ClientController extends Controller
             $meta = $device->meta ?? [];
             $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
+            $battery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
+            $batteryThreshold = (int) ($meta['battery_low_threshold'] ?? 20);
+            $batteryStatus = $meta['battery_status'] ?? (
+                $battery === null ? 'unknown' : ((float) $battery <= $batteryThreshold ? 'low' : 'normal')
+            );
 
             $trackerInfo = [
                 'id' => $device->id,
@@ -1663,7 +1668,14 @@ class ClientController extends Controller
                 'status' => $device->status?->value ?? 'unknown',
                 'health_status' => $device->health_status?->value ?? 'unknown',
                 'last_seen_at' => $device->last_seen_at?->toISOString(),
-                'battery' => $device->battery_level,
+                'battery' => $battery,
+                'battery_status' => $batteryStatus,
+                'battery_voltage_mv' => $meta['battery_voltage_mv'] ?? null,
+                'battery_low_threshold' => $batteryThreshold,
+                'charging_status' => $meta['charging_status'] ?? null,
+                'external_power' => $this->isTruthy($meta['external_power'] ?? false),
+                'last_power_event' => $meta['power_event'] ?? null,
+                'last_safety_event' => $meta['last_safety_event'] ?? null,
                 'locate_now_url' => route('operations.clients.location.locate-now', ['client' => $client->id], false),
                 'last_command_status' => QueclinkPendingCommand::query()
                     ->where('command_word', 'GTRTO')
@@ -1803,6 +1815,15 @@ class ClientController extends Controller
         $locateNow->queueForDevice($device, $request->user());
 
         return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        return $value === true
+            || $value === 1
+            || $value === '1'
+            || $value === 'true'
+            || $value === 'yes';
     }
 
 }
