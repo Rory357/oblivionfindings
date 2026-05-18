@@ -38,6 +38,7 @@ class QueclinkInstall extends Command
     protected $description = 'Install/refresh the Queclink TCP listener as a systemd service';
 
     private const UNIT_FILE = '/etc/systemd/system/oblivion-queclink.service';
+
     private const SERVICE_NAME = 'oblivion-queclink.service';
 
     public function handle(): int
@@ -48,6 +49,7 @@ class QueclinkInstall extends Command
 
         if ($port < 1024 || $port > 65535) {
             $this->error("Port {$port} is invalid (must be 1024-65535).");
+
             return self::FAILURE;
         }
 
@@ -55,6 +57,7 @@ class QueclinkInstall extends Command
             $this->warn('queclink:install is a no-op on non-Linux platforms.');
             $this->line('On this machine, run the listener manually:');
             $this->line("  php artisan queclink:listen --port={$port}");
+
             return self::SUCCESS;
         }
 
@@ -62,6 +65,7 @@ class QueclinkInstall extends Command
             $this->warn('systemd not detected on this host.');
             $this->line('Run the listener under your own supervisor (Supervisor, runit, etc.):');
             $this->line("  php artisan queclink:listen --port={$port}");
+
             return self::SUCCESS;
         }
 
@@ -79,9 +83,10 @@ class QueclinkInstall extends Command
         $changed = trim($existing) !== trim($unit);
 
         if ($changed) {
-            $this->line("Writing " . self::UNIT_FILE);
+            $this->line('Writing '.self::UNIT_FILE);
             if (@file_put_contents(self::UNIT_FILE, $unit) === false) {
                 $this->error('Could not write unit file. Re-run with sudo.');
+
                 return self::FAILURE;
             }
             $this->exec('systemctl daemon-reload');
@@ -89,32 +94,34 @@ class QueclinkInstall extends Command
             $this->line('Unit file unchanged.');
         }
 
-        $this->exec('systemctl enable ' . escapeshellarg(self::SERVICE_NAME));
-        $action = $changed ? 'restart' : 'start';
-        $this->exec("systemctl {$action} " . escapeshellarg(self::SERVICE_NAME));
+        $this->exec('systemctl enable '.escapeshellarg(self::SERVICE_NAME));
+        // The listener is a long-running PHP process, so code-only deploys need
+        // a restart even when the unit file itself did not change.
+        $this->exec('systemctl restart '.escapeshellarg(self::SERVICE_NAME));
 
         if (! $this->option('no-firewall')) {
             $this->openFirewallPort($port);
         }
 
         $this->info("Queclink listener installed on TCP port {$port}.");
-        $this->line("Status:   systemctl status oblivion-queclink");
-        $this->line("Logs:     journalctl -u oblivion-queclink -f");
+        $this->line('Status:   systemctl status oblivion-queclink');
+        $this->line('Logs:     journalctl -u oblivion-queclink -f');
 
         Log::info('queclink:install completed', ['port' => $port, 'changed_unit' => $changed]);
+
         return self::SUCCESS;
     }
 
     protected function reportStatus(): int
     {
         $unitExists = is_readable(self::UNIT_FILE);
-        $this->line("Unit file:     " . (self::UNIT_FILE) . ' — ' . ($unitExists ? 'present' : 'missing'));
+        $this->line('Unit file:     '.(self::UNIT_FILE).' — '.($unitExists ? 'present' : 'missing'));
 
         if ($unitExists) {
             $output = [];
             $code = 0;
-            exec('systemctl is-active ' . escapeshellarg(self::SERVICE_NAME) . ' 2>&1', $output, $code);
-            $this->line('Service state: ' . trim(implode("\n", $output)));
+            exec('systemctl is-active '.escapeshellarg(self::SERVICE_NAME).' 2>&1', $output, $code);
+            $this->line('Service state: '.trim(implode("\n", $output)));
         }
 
         return self::SUCCESS;
@@ -122,7 +129,8 @@ class QueclinkInstall extends Command
 
     protected function renderUnit(string $phpBinary, string $projectRoot, int $port, string $user): string
     {
-        $artisan = $projectRoot . '/artisan';
+        $artisan = $projectRoot.'/artisan';
+
         return <<<UNIT
 [Unit]
 Description=Oblivion Findings — Queclink @Track TCP listener
@@ -157,6 +165,7 @@ UNIT;
         $ufwPath = trim((string) shell_exec('command -v ufw 2>/dev/null'));
         if ($ufwPath === '') {
             $this->line('UFW not detected — skipping firewall step.');
+
             return;
         }
         $this->exec("ufw allow {$port}/tcp comment 'Oblivion Queclink listener'");
@@ -172,9 +181,9 @@ UNIT;
     {
         $output = [];
         $code = 0;
-        exec($command . ' 2>&1', $output, $code);
+        exec($command.' 2>&1', $output, $code);
         foreach ($output as $line) {
-            $this->line("  > " . $line);
+            $this->line('  > '.$line);
         }
         if ($code !== 0) {
             $this->warn("  ! exit code {$code}");
