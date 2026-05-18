@@ -118,11 +118,40 @@ class FleetTelemetryIngestService
             $tracker->update(['last_seen_at' => now()]);
 
             if ($device) {
-                $device->forceFill([
+                $deviceUpdates = [
                     'last_seen_at' => now(),
                     'battery_level' => $normalized['battery_pct'] ?? $device->battery_level,
                     'battery_updated_at' => $normalized['battery_pct'] !== null ? now() : $device->battery_updated_at,
-                ])->save();
+                ];
+
+                $meta = $device->meta ?? [];
+                if ($normalized['battery_pct'] !== null) {
+                    $meta['battery'] = $normalized['battery_pct'];
+                    $meta['battery_level'] = $normalized['battery_pct'];
+                }
+
+                if (!$consentBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
+                    $deviceUpdates['latitude'] = $normalized['latitude'];
+                    $deviceUpdates['longitude'] = $normalized['longitude'];
+                    $deviceUpdates['last_signal_at'] = $occurredAt ?? now();
+
+                    $meta['lat'] = $normalized['latitude'];
+                    $meta['latitude'] = $normalized['latitude'];
+                    $meta['lng'] = $normalized['longitude'];
+                    $meta['longitude'] = $normalized['longitude'];
+                    $meta['speed'] = $normalized['speed_kph'];
+                    $meta['heading'] = $normalized['heading_deg'];
+                    $meta['accuracy'] = $normalized['accuracy_m'];
+                    $meta['altitude'] = $normalized['altitude_m'];
+                    $meta['motion'] = $normalized['motion_status'];
+                    $meta['last_location_at'] = $occurredAt instanceof Carbon
+                        ? $occurredAt->toISOString()
+                        : now()->toISOString();
+                }
+
+                $deviceUpdates['meta'] = $meta;
+
+                $device->forceFill($deviceUpdates)->save();
             }
 
             $state = FleetVehicleStateSnapshot::query()

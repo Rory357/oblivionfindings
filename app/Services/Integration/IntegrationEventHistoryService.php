@@ -3,6 +3,7 @@
 namespace App\Services\Integration;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Models\FleetTelemetryEvent;
 use App\Models\Integration\IntegrationEvent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -12,7 +13,22 @@ class IntegrationEventHistoryService
 {
     public function forDevice(?Device $device, array $filters = [], bool $includeEventType = false): Collection
     {
-        if (!$device || !Schema::hasTable('integration_events')) {
+        if (!$device) {
+            return collect();
+        }
+
+        $locations = $this->integrationEventLocations($device, $filters, $includeEventType)
+            ->merge($this->fleetTelemetryLocations($device, $filters, $includeEventType));
+
+        return $locations
+            ->sortByDesc(fn (array $location) => $location['timestamp'] ?? '')
+            ->take(500)
+            ->values();
+    }
+
+    private function integrationEventLocations(Device $device, array $filters, bool $includeEventType): Collection
+    {
+        if (!Schema::hasTable('integration_events')) {
             return collect();
         }
 
@@ -57,8 +73,49 @@ class IntegrationEventHistoryService
         return $query->orderByDesc('created_at')
             ->limit(500)
             ->get()
+            ->toBase()
             ->map(fn (IntegrationEvent $event) => $this->mapLocationEvent($event, $includeEventType))
             ->filter()
+            ->values();
+    }
+
+    private function fleetTelemetryLocations(Device $device, array $filters, bool $includeEventType): Collection
+    {
+        if (!Schema::hasTable('fleet_telemetry_events')) {
+            return collect();
+        }
+
+        $legacyTrackerId = $device->legacy_asset_tracker_id;
+
+        $query = FleetTelemetryEvent::query()
+            ->where('consent_blocked', false)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where(function (Builder $query) use ($device, $legacyTrackerId): void {
+                $query->where('device_id', $device->id);
+
+                if ($legacyTrackerId) {
+                    $query->orWhere(function (Builder $fallback) use ($legacyTrackerId): void {
+                        $fallback->whereNull('device_id')
+                            ->where('asset_tracker_id', $legacyTrackerId);
+                    });
+                }
+            });
+
+        if (!empty($filters['date_from'])) {
+            $query->where('occurred_at', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->where('occurred_at', '<=', $filters['date_to'].' 23:59:59');
+        }
+
+        return $query->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get()
+            ->toBase()
+            ->map(fn (FleetTelemetryEvent $event) => $this->mapFleetTelemetryEvent($event, $includeEventType))
             ->values();
     }
 
@@ -89,6 +146,25 @@ class IntegrationEventHistoryService
             'timestamp' => $event->created_at?->toISOString() ?? $event->created_at,
             'speed' => $payload['speed'] ?? $payload['speed_kph'] ?? null,
             'battery' => $payload['battery'] ?? $payload['battery_level'] ?? $payload['battery_pct'] ?? null,
+        ];
+
+        if ($includeEventType) {
+            $location['event_type'] = $event->event_type;
+        }
+
+        return $location;
+    }
+
+    private function mapFleetTelemetryEvent(FleetTelemetryEvent $event, bool $includeEventType): array
+    {
+        $location = [
+            'lat' => (float) $event->latitude,
+            'lng' => (float) $event->longitude,
+            'timestamp' => $event->occurred_at?->toISOString()
+                ?? $event->created_at?->toISOString()
+                ?? $event->created_at,
+            'speed' => $event->speed_kph !== null ? (float) $event->speed_kph : null,
+            'battery' => $event->battery_pct,
         ];
 
         if ($includeEventType) {

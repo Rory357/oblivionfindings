@@ -4,10 +4,13 @@ namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Asset;
+use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\FleetTelemetryEvent;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -256,6 +259,68 @@ class ResidentTrackingRefactorTest extends TestCase
         $response->assertOk();
         $response->assertInertia(function ($page) {
             $this->assertNull($page->toArray()['props']['tracker']);
+        });
+    }
+
+    public function test_history_includes_fleet_telemetry_for_canonical_tracker(): void
+    {
+        $asset = Asset::create([
+            'client_id' => $this->clientA->id,
+            'name' => 'Amelia pendant',
+            'status' => 'active',
+            'risk_level' => 'medium',
+            'category' => 'personal_tracker',
+        ]);
+        $tracker = AssetTracker::create([
+            'asset_id' => $asset->id,
+            'vendor' => 'queclink',
+            'device_uid' => 'QUE-AMELIA',
+            'imei' => 'QUE-AMELIA',
+            'status' => 'paired',
+            'paired_at' => now(),
+        ]);
+        $device = Device::factory()->tracking()->create([
+            'name' => 'Amelia tracker',
+            'provider' => 'queclink',
+            'imei' => 'QUE-AMELIA',
+            'device_uid' => 'QUE-AMELIA',
+            'legacy_asset_tracker_id' => $tracker->id,
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'client',
+            'assignable_id' => $this->clientA->id,
+            'assigned_at' => now(),
+        ]);
+        FleetTelemetryEvent::create([
+            'asset_id' => $asset->id,
+            'asset_tracker_id' => $tracker->id,
+            'device_id' => $device->id,
+            'vendor' => 'queclink',
+            'occurred_at' => now()->subMinute(),
+            'received_at' => now(),
+            'latitude' => -36.8485,
+            'longitude' => 174.7633,
+            'speed_kph' => 7.5,
+            'battery_pct' => 88,
+            'event_type' => 'location_report',
+            'idempotency_key' => 'history-queclink-amalia',
+            'raw_payload' => ['lat' => -36.8485, 'lng' => 174.7633],
+            'consent_blocked' => false,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get("/fleet-assets/resident-tracking/history/{$this->clientA->id}");
+
+        $response->assertOk();
+        $response->assertInertia(function ($page) {
+            $locations = $page->toArray()['props']['locations'];
+            $this->assertCount(1, $locations);
+            $this->assertEqualsWithDelta(-36.8485, $locations[0]['lat'], 0.0001);
+            $this->assertEqualsWithDelta(174.7633, $locations[0]['lng'], 0.0001);
+            $this->assertEquals(7.5, $locations[0]['speed']);
+            $this->assertEquals(88, $locations[0]['battery']);
+            $this->assertEquals('location_report', $locations[0]['event_type']);
         });
     }
 

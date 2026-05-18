@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\AssetTracker;
@@ -345,5 +346,87 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertFalse((bool) $event->consent_blocked);
         $this->assertEqualsWithDelta(-41.4, (float) $event->latitude, 0.0001);
         $this->assertEqualsWithDelta(174.4, (float) $event->longitude, 0.0001);
+    }
+
+    public function test_consented_client_tracker_updates_canonical_device_location(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+
+        $site = Site::create(['name' => 'Test Site']);
+        $client = Client::create(['first_name' => 'Amelia', 'last_name' => 'Wilson']);
+        $consentType = ConsentType::create([
+            'name' => 'Fleet Tracking',
+            'category' => 'essential',
+            'description' => 'Tracking consent',
+            'purpose' => 'Fleet tracking',
+            'legal_basis' => 'GDPR Art 6',
+            'version' => 1,
+            'active' => true,
+        ]);
+        $consentVersion = ConsentTypeVersion::create([
+            'consent_type_id' => $consentType->id,
+            'version' => 1,
+            'description' => 'Fleet tracking v1',
+            'purpose' => 'Fleet tracking',
+            'legal_basis' => 'GDPR Art 6',
+            'effective_from' => now()->subDay(),
+        ]);
+        $consent = ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => $consentType->id,
+            'consent_type_version_id' => $consentVersion->id,
+            'status' => 'given',
+            'given_at' => now()->subDay(),
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        $asset = Asset::create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+            'name' => 'Amelia pendant',
+            'status' => 'active',
+            'risk_level' => 'medium',
+            'category' => 'personal_tracker',
+        ]);
+        $tracker = AssetTracker::create([
+            'asset_id' => $asset->id,
+            'vendor' => 'queclink',
+            'device_uid' => 'QUE-AMELIA',
+            'imei' => 'QUE-AMELIA',
+            'status' => 'paired',
+            'paired_at' => now(),
+            'consent_id' => $consent->id,
+        ]);
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => 'QUE-AMELIA',
+            'device_uid' => 'QUE-AMELIA',
+            'legacy_asset_tracker_id' => $tracker->id,
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'client',
+            'assignable_id' => $client->id,
+            'assigned_at' => now(),
+            'consent_id' => $consent->id,
+        ]);
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-AMELIA',
+                'gps_time' => now()->toISOString(),
+                'lat' => -36.8485,
+                'lng' => 174.7633,
+                'speed' => 7.5,
+                'course' => 180,
+            ])
+            ->assertStatus(200);
+
+        $device->refresh();
+
+        $this->assertEqualsWithDelta(-36.8485, (float) $device->latitude, 0.0001);
+        $this->assertEqualsWithDelta(174.7633, (float) $device->longitude, 0.0001);
+        $this->assertEquals(7.5, $device->meta['speed']);
+        $this->assertEquals(180, $device->meta['heading']);
     }
 }
