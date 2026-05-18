@@ -17,7 +17,7 @@ use InvalidArgumentException;
  *
  * Default passwords (factory defaults — operators can change via AT+GTBSI):
  *   - GV500CG family: "gv500cg" (note: full model code, not just "gv500")
- *   - GL30M family:   "gl30m"
+ *   - GL30M family:   "gl30"
  */
 class CommandBuilder
 {
@@ -149,7 +149,7 @@ class CommandBuilder
     {
         return match (strtolower($family)) {
             self::FAMILY_GV500CG => 'gv500cg',
-            self::FAMILY_GL30M => 'gl30m',
+            self::FAMILY_GL30M => 'gl30',
             default => 'gv500cg',
         };
     }

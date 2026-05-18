@@ -399,26 +399,32 @@ class QueclinkHubController extends Controller
         $hostname = (string) (AppSetting::query()->where('key', 'queclink.public_hostname')->value('value') ?? '');
         $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value') ?? 8090);
         $family = strtolower($request->string('family', 'gv500cg')->toString());
-        $password = $family === 'gl30m' ? 'gl30m' : 'gv500cg';
 
         if ($hostname === '') {
             return response()->json(['error' => 'Set the public hostname under Listener settings first.'], 422);
         }
 
-        // AT+GTSRI fields (per @Track v5.01 §3.1.2):
-        //   password, ReportMode=3 (TCP long-conn), Reserved, BufferMode=1,
-        //   MainDomain, MainPort, BackupDomain, BackupPort, SmsGateway,
-        //   HeartbeatInterval (MINUTES; valid 0 or 2-360), SackMode=1 (require SACK),
-        //   ProtocolFormat=0 (ASCII), SmsAckMode=0, HighPriorityReportMask=0,
-        //   ConnectionLife=30s, PrimaryDNS, SecondaryDNS, SerialNumber=FFFF
-        $line = sprintf(
-            'AT+GTSRI=%s,3,,1,%s,%d,%s,%d,,5,1,0,0,0,30,0.0.0.0,0.0.0.0,FFFF$',
-            $password,
-            $hostname,
-            $port,
-            $hostname,
-            $port,
-        );
+        if ($family === CommandBuilder::FAMILY_GL30M) {
+            // GL30MEUR01 @Track v2.04: ReportMode, ManualNetreg, BufferMode,
+            // Main/Backup domains, heartbeat, SACK, SMS ACK, PSM hold, ASCII.
+            $line = sprintf(
+                'AT+GTSRI=gl30,3,0,1,%s,%d,%s,%d,,5,1,0,30,0,0,FFFF$',
+                $hostname,
+                $port,
+                $hostname,
+                $port,
+            );
+        } else {
+            // GV500CG @Track v5.01: ReportMode, Reserved, BufferMode,
+            // Main/Backup domains, heartbeat, SACK, protocol, DNS, serial.
+            $line = sprintf(
+                'AT+GTSRI=gv500cg,3,,1,%s,%d,%s,%d,,5,1,0,0,0,30,0.0.0.0,0.0.0.0,FFFF$',
+                $hostname,
+                $port,
+                $hostname,
+                $port,
+            );
+        }
 
         return response()->json([
             'config_string' => $line,

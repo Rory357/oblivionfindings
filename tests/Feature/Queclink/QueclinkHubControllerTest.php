@@ -228,6 +228,21 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertNotEmpty($data['instructions']);
     }
 
+    public function test_gl30m_provisioning_string_uses_gl30meu_server_registration_shape()
+    {
+        AppSetting::create(['key' => 'queclink.public_hostname', 'value' => 'tracking.example.co.nz']);
+        AppSetting::create(['key' => 'queclink.listener.port', 'value' => 8091]);
+
+        $response = $this->actingAs($this->admin)
+            ->getJson('/security-devices/integrations/queclink/provisioning?family=gl30m');
+
+        $response->assertOk()
+            ->assertJsonPath(
+                'config_string',
+                'AT+GTSRI=gl30,3,0,1,tracking.example.co.nz,8091,tracking.example.co.nz,8091,,5,1,0,30,0,0,FFFF$',
+            );
+    }
+
     public function test_unauthorised_user_cannot_reach_hub()
     {
         $u = User::factory()->create();  // no permissions
