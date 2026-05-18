@@ -172,6 +172,9 @@ NOMINATIM_IMPORT_STYLE=${NOMINATIM_IMPORT_STYLE}
 EOF
 run_root install -m 0644 -o nominatim -g nominatim /tmp/oblivion-nominatim-project.env "${NOMINATIM_PROJECT_DIR}/.env"
 rm -f /tmp/oblivion-nominatim-project.env
+run_root chmod a+rx "$BASE_DIR" "$VENV_DIR" "$NOMINATIM_PROJECT_DIR"
+run_root chmod -R a+rX "$VENV_DIR"
+run_root chmod a+r "${NOMINATIM_PROJECT_DIR}/.env"
 
 if is_imported; then
     echo "Nominatim import skipped: imported project marker already exists."
@@ -223,8 +226,8 @@ Requires=${SERVICE_NAME}.socket
 
 [Service]
 Type=simple
-User=nominatim
-Group=nominatim
+User=www-data
+Group=www-data
 WorkingDirectory=${NOMINATIM_PROJECT_DIR}
 ExecStart=${VENV_DIR}/bin/gunicorn -b unix:${SOCKET_PATH} -w 4 --worker-class asgi --protocol uwsgi --worker-connections 1000 "nominatim_api.server.falcon.server:run_wsgi()"
 ExecReload=/bin/kill -s HUP \$MAINPID
