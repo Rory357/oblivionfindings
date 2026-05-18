@@ -107,6 +107,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/clients/{client}/location/history', [ClientController::class, 'locationHistory'])
             ->whereNumber('client')
             ->name('operations.clients.location.history');
+        Route::post('/clients/{client}/location/locate-now', [ClientController::class, 'locateNow'])
+            ->whereNumber('client')
+            ->name('operations.clients.location.locate-now');
 
         // Documents
         Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])

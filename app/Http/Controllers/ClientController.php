@@ -48,10 +48,12 @@ use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetIncident;
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Services\HealthSafety\HsModuleSummaryService;
+use App\Services\Queclink\LocateNowService;
 use App\Services\ShiftCoverageService;
 use App\Support\ClientSafetyPayload;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class ClientController extends Controller
 {
@@ -1773,6 +1775,27 @@ class ClientController extends Controller
             ->forDevice($device, $request->only(['date_from', 'date_to']));
 
         return response()->json(['locations' => $locations]);
+    }
+
+    public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
+    {
+        $this->authorize('view', $client);
+
+        $tenantId = $client->tenant_id ?? 1;
+        $device = app(DeviceRegistryService::class)
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
+            ->first();
+
+        if (! $device) {
+            throw ValidationException::withMessages([
+                'tracker' => 'This client does not have a paired Queclink tracker.',
+            ]);
+        }
+
+        $locateNow->queueForDevice($device, $request->user());
+
+        return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
     }
 
 }

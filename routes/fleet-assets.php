@@ -199,6 +199,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/resident-tracking', [ResidentTrackingController::class, 'index'])->name('fleet-assets.resident-tracking.index');
         Route::get('/resident-tracking/assign', [ResidentTrackingController::class, 'assignPage'])->name('fleet-assets.resident-tracking.assign');
         Route::get('/resident-tracking/history/{client}', [ResidentTrackingController::class, 'history'])->whereNumber('client')->name('fleet-assets.resident-tracking.history');
+        Route::post('/resident-tracking/{client}/locate-now', [ResidentTrackingController::class, 'locateNow'])->whereNumber('client')->name('fleet-assets.resident-tracking.locate-now');
     });
 
     // Resident Tracking — write (assign/unassign use canonical Device model)

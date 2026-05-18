@@ -11,9 +11,11 @@ use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
+use App\Services\Queclink\LocateNowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ResidentTrackingController extends Controller
@@ -382,9 +384,36 @@ class ResidentTrackingController extends Controller
         ]);
     }
 
+    public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
+    {
+        $authorizedClientIds = $this->getAuthorizedClientIds($request->user());
+        abort_unless($authorizedClientIds === null || in_array($client->id, $authorizedClientIds, true), 403);
+
+        $tenantId = $client->tenant_id ?? 1;
+        $device = $this->registry
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
+            ->first();
+
+        if (! $device) {
+            throw ValidationException::withMessages([
+                'tracker' => 'This resident does not have a paired Queclink tracker.',
+            ]);
+        }
+
+        $locateNow->queueForDevice($device, $request->user());
+
+        return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
+    }
+
     private function getAuthorizedClientIds($user): ?array
     {
-        if (in_array($user->role, ['admin', 'super-admin', 'manager'])) {
+        if (
+            in_array($user->role, ['admin', 'super-admin', 'manager'], true)
+            || $user->canDo('clients.viewAny')
+            || $user->canDo('fleet.viewAny')
+            || $user->canDo('assets.viewAny')
+        ) {
             return null;
         }
 
