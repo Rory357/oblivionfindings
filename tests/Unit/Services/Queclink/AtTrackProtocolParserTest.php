@@ -119,7 +119,38 @@ it('flags GTBPL as a battery_low event with the battery percentage in field 4', 
     $frame = $this->parser->parse('+RESP:GTBPL,970204,861106050000000,GL30MEU,15,00,1,1,0.0,0,0.0,0.0,0.0,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0463$');
 
     expect($frame->payload['alarm'])->toBe('battery_low')
+        ->and($frame->payload['event_type'])->toBe('battery_low')
         ->and($frame->payload['battery'])->toBe(15.0);
+});
+
+it('normalizes GL30 low battery with percentage and location', function () {
+    $frame = $this->parser->parse('+RESP:GTBPL,970204,861106050000000,GL30MEU,15,00,1,1,0.0,0,0.0,175.241655,-37.723657,20260518050806,0530,0001,0017E102,01,15,0.0,20260518050810,0463$');
+
+    expect($frame->payload['event_type'])->toBe('battery_low')
+        ->and($frame->payload['battery'])->toBe(15.0)
+        ->and($frame->payload['alarm'])->toBe('battery_low')
+        ->and($frame->payload['lon'])->toBe(175.241655)
+        ->and($frame->payload['lat'])->toBe(-37.723657);
+});
+
+it('normalizes GL30 SOS and man down as critical safety events', function () {
+    $sos = $this->parser->parse('+RESP:GTSOS,970204,861106050000000,GL30MEU,,00,1,1,0.0,0,0.0,175.241655,-37.723657,20260518050806,0530,0001,0017E102,01,15,0.0,20260518050810,0464$');
+    $manDown = $this->parser->parse('+RESP:GTMAN,970204,861106050000000,GL30MEU,,00,1,1,0.0,0,0.0,175.241655,-37.723657,20260518050806,0530,0001,0017E102,01,15,0.0,20260518050810,0465$');
+
+    expect($sos->payload['sos_flag'])->toBeTrue()
+        ->and($sos->payload['event_type'])->toBe('vehicle_sos')
+        ->and($manDown->payload['sos_flag'])->toBeTrue()
+        ->and($manDown->payload['event_type'])->toBe('man_down');
+});
+
+it('normalizes GL30 power events for device health metadata', function () {
+    $powerOn = $this->parser->parse('+RESP:GTPNA,970204,861106050000000,GL30MEU,,00,1,1,0.0,0,0.0,175.241655,-37.723657,20260518050806,0530,0001,0017E102,01,15,0.0,20260518050810,0466$');
+    $powerOff = $this->parser->parse('+RESP:GTPFA,970204,861106050000000,GL30MEU,,00,1,1,0.0,0,0.0,175.241655,-37.723657,20260518050806,0530,0001,0017E102,01,15,0.0,20260518050810,0467$');
+
+    expect($powerOn->payload['power_event'])->toBe('power_on')
+        ->and($powerOn->payload['charging_status'])->toBeNull()
+        ->and($powerOff->payload['power_event'])->toBe('power_off')
+        ->and($powerOff->payload['charging_status'])->toBeNull();
 });
 
 // ─── Ignition events ─────────────────────────────────────────────────

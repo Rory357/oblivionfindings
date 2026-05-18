@@ -29,7 +29,8 @@ class QueclinkAdapter implements TelemetryAdapterInterface
         $alarm = strtolower((string) ($payload['alarm'] ?? $payload['event'] ?? ''));
         $eventType = $this->mapEventType($alarm, $payload);
 
-        $sosFlag = in_array($alarm, ['sos', 'panic', 'emergency'], true);
+        $sosFlag = (bool) ($payload['sos_flag'] ?? false)
+            || in_array($alarm, ['sos', 'panic', 'emergency'], true);
         $tamperFlag = in_array($alarm, ['tamper', 'power_cut', 'powercut', 'cut'], true);
 
         return [

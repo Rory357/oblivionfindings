@@ -165,6 +165,9 @@ class AtTrackProtocolParser
             'frame_type' => $frameType,
             'command_word' => $commandWord,
             'event_type' => $this->eventTypeFromCommand($commandWord),
+            'battery' => $this->numOrNull($fields[4] ?? null),
+            'power_event' => null,
+            'charging_status' => null,
         ];
 
         if ($frameType === 'ACK') {
@@ -219,6 +222,7 @@ class AtTrackProtocolParser
             case 'GTSOS':
                 $payload['alarm'] = 'sos';
                 $payload['event_type'] = 'vehicle_sos';
+                $payload['sos_flag'] = true;
                 break;
             case 'GTTOW':
                 $payload['alarm'] = 'tamper';
@@ -236,10 +240,12 @@ class AtTrackProtocolParser
             case 'GTPNA':
                 $payload['alarm'] = 'power_on';
                 $payload['event_type'] = 'power_on';
+                $payload['power_event'] = 'power_on';
                 break;
             case 'GTPFA':
                 $payload['alarm'] = 'power_off';
                 $payload['event_type'] = 'power_off';
+                $payload['power_event'] = 'power_off';
                 break;
             case 'GTVGN':
                 $payload['ignition'] = true;
