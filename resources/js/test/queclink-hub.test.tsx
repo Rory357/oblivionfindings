@@ -2,7 +2,10 @@ import { render, screen } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DebugConsoleTab } from '@/pages/security-devices/integrations/queclink-hub';
+import {
+    DebugConsoleTab,
+    DeviceSettingsTab,
+} from '@/pages/security-devices/integrations/queclink-hub';
 
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => (
@@ -116,5 +119,91 @@ describe('QueclinkHub debug console', () => {
                 headers: expect.objectContaining({ Accept: 'application/json' }),
             }),
         );
+    });
+});
+
+describe('QueclinkHub device settings', () => {
+    it('renders the latest config snapshot and safe GL30 controls', () => {
+        render(
+            <DeviceSettingsTab
+                can={{ manage: true }}
+                listener={{
+                    port: 8090,
+                    public_hostname: 'oblivionfindings.com',
+                    service_state: 'active',
+                    connected_count: 1,
+                }}
+                devices={[
+                    {
+                        id: 2,
+                        imei: '867963069916998',
+                        status: 'paired',
+                        model_hint: 'GL30MEU',
+                        protocol_version: '970204',
+                        firmware_version: null,
+                        connection_state: 'connected',
+                        first_seen_at: null,
+                        last_seen_at: '2026-05-18T02:07:01Z',
+                        last_frame_at: '2026-05-18T02:07:01Z',
+                        remote_address: null,
+                        assignment: {
+                            type: 'client',
+                            target_id: 9012,
+                            assigned_at: '2026-05-18T02:00:00Z',
+                            label: 'Amelia Wilson',
+                        },
+                        configuration: {
+                            available: true,
+                            received_at: '2026-05-18T03:15:00Z',
+                            raw: 'SRI,3,0,1,oblivionfindings.com,8090,oblivionfindings.com,8090,,5,1,0,30,0,,CFG,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0',
+                            sections: {},
+                            summary: {
+                                server: {
+                                    main_host: 'oblivionfindings.com',
+                                    main_port: '8090',
+                                    backup_host: 'oblivionfindings.com',
+                                    backup_port: '8090',
+                                    heartbeat_interval_minutes: '5',
+                                    sack_enable: '1',
+                                    psm_network_hold_time_seconds: '30',
+                                    report_mode: '3',
+                                    manual_netreg: '0',
+                                    buffer_mode: '1',
+                                    sms_ack_enable: '0',
+                                    protocol_format: '0',
+                                },
+                                global: {
+                                    device_name: 'GL30MEU',
+                                    gnss_timeout_seconds: '150',
+                                    event_mask: '08E3',
+                                    report_item_mask: '006F',
+                                    mode_selection: '1',
+                                    continuous_send_interval_seconds: '30',
+                                    start_mode: '0',
+                                    specified_time_of_day: '1200',
+                                    wakeup_interval_hours: '1',
+                                    gnss_enable: '1',
+                                    agps_mode: '1',
+                                    gsm_report: '0000',
+                                    battery_low_percentage: '10',
+                                    function_button_mode: '1',
+                                    sos_report_mode: '1',
+                                    wifi_report: '2',
+                                    led_on: '1',
+                                    charge_standby_mode: '0',
+                                },
+                            },
+                        },
+                        recent_commands: [],
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText('Device settings')).toBeVisible();
+        expect(screen.getByText(/Amelia Wilson/)).toBeVisible();
+        expect(screen.getAllByDisplayValue('oblivionfindings.com')[0]).toBeVisible();
+        expect(screen.getAllByDisplayValue('30')[0]).toBeVisible();
+        expect(screen.getByText('Read full config')).toBeVisible();
     });
 });

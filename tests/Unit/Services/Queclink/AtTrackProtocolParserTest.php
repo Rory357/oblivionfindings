@@ -80,6 +80,18 @@ it('extracts position fields from a GTFRI frame matching the PDF example', funct
         ->and($frame->payload['event_type'])->toBe('location_report');
 });
 
+it('extracts configuration text from a GTALM readback frame', function () {
+    $frame = $this->parser->parse('+RESP:GTALM,970204,861106050000000,GL30MEU,1,1,BSI,,,,,,,00,0,0,0,0,SRI,3,0,1,oblivionfindings.com,8090,oblivionfindings.com,8090,,5,1,0,30,0,,CFG,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,20260518031500,0A10$');
+
+    expect($frame->isValid())->toBeTrue()
+        ->and($frame->commandWord)->toBe('GTALM')
+        ->and($frame->payload['event_type'])->toBe('configuration_report')
+        ->and($frame->payload['config_total_packets'])->toBe(1)
+        ->and($frame->payload['config_current_packet'])->toBe(1)
+        ->and($frame->payload['config_text'])->toContain('SRI,3,0,1,oblivionfindings.com,8090')
+        ->and($frame->payload['send_time'])->toBe('2026-05-18T03:15:00Z');
+});
+
 // ─── SOS / panic / alarms ────────────────────────────────────────────
 
 it('flags GTSOS as a critical SOS event', function () {

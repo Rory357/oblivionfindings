@@ -64,6 +64,7 @@ class AtTrackProtocolParser
             if (str_starts_with($body, 'AT+GT')) {
                 return $this->parseAtCommand($raw, $body);
             }
+
             return $this->failed($raw, 'no colon delimiter found in frame body');
         }
 
@@ -93,6 +94,7 @@ class AtTrackProtocolParser
             // +SACK:GTHBD,<protocolVer>,<count>$  - rarely received inbound but supported.
             $proto = $fields[1] ?? null;
             $count = $fields[2] ?? null;
+
             return new AtTrackFrame(
                 rawFrame: $raw,
                 frameType: $frameType,
@@ -167,6 +169,10 @@ class AtTrackProtocolParser
 
         if ($frameType === 'ACK') {
             return $payload;
+        }
+
+        if ($commandWord === 'GTALM') {
+            return $this->normaliseConfigurationReport($payload, $fields);
         }
 
         // Generic Location Report layout — applies to GTFRI, GTTOW, GTSPD, GTSOS,
@@ -280,11 +286,38 @@ class AtTrackProtocolParser
         return $payload;
     }
 
+    /**
+     * +RESP:GTALM returns configuration text from AT+GTRTO READ. The middle
+     * payload is a comma-separated sequence of command sections, so keep it
+     * intact for the higher-level configuration parser.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $fields
+     * @return array<string, mixed>
+     */
+    protected function normaliseConfigurationReport(array $payload, array $fields): array
+    {
+        $payload['event_type'] = 'configuration_report';
+        $payload['config_total_packets'] = (int) ($fields[4] ?? 1);
+        $payload['config_current_packet'] = (int) ($fields[5] ?? 1);
+
+        $tailOffset = count($fields) >= 8 ? -2 : 0;
+        $configFields = $tailOffset < 0
+            ? array_slice($fields, 6, $tailOffset)
+            : array_slice($fields, 6);
+
+        $payload['config_text'] = implode(',', $configFields);
+        $payload['send_time'] = $this->parseTimestamp($fields[count($fields) - 2] ?? null);
+
+        return $payload;
+    }
+
     protected function eventTypeFromCommand(?string $cmd): ?string
     {
         if ($cmd === null) {
             return null;
         }
+
         return strtolower(str_replace('GT', '', $cmd));
     }
 
@@ -299,6 +332,7 @@ class AtTrackProtocolParser
         if ($value === null || $value === '') {
             return null;
         }
+
         return is_numeric($value) ? (float) $value : null;
     }
 
@@ -310,6 +344,7 @@ class AtTrackProtocolParser
         if (! ctype_digit($value)) {
             return null;
         }
+
         // YYYYMMDDHHMMSS → ISO-ish; FleetTelemetryIngestService accepts Carbon-parseable strings.
         return sprintf(
             '%s-%s-%sT%s:%s:%sZ',
@@ -327,7 +362,7 @@ class AtTrackProtocolParser
         // AT+GTXXX,<password>,<arg1>,...,<serial>$
         $afterPrefix = substr($body, 5); // strip "AT+GT"
         $commaPos = strpos($afterPrefix, ',');
-        $commandWord = 'GT' . ($commaPos === false ? $afterPrefix : substr($afterPrefix, 0, $commaPos));
+        $commandWord = 'GT'.($commaPos === false ? $afterPrefix : substr($afterPrefix, 0, $commaPos));
         $fields = $commaPos === false ? [] : explode(',', substr($afterPrefix, $commaPos + 1));
 
         return new AtTrackFrame(

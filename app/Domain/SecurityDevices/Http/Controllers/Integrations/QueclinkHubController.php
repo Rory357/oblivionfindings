@@ -2,21 +2,21 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers\Integrations;
 
+use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\Asset;
-use App\Models\AssetCategory;
 use App\Models\AssetTracker;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\User;
 use App\Services\Queclink\CommandBuilder;
+use App\Services\Queclink\ConfigurationSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class QueclinkHubController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, ConfigurationSnapshotService $configurations)
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $tenantId = $this->resolveTenantId($request->user());
@@ -50,7 +50,7 @@ class QueclinkHubController extends Controller
         $devices = QueclinkDevice::query()
             ->orderByDesc('last_seen_at')
             ->get()
-            ->map(fn (QueclinkDevice $d) => $this->serialiseDevice($d))
+            ->map(fn (QueclinkDevice $d) => $this->serialiseDevice($d, $configurations))
             ->values();
 
         $pending = $devices->where('status', QueclinkDevice::STATUS_PENDING)->values();
@@ -95,14 +95,14 @@ class QueclinkHubController extends Controller
                     ->get(['id', 'name', 'registration_number'])
                     ->map(fn (Asset $a) => [
                         'id' => $a->id,
-                        'label' => trim($a->name . ($a->registration_number ? " ({$a->registration_number})" : '')),
+                        'label' => trim($a->name.($a->registration_number ? " ({$a->registration_number})" : '')),
                     ])->values(),
                 'staff' => User::query()
                     ->whereNotNull('approved_at')
                     ->orderBy('name')
                     ->limit(500)
                     ->get(['id', 'name', 'email'])
-                    ->map(fn (User $u) => ['id' => $u->id, 'label' => $u->name . " <{$u->email}>"])
+                    ->map(fn (User $u) => ['id' => $u->id, 'label' => $u->name." <{$u->email}>"])
                     ->values(),
                 'clients' => Client::query()
                     ->orderBy('first_name')
@@ -110,7 +110,7 @@ class QueclinkHubController extends Controller
                     ->get(['id', 'first_name', 'last_name'])
                     ->map(fn (Client $c) => [
                         'id' => $c->id,
-                        'label' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                        'label' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                     ])->values(),
             ],
             'can' => [
@@ -136,7 +136,7 @@ class QueclinkHubController extends Controller
             try {
                 Artisan::call('queclink:install', ['--port' => $validated['port']]);
             } catch (\Throwable $e) {
-                return back()->with('warning', 'Settings saved, but the listener could not be restarted automatically: ' . $e->getMessage());
+                return back()->with('warning', 'Settings saved, but the listener could not be restarted automatically: '.$e->getMessage());
             }
         }
 
@@ -178,7 +178,7 @@ class QueclinkHubController extends Controller
                 'device_id' => $device->id,
                 'assignable_type' => $validated['pairing_type'],
                 'assignable_id' => (int) $validated['target_id'],
-                'assignment_type' => \App\Domain\SecurityDevices\Enums\AssignmentType::Permanent->value,
+                'assignment_type' => AssignmentType::Permanent->value,
                 'assigned_at' => now(),
                 'assigned_by_user_id' => $request->user()->id,
                 'consent_id' => $validated['pairing_type'] === 'client' ? ($validated['consent_id'] ?? null) : null,
@@ -213,6 +213,7 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
         $queclinkDevice->update(['status' => QueclinkDevice::STATUS_REJECTED]);
+
         return back()->with('success', "Device {$queclinkDevice->imei} rejected.");
     }
 
@@ -285,6 +286,90 @@ class QueclinkHubController extends Controller
         ]);
 
         return back()->with('success', 'Command queued — it will be sent on the device\'s next frame.');
+    }
+
+    public function readConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be read from paired devices.');
+
+        $validated = $request->validate([
+            'section' => ['nullable', 'string', 'in:all,BSI,SRI,NTS,TLS,CFG,PIN,DOG,TMA,NMD,PDS,WFI'],
+        ]);
+
+        $section = $validated['section'] ?? 'all';
+        $family = $this->guessFamily($queclinkDevice);
+
+        try {
+            $built = $builder->readConfiguration($family, $section);
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['section' => $e->getMessage()]);
+        }
+
+        $this->queueCommand($request, $queclinkDevice, $built, now()->addMinutes(10));
+
+        return back()->with('success', 'Configuration read queued — it will be sent on the device\'s next frame.');
+    }
+
+    public function updateServerConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
+        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+
+        $validated = $request->validate([
+            'report_mode' => ['required', 'integer', 'between:0,7'],
+            'manual_netreg' => ['required', 'integer', 'between:0,1'],
+            'buffer_mode' => ['required', 'integer', 'between:0,2'],
+            'main_host' => ['required', 'string', 'max:60'],
+            'main_port' => ['required', 'integer', 'between:0,65535'],
+            'backup_host' => ['nullable', 'string', 'max:60'],
+            'backup_port' => ['required', 'integer', 'between:0,65535'],
+            'sms_gateway' => ['nullable', 'string', 'max:20'],
+            'heartbeat_interval_minutes' => ['required', 'integer', 'between:0,360'],
+            'sack_enable' => ['required', 'integer', 'between:0,2'],
+            'sms_ack_enable' => ['required', 'integer', 'between:0,1'],
+            'psm_network_hold_time_seconds' => ['required', 'integer', 'between:0,86400'],
+            'protocol_format' => ['required', 'integer', 'in:0'],
+        ]);
+
+        $built = $builder->gl30ServerRegistration($validated);
+        $this->queueCommand($request, $queclinkDevice, $built);
+
+        return back()->with('success', 'Server registration update queued.');
+    }
+
+    public function updateGlobalConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
+        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+
+        $validated = $request->validate([
+            'device_name' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'gnss_timeout_seconds' => ['required', 'integer', 'between:120,600'],
+            'event_mask' => ['required', 'string', 'max:4', 'regex:/^[0-9A-Fa-f]{1,4}$/'],
+            'report_item_mask' => ['required', 'string', 'max:4', 'regex:/^[0-9A-Fa-f]{1,4}$/'],
+            'mode_selection' => ['required', 'integer', 'between:0,1'],
+            'continuous_send_interval_seconds' => ['required', 'integer', 'between:0,65535', 'not_in:1,2,3,4'],
+            'start_mode' => ['required', 'integer', 'between:0,2'],
+            'specified_time_of_day' => ['required', 'string', 'regex:/^([01][0-9]|2[0-3])[0-5][0-9]$/'],
+            'wakeup_interval_hours' => ['required', 'integer', 'between:1,168'],
+            'gnss_enable' => ['required', 'integer', 'between:0,1'],
+            'agps_mode' => ['required', 'integer', 'between:0,1'],
+            'gsm_report' => ['required', 'string', 'max:4', 'regex:/^[0-9A-Fa-f]{1,4}$/'],
+            'battery_low_percentage' => ['required', 'integer', 'between:0,30'],
+            'function_button_mode' => ['required', 'integer', 'between:0,2'],
+            'sos_report_mode' => ['required', 'integer', 'between:0,2'],
+            'wifi_report' => ['required', 'integer', 'in:1,2,4,8'],
+            'led_on' => ['required', 'integer', 'between:0,2'],
+            'charge_standby_mode' => ['required', 'integer', 'between:0,1'],
+        ]);
+
+        $built = $builder->gl30GlobalConfiguration($validated);
+        $this->queueCommand($request, $queclinkDevice, $built);
+
+        return back()->with('success', 'Global tracking settings update queued.');
     }
 
     /**
@@ -390,6 +475,7 @@ class QueclinkHubController extends Controller
 
     /**
      * Generates the AT+GTSRI provisioning string operators paste into the
+     *
      * @Track MT Setup tool to point a fresh device at this server.
      */
     public function provisioningString(Request $request)
@@ -440,7 +526,7 @@ class QueclinkHubController extends Controller
 
     // ── Helpers ────────────────────────────────────────────────────────
 
-    private function serialiseDevice(QueclinkDevice $d): array
+    private function serialiseDevice(QueclinkDevice $d, ?ConfigurationSnapshotService $configurations = null): array
     {
         $assignment = $d->device_id
             ? DeviceAssignment::query()
@@ -468,7 +554,47 @@ class QueclinkHubController extends Controller
                 'assigned_at' => $assignment->assigned_at?->toIso8601String(),
                 'label' => $this->resolveAssignmentLabel($assignment),
             ] : null,
+            'configuration' => $configurations?->latestForDevice($d),
+            'recent_commands' => $this->recentCommands($d),
         ];
+    }
+
+    private function queueCommand(Request $request, QueclinkDevice $queclinkDevice, array $built, ?Carbon $expiresAt = null): QueclinkPendingCommand
+    {
+        return QueclinkPendingCommand::create([
+            'queclink_device_id' => $queclinkDevice->id,
+            'imei' => $queclinkDevice->imei,
+            'tenant_id' => $queclinkDevice->tenant_id,
+            'command_word' => $built['command_word'],
+            'raw_command' => $built['raw'],
+            'serial_number' => $built['serial'],
+            'status' => QueclinkPendingCommand::STATUS_QUEUED,
+            'created_by_user_id' => $request->user()->id,
+            'expires_at' => $expiresAt ?? now()->addMinutes(5),
+        ]);
+    }
+
+    private function recentCommands(QueclinkDevice $d): array
+    {
+        return QueclinkPendingCommand::query()
+            ->forDevice($d->id)
+            ->latest()
+            ->limit(12)
+            ->get()
+            ->map(fn (QueclinkPendingCommand $command) => [
+                'id' => $command->id,
+                'command_word' => $command->command_word,
+                'raw_command' => $command->raw_command,
+                'serial_number' => $command->serial_number,
+                'status' => $command->status,
+                'created_at' => $command->created_at?->toIso8601String(),
+                'sent_at' => $command->sent_at?->toIso8601String(),
+                'acked_at' => $command->acked_at?->toIso8601String(),
+                'expires_at' => $command->expires_at?->toIso8601String(),
+                'failed_reason' => $command->failed_reason,
+            ])
+            ->values()
+            ->all();
     }
 
     private function resolveAssignmentLabel(DeviceAssignment $assignment): string
@@ -477,10 +603,11 @@ class QueclinkHubController extends Controller
         if (! $entity) {
             return "(unknown {$assignment->assignable_type} #{$assignment->assignable_id})";
         }
+
         return match ($assignment->assignable_type) {
-            DeviceAssignment::TARGET_VEHICLE => $entity->name . ($entity->registration_number ? " ({$entity->registration_number})" : ''),
+            DeviceAssignment::TARGET_VEHICLE => $entity->name.($entity->registration_number ? " ({$entity->registration_number})" : ''),
             DeviceAssignment::TARGET_STAFF => $entity->name,
-            DeviceAssignment::TARGET_CLIENT => trim(($entity->first_name ?? '') . ' ' . ($entity->last_name ?? '')),
+            DeviceAssignment::TARGET_CLIENT => trim(($entity->first_name ?? '').' '.($entity->last_name ?? '')),
             default => (string) ($entity->name ?? $entity->id),
         };
     }
@@ -503,8 +630,8 @@ class QueclinkHubController extends Controller
         }
 
         $name = match ($type) {
-            'staff' => 'Personal tracker — ' . (User::find($targetId)?->name ?? "user #{$targetId}"),
-            'client' => 'Care tracker — ' . trim(((Client::find($targetId)?->first_name) ?? '') . ' ' . ((Client::find($targetId)?->last_name) ?? '')),
+            'staff' => 'Personal tracker — '.(User::find($targetId)?->name ?? "user #{$targetId}"),
+            'client' => 'Care tracker — '.trim(((Client::find($targetId)?->first_name) ?? '').' '.((Client::find($targetId)?->last_name) ?? '')),
         };
 
         return Asset::create([
@@ -536,6 +663,7 @@ class QueclinkHubController extends Controller
                 'tenant_id' => $existing->tenant_id ?: $tenantId,
                 'last_seen_at' => $qd->last_seen_at ?: $existing->last_seen_at,
             ])->save();
+
             return $existing;
         }
 
@@ -600,6 +728,7 @@ class QueclinkHubController extends Controller
         $output = [];
         $code = 0;
         @exec('systemctl is-active oblivion-queclink.service 2>&1', $output, $code);
+
         return trim(implode(' ', $output)) ?: 'unknown';
     }
 

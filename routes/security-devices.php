@@ -265,6 +265,12 @@ Route::middleware([
                 ->name('security-devices.integrations.queclink.stream');
             Route::post('/devices/{queclinkDevice}/command', [QueclinkHubController::class, 'sendCommand'])
                 ->name('security-devices.integrations.queclink.command');
+            Route::post('/devices/{queclinkDevice}/configuration/read', [QueclinkHubController::class, 'readConfiguration'])
+                ->name('security-devices.integrations.queclink.configuration.read');
+            Route::post('/devices/{queclinkDevice}/configuration/server', [QueclinkHubController::class, 'updateServerConfiguration'])
+                ->name('security-devices.integrations.queclink.configuration.server');
+            Route::post('/devices/{queclinkDevice}/configuration/global', [QueclinkHubController::class, 'updateGlobalConfiguration'])
+                ->name('security-devices.integrations.queclink.configuration.global');
 
             // IMS cloud credential management (legacy scaffold endpoints).
             Route::post('/key', [QueclinkController::class, 'saveKey'])

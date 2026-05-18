@@ -82,6 +82,8 @@ type Device = {
         assigned_at: string | null;
         label: string;
     } | null;
+    configuration?: DeviceConfiguration | null;
+    recent_commands?: RecentCommand[];
 };
 
 type Target = { id: number; label: string };
@@ -96,6 +98,35 @@ type Frame = {
     parse_ok: boolean;
     parse_error: string | null;
     created_at: string | null;
+};
+
+type DeviceConfigurationSection = {
+    name: string;
+    values: string[];
+};
+
+type DeviceConfiguration = {
+    available: boolean;
+    received_at: string | null;
+    raw: string;
+    sections: Record<string, DeviceConfigurationSection>;
+    summary: {
+        server: Record<string, string> | null;
+        global: Record<string, string> | null;
+    };
+};
+
+type RecentCommand = {
+    id: number;
+    command_word: string;
+    raw_command: string;
+    serial_number: string;
+    status: 'queued' | 'sent' | 'acked' | 'failed' | 'expired';
+    created_at: string | null;
+    sent_at: string | null;
+    acked_at: string | null;
+    expires_at: string | null;
+    failed_reason: string | null;
 };
 
 type Props = {
@@ -213,7 +244,7 @@ export default function QueclinkHub({
 
                 {/* ── Tabs ────────────────────────────────────────── */}
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className="grid w-full grid-cols-6">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="pending" className="gap-2">
                             Pending
@@ -226,6 +257,7 @@ export default function QueclinkHub({
                         <TabsTrigger value="devices">
                             Devices ({devices.paired.length})
                         </TabsTrigger>
+                        <TabsTrigger value="settings">Device settings</TabsTrigger>
                         <TabsTrigger value="console">Debug console</TabsTrigger>
                         <TabsTrigger value="ims">IMS cloud</TabsTrigger>
                     </TabsList>
@@ -245,6 +277,14 @@ export default function QueclinkHub({
 
                     <TabsContent value="devices" className="space-y-6 pt-6">
                         <DevicesTab paired={devices.paired} can={can} />
+                    </TabsContent>
+
+                    <TabsContent value="settings" className="space-y-6 pt-6">
+                        <DeviceSettingsTab
+                            devices={devices.paired}
+                            listener={listener}
+                            can={can}
+                        />
                     </TabsContent>
 
                     <TabsContent value="console" className="space-y-6 pt-6">
@@ -947,6 +987,583 @@ function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
                 </Table>
             </CardContent>
         </Card>
+    );
+}
+
+// ── Device Settings tab ────────────────────────────────────────────
+
+type ServerSettingsForm = {
+    report_mode: string;
+    manual_netreg: string;
+    buffer_mode: string;
+    main_host: string;
+    main_port: string;
+    backup_host: string;
+    backup_port: string;
+    sms_gateway: string;
+    heartbeat_interval_minutes: string;
+    sack_enable: string;
+    sms_ack_enable: string;
+    psm_network_hold_time_seconds: string;
+    protocol_format: string;
+};
+
+type GlobalSettingsForm = {
+    device_name: string;
+    gnss_timeout_seconds: string;
+    event_mask: string;
+    report_item_mask: string;
+    mode_selection: string;
+    continuous_send_interval_seconds: string;
+    start_mode: string;
+    specified_time_of_day: string;
+    wakeup_interval_hours: string;
+    gnss_enable: string;
+    agps_mode: string;
+    gsm_report: string;
+    battery_low_percentage: string;
+    function_button_mode: string;
+    sos_report_mode: string;
+    wifi_report: string;
+    led_on: string;
+    charge_standby_mode: string;
+};
+
+function str(value: unknown, fallback: string): string {
+    return value === null || value === undefined || value === '' ? fallback : String(value);
+}
+
+function serverDefaults(device: Device | null, listener: Props['listener']): ServerSettingsForm {
+    const current = device?.configuration?.summary.server ?? {};
+    const host = str(current.main_host, listener.public_hostname || 'oblivionfindings.com');
+    const port = str(current.main_port, String(listener.port || 8090));
+
+    return {
+        report_mode: str(current.report_mode, '3'),
+        manual_netreg: str(current.manual_netreg, '0'),
+        buffer_mode: str(current.buffer_mode, '1'),
+        main_host: host,
+        main_port: port,
+        backup_host: str(current.backup_host, host),
+        backup_port: str(current.backup_port, port),
+        sms_gateway: str(current.sms_gateway, ''),
+        heartbeat_interval_minutes: str(current.heartbeat_interval_minutes, '5'),
+        sack_enable: str(current.sack_enable, '1'),
+        sms_ack_enable: str(current.sms_ack_enable, '0'),
+        psm_network_hold_time_seconds: str(current.psm_network_hold_time_seconds, '30'),
+        protocol_format: str(current.protocol_format, '0'),
+    };
+}
+
+function globalDefaults(device: Device | null): GlobalSettingsForm {
+    const current = device?.configuration?.summary.global ?? {};
+
+    return {
+        device_name: str(current.device_name, device?.model_hint || 'GL30MEU'),
+        gnss_timeout_seconds: str(current.gnss_timeout_seconds, '150'),
+        event_mask: str(current.event_mask, '08E3'),
+        report_item_mask: str(current.report_item_mask, '006F'),
+        mode_selection: str(current.mode_selection, '1'),
+        continuous_send_interval_seconds: str(
+            current.continuous_send_interval_seconds,
+            '30',
+        ),
+        start_mode: str(current.start_mode, '0'),
+        specified_time_of_day: str(current.specified_time_of_day, '1200'),
+        wakeup_interval_hours: str(current.wakeup_interval_hours, '1'),
+        gnss_enable: str(current.gnss_enable, '1'),
+        agps_mode: str(current.agps_mode, '1'),
+        gsm_report: str(current.gsm_report, '0000'),
+        battery_low_percentage: str(current.battery_low_percentage, '10'),
+        function_button_mode: str(current.function_button_mode, '1'),
+        sos_report_mode: str(current.sos_report_mode, '1'),
+        wifi_report: str(current.wifi_report, '2'),
+        led_on: str(current.led_on, '1'),
+        charge_standby_mode: str(current.charge_standby_mode, '0'),
+    };
+}
+
+function commandStatusBadge(status: RecentCommand['status']) {
+    const classes = {
+        queued: 'bg-status-info-bg text-status-info',
+        sent: 'bg-status-warning-bg text-status-warning',
+        acked: 'bg-status-success-bg text-status-success',
+        failed: 'bg-status-critical-bg text-status-critical',
+        expired: 'bg-muted text-muted-foreground',
+    };
+
+    return <Badge className={classes[status]}>{status}</Badge>;
+}
+
+export function DeviceSettingsTab({
+    devices,
+    listener,
+    can,
+}: {
+    devices: Device[];
+    listener: Props['listener'];
+    can: Props['can'];
+}) {
+    const [targetId, setTargetId] = useState<string>(
+        devices[0] ? String(devices[0].id) : '',
+    );
+    const target = useMemo(
+        () => devices.find((device) => String(device.id) === targetId) ?? null,
+        [devices, targetId],
+    );
+    const [serverForm, setServerForm] = useState<ServerSettingsForm>(() =>
+        serverDefaults(devices[0] ?? null, listener),
+    );
+    const [globalForm, setGlobalForm] = useState<GlobalSettingsForm>(() =>
+        globalDefaults(devices[0] ?? null),
+    );
+
+    useEffect(() => {
+        setServerForm(serverDefaults(target, listener));
+        setGlobalForm(globalDefaults(target));
+    }, [listener, target]);
+
+    if (devices.length === 0) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Device settings</CardTitle>
+                    <CardDescription>
+                        Pair a Queclink device before configuring device settings.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+        );
+    }
+
+    const post = (path: string, payload: Record<string, string>) => {
+        router.post(path, payload, { preserveScroll: true });
+    };
+
+    const config = target?.configuration;
+    const recentCommands = target?.recent_commands ?? [];
+
+    return (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <CardTitle>Device settings</CardTitle>
+                                <CardDescription>
+                                    Read the live Queclink configuration and queue safe GL30
+                                    updates through the TCP listener.
+                                </CardDescription>
+                            </div>
+                            <Button
+                                type="button"
+                                disabled={!can.manage || !target}
+                                onClick={() => {
+                                    if (!target) return;
+                                    post(
+                                        `/security-devices/integrations/queclink/devices/${target.id}/configuration/read`,
+                                        { section: 'all' },
+                                    );
+                                }}
+                            >
+                                <RefreshCw className="mr-2 h-3 w-3" />
+                                Read full config
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label>Target device</Label>
+                            <Select value={targetId} onValueChange={setTargetId}>
+                                <SelectTrigger className="max-w-xl">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {devices.map((device) => (
+                                        <SelectItem key={device.id} value={String(device.id)}>
+                                            {device.imei}
+                                            {device.assignment?.label
+                                                ? ` — ${device.assignment.label}`
+                                                : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-4">
+                            <div>
+                                <p className="text-xs text-muted-foreground">Model</p>
+                                <p className="font-medium">{target?.model_hint ?? 'Unknown'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Connection</p>
+                                <p className="font-medium">{target?.connection_state ?? '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Last frame</p>
+                                <p className="font-medium">{fmtRel(target?.last_frame_at ?? null)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Config read</p>
+                                <p className="font-medium">
+                                    {config?.available ? fmt(config.received_at) : 'not read yet'}
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Server connection</CardTitle>
+                            <CardDescription>
+                                GL30 SRI settings used to keep the device reporting to Oblivion.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <Field
+                                    label="Main host"
+                                    value={serverForm.main_host}
+                                    onChange={(value) => setServerForm({ ...serverForm, main_host: value })}
+                                />
+                                <Field
+                                    label="Main port"
+                                    type="number"
+                                    value={serverForm.main_port}
+                                    onChange={(value) => setServerForm({ ...serverForm, main_port: value })}
+                                />
+                                <Field
+                                    label="Backup host"
+                                    value={serverForm.backup_host}
+                                    onChange={(value) => setServerForm({ ...serverForm, backup_host: value })}
+                                />
+                                <Field
+                                    label="Backup port"
+                                    type="number"
+                                    value={serverForm.backup_port}
+                                    onChange={(value) => setServerForm({ ...serverForm, backup_port: value })}
+                                />
+                                <Field
+                                    label="Heartbeat minutes"
+                                    type="number"
+                                    value={serverForm.heartbeat_interval_minutes}
+                                    onChange={(value) =>
+                                        setServerForm({
+                                            ...serverForm,
+                                            heartbeat_interval_minutes: value,
+                                        })
+                                    }
+                                />
+                                <Field
+                                    label="PSM hold seconds"
+                                    type="number"
+                                    value={serverForm.psm_network_hold_time_seconds}
+                                    onChange={(value) =>
+                                        setServerForm({
+                                            ...serverForm,
+                                            psm_network_hold_time_seconds: value,
+                                        })
+                                    }
+                                />
+                                <SelectField
+                                    label="Report mode"
+                                    value={serverForm.report_mode}
+                                    onChange={(value) => setServerForm({ ...serverForm, report_mode: value })}
+                                    options={[
+                                        ['3', 'TCP long connection'],
+                                        ['7', 'TCP long + backup'],
+                                        ['2', 'TCP short forced'],
+                                    ]}
+                                />
+                                <SelectField
+                                    label="SACK"
+                                    value={serverForm.sack_enable}
+                                    onChange={(value) => setServerForm({ ...serverForm, sack_enable: value })}
+                                    options={[
+                                        ['1', 'Enable and check'],
+                                        ['2', 'Enable no serial check'],
+                                        ['0', 'Disabled'],
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Manual network"
+                                    value={serverForm.manual_netreg}
+                                    onChange={(value) => setServerForm({ ...serverForm, manual_netreg: value })}
+                                    options={[
+                                        ['0', 'Disabled'],
+                                        ['1', 'Enabled'],
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Buffer mode"
+                                    value={serverForm.buffer_mode}
+                                    onChange={(value) => setServerForm({ ...serverForm, buffer_mode: value })}
+                                    options={[
+                                        ['1', 'Low priority'],
+                                        ['2', 'High priority'],
+                                        ['0', 'Disabled'],
+                                    ]}
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                disabled={!can.manage || !target}
+                                onClick={() => {
+                                    if (!target) return;
+                                    post(
+                                        `/security-devices/integrations/queclink/devices/${target.id}/configuration/server`,
+                                        serverForm,
+                                    );
+                                }}
+                            >
+                                <Send className="mr-2 h-3 w-3" />
+                                Queue server settings
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Global tracking</CardTitle>
+                            <CardDescription>
+                                GL30 CFG settings for test reporting, GNSS, Wi-Fi fallback, and LEDs.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <Field
+                                    label="Device name"
+                                    value={globalForm.device_name}
+                                    onChange={(value) => setGlobalForm({ ...globalForm, device_name: value })}
+                                />
+                                <Field
+                                    label="GNSS timeout seconds"
+                                    type="number"
+                                    value={globalForm.gnss_timeout_seconds}
+                                    onChange={(value) =>
+                                        setGlobalForm({ ...globalForm, gnss_timeout_seconds: value })
+                                    }
+                                />
+                                <SelectField
+                                    label="Mode"
+                                    value={globalForm.mode_selection}
+                                    onChange={(value) =>
+                                        setGlobalForm({ ...globalForm, mode_selection: value })
+                                    }
+                                    options={[
+                                        ['1', 'Continuous'],
+                                        ['0', 'Power saving'],
+                                    ]}
+                                />
+                                <Field
+                                    label="Send interval seconds"
+                                    type="number"
+                                    value={globalForm.continuous_send_interval_seconds}
+                                    onChange={(value) =>
+                                        setGlobalForm({
+                                            ...globalForm,
+                                            continuous_send_interval_seconds: value,
+                                        })
+                                    }
+                                />
+                                <SelectField
+                                    label="GNSS"
+                                    value={globalForm.gnss_enable}
+                                    onChange={(value) =>
+                                        setGlobalForm({ ...globalForm, gnss_enable: value })
+                                    }
+                                    options={[
+                                        ['1', 'Enabled'],
+                                        ['0', 'Disabled'],
+                                    ]}
+                                />
+                                <SelectField
+                                    label="AGPS"
+                                    value={globalForm.agps_mode}
+                                    onChange={(value) =>
+                                        setGlobalForm({ ...globalForm, agps_mode: value })
+                                    }
+                                    options={[
+                                        ['1', 'Enabled'],
+                                        ['0', 'Disabled'],
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Wi-Fi fallback"
+                                    value={globalForm.wifi_report}
+                                    onChange={(value) =>
+                                        setGlobalForm({ ...globalForm, wifi_report: value })
+                                    }
+                                    options={[
+                                        ['2', 'Report Wi-Fi if GNSS fails'],
+                                        ['1', 'Always report GTFRI'],
+                                    ]}
+                                />
+                                <SelectField
+                                    label="LEDs"
+                                    value={globalForm.led_on}
+                                    onChange={(value) => setGlobalForm({ ...globalForm, led_on: value })}
+                                    options={[
+                                        ['1', 'Normal'],
+                                        ['0', 'Reduced GNSS LED'],
+                                        ['2', 'Mostly off'],
+                                    ]}
+                                />
+                                <Field
+                                    label="Report item mask"
+                                    value={globalForm.report_item_mask}
+                                    onChange={(value) =>
+                                        setGlobalForm({
+                                            ...globalForm,
+                                            report_item_mask: value.toUpperCase(),
+                                        })
+                                    }
+                                />
+                                <Field
+                                    label="Event mask"
+                                    value={globalForm.event_mask}
+                                    onChange={(value) =>
+                                        setGlobalForm({
+                                            ...globalForm,
+                                            event_mask: value.toUpperCase(),
+                                        })
+                                    }
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                disabled={!can.manage || !target}
+                                onClick={() => {
+                                    if (!target) return;
+                                    post(
+                                        `/security-devices/integrations/queclink/devices/${target.id}/configuration/global`,
+                                        globalForm,
+                                    );
+                                }}
+                            >
+                                <Send className="mr-2 h-3 w-3" />
+                                Queue global settings
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Configuration snapshot</CardTitle>
+                        <CardDescription>
+                            Last parsed +RESP:GTALM response from the selected device.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Textarea
+                            readOnly
+                            value={
+                                config?.available
+                                    ? config.raw
+                                    : 'No configuration readback has been received yet.'
+                            }
+                            className="min-h-40 font-mono text-xs"
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Command status</CardTitle>
+                    <CardDescription>
+                        Recent queued AT commands for the selected device.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {recentCommands.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No commands queued yet.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {recentCommands.map((command) => (
+                                <div key={command.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="font-medium">{command.command_word}</span>
+                                        {commandStatusBadge(command.status)}
+                                    </div>
+                                    <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                                        {command.raw_command}
+                                    </p>
+                                    <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                        <div>
+                                            <dt>Created</dt>
+                                            <dd>{fmtRel(command.created_at)}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>ACK</dt>
+                                            <dd>{command.acked_at ? fmtRel(command.acked_at) : 'waiting'}</dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+function Field({
+    label,
+    value,
+    onChange,
+    type = 'text',
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    type?: 'text' | 'number';
+}) {
+    return (
+        <div className="space-y-2">
+            <Label className="text-xs">{label}</Label>
+            <Input
+                type={type}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+            />
+        </div>
+    );
+}
+
+function SelectField({
+    label,
+    value,
+    options,
+    onChange,
+}: {
+    label: string;
+    value: string;
+    options: Array<[string, string]>;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <div className="space-y-2">
+            <Label className="text-xs">{label}</Label>
+            <Select value={value} onValueChange={onChange}>
+                <SelectTrigger>
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {options.map(([optionValue, label]) => (
+                        <SelectItem key={optionValue} value={optionValue}>
+                            {label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
     );
 }
 

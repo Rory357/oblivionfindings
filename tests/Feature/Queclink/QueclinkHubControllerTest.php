@@ -48,6 +48,40 @@ class QueclinkHubControllerTest extends TestCase
         );
     }
 
+    public function test_hub_page_exposes_latest_device_configuration_snapshot()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        QueclinkRawFrame::create([
+            'queclink_device_id' => $device->id,
+            'imei' => $device->imei,
+            'direction' => 'inbound',
+            'frame_type' => 'RESP',
+            'command_word' => 'GTALM',
+            'raw_frame' => '+RESP:GTALM,970204,867963069916998,GL30MEU,1,1,SRI,3,0,1,oblivionfindings.com,8090,oblivionfindings.com,8090,,5,1,0,30,0,,CFG,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,20260518031500,0A10$',
+            'parsed_payload' => [
+                'event_type' => 'configuration_report',
+                'config_total_packets' => 1,
+                'config_current_packet' => 1,
+                'config_text' => 'SRI,3,0,1,oblivionfindings.com,8090,oblivionfindings.com,8090,,5,1,0,30,0,,CFG,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0',
+                'send_time' => '2026-05-18T03:15:00Z',
+            ],
+            'parse_ok' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/integrations/queclink')
+            ->assertInertia(fn ($page) => $page
+                ->where('devices.paired.0.configuration.available', true)
+                ->where('devices.paired.0.configuration.summary.server.main_host', 'oblivionfindings.com')
+                ->where('devices.paired.0.configuration.summary.global.continuous_send_interval_seconds', '30')
+            );
+    }
+
     public function test_save_settings_persists_port_and_hostname()
     {
         $this->actingAs($this->admin)
@@ -186,6 +220,126 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertStringEndsWith('$', $cmd->raw_command);
     }
 
+    public function test_read_device_configuration_queues_gl30_read_all_command()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/read", [
+                'section' => 'all',
+            ])
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTRTO', $cmd->command_word);
+        $this->assertMatchesRegularExpression('/^AT\+GTRTO=gl30,2,,,,,,[0-9A-F]{4}\$$/', $cmd->raw_command);
+    }
+
+    public function test_update_server_registration_queues_gl30_sri_command()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/server", [
+                'report_mode' => 3,
+                'manual_netreg' => 0,
+                'buffer_mode' => 1,
+                'main_host' => 'oblivionfindings.com',
+                'main_port' => 8090,
+                'backup_host' => 'oblivionfindings.com',
+                'backup_port' => 8090,
+                'heartbeat_interval_minutes' => 5,
+                'sack_enable' => 1,
+                'sms_ack_enable' => 0,
+                'psm_network_hold_time_seconds' => 30,
+                'protocol_format' => 0,
+            ])
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTSRI', $cmd->command_word);
+        $this->assertStringContainsString('AT+GTSRI=gl30,3,0,1,oblivionfindings.com,8090,oblivionfindings.com,8090,,5,1,0,30,0,0,', $cmd->raw_command);
+    }
+
+    public function test_update_global_configuration_queues_gl30_cfg_command()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/global", [
+                'device_name' => 'GL30MEU',
+                'gnss_timeout_seconds' => 150,
+                'event_mask' => '08E3',
+                'report_item_mask' => '006F',
+                'mode_selection' => 1,
+                'continuous_send_interval_seconds' => 30,
+                'start_mode' => 0,
+                'specified_time_of_day' => '1200',
+                'wakeup_interval_hours' => 1,
+                'gnss_enable' => 1,
+                'agps_mode' => 1,
+                'gsm_report' => '0000',
+                'battery_low_percentage' => 10,
+                'function_button_mode' => 1,
+                'sos_report_mode' => 1,
+                'wifi_report' => 2,
+                'led_on' => 1,
+                'charge_standby_mode' => 0,
+            ])
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTCFG', $cmd->command_word);
+        $this->assertStringContainsString('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,', $cmd->raw_command);
+    }
+
+    public function test_update_global_configuration_rejects_invalid_short_gl30_interval()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from('/security-devices/integrations/queclink?tab=settings')
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/global", [
+                'device_name' => 'GL30MEU',
+                'gnss_timeout_seconds' => 150,
+                'event_mask' => '08E3',
+                'report_item_mask' => '006F',
+                'mode_selection' => 1,
+                'continuous_send_interval_seconds' => 2,
+                'start_mode' => 0,
+                'specified_time_of_day' => '1200',
+                'wakeup_interval_hours' => 1,
+                'gnss_enable' => 1,
+                'agps_mode' => 1,
+                'gsm_report' => '0000',
+                'battery_low_percentage' => 10,
+                'function_button_mode' => 1,
+                'sos_report_mode' => 1,
+                'wifi_report' => 2,
+                'led_on' => 1,
+                'charge_standby_mode' => 0,
+            ])
+            ->assertSessionHasErrors('continuous_send_interval_seconds');
+
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
+    }
+
     public function test_personal_tracker_command_uses_gl30_family_when_model_hint_is_blank()
     {
         $canonicalDevice = Device::factory()->tracking()->create([
@@ -242,7 +396,7 @@ class QueclinkHubControllerTest extends TestCase
             ->assertJsonPath('error', 'Set the public hostname under Listener settings first.');
     }
 
-    public function test_provisioning_string_generates_AT_GTSRI_with_configured_hostname_and_port()
+    public function test_provisioning_string_generates_a_t_gtsr_i_with_configured_hostname_and_port()
     {
         AppSetting::create(['key' => 'queclink.public_hostname', 'value' => 'tracking.example.co.nz']);
         AppSetting::create(['key' => 'queclink.listener.port', 'value' => 8091]);
