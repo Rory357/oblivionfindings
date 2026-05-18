@@ -120,14 +120,34 @@ class FleetTelemetryIngestService
             if ($device) {
                 $deviceUpdates = [
                     'last_seen_at' => now(),
-                    'battery_level' => $normalized['battery_pct'] ?? $device->battery_level,
-                    'battery_updated_at' => $normalized['battery_pct'] !== null ? now() : $device->battery_updated_at,
                 ];
 
                 $meta = $device->meta ?? [];
+                $raw = $normalized['raw_payload'] ?? [];
+
                 if ($normalized['battery_pct'] !== null) {
+                    $deviceUpdates['battery_level'] = $normalized['battery_pct'];
+                    $deviceUpdates['battery_updated_at'] = now();
+
                     $meta['battery'] = $normalized['battery_pct'];
                     $meta['battery_level'] = $normalized['battery_pct'];
+                }
+
+                foreach (['charging_status', 'battery_voltage_mv', 'power_event', 'external_power'] as $key) {
+                    if (array_key_exists($key, $raw)) {
+                        $meta[$key] = $raw[$key];
+                    }
+                }
+
+                $threshold = (int) ($meta['battery_low_threshold'] ?? data_get($raw, 'battery_low_threshold', 20));
+                $meta['battery_status'] = $normalized['battery_pct'] === null
+                    ? ($meta['battery_status'] ?? 'unknown')
+                    : ((int) $normalized['battery_pct'] <= $threshold ? 'low' : 'normal');
+
+                if (($meta['charging_status'] ?? null) === 'charging' || ($meta['external_power'] ?? false)) {
+                    $meta['battery_status_label'] = 'Charging';
+                } elseif ($normalized['battery_pct'] !== null) {
+                    unset($meta['battery_status_label']);
                 }
 
                 if (!$consentBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {

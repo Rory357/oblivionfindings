@@ -511,4 +511,133 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertEqualsWithDelta(-37.723667, (float) $device->latitude, 0.0001);
         $this->assertEqualsWithDelta(175.2416, (float) $device->longitude, 0.0001);
     }
+
+    public function test_gl30_battery_low_updates_device_health_and_event_without_location_change(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+
+        ['device' => $device, 'asset' => $asset] = $this->createConsentedPersonalTracker('QUE-HEALTH-LOW');
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-HEALTH-LOW',
+                'gps_time' => now()->toISOString(),
+                'alarm' => 'battery_low',
+                'event_type' => 'battery_low',
+                'battery' => 15,
+                'battery_low_threshold' => 20,
+                'charging_status' => 'not_charging',
+            ])
+            ->assertStatus(200);
+
+        $device->refresh();
+
+        $this->assertSame(15, $device->battery_level);
+        $this->assertNotNull($device->battery_updated_at);
+        $this->assertSame(15, $device->meta['battery']);
+        $this->assertSame(15, $device->meta['battery_level']);
+        $this->assertSame('low', $device->meta['battery_status']);
+        $this->assertSame('not_charging', $device->meta['charging_status']);
+
+        $this->assertDatabaseHas('fleet_telemetry_events', [
+            'asset_id' => $asset->id,
+            'device_id' => $device->id,
+            'event_type' => 'battery_low',
+            'battery_pct' => 15,
+        ]);
+    }
+
+    public function test_gl30_charging_state_updates_device_health_without_battery_percentage_or_location(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+
+        ['device' => $device] = $this->createConsentedPersonalTracker('QUE-HEALTH-CHARGE');
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-HEALTH-CHARGE',
+                'gps_time' => now()->toISOString(),
+                'event_type' => 'heartbeat',
+                'external_power' => true,
+                'charging_status' => 'charging',
+                'power_event' => 'power_on',
+            ])
+            ->assertStatus(200);
+
+        $device->refresh();
+
+        $this->assertNull($device->battery_level);
+        $this->assertSame('charging', $device->meta['charging_status']);
+        $this->assertTrue($device->meta['external_power']);
+        $this->assertSame('power_on', $device->meta['power_event']);
+        $this->assertSame('unknown', $device->meta['battery_status']);
+        $this->assertSame('Charging', $device->meta['battery_status_label']);
+    }
+
+    /**
+     * @return array{client: Client, consent: ClientConsent, asset: Asset, tracker: AssetTracker, device: Device}
+     */
+    private function createConsentedPersonalTracker(string $deviceUid): array
+    {
+        $site = Site::create(['name' => 'Harbour Respite']);
+        $client = Client::create(['first_name' => 'Amelia', 'last_name' => 'Wilson']);
+        $consentType = ConsentType::create([
+            'name' => "Personal Tracker {$deviceUid}",
+            'category' => 'safety',
+            'description' => 'Personal tracker consent',
+            'purpose' => 'Resident safety tracking',
+            'legal_basis' => 'Consent',
+            'version' => 1,
+            'active' => true,
+        ]);
+        $consentVersion = ConsentTypeVersion::create([
+            'consent_type_id' => $consentType->id,
+            'version' => 1,
+            'description' => 'Personal tracker consent v1',
+            'purpose' => 'Resident safety tracking',
+            'legal_basis' => 'Consent',
+            'effective_from' => now()->subDay(),
+        ]);
+        $consent = ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => $consentType->id,
+            'consent_type_version_id' => $consentVersion->id,
+            'status' => 'given',
+            'given_at' => now()->subDay(),
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        $asset = Asset::create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+            'name' => "{$client->first_name} pendant",
+            'status' => 'active',
+            'risk_level' => 'medium',
+            'category' => 'personal_tracker',
+        ]);
+        $tracker = AssetTracker::create([
+            'asset_id' => $asset->id,
+            'vendor' => 'queclink',
+            'device_uid' => $deviceUid,
+            'imei' => $deviceUid,
+            'status' => 'paired',
+            'paired_at' => now(),
+            'consent_id' => $consent->id,
+        ]);
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => $deviceUid,
+            'device_uid' => $deviceUid,
+            'legacy_asset_tracker_id' => $tracker->id,
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'client',
+            'assignable_id' => $client->id,
+            'assigned_at' => now(),
+            'consent_id' => $consent->id,
+        ]);
+
+        return compact('client', 'consent', 'asset', 'tracker', 'device');
+    }
 }
