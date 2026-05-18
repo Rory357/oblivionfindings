@@ -7,6 +7,8 @@ SOCKET_PATH="/run/${SERVICE_NAME}.sock"
 BASE_DIR="/srv/nominatim"
 VENV_DIR="${BASE_DIR}/nominatim-venv"
 MARKER_NAME=".oblivion-nominatim-import-complete"
+WEB_USER="www-data"
+WEB_GROUP="www-data"
 
 if [[ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]]; then
     echo "Nominatim install skipped: non-Linux host."
@@ -37,6 +39,10 @@ fi
 
 PBF_PATH="${NOMINATIM_PBF_PATH:-${NOMINATIM_PROJECT_DIR}/data/$(basename "$NOMINATIM_REGION_PBF_URL")}"
 MARKER_FILE="${NOMINATIM_PROJECT_DIR}/${MARKER_NAME}"
+WEB_HOME="$(getent passwd "$WEB_USER" | cut -d: -f6 || true)"
+if [[ -z "$WEB_HOME" ]]; then
+    WEB_HOME="/var/www"
+fi
 
 SUDO=()
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -161,8 +167,8 @@ if ! run_as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='nominatim'
     run_as_postgres createuser -s nominatim
 fi
 
-if ! run_as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='www-data'" | grep -q 1; then
-    run_as_postgres createuser www-data
+if ! run_as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${WEB_USER}'" | grep -q 1; then
+    run_as_postgres createuser "$WEB_USER"
 fi
 
 cat > /tmp/oblivion-nominatim-project.env <<EOF
@@ -175,6 +181,7 @@ rm -f /tmp/oblivion-nominatim-project.env
 run_root chmod a+rx "$BASE_DIR" "$VENV_DIR" "$NOMINATIM_PROJECT_DIR"
 run_root chmod -R a+rX "$VENV_DIR"
 run_root chmod a+r "${NOMINATIM_PROJECT_DIR}/.env"
+run_root install -d -m 0755 -o "$WEB_USER" -g "$WEB_GROUP" "${WEB_HOME}/.gunicorn"
 
 if is_imported; then
     echo "Nominatim import skipped: imported project marker already exists."
@@ -212,7 +219,7 @@ Description=Gunicorn socket for Oblivion Nominatim
 
 [Socket]
 ListenStream=${SOCKET_PATH}
-SocketUser=www-data
+SocketUser=${WEB_USER}
 
 [Install]
 WantedBy=sockets.target
@@ -226,10 +233,10 @@ Requires=${SERVICE_NAME}.socket
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=${WEB_USER}
+Group=${WEB_GROUP}
 WorkingDirectory=${NOMINATIM_PROJECT_DIR}
-ExecStart=${VENV_DIR}/bin/gunicorn -b unix:${SOCKET_PATH} -w 4 --worker-class asgi --protocol uwsgi --worker-connections 1000 "nominatim_api.server.falcon.server:run_wsgi()"
+ExecStart=${VENV_DIR}/bin/gunicorn -b unix:${SOCKET_PATH} -w 4 --worker-class asgi --worker-connections 1000 "nominatim_api.server.falcon.server:run_wsgi()"
 ExecReload=/bin/kill -s HUP \$MAINPID
 PrivateTmp=true
 TimeoutStopSec=5
@@ -250,8 +257,10 @@ server {
     server_name _;
 
     location / {
-        uwsgi_pass oblivion_nominatim_service;
-        include uwsgi_params;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_pass http://oblivion_nominatim_service;
     }
 }
 EOF
