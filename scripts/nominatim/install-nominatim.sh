@@ -92,6 +92,19 @@ available_memory_mb() {
 
 is_imported() {
     [[ -f "$MARKER_FILE" ]] && return 0
+    [[ -x "$VENV_DIR/bin/nominatim" ]] || return 1
+
+    if run_as_nominatim "$VENV_DIR/bin/nominatim" admin --project-dir "$NOMINATIM_PROJECT_DIR" --check-database >/dev/null 2>&1; then
+        run_root touch "$MARKER_FILE"
+        run_root chown nominatim:nominatim "$MARKER_FILE"
+
+        return 0
+    fi
+
+    return 1
+}
+
+database_exists() {
     run_as_postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='nominatim'" 2>/dev/null | grep -q 1
 }
 
@@ -148,8 +161,13 @@ if ! run_as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='nominatim'
     run_as_postgres createuser -s nominatim
 fi
 
+if ! run_as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='www-data'" | grep -q 1; then
+    run_as_postgres createuser www-data
+fi
+
 cat > /tmp/oblivion-nominatim-project.env <<EOF
 NOMINATIM_DATABASE_DSN=pgsql:dbname=nominatim
+NOMINATIM_DATABASE_WEBUSER=www-data
 NOMINATIM_IMPORT_STYLE=${NOMINATIM_IMPORT_STYLE}
 EOF
 run_root install -m 0644 -o nominatim -g nominatim /tmp/oblivion-nominatim-project.env "${NOMINATIM_PROJECT_DIR}/.env"
@@ -158,6 +176,11 @@ rm -f /tmp/oblivion-nominatim-project.env
 if is_imported; then
     echo "Nominatim import skipped: imported project marker already exists."
 else
+    if database_exists; then
+        echo "Removing incomplete Nominatim database before retry"
+        run_as_postgres dropdb nominatim
+    fi
+
     ensure_preflight_for_import
 
     if [[ ! -f "$PBF_PATH" || "$NOMINATIM_REFRESH_PBF" == "1" ]]; then
