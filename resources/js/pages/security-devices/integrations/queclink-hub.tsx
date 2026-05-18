@@ -502,7 +502,7 @@ function OverviewTab({
                             </code>{' '}
                             for GV-series,{' '}
                             <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                gl30m
+                                gl30
                             </code>{' '}
                             for GL-series).
                         </Step>

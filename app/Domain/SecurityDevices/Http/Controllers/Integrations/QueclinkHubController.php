@@ -568,6 +568,27 @@ class QueclinkHubController extends Controller
         if (str_contains($hint, 'gl30') || str_contains($hint, 'gl-30')) {
             return CommandBuilder::FAMILY_GL30M;
         }
+        if (str_contains($hint, 'gv500')) {
+            return CommandBuilder::FAMILY_GV500CG;
+        }
+
+        $category = strtolower((string) $qd->device?->category);
+        if (in_array($category, ['personal_tracker', 'lone_worker_tracker', 'client_tracker'], true)) {
+            return CommandBuilder::FAMILY_GL30M;
+        }
+
+        $assignmentType = $qd->device_id
+            ? DeviceAssignment::query()
+                ->where('device_id', $qd->device_id)
+                ->whereNull('released_at')
+                ->latest('assigned_at')
+                ->value('assignable_type')
+            : null;
+
+        if (in_array($assignmentType, [DeviceAssignment::TARGET_STAFF, DeviceAssignment::TARGET_CLIENT], true)) {
+            return CommandBuilder::FAMILY_GL30M;
+        }
+
         return CommandBuilder::FAMILY_GV500CG;
     }
 

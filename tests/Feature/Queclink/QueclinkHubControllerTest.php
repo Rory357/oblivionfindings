@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Queclink;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\AppSetting;
 use App\Models\Asset;
 use App\Models\Queclink\QueclinkDevice;
@@ -182,6 +183,34 @@ class QueclinkHubControllerTest extends TestCase
         $cmd = QueclinkPendingCommand::first();
         $this->assertSame('GTRTO', $cmd->command_word);
         $this->assertStringStartsWith('AT+GTRTO=gv500cg,1,', $cmd->raw_command);
+        $this->assertStringEndsWith('$', $cmd->raw_command);
+    }
+
+    public function test_personal_tracker_command_uses_gl30_family_when_model_hint_is_blank()
+    {
+        $canonicalDevice = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => '867963069916998',
+            'device_uid' => '867963069916998',
+            'model' => null,
+        ]);
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'device_id' => $canonicalDevice->id,
+            'model_hint' => null,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/command", [
+                'mode' => 'preset',
+                'preset' => 'request_location',
+            ])
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTRTO', $cmd->command_word);
+        $this->assertStringStartsWith('AT+GTRTO=gl30,1,', $cmd->raw_command);
         $this->assertStringEndsWith('$', $cmd->raw_command);
     }
 
