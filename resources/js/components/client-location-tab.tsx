@@ -22,8 +22,6 @@ import {
     Shield,
     ShieldAlert,
     ShieldOff,
-    Wifi,
-    WifiOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -275,7 +273,6 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
 
     const hasConsent = trackingConsent?.status === 'active' || trackingConsent?.status === 'granted';
     const hasTracker = tracker !== null;
-    const isOnline = tracker?.status === 'online';
     const commandLabel = commandStatusLabel(tracker?.last_command_status);
     const batteryState = getBatteryState(tracker);
     const BatteryIcon = batteryState.icon;
@@ -326,61 +323,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
 
             {/* Status Cards */}
             {hasTracker && (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    {/* Tracker Device */}
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            {isOnline ? (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg">
-                                    <Wifi className="h-5 w-5 text-status-success dark:text-status-success" />
-                                </div>
-                            ) : (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-critical-bg">
-                                    <WifiOff className="h-5 w-5 text-status-critical dark:text-status-critical" />
-                                </div>
-                            )}
-                            <div>
-                                <p className="text-xs text-muted-foreground">Tracker</p>
-                                <p className="font-semibold text-sm">{tracker.name}</p>
-                                <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                                    <Badge variant={isOnline ? 'default' : 'secondary'} className="text-[10px] capitalize">
-                                        {tracker.status}
-                                    </Badge>
-                                    {commandLabel && (
-                                        <Badge variant="secondary" className="text-[10px]">
-                                            {commandLabel}
-                                        </Badge>
-                                    )}
-                                    {safetyLabel && (
-                                        <Badge
-                                            variant="outline"
-                                            className="gap-1 border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
-                                        >
-                                            <ShieldAlert className="h-3 w-3" />
-                                            {safetyLabel}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Device Info */}
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted dark:bg-muted">
-                                <Radio className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Device</p>
-                                <p className="text-sm font-medium">{tracker.serial ?? tracker.mac ?? '---'}</p>
-                                {tracker.provider && (
-                                    <p className="text-[10px] text-muted-foreground">{tracker.provider}</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
+                <div className="grid gap-3 sm:grid-cols-3">
                     {/* Battery */}
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
@@ -448,7 +391,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <MapPin className="h-4 w-4" />
+                                <Navigation className="h-4 w-4" />
                                 {showHistory ? 'Movement History' : 'Current Location'}
                             </CardTitle>
                             <div className="flex flex-wrap items-center justify-end gap-3">
@@ -480,13 +423,22 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                                             {commandLabel}
                                         </Badge>
                                     )}
+                                    {safetyLabel && (
+                                        <Badge
+                                            variant="outline"
+                                            className="gap-1 border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
+                                        >
+                                            <ShieldAlert className="h-3 w-3" />
+                                            {safetyLabel}
+                                        </Badge>
+                                    )}
                                     <Button
                                         type="button"
                                         size="sm"
                                         onClick={handleLocateNow}
                                         disabled={!tracker}
                                     >
-                                        <MapPin className="mr-1 h-4 w-4" />
+                                        <Navigation className="mr-1 h-4 w-4" />
                                         Locate Now
                                     </Button>
                                 </div>

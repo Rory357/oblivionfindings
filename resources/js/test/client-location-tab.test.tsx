@@ -69,8 +69,13 @@ it('queues Locate Now from the client location tab and shows command state', asy
     );
 
     expect(screen.getAllByText('Acknowledged')[0]).toBeVisible();
+    expect(screen.getByText('Battery')).toBeVisible();
+    expect(screen.getByText('Last Seen')).toBeVisible();
+    expect(screen.getByText('Consent')).toBeVisible();
     expect(screen.getByText('Charging')).toBeVisible();
     expect(screen.getByText('SOS received')).toBeVisible();
+    expect(screen.queryByText('Tracker')).not.toBeInTheDocument();
+    expect(screen.queryByText('Device')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
 

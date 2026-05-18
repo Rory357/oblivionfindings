@@ -1,6 +1,5 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { HalfMoonGauge, FLEET_COLORS } from '@/components/fleet-charts';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { type MapMarker, type MapGeofence } from '@/components/leaflet-map';
 import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
@@ -24,12 +23,7 @@ import {
     Search,
     Shield,
     ShieldAlert,
-    Signal,
-    SignalZero,
     UserPlus,
-    Users,
-    Wifi,
-    WifiOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -278,6 +272,21 @@ export default function ResidentTrackingIndex({
     const safeAlerts = recent_alerts ?? [];
     const safeOutings = active_outings ?? [];
     const safeGeofences = useMemo(() => geofences ?? [], [geofences]);
+    const heroStats = useMemo(() => [
+        { label: 'Tracked', value: safeStats.tracked ?? 0 },
+        { label: 'Online', value: safeStats.online ?? 0 },
+        { label: 'Offline', value: safeStats.offline ?? 0 },
+        { label: 'In Zone', value: safeStats.in_geofence ?? 0 },
+        { label: 'Outside Zone', value: safeStats.outside_geofence ?? 0 },
+        { label: 'Low Battery', value: safeStats.low_battery ?? 0 },
+    ], [
+        safeStats.in_geofence,
+        safeStats.low_battery,
+        safeStats.offline,
+        safeStats.online,
+        safeStats.outside_geofence,
+        safeStats.tracked,
+    ]);
 
     // Auto-refresh every 30s
     useEffect(() => {
@@ -397,6 +406,7 @@ export default function ResidentTrackingIndex({
                 <FleetHero
                     title="Resident Tracking"
                     subtitle="Safety command center - monitor tracked residents in real-time"
+                    stats={heroStats}
                     actions={can.manage ? (
                         <Button asChild>
                             <Link href="/fleet-assets/resident-tracking/assign">
@@ -406,16 +416,6 @@ export default function ResidentTrackingIndex({
                         </Button>
                     ) : undefined}
                 />
-
-                {/* KPI Row */}
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-                    <FleetStatCard label="Tracked" value={safeStats.tracked ?? 0} icon={Users} color="purple" />
-                    <FleetStatCard label="Online" value={safeStats.online ?? 0} icon={Wifi} color="blue" />
-                    <FleetStatCard label="Offline" value={safeStats.offline ?? 0} icon={WifiOff} color="red" />
-                    <FleetStatCard label="In Zone" value={safeStats.in_geofence ?? 0} icon={Shield} color="purple" />
-                    <FleetStatCard label="Outside Zone" value={safeStats.outside_geofence ?? 0} icon={ShieldAlert} color="amber" />
-                    <FleetStatCard label="Low Battery" value={safeStats.low_battery ?? 0} icon={BatteryLow} color="red" />
-                </div>
 
                 {/* Main Grid: Map + Sidebar */}
                 <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">

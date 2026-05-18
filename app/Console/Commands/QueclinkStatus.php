@@ -43,7 +43,10 @@ class QueclinkStatus extends Command
             ->where('created_at', '>=', now()->subHour())
             ->count();
 
-        $lastFrameAt = QueclinkRawFrame::query()->max('created_at');
+        $lastFrameAt = QueclinkRawFrame::query()
+            ->latest('created_at')
+            ->first()
+            ?->created_at;
 
         $status = [
             'port' => $port,
@@ -56,20 +59,21 @@ class QueclinkStatus extends Command
 
         if ($this->option('json')) {
             $this->line(json_encode($status, JSON_PRETTY_PRINT));
+
             return self::SUCCESS;
         }
 
         $this->info('Queclink listener status');
-        $this->line('  Service:        ' . $serviceState);
-        $this->line('  Port:           ' . $port);
-        $this->line('  Public host:    ' . $hostname);
-        $this->line('  Devices total:  ' . $devices['total']);
-        $this->line('  ├─ paired:      ' . $devices['paired']);
-        $this->line('  ├─ pending:     ' . $devices['pending']);
-        $this->line('  ├─ rejected:    ' . $devices['rejected']);
-        $this->line('  └─ connected:   ' . $devices['connected_now']);
-        $this->line('  Frames (1h):    ' . $recentFrames);
-        $this->line('  Last frame:     ' . ($lastFrameAt?->diffForHumans() ?? 'never'));
+        $this->line('  Service:        '.$serviceState);
+        $this->line('  Port:           '.$port);
+        $this->line('  Public host:    '.$hostname);
+        $this->line('  Devices total:  '.$devices['total']);
+        $this->line('  ├─ paired:      '.$devices['paired']);
+        $this->line('  ├─ pending:     '.$devices['pending']);
+        $this->line('  ├─ rejected:    '.$devices['rejected']);
+        $this->line('  └─ connected:   '.$devices['connected_now']);
+        $this->line('  Frames (1h):    '.$recentFrames);
+        $this->line('  Last frame:     '.($lastFrameAt?->diffForHumans() ?? 'never'));
 
         return self::SUCCESS;
     }
@@ -82,6 +86,7 @@ class QueclinkStatus extends Command
         $output = [];
         $code = 0;
         exec('systemctl is-active oblivion-queclink.service 2>&1', $output, $code);
+
         return trim(implode(' ', $output)) ?: 'unknown';
     }
 }

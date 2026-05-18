@@ -67,32 +67,40 @@ function csvCell(value: unknown): string {
 export default function ResidentTrackingHistory({ client, tracker, locations, filters }: Props) {
     const [dateFrom, setDateFrom] = useState(filters?.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters?.date_to ?? '');
+    const [showAllPoints, setShowAllPoints] = useState(false);
+    const latestLocation = locations?.[0] ?? null;
+    const firstLocation = locations && locations.length > 0 ? locations[locations.length - 1] : null;
 
     const polyline = useMemo(() => {
-        if (!locations || locations.length < 2) return undefined;
-        // Reverse to get chronological order for polyline
+        if (!showAllPoints || !locations || locations.length < 2) return undefined;
         return [...locations].reverse().map((l) => ({ lat: l.lat, lng: l.lng }));
-    }, [locations]);
+    }, [locations, showAllPoints]);
 
     const mapCenter = useMemo(() => {
-        if (locations && locations.length > 0) {
-            const first = locations[0];
-            return { lat: first.lat, lng: first.lng };
+        if (latestLocation) {
+            return { lat: latestLocation.lat, lng: latestLocation.lng };
         }
         return { lat: -41.2865, lng: 174.7762 };
-    }, [locations]);
+    }, [latestLocation]);
 
     const markers: MapMarker[] = useMemo(() => {
-        return (locations ?? []).map((location, index) => ({
-            id: `location-${index}`,
+        const visibleLocations = showAllPoints
+            ? (locations ?? [])
+            : latestLocation
+                ? [latestLocation]
+                : [];
+
+        return visibleLocations.map((location, index) => ({
+            id: showAllPoints ? `location-${index}` : 'live-location',
             lat: location.lat,
             lng: location.lng,
-            title: client?.name ?? 'Location',
+            title: index === 0 ? `${client?.name ?? 'Resident'} live location` : `${client?.name ?? 'Resident'} history point`,
             type: 'default' as const,
-            status: 'idle',
-            popup: `${displayLocation(location)}${location.address && location.coordinates ? `<br/>Coordinates: ${location.coordinates}` : ''}<br/>${formatDateTime(location.timestamp)}`,
+            status: index === 0 ? 'online' : 'idle',
+            color: index === 0 ? '#ef4444' : '#eab308',
+            popup: `${index === 0 ? 'Live location' : 'History point'}<br/>${displayLocation(location)}${location.address && location.coordinates ? `<br/>Coordinates: ${location.coordinates}` : ''}<br/>${formatDateTime(location.timestamp)}`,
         }));
-    }, [client?.name, locations]);
+    }, [client?.name, latestLocation, locations, showAllPoints]);
 
     const handleFilter = () => {
         router.get(`/fleet-assets/resident-tracking/history/${client?.id}`, {
@@ -218,18 +226,87 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                                 onClick={() => {
                                     setDateFrom('');
                                     setDateTo('');
+                                    setShowAllPoints(false);
                                     router.get(`/fleet-assets/resident-tracking/history/${client?.id}`, {}, { preserveState: true });
                                 }}
                             >
                                 <RotateCcw className="mr-2 h-4 w-4" />
                                 Reset
                             </Button>
+                            {(locations?.length ?? 0) > 1 && (
+                                <Button
+                                    variant={showAllPoints ? 'secondary' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setShowAllPoints((value) => !value)}
+                                >
+                                    <MapPin className="mr-2 h-4 w-4" />
+                                    {showAllPoints ? 'Live point only' : 'View all points'}
+                                </Button>
+                            )}
+                            <Badge variant={showAllPoints ? 'default' : 'secondary'} className="text-xs">
+                                {showAllPoints
+                                    ? `Showing all ${locations?.length ?? 0} points`
+                                    : 'Showing live point'}
+                            </Badge>
                             <Badge variant="secondary" className="ml-auto text-xs">
                                 {locations?.length ?? 0} location points
                             </Badge>
                         </div>
                     </CardContent>
                 </Card>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground">Live point</p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {latestLocation ? formatRelativeTime(latestLocation.timestamp) : 'Not reported'}
+                            </p>
+                            {latestLocation && (
+                                <p className="mt-1 truncate text-xs text-muted-foreground">
+                                    {displayLocation(latestLocation)}
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground">History starts</p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {firstLocation ? formatDateTime(firstLocation.timestamp) : 'No history'}
+                            </p>
+                            {firstLocation && (
+                                <p className="mt-1 truncate text-xs text-muted-foreground">
+                                    {displayLocation(firstLocation)}
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground">Points in view</p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {showAllPoints ? (locations?.length ?? 0) : latestLocation ? 1 : 0}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {showAllPoints ? 'Full history visible on map' : 'Map kept on current location'}
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-xs text-muted-foreground">Latest event</p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {latestLocation?.event_type
+                                    ? latestLocation.event_type.replace(/[._]/g, ' ')
+                                    : 'Location report'}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {latestLocation?.speed != null ? `${latestLocation.speed} km/h` : 'Speed not reported'}
+                            </p>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 {/* Map + Timeline Split */}
                 <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
@@ -273,9 +350,16 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                                                 <MapPin className="h-4 w-4 text-primary dark:text-primary" />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-xs text-muted-foreground">
-                                                    {formatDateTime(loc.timestamp)}
-                                                </p>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {formatDateTime(loc.timestamp)}
+                                                    </p>
+                                                    {i === 0 && (
+                                                        <Badge variant="default" className="text-[10px]">
+                                                            Current
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <p className="text-sm">
                                                     {displayLocation(loc)}
                                                 </p>

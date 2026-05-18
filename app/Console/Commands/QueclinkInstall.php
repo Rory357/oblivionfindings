@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AppSetting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 /**
  * Idempotent installer for the Queclink TCP listener service.
@@ -82,25 +83,35 @@ class QueclinkInstall extends Command
 
         $changed = trim($existing) !== trim($unit);
 
-        if ($changed) {
-            $this->line('Writing '.self::UNIT_FILE);
-            if (@file_put_contents(self::UNIT_FILE, $unit) === false) {
-                $this->error('Could not write unit file. Re-run with sudo.');
+        try {
+            if ($changed) {
+                $this->line('Writing '.self::UNIT_FILE);
+                if (@file_put_contents(self::UNIT_FILE, $unit) === false) {
+                    $this->error('Could not write unit file. Re-run with sudo.');
 
-                return self::FAILURE;
+                    return self::FAILURE;
+                }
+                $this->exec('systemctl daemon-reload');
+            } else {
+                $this->line('Unit file unchanged.');
             }
-            $this->exec('systemctl daemon-reload');
-        } else {
-            $this->line('Unit file unchanged.');
-        }
 
-        $this->exec('systemctl enable '.escapeshellarg(self::SERVICE_NAME));
-        // The listener is a long-running PHP process, so code-only deploys need
-        // a restart even when the unit file itself did not change.
-        $this->exec('systemctl restart '.escapeshellarg(self::SERVICE_NAME));
+            $this->exec('systemctl enable '.escapeshellarg(self::SERVICE_NAME));
+            // The listener is a long-running PHP process, so code-only deploys need
+            // a restart even when the unit file itself did not change.
+            $this->exec('systemctl restart '.escapeshellarg(self::SERVICE_NAME));
 
-        if (! $this->option('no-firewall')) {
-            $this->openFirewallPort($port);
+            if (! $this->option('no-firewall')) {
+                $this->openFirewallPort($port);
+            }
+        } catch (RuntimeException $exception) {
+            Log::error('queclink:install failed', [
+                'port' => $port,
+                'changed_unit' => $changed,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return self::FAILURE;
         }
 
         $this->info("Queclink listener installed on TCP port {$port}.");
@@ -168,7 +179,7 @@ UNIT;
 
             return;
         }
-        $this->exec("ufw allow {$port}/tcp comment 'Oblivion Queclink listener'");
+        $this->exec("ufw allow {$port}/tcp comment 'Oblivion Queclink listener'", required: false);
         $this->line("UFW rule added for tcp/{$port}.");
     }
 
@@ -177,7 +188,7 @@ UNIT;
         return is_dir('/run/systemd/system') || file_exists('/usr/bin/systemctl');
     }
 
-    protected function exec(string $command): void
+    protected function exec(string $command, bool $required = true): int
     {
         $output = [];
         $code = 0;
@@ -186,7 +197,16 @@ UNIT;
             $this->line('  > '.$line);
         }
         if ($code !== 0) {
-            $this->warn("  ! exit code {$code}");
+            $message = "Command failed with exit code {$code}: {$command}";
+            if ($required) {
+                $this->error("  ! {$message}");
+
+                throw new RuntimeException($message);
+            }
+
+            $this->warn("  ! {$message}");
         }
+
+        return $code;
     }
 }

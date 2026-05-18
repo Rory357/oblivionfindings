@@ -10,8 +10,8 @@
 #   2. npm ci && npm run build
 #   3. php artisan migrate --force
 #   4. php artisan storage:link
-#   5. php artisan queclink:install   (writes systemd unit + opens UFW port)
-#   6. php artisan optimize:clear
+#   5. php artisan optimize:clear
+#   6. php artisan queclink:install   (refreshes + restarts listener last)
 #
 # Requires: bash, php, composer, node + npm, MySQL credentials in .env.
 # If running on a server with sudo available the queclink:install step
@@ -43,6 +43,9 @@ php artisan migrate --force
 echo "▶ php artisan storage:link"
 php artisan storage:link 2>/dev/null || true
 
+echo "▶ php artisan optimize:clear"
+php artisan optimize:clear
+
 if [ "$SKIP_QUECLINK" -eq 0 ]; then
     echo "▶ php artisan queclink:install"
     if [ "$(id -u)" -ne 0 ] && ! command -v sudo >/dev/null; then
@@ -56,9 +59,6 @@ if [ "$SKIP_QUECLINK" -eq 0 ]; then
 else
     echo "▶ skipping queclink:install (--skip-queclink)"
 fi
-
-echo "▶ php artisan optimize:clear"
-php artisan optimize:clear
 
 echo
 echo "✓ Server provisioning complete."

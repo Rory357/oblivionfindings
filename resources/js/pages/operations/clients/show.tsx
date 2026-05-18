@@ -74,6 +74,7 @@ import {
     ListTodo,
     MapPin,
     MessageSquare as MsgIcon,
+    Navigation,
     Package,
     Pencil,
     Phone,
@@ -655,7 +656,7 @@ export default function ClientShow({
                 count: pendingConsentRequestsCount || undefined,
                 href: `/operations/clients/${client.id}/consent-requests`,
             },
-            { key: 'location', label: 'Location', icon: MapPin, show: true },
+            { key: 'location', label: 'Location', icon: Navigation, show: true },
             { key: 'portal', label: 'Family Portal', icon: Users, show: true },
             {
                 key: 'family_notes',

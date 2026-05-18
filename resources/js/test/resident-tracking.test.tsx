@@ -3,6 +3,7 @@ import type React from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import ResidentTrackingIndex from '@/pages/fleet-assets/resident-tracking';
+import ResidentTrackingHistory from '@/pages/fleet-assets/resident-tracking/history';
 
 const inertiaMocks = vi.hoisted(() => ({
     post: vi.fn(),
@@ -31,13 +32,31 @@ vi.mock('@/components/page-shell', () => ({
 }));
 
 vi.mock('@/components/fleet-hero', () => ({
-    default: ({ title, actions }: { title: string; actions?: React.ReactNode }) => (
-        <header><h1>{title}</h1>{actions}</header>
+    default: ({
+        title,
+        actions,
+        stats,
+    }: {
+        title: string;
+        actions?: React.ReactNode;
+        stats?: Array<{ label: string; value: string | number }>;
+    }) => (
+        <header>
+            <h1>{title}</h1>
+            {stats?.map((stat) => (
+                <span key={stat.label}>
+                    {stat.label}: {stat.value}
+                </span>
+            ))}
+            {actions}
+        </header>
     ),
 }));
 
 vi.mock('@/components/leaflet-map', () => ({
-    default: () => <div data-testid="resident-map" />,
+    default: ({ markers }: { markers?: unknown[] }) => (
+        <div data-marker-count={markers?.length ?? 0} data-testid="resident-map" />
+    ),
 }));
 
 vi.mock('@/components/fleet-charts', () => ({
@@ -158,6 +177,10 @@ beforeEach(() => {
 it('queues Locate Now from the resident tracking list and shows command state', async () => {
     renderResidentTracking();
 
+    expect(screen.getByText('Tracked: 3')).toBeVisible();
+    expect(screen.getByText('Online: 3')).toBeVisible();
+    expect(screen.getByText('Offline: 0')).toBeVisible();
+    expect(screen.getByText('Low Battery: 1')).toBeVisible();
     expect(screen.getByText('Queued')).toBeVisible();
     expect(screen.getByText('Battery not reported')).toBeVisible();
     expect(screen.getByText('SOS received')).toBeVisible();
@@ -172,4 +195,58 @@ it('queues Locate Now from the resident tracking list and shows command state', 
         {},
         expect.objectContaining({ preserveScroll: true }),
     );
+});
+
+it('keeps location history on the live point until all points are requested', async () => {
+    render(
+        <ResidentTrackingHistory
+            client={{
+                id: 9012,
+                name: 'Amelia Wilson',
+                house: 'Harbour House',
+                photo: null,
+            }}
+            tracker={{
+                id: 12,
+                name: 'Care tracker 867963069916998',
+                serial: null,
+                status: 'active',
+            }}
+            filters={{}}
+            locations={[
+                {
+                    lat: -37.723657,
+                    lng: 175.241655,
+                    timestamp: '2026-05-18T08:06:00Z',
+                    speed: 0,
+                    battery: null,
+                    event_type: 'location_report',
+                },
+                {
+                    lat: -37.723687,
+                    lng: 175.241568,
+                    timestamp: '2026-05-18T07:47:00Z',
+                    speed: 0,
+                    battery: null,
+                    event_type: 'location_report',
+                },
+                {
+                    lat: -37.723587,
+                    lng: 175.241568,
+                    timestamp: '2026-05-18T07:29:00Z',
+                    speed: 0,
+                    battery: null,
+                    event_type: 'location_report',
+                },
+            ]}
+        />,
+    );
+
+    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '1');
+    expect(screen.getByText('Showing live point')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: /View all points/i }));
+
+    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '3');
+    expect(screen.getByText('Showing all 3 points')).toBeVisible();
 });
