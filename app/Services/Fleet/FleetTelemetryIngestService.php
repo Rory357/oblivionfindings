@@ -144,6 +144,14 @@ class FleetTelemetryIngestService
                     ? ($meta['battery_status'] ?? 'unknown')
                     : ((int) $normalized['battery_pct'] <= $threshold ? 'low' : 'normal');
 
+                $safetyEvent = $this->normalisedSafetyEvent($normalized);
+                if ($safetyEvent !== null) {
+                    $meta['last_safety_event'] = $safetyEvent;
+                    $meta['last_safety_event_at'] = $occurredAt instanceof Carbon
+                        ? $occurredAt->toISOString()
+                        : now()->toISOString();
+                }
+
                 if (($meta['charging_status'] ?? null) === 'charging' || ($meta['external_power'] ?? false)) {
                     $meta['battery_status_label'] = 'Charging';
                 } elseif ($normalized['battery_pct'] !== null) {
@@ -220,11 +228,31 @@ class FleetTelemetryIngestService
                     'signal_type' => 'vehicle.sos',
                     'severity_hint' => 'critical',
                     'occurred_at' => $occurredAt,
+                    'idempotency_key' => "fleet-telemetry:{$event->id}:vehicle.sos",
                     'payload' => [
                         'event_id' => $event->id,
                         'vendor' => $vendor,
+                        'command_word' => data_get($normalized, 'raw_payload.command_word'),
                     ],
                 ]);
+
+                if ($this->isResidentSafetyTracker($asset)) {
+                    $this->signals->emit([
+                        'asset_id' => $asset->id,
+                        'asset_tracker_id' => $tracker->id,
+                        'device_id' => $device?->id,
+                        'signal_type' => 'resident.sos',
+                        'severity_hint' => 'critical',
+                        'occurred_at' => $occurredAt,
+                        'idempotency_key' => "fleet-telemetry:{$event->id}:resident.sos",
+                        'payload' => [
+                            'event_id' => $event->id,
+                            'vendor' => $vendor,
+                            'command_word' => data_get($normalized, 'raw_payload.command_word'),
+                            'event_type' => $normalized['event_type'] ?? null,
+                        ],
+                    ]);
+                }
             }
 
             if (!empty($normalized['tamper_flag'])) {
@@ -238,6 +266,24 @@ class FleetTelemetryIngestService
                     'payload' => [
                         'event_id' => $event->id,
                         'vendor' => $vendor,
+                    ],
+                ]);
+            }
+
+            if (($normalized['event_type'] ?? null) === 'battery_low') {
+                $this->signals->emit([
+                    'asset_id' => $asset->id,
+                    'asset_tracker_id' => $tracker->id,
+                    'device_id' => $device?->id,
+                    'signal_type' => 'device.low_battery',
+                    'severity_hint' => 'warning',
+                    'occurred_at' => $occurredAt,
+                    'idempotency_key' => "fleet-telemetry:{$event->id}:device.low_battery",
+                    'payload' => [
+                        'event_id' => $event->id,
+                        'vendor' => $vendor,
+                        'battery_pct' => $normalized['battery_pct'],
+                        'command_word' => data_get($normalized, 'raw_payload.command_word'),
                     ],
                 ]);
             }
@@ -269,6 +315,27 @@ class FleetTelemetryIngestService
         }
 
         return $asset->categoryRef?->slug === 'vehicle';
+    }
+
+    protected function isResidentSafetyTracker(Asset $asset): bool
+    {
+        if ($asset->client_id) {
+            return true;
+        }
+
+        return $asset->category === 'personal_tracker'
+            || $asset->categoryRef?->slug === 'personal_tracker';
+    }
+
+    protected function normalisedSafetyEvent(array $normalized): ?string
+    {
+        if (empty($normalized['sos_flag'])) {
+            return null;
+        }
+
+        $eventType = $normalized['event_type'] ?? null;
+
+        return $eventType === 'man_down' ? 'man_down' : 'vehicle_sos';
     }
 
     protected function buildIdempotencyKey(string $vendor, array $normalized, array $payload): string

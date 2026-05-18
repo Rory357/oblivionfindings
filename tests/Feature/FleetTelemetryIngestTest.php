@@ -11,9 +11,11 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\FleetSignal;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class FleetTelemetryIngestTest extends TestCase
@@ -515,6 +517,7 @@ class FleetTelemetryIngestTest extends TestCase
     public function test_gl30_battery_low_updates_device_health_and_event_without_location_change(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
+        Queue::fake();
 
         ['device' => $device, 'asset' => $asset] = $this->createConsentedPersonalTracker('QUE-HEALTH-LOW');
 
@@ -527,6 +530,7 @@ class FleetTelemetryIngestTest extends TestCase
                 'battery' => 15,
                 'battery_low_threshold' => 20,
                 'charging_status' => 'not_charging',
+                'command_word' => 'GTBPL',
             ])
             ->assertStatus(200);
 
@@ -545,6 +549,65 @@ class FleetTelemetryIngestTest extends TestCase
             'event_type' => 'battery_low',
             'battery_pct' => 15,
         ]);
+
+        $signal = FleetSignal::query()->where('signal_type', 'device.low_battery')->first();
+        $this->assertNotNull($signal);
+        $this->assertSame('warning', $signal->severity_hint);
+        $this->assertSame(15, $signal->payload['battery_pct']);
+        $this->assertSame('GTBPL', $signal->payload['command_word']);
+    }
+
+    public function test_gl30_sos_emits_resident_safety_signal_and_updates_device_meta(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+        Queue::fake();
+
+        ['device' => $device, 'asset' => $asset, 'tracker' => $tracker] = $this->createConsentedPersonalTracker('QUE-SOS');
+        $gpsTime = now()->toISOString();
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-SOS',
+                'gps_time' => $gpsTime,
+                'alarm' => 'sos',
+                'event_type' => 'vehicle_sos',
+                'sos_flag' => true,
+                'command_word' => 'GTSOS',
+            ])
+            ->assertStatus(200);
+
+        $event = FleetTelemetryEvent::query()->where('asset_id', $asset->id)->first();
+        $this->assertNotNull($event);
+
+        $device->refresh();
+        $this->assertSame('vehicle_sos', $device->meta['last_safety_event']);
+
+        $this->assertDatabaseHas('fleet_signals', [
+            'asset_id' => $asset->id,
+            'asset_tracker_id' => $tracker->id,
+            'device_id' => $device->id,
+            'signal_type' => 'resident.sos',
+            'severity_hint' => 'critical',
+        ]);
+
+        $signal = FleetSignal::query()->where('signal_type', 'resident.sos')->first();
+        $this->assertSame($event->id, $signal->payload['event_id']);
+        $this->assertSame('queclink', $signal->payload['vendor']);
+        $this->assertSame('GTSOS', $signal->payload['command_word']);
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-SOS',
+                'gps_time' => $gpsTime,
+                'alarm' => 'sos',
+                'event_type' => 'vehicle_sos',
+                'sos_flag' => true,
+                'command_word' => 'GTSOS',
+            ])
+            ->assertStatus(200)
+            ->assertJson(['duplicate' => true]);
+
+        $this->assertSame(1, FleetSignal::query()->where('signal_type', 'resident.sos')->count());
     }
 
     public function test_gl30_charging_state_updates_device_health_without_battery_percentage_or_location(): void
