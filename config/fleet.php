@@ -15,9 +15,19 @@ return [
     'maps' => [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
         'reverse_geocode_enabled' => env('FLEET_REVERSE_GEOCODE_ENABLED', false),
+        'reverse_geocode_provider' => env('FLEET_REVERSE_GEOCODE_PROVIDER', 'google'),
+        'reverse_geocode_timeout_seconds' => env('FLEET_REVERSE_GEOCODE_TIMEOUT_SECONDS', 6),
         'reverse_geocode_min_distance_km' => env('FLEET_REVERSE_GEOCODE_MIN_DISTANCE_KM', 1),
         'reverse_geocode_cache_ttl_days' => env('FLEET_REVERSE_GEOCODE_CACHE_TTL_DAYS', 30),
         'reverse_geocode_rate_limit_per_minute' => env('FLEET_REVERSE_GEOCODE_RATE_LIMIT_PER_MINUTE', 30),
+        'nominatim' => [
+            'endpoint' => env('FLEET_NOMINATIM_ENDPOINT', 'http://127.0.0.1:8088'),
+            'user_agent' => env('FLEET_NOMINATIM_USER_AGENT', 'OblivionFindings/1.0'),
+            'contact_email' => env('FLEET_NOMINATIM_CONTACT_EMAIL'),
+            'auto_install' => env('FLEET_NOMINATIM_AUTO_INSTALL', false),
+            'region_pbf_url' => env('FLEET_NOMINATIM_REGION_PBF_URL', 'https://download.geofabrik.de/australia-oceania/new-zealand-latest.osm.pbf'),
+            'project_dir' => env('FLEET_NOMINATIM_PROJECT_DIR', '/srv/nominatim-project'),
+        ],
     ],
 
     'behaviour' => [

@@ -169,6 +169,36 @@ class ResidentLocationAddressTest extends TestCase
         $this->assertNotNull($failureEvent->reverse_geocode_failed_at);
     }
 
+    public function test_reverse_geocode_backfill_improves_history_display_location(): void
+    {
+        config(['fleet.maps.reverse_geocode_enabled' => true]);
+
+        ['device' => $device] = $this->createResidentTracker('QUE-ADDR-7');
+        $event = $this->createTelemetryEvent($device, [
+            'address' => null,
+            'latitude' => -37.7870000,
+            'longitude' => 175.2793000,
+        ]);
+
+        $locations = app(IntegrationEventHistoryService::class)->forDevice($device);
+        $this->assertSame('-37.787000, 175.279300', $locations[0]['display_location']);
+
+        $successGeocoder = new class extends ReverseGeocodeService
+        {
+            public function reverseGeocode(float $lat, float $lng, ?int $assetId = null): ?string
+            {
+                return '12 Queen Street, Hamilton';
+            }
+        };
+
+        (new ReverseGeocodeFleetTelemetryEvent($event->id))->handle($successGeocoder);
+
+        $locations = app(IntegrationEventHistoryService::class)->forDevice($device);
+        $this->assertSame('12 Queen Street, Hamilton', $locations[0]['address']);
+        $this->assertSame('-37.787000, 175.279300', $locations[0]['coordinates']);
+        $this->assertSame('12 Queen Street, Hamilton', $locations[0]['display_location']);
+    }
+
     private function createResidentTracker(string $deviceUid): array
     {
         $site = Site::factory()->create();

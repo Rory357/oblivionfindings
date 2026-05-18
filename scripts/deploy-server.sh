@@ -11,7 +11,9 @@
 #   3. php artisan migrate --force
 #   4. php artisan storage:link
 #   5. php artisan optimize:clear
-#   6. php artisan queclink:install   (refreshes + restarts listener last)
+#   6. optional Nominatim install or geocoder health check
+#   7. php artisan queclink:install   (refreshes + restarts listener)
+#   8. php artisan queue:restart
 #
 # Requires: bash, php, composer, node + npm, MySQL credentials in .env.
 # If running on a server with sudo available the queclink:install step
@@ -21,10 +23,15 @@
 set -euo pipefail
 
 SKIP_QUECLINK=0
+INSTALL_NOMINATIM=0
+SKIP_NOMINATIM=0
 for arg in "$@"; do
     case "$arg" in
         --skip-queclink) SKIP_QUECLINK=1 ;;
-        --help|-h) echo "Usage: $0 [--skip-queclink]"; exit 0 ;;
+        --install-nominatim) INSTALL_NOMINATIM=1 ;;
+        --skip-nominatim) SKIP_NOMINATIM=1 ;;
+        --help|-h) echo "Usage: $0 [--skip-queclink] [--install-nominatim] [--skip-nominatim]"; exit 0 ;;
+        *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done
 
@@ -35,6 +42,7 @@ composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "▶ npm ci && npm run build"
 npm ci
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
 npm run build
 
 echo "▶ php artisan migrate --force"
@@ -45,6 +53,19 @@ php artisan storage:link 2>/dev/null || true
 
 echo "▶ php artisan optimize:clear"
 php artisan optimize:clear
+
+if [ "$SKIP_NOMINATIM" -eq 1 ]; then
+    echo "▶ skipping geocoder health check (--skip-nominatim)"
+elif [ "$INSTALL_NOMINATIM" -eq 1 ]; then
+    echo "▶ scripts/nominatim/install-nominatim.sh"
+    bash scripts/nominatim/install-nominatim.sh
+
+    echo "▶ php artisan fleet:geocoder:status --fail-if-enabled"
+    php artisan fleet:geocoder:status --fail-if-enabled
+else
+    echo "▶ php artisan fleet:geocoder:status --fail-if-enabled"
+    php artisan fleet:geocoder:status --fail-if-enabled
+fi
 
 if [ "$SKIP_QUECLINK" -eq 0 ]; then
     echo "▶ php artisan queclink:install"
@@ -60,6 +81,9 @@ else
     echo "▶ skipping queclink:install (--skip-queclink)"
 fi
 
+echo "▶ php artisan queue:restart"
+php artisan queue:restart
+
 echo
 echo "✓ Server provisioning complete."
 echo
@@ -67,3 +91,7 @@ echo "Queclink listener:"
 echo "  Status:   sudo systemctl status oblivion-queclink"
 echo "  Logs:     sudo journalctl -u oblivion-queclink -f"
 echo "  Settings: visit /security-devices/integrations/queclink in the app"
+echo
+echo "Fleet geocoder:"
+echo "  Status:   php artisan fleet:geocoder:status"
+echo "  Backfill: php artisan fleet:reverse-geocode:backfill --client=9012 --limit=500 --dry-run"
