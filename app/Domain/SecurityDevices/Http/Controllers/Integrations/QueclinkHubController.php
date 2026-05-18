@@ -10,17 +10,20 @@ use App\Models\AppSetting;
 use App\Models\Asset;
 use App\Models\AssetTracker;
 use App\Models\Client;
+use App\Models\ClientConsent;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use App\Services\Queclink\CommandBuilder;
 use App\Services\Queclink\ConfigurationSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -151,37 +154,45 @@ class QueclinkHubController extends Controller
         $validated = $request->validate([
             'pairing_type' => ['required', 'in:vehicle,staff,client'],
             'target_id' => ['required', 'integer'],
-            'consent_id' => ['nullable', 'integer'],
+            'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
             'create_personal_tracker_asset' => ['nullable', 'boolean'],
         ]);
 
         return DB::transaction(function () use ($queclinkDevice, $validated, $request) {
             $tenantId = $this->resolveTenantId($request->user());
+            $pairingType = $validated['pairing_type'];
+            $targetId = (int) $validated['target_id'];
+            $client = $pairingType === 'client'
+                ? Client::query()->findOrFail($targetId)
+                : null;
+            $consentId = $client
+                ? $this->resolveClientTrackingConsentId($client, $validated['consent_id'] ?? null)
+                : null;
 
-            $asset = match ($validated['pairing_type']) {
-                'vehicle' => $this->resolveVehicleAsset((int) $validated['target_id']),
+            $asset = match ($pairingType) {
+                'vehicle' => $this->resolveVehicleAsset($targetId),
                 'staff' => $this->ensurePersonalTrackerAsset(
                     type: 'staff',
-                    targetId: (int) $validated['target_id'],
+                    targetId: $targetId,
                     tenantId: $tenantId,
                 ),
                 'client' => $this->ensurePersonalTrackerAsset(
                     type: 'client',
-                    targetId: (int) $validated['target_id'],
+                    targetId: $targetId,
                     tenantId: $tenantId,
                 ),
             };
 
-            $device = $this->ensureCanonicalDevice($queclinkDevice, $tenantId, $validated['pairing_type']);
+            $device = $this->ensureCanonicalDevice($queclinkDevice, $tenantId, $pairingType);
 
             DeviceAssignment::create([
                 'device_id' => $device->id,
-                'assignable_type' => $validated['pairing_type'],
-                'assignable_id' => (int) $validated['target_id'],
+                'assignable_type' => $pairingType,
+                'assignable_id' => $targetId,
                 'assignment_type' => AssignmentType::Permanent->value,
                 'assigned_at' => now(),
                 'assigned_by_user_id' => $request->user()->id,
-                'consent_id' => $validated['pairing_type'] === 'client' ? ($validated['consent_id'] ?? null) : null,
+                'consent_id' => $consentId,
             ]);
 
             AssetTracker::updateOrCreate(
@@ -194,7 +205,7 @@ class QueclinkHubController extends Controller
                     'imei' => $queclinkDevice->imei,
                     'status' => 'paired',
                     'paired_at' => now(),
-                    'consent_id' => $validated['pairing_type'] === 'client' ? ($validated['consent_id'] ?? null) : null,
+                    'consent_id' => $consentId,
                 ],
             );
 
@@ -207,6 +218,40 @@ class QueclinkHubController extends Controller
 
             return back()->with('success', "Device {$queclinkDevice->imei} paired.");
         });
+    }
+
+    private function resolveClientTrackingConsentId(Client $client, ?int $requestedConsentId): int
+    {
+        if ($requestedConsentId) {
+            $consent = ClientConsent::query()
+                ->where('client_id', $client->id)
+                ->find($requestedConsentId);
+
+            if ($this->isUsableConsent($consent)) {
+                return (int) $consent->id;
+            }
+
+            throw ValidationException::withMessages([
+                'consent_id' => 'The selected tracking consent is not active for this client.',
+            ]);
+        }
+
+        $consent = ConsentValidationService::latestValidTrackingConsentForClient($client);
+
+        if ($consent) {
+            return (int) $consent->id;
+        }
+
+        throw ValidationException::withMessages([
+            'consent_id' => 'Client tracker pairing requires an active location tracking consent.',
+        ]);
+    }
+
+    private function isUsableConsent(?ClientConsent $consent): bool
+    {
+        return $consent !== null
+            && ! $consent->withdrawn_at
+            && $consent->isValid();
     }
 
     public function rejectDevice(Request $request, QueclinkDevice $queclinkDevice)

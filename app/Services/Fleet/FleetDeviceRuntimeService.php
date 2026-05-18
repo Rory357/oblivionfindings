@@ -8,6 +8,7 @@ use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Services\ConsentValidationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -147,9 +148,14 @@ class FleetDeviceRuntimeService
             $client = Client::query()->find($assignment->assignable_id);
         }
 
-        if (!$client) {
+        if (! $client) {
             $client = $asset?->client;
         }
+
+        $clientConsent = $client
+            ? ConsentValidationService::latestValidTrackingConsentForClient($client)
+            : null;
+        $usableConsent = $this->firstUsableConsent($assignmentConsent, $trackerConsent, $clientConsent);
 
         return [
             'assignment' => $assignment,
@@ -158,13 +164,14 @@ class FleetDeviceRuntimeService
             'client' => $client,
             'assignment_consent' => $assignmentConsent,
             'tracker_consent' => $trackerConsent,
-            'consent' => $assignmentConsent ?? $trackerConsent,
+            'client_consent' => $clientConsent,
+            'consent' => $usableConsent,
         ];
     }
 
     public function mapConsentStatus(?ClientConsent $consent): string
     {
-        if (!$consent) {
+        if (! $consent) {
             return 'pending';
         }
 
@@ -197,11 +204,22 @@ class FleetDeviceRuntimeService
         return $value === '' ? null : $value;
     }
 
+    private function firstUsableConsent(?ClientConsent ...$consents): ?ClientConsent
+    {
+        foreach ($consents as $consent) {
+            if ($consent && ! $consent->withdrawn_at && $consent->isValid()) {
+                return $consent;
+            }
+        }
+
+        return null;
+    }
+
     private function resolveTenantIdForTracker(AssetTracker $tracker): int
     {
         $siteId = $tracker->asset?->site_id;
 
-        if (!$siteId) {
+        if (! $siteId) {
             return 1;
         }
 

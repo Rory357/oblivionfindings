@@ -3,8 +3,14 @@
 namespace Tests\Feature\Queclink;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AppSetting;
 use App\Models\Asset;
+use App\Models\AssetTracker;
+use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
@@ -158,6 +164,58 @@ class QueclinkHubControllerTest extends TestCase
             'category' => 'personal_tracker',
             'primary_driver_user_id' => $staff->id,
         ]);
+    }
+
+    public function test_claim_as_client_links_existing_valid_tracking_consent_when_not_supplied()
+    {
+        $client = Client::create(['first_name' => 'Amelia', 'last_name' => 'Wilson']);
+        $consentType = ConsentType::create([
+            'name' => 'Personal Tracker (Wandering Risk)',
+            'category' => 'safety',
+            'description' => 'Personal tracker consent',
+            'purpose' => 'Resident safety tracking',
+            'legal_basis' => 'Consent',
+            'version' => 1,
+            'active' => true,
+        ]);
+        $consentVersion = ConsentTypeVersion::create([
+            'consent_type_id' => $consentType->id,
+            'version' => 1,
+            'description' => 'Personal tracker consent v1',
+            'purpose' => 'Resident safety tracking',
+            'legal_basis' => 'Consent',
+            'effective_from' => now()->subDay(),
+        ]);
+        $consent = ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => $consentType->id,
+            'consent_type_version_id' => $consentVersion->id,
+            'status' => 'given',
+            'given_at' => now()->subDay(),
+            'expires_at' => now()->addDays(30),
+        ]);
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PENDING,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
+                'pairing_type' => 'client',
+                'target_id' => $client->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertSame($consent->id, DeviceAssignment::query()
+            ->where('device_id', $device->fresh()->device_id)
+            ->where('assignable_type', 'client')
+            ->value('consent_id'));
+
+        $this->assertSame($consent->id, AssetTracker::query()
+            ->where('vendor', 'queclink')
+            ->where('device_uid', $device->imei)
+            ->value('consent_id'));
     }
 
     public function test_reject_pending_device_marks_status_rejected()
