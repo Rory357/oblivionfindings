@@ -51,6 +51,9 @@ type Resident = {
     last_seen_at: string | null;
     lat: number | null;
     lng: number | null;
+    address?: string | null;
+    coordinates?: string | null;
+    display_location?: string | null;
     battery: number | null;
     battery_status?: 'low' | 'normal' | 'unknown' | string | null;
     battery_voltage_mv?: number | null;
@@ -217,6 +220,20 @@ function safetyEventLabel(event?: string | null): string | null {
     }
 }
 
+function coordinateText(lat: number, lng: number): string {
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+function displayLocation(resident: Resident): string | null {
+    if (resident.display_location) return resident.display_location;
+    if (resident.coordinates) return resident.coordinates;
+    if (resident.lat != null && resident.lng != null) {
+        return coordinateText(resident.lat, resident.lng);
+    }
+
+    return null;
+}
+
 function formatAlertType(alertType: string): string {
     return alertType
         .replace(/[._]/g, ' ')
@@ -311,6 +328,7 @@ export default function ResidentTrackingIndex({
             .map((r) => {
                 const battery = getBatteryState(r);
                 const safety = safetyEventLabel(r.last_safety_event);
+                const location = displayLocation(r);
 
                 return {
                     id: r.client_id,
@@ -319,7 +337,7 @@ export default function ResidentTrackingIndex({
                     title: r.preferred_name ?? r.name,
                     type: 'default' as const,
                     status: getMarkerStatus(r),
-                    popup: `${r.name}<br/>${r.house}<br/>Zone: ${getZoneBadge(r).text}<br/>Battery: ${battery.label}${battery.detail ? ` (${battery.detail})` : ''}${safety ? `<br/>Safety: ${safety}` : ''}<br/>Last seen: ${formatRelativeTime(r.last_seen_at)}`,
+                    popup: `${r.name}<br/>${r.house}${location ? `<br/>Location: ${location}` : ''}${r.address && r.coordinates ? `<br/>Coordinates: ${r.coordinates}` : ''}<br/>Zone: ${getZoneBadge(r).text}<br/>Battery: ${battery.label}${battery.detail ? ` (${battery.detail})` : ''}${safety ? `<br/>Safety: ${safety}` : ''}<br/>Last seen: ${formatRelativeTime(r.last_seen_at)}`,
                 };
             });
     }, [safeResidents]);
@@ -523,6 +541,7 @@ export default function ResidentTrackingIndex({
                                             const BatteryIcon = battery.icon;
                                             const commandLabel = commandStatusLabel(resident.last_command_status);
                                             const safety = safetyEventLabel(resident.last_safety_event);
+                                            const location = displayLocation(resident);
 
                                             return (
                                                 <div
@@ -560,6 +579,11 @@ export default function ResidentTrackingIndex({
                                                             <div className="text-xs text-muted-foreground">
                                                                 {resident.house} &middot; {formatRelativeTime(resident.last_seen_at)}
                                                             </div>
+                                                            {location && (
+                                                                <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                                                                    {location}
+                                                                </div>
+                                                            )}
                                                             {safety && (
                                                                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                                                     <Badge

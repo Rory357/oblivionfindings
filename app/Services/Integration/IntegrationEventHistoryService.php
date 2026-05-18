@@ -13,7 +13,7 @@ class IntegrationEventHistoryService
 {
     public function forDevice(?Device $device, array $filters = [], bool $includeEventType = false): Collection
     {
-        if (!$device) {
+        if (! $device) {
             return collect();
         }
 
@@ -28,14 +28,14 @@ class IntegrationEventHistoryService
 
     private function integrationEventLocations(Device $device, array $filters, bool $includeEventType): Collection
     {
-        if (!Schema::hasTable('integration_events')) {
+        if (! Schema::hasTable('integration_events')) {
             return collect();
         }
 
         $hasCanonicalColumn = $this->hasCanonicalDeviceColumn();
         $legacyHardwareId = $device->legacy_location_hardware_id;
 
-        if (!$hasCanonicalColumn && !$legacyHardwareId) {
+        if (! $hasCanonicalColumn && ! $legacyHardwareId) {
             return collect();
         }
 
@@ -46,7 +46,7 @@ class IntegrationEventHistoryService
                     $query->where('canonical_device_id', $device->id);
                 }
 
-                if (!$legacyHardwareId) {
+                if (! $legacyHardwareId) {
                     return;
                 }
 
@@ -62,12 +62,12 @@ class IntegrationEventHistoryService
                 $query->where('hardware_id', $legacyHardwareId);
             });
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('created_at', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
+        if (! empty($filters['date_to'])) {
+            $query->where('created_at', '<=', $filters['date_to'].' 23:59:59');
         }
 
         return $query->orderByDesc('created_at')
@@ -81,7 +81,7 @@ class IntegrationEventHistoryService
 
     private function fleetTelemetryLocations(Device $device, array $filters, bool $includeEventType): Collection
     {
-        if (!Schema::hasTable('fleet_telemetry_events')) {
+        if (! Schema::hasTable('fleet_telemetry_events')) {
             return collect();
         }
 
@@ -102,11 +102,11 @@ class IntegrationEventHistoryService
                 }
             });
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('occurred_at', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->where('occurred_at', '<=', $filters['date_to'].' 23:59:59');
         }
 
@@ -140,9 +140,15 @@ class IntegrationEventHistoryService
             return null;
         }
 
+        $coordinates = $this->formatCoordinates($lat, $lng);
+        $address = $this->addressFromPayload($payload);
+
         $location = [
             'lat' => (float) $lat,
             'lng' => (float) $lng,
+            'address' => $address,
+            'coordinates' => $coordinates,
+            'display_location' => $address ?: $coordinates,
             'timestamp' => $event->created_at?->toISOString() ?? $event->created_at,
             'speed' => $payload['speed'] ?? $payload['speed_kph'] ?? null,
             'battery' => $payload['battery'] ?? $payload['battery_level'] ?? $payload['battery_pct'] ?? null,
@@ -157,9 +163,14 @@ class IntegrationEventHistoryService
 
     private function mapFleetTelemetryEvent(FleetTelemetryEvent $event, bool $includeEventType): array
     {
+        $coordinates = $this->formatCoordinates($event->latitude, $event->longitude);
+
         $location = [
             'lat' => (float) $event->latitude,
             'lng' => (float) $event->longitude,
+            'address' => $event->address,
+            'coordinates' => $coordinates,
+            'display_location' => $event->address ?: $coordinates,
             'timestamp' => $event->occurred_at?->toISOString()
                 ?? $event->created_at?->toISOString()
                 ?? $event->created_at,
@@ -191,6 +202,21 @@ class IntegrationEventHistoryService
         }
 
         return [];
+    }
+
+    private function addressFromPayload(array $payload): ?string
+    {
+        $address = $payload['address']
+            ?? $payload['formatted_address']
+            ?? data_get($payload, 'location.address')
+            ?? data_get($payload, 'gps.address');
+
+        return is_string($address) && trim($address) !== '' ? trim($address) : null;
+    }
+
+    private function formatCoordinates(mixed $lat, mixed $lng): string
+    {
+        return sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
     }
 
     private function selectColumns(): array

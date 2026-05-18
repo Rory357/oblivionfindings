@@ -9,9 +9,12 @@ use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\Client;
+use App\Models\ClientConsent;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
+use App\Models\FleetTelemetryEvent;
 use App\Models\Queclink\QueclinkPendingCommand;
+use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\Queclink\LocateNowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +49,10 @@ class ResidentTrackingController extends Controller
         // Filter to authorized clients.
         $clientDevices = $clientDevices->filter(function (Device $device) use ($authorizedClientIds) {
             $assignment = $device->assignments->first();
-            if (!$assignment) return false;
+            if (! $assignment) {
+                return false;
+            }
+
             return $authorizedClientIds === null || in_array($assignment->assignable_id, $authorizedClientIds);
         });
 
@@ -61,7 +67,7 @@ class ResidentTrackingController extends Controller
                 $geofences = AssetGeofence::where('is_active', true)
                     ->where(function ($q) {
                         $q->where('scope', 'resident')
-                          ->orWhereHas('asset', fn ($q2) => $q2->where('asset_type', 'house'));
+                            ->orWhereHas('asset', fn ($q2) => $q2->where('asset_type', 'house'));
                     })
                     ->get();
             }
@@ -86,14 +92,20 @@ class ResidentTrackingController extends Controller
         // Build resident tracking data.
         $residents = $clientDevices->map(function (Device $device) use ($clients, $geofences, $activeOutingClientIds) {
             $assignment = $device->assignments->first();
-            if (!$assignment) return null;
+            if (! $assignment) {
+                return null;
+            }
 
             $client = $clients->get($assignment->assignable_id);
-            if (!$client) return null;
+            if (! $client) {
+                return null;
+            }
 
             $meta = $device->meta ?? [];
             $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
+            $address = $lat !== null && $lng !== null ? $this->latestAddressForDevice($device) : null;
+            $coordinates = $this->formatCoordinates($lat, $lng);
             $battery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
             $batteryThreshold = (int) ($meta['battery_low_threshold'] ?? 20);
             $batteryStatus = $meta['battery_status'] ?? (
@@ -105,8 +117,13 @@ class ResidentTrackingController extends Controller
             if ($lat !== null && $lng !== null) {
                 $siteId = $client->site_id;
                 $applicableGeofence = $geofences->first(function ($gf) use ($siteId) {
-                    if ($gf->scope === 'resident' && $gf->site_id === $siteId) return true;
-                    if ($gf->asset && $gf->asset->site_id === $siteId) return true;
+                    if ($gf->scope === 'resident' && $gf->site_id === $siteId) {
+                        return true;
+                    }
+                    if ($gf->asset && $gf->asset->site_id === $siteId) {
+                        return true;
+                    }
+
                     return false;
                 });
 
@@ -133,7 +150,7 @@ class ResidentTrackingController extends Controller
                 'id' => $device->id,
                 'device_uid' => $device->device_uid,
                 'client_id' => $client->id,
-                'name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
                 'preferred_name' => $client->preferred_name,
                 'house' => $client->site?->name ?? 'Unknown',
                 'site_id' => $client->site_id,
@@ -145,6 +162,9 @@ class ResidentTrackingController extends Controller
                 'last_seen_at' => $device->last_seen_at?->toISOString(),
                 'lat' => $lat !== null ? (float) $lat : null,
                 'lng' => $lng !== null ? (float) $lng : null,
+                'address' => $address,
+                'coordinates' => $coordinates,
+                'display_location' => $address ?: $coordinates,
                 'battery' => $battery,
                 'battery_status' => $batteryStatus,
                 'battery_voltage_mv' => $meta['battery_voltage_mv'] ?? null,
@@ -185,13 +205,14 @@ class ResidentTrackingController extends Controller
                     ->latest()->limit(5)->get()
                     ->map(function ($alert) {
                         $client = $alert->client_id ? Client::find($alert->client_id) : null;
+
                         return [
                             'id' => $alert->id,
                             'title' => $alert->alert_type ?? 'Alert',
                             'severity' => $alert->severity ?? 'medium',
                             'status' => $alert->status ?? 'open',
                             'created_at' => $alert->created_at?->toISOString(),
-                            'resident_name' => $client ? trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')) : null,
+                            'resident_name' => $client ? trim(($client->first_name ?? '').' '.($client->last_name ?? '')) : null,
                         ];
                     })->toArray();
             }
@@ -257,7 +278,7 @@ class ResidentTrackingController extends Controller
         }
         $availableClients = $clientQuery->get()->map(fn ($c) => [
             'id' => $c->id,
-            'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+            'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
             'house' => $c->site?->name ?? 'Unknown',
             'is_tracked' => in_array($c->id, $trackedClientIds),
         ]);
@@ -294,6 +315,7 @@ class ResidentTrackingController extends Controller
         $assignedTrackers = $assignedDevices->map(function (Device $d) use ($assignedClients) {
             $assignment = $d->assignments->first();
             $client = $assignedClients[$assignment?->assignable_id] ?? null;
+
             return [
                 'id' => $d->id,
                 'device_uid' => $d->device_uid,
@@ -302,7 +324,7 @@ class ResidentTrackingController extends Controller
                 'provider' => $d->provider,
                 'status' => $d->status?->value,
                 'client_id' => $assignment?->assignable_id,
-                'client_name' => $client ? trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')) : 'Unknown',
+                'client_name' => $client ? trim(($client->first_name ?? '').' '.($client->last_name ?? '')) : 'Unknown',
                 'client_house' => $client?->site?->name ?? 'Unknown',
                 'battery' => $d->battery_level,
                 'detail_url' => "/security-devices/devices/{$d->id}",
@@ -334,7 +356,7 @@ class ResidentTrackingController extends Controller
         $device = Device::findOrFail($data['tracker_id']);
 
         $consentId = $data['consent_id']
-            ?? \App\Models\ClientConsent::query()
+            ?? ClientConsent::query()
                 ->where('client_id', $data['client_id'])
                 ->where('status', 'given')
                 ->whereNull('withdrawn_at')
@@ -375,13 +397,13 @@ class ResidentTrackingController extends Controller
             ->where('domain', 'tracking')
             ->first();
 
-        $locations = app(\App\Services\Integration\IntegrationEventHistoryService::class)
+        $locations = app(IntegrationEventHistoryService::class)
             ->forDevice($device, $request->only(['date_from', 'date_to']), true);
 
         return Inertia::render('fleet-assets/resident-tracking/history', [
             'client' => [
                 'id' => $client->id,
-                'name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
                 'house' => $client->site?->name ?? 'Unknown',
                 'photo' => $client->profile_photo_url,
             ],
@@ -470,6 +492,28 @@ class ResidentTrackingController extends Controller
             || $value === 'yes';
     }
 
+    private function latestAddressForDevice(Device $device): ?string
+    {
+        return FleetTelemetryEvent::query()
+            ->where('device_id', $device->id)
+            ->where('consent_blocked', false)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereNotNull('address')
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->value('address');
+    }
+
+    private function formatCoordinates(mixed $lat, mixed $lng): ?string
+    {
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        return sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
+    }
+
     private function buildMapGeofences($geofences): array
     {
         try {
@@ -492,6 +536,7 @@ class ResidentTrackingController extends Controller
                         'lng' => $p['lng'] ?? $p['lon'] ?? $p['longitude'] ?? 0,
                     ])->toArray();
                 }
+
                 return $result;
             })->toArray();
         } catch (\Throwable) {

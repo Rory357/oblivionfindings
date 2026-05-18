@@ -12,49 +12,67 @@ namespace App\Http\Controllers;
  * See: Phase 14 refactoring plan
  */
 
+use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Http\Requests\StoreClientRequest;
+use App\Http\Requests\UpdateClientRequest;
+use App\Models\AssetGeofence;
+use App\Models\CarePlan;
 use App\Models\Client;
+use App\Models\ClientAppointment;
+use App\Models\ClientConsent;
 use App\Models\ClientDocument;
-use App\Models\ClientPersonalAsset;
+use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientOnboardingWorkflow;
+use App\Models\ClientPersonalAsset;
+use App\Models\ClientPhoto;
+use App\Models\ClientRisk;
+use App\Models\ConsentRequest;
+use App\Models\ConsentType;
+use App\Models\FamilyNote;
+use App\Models\FamilyVisitRequest;
+use App\Models\FleetIncident;
+use App\Models\FleetMedicationTransitLog;
+use App\Models\FleetOuting;
+use App\Models\FleetOutingResident;
+use App\Models\FleetResidentTransport;
+use App\Models\FleetTelemetryEvent;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
+use App\Models\ProgressNote;
+use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\Role;
+use App\Models\ServiceAgreement;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftSeries;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
-use App\Models\Site;
-use App\Models\ServiceContext;
-use App\Services\NotificationService;
 use App\Services\AuditLogger;
+use App\Services\ConsentValidationService;
+use App\Services\HealthSafety\HsModuleSummaryService;
+use App\Services\Integration\IntegrationEventHistoryService;
+use App\Services\NotificationService;
+use App\Services\Queclink\LocateNowService;
+use App\Services\ShiftCoverageService;
+use App\Support\ClientSafetyPayload;
+use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use App\Http\Requests\StoreClientRequest;
-use App\Http\Requests\UpdateClientRequest;
-use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Services\DeviceRegistryService;
-use App\Models\AssetGeofence;
-use App\Models\ConsentType;
-use App\Models\FleetResidentTransport;
-use App\Models\FleetOuting;
-use App\Models\FleetOutingResident;
-use App\Models\FleetMedicationTransitLog;
-use App\Models\FleetIncident;
-use App\Models\Queclink\QueclinkPendingCommand;
-use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
-use App\Services\HealthSafety\HsModuleSummaryService;
-use App\Services\Queclink\LocateNowService;
-use App\Services\ShiftCoverageService;
-use App\Support\ClientSafetyPayload;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class ClientController extends Controller
 {
@@ -66,8 +84,8 @@ class ClientController extends Controller
 
         $clients = Client::query()
             ->when(
-                $user->hasRole('support_worker') && !$user->hasRole('admin', 'manager', 'coordinator'),
-                fn($q) => $q->whereHas('supportWorkers', fn($q) => $q->whereKey($user->id))
+                $user->hasRole('support_worker') && ! $user->hasRole('admin', 'manager', 'coordinator'),
+                fn ($q) => $q->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
             )
             ->with([
                 'site:id,name,is_active',
@@ -108,6 +126,7 @@ class ClientController extends Controller
         $clients = $clients->map(function (Client $c) {
             $summary = $this->buildOnboardingSummaryFromCounts($c);
             $hasRespite = ((int) ($c->respite_bookings_count ?? 0) + (int) ($c->respite_booking_requests_count ?? 0)) > 0;
+
             return [
                 'id' => $c->id,
                 'nhi_number' => $c->nhi_number,
@@ -132,7 +151,7 @@ class ClientController extends Controller
     {
         $overrides = $client->onboardingOverrides
             ->keyBy('key')
-            ->map(fn($o) => (bool) $o->value)
+            ->map(fn ($o) => (bool) $o->value)
             ->toArray();
 
         $hasProfile = (bool) ($client->first_name && $client->last_name)
@@ -197,8 +216,8 @@ class ClientController extends Controller
                     'id' => $client->id,
                     'first_name' => $client->first_name,
                     'last_name' => $client->last_name,
-                'profile_photo_url' => $client->profile_photo_url,
-                'avatar' => $client->avatar,
+                    'profile_photo_url' => $client->profile_photo_url,
+                    'avatar' => $client->avatar,
                     'status' => $client->status,
                     'site' => $client->site
                         ? [
@@ -206,7 +225,7 @@ class ClientController extends Controller
                             'name' => $client->site->name,
                         ]
                         : null,
-                    'support_workers' => $client->supportWorkers->map(fn($u) => [
+                    'support_workers' => $client->supportWorkers->map(fn ($u) => [
                         'id' => $u->id,
                         'name' => $u->name,
                         'email' => $u->email,
@@ -216,8 +235,8 @@ class ClientController extends Controller
         }
 
         // Check for expired consents and pass to frontend
-        $expiredConsents = \App\Services\ConsentValidationService::getExpiredConsents($client);
-        $missingMandatory = \App\Services\ConsentValidationService::getMissingMandatoryConsents($client);
+        $expiredConsents = ConsentValidationService::getExpiredConsents($client);
+        $missingMandatory = ConsentValidationService::getMissingMandatoryConsents($client);
 
         $nextShift = Shift::query()
             ->where('client_id', $client->id)
@@ -286,7 +305,7 @@ class ClientController extends Controller
         $documents = ClientDocument::query()
             ->where('client_id', $client->id)
             ->orderByDesc('created_at')
-            ->get(['id','title','category','version','effective_date','expiry_date','portal_visible','notes','original_name','mime_type','size_bytes','created_at']);
+            ->get(['id', 'title', 'category', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at']);
 
         $events = TimelineEvent::query()
             ->where('client_id', $client->id)
@@ -345,7 +364,7 @@ class ClientController extends Controller
                     'type' => $client->serviceContext->type?->value,
                     'name' => $client->serviceContext->name,
                 ] : null,
-                'support_workers' => $client->supportWorkers->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
+                'support_workers' => $client->supportWorkers->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
                 // Identity & Culture
                 'ethnicity' => $client->ethnicity,
                 'preferred_pronouns' => $client->preferred_pronouns,
@@ -369,16 +388,16 @@ class ClientController extends Controller
             ],
             'support_plan' => $client->supportPlan,
             'assessments' => $client->assessments
-                ->sortByDesc(fn($a) => $a->assessed_at ?? $a->created_at)
+                ->sortByDesc(fn ($a) => $a->assessed_at ?? $a->created_at)
                 ->values(),
             'documents' => $documents,
-            'portal_users' => $client->portalUsers->map(fn($u) => [
+            'portal_users' => $client->portalUsers->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
                 'relation' => $u->pivot?->relation,
             ])->values(),
-            'events' => $events->map(fn($e) => [
+            'events' => $events->map(fn ($e) => [
                 'id' => $e->id,
                 'source_id' => $e->source_id,
                 'source_type' => $e->source_type,
@@ -397,7 +416,7 @@ class ClientController extends Controller
                     'body' => $c->body,
                     'user_id' => $c->user_id,
                     'user_name' => $c->user?->name,
-                    'is_staff' => !in_array($c->user?->role, ['client', 'next_of_kin'], true),
+                    'is_staff' => ! in_array($c->user?->role, ['client', 'next_of_kin'], true),
                     'likes_count' => $c->likes->count(),
                     'liked_by_user_ids' => $c->likes->pluck('user_id')->all(),
                     'created_at' => $c->created_at?->toISOString(),
@@ -406,7 +425,7 @@ class ClientController extends Controller
                         'body' => $r->body,
                         'user_id' => $r->user_id,
                         'user_name' => $r->user?->name,
-                        'is_staff' => !in_array($r->user?->role, ['client', 'next_of_kin'], true),
+                        'is_staff' => ! in_array($r->user?->role, ['client', 'next_of_kin'], true),
                         'likes_count' => $r->likes->count(),
                         'liked_by_user_ids' => $r->likes->pluck('user_id')->all(),
                         'created_at' => $r->created_at?->toISOString(),
@@ -422,7 +441,7 @@ class ClientController extends Controller
                     ->values()
                     ->all(),
             ])->values(),
-            'handover' => $handover->map(fn($e) => [
+            'handover' => $handover->map(fn ($e) => [
                 'id' => $e->id,
                 'source_id' => $e->source_id,
                 'source_type' => $e->source_type,
@@ -443,7 +462,7 @@ class ClientController extends Controller
                     'weekdays' => $series->by_weekday ?? [],
                     'starts_time' => $series->starts_time,
                     'ends_time' => $series->ends_time,
-                    'next_starts_at' => $series->next_starts_at ? \Carbon\Carbon::parse($series->next_starts_at)->toIso8601String() : null,
+                    'next_starts_at' => $series->next_starts_at ? Carbon::parse($series->next_starts_at)->toIso8601String() : null,
                     'location' => $series->location,
                     'is_sleepover' => (bool) $series->is_sleepover,
                     'is_on_call' => (bool) $series->is_on_call,
@@ -493,7 +512,7 @@ class ClientController extends Controller
                         'name' => $client->onboardingWorkflow->assignee->name,
                     ] : null,
                     'notes' => $client->onboardingWorkflow->notes,
-                    'steps' => $client->onboardingWorkflow->steps->sortBy('step_order')->map(fn($s) => [
+                    'steps' => $client->onboardingWorkflow->steps->sortBy('step_order')->map(fn ($s) => [
                         'id' => $s->id,
                         'step_name' => $s->step_name,
                         'step_order' => $s->step_order,
@@ -507,44 +526,44 @@ class ClientController extends Controller
                 ] : null,
             ],
             // Progress notes for client (last 20)
-            'client_progress_notes' => \App\Models\ProgressNote::where('client_id', $client->id)
+            'client_progress_notes' => ProgressNote::where('client_id', $client->id)
                 ->with(['author:id,name', 'goal:id,title'])
                 ->orderByDesc('created_at')
                 ->limit(20)
                 ->get(),
 
             // Service agreements
-            'client_agreements' => \App\Models\ServiceAgreement::where('client_id', $client->id)
+            'client_agreements' => ServiceAgreement::where('client_id', $client->id)
                 ->orderByDesc('created_at')
                 ->get(),
 
             // Active risks
-            'client_risks' => \App\Models\ClientRisk::where('client_id', $client->id)
+            'client_risks' => ClientRisk::where('client_id', $client->id)
                 ->where('active', true)
                 ->orderByDesc('severity')
                 ->limit(10)
                 ->get(),
 
             // Recent incidents (last 5)
-            'client_incidents' => \App\Models\ClientIncident::where('client_id', $client->id)
+            'client_incidents' => ClientIncident::where('client_id', $client->id)
                 ->with(['reporter:id,name'])
                 ->orderByDesc('occurred_at')
                 ->limit(5)
                 ->get(),
 
             'care_plans_summary' => [
-                'active_plan' => \App\Models\CarePlan::where('client_id', $client->id)
+                'active_plan' => CarePlan::where('client_id', $client->id)
                     ->where('status', 'active')
-                    ->withCount(['goals', 'goals as goals_completed' => fn($q) => $q->where('status', 'completed')])
+                    ->withCount(['goals', 'goals as goals_completed' => fn ($q) => $q->where('status', 'completed')])
                     ->with('goals:id,care_plan_id,title,status,progress_percentage,priority')
                     ->first(),
-                'total_plans' => \App\Models\CarePlan::where('client_id', $client->id)->count(),
-                'review_due' => \App\Models\CarePlan::where('client_id', $client->id)
+                'total_plans' => CarePlan::where('client_id', $client->id)->count(),
+                'review_due' => CarePlan::where('client_id', $client->id)
                     ->where('status', 'active')
                     ->where(function ($q) {
                         $q->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
                     })->exists(),
-                'recent_notes' => \App\Models\ProgressNote::where('client_id', $client->id)
+                'recent_notes' => ProgressNote::where('client_id', $client->id)
                     ->with(['author:id,name', 'goal:id,title'])
                     ->orderByDesc('created_at')
                     ->limit(5)
@@ -557,7 +576,7 @@ class ClientController extends Controller
                     ->limit(10)
                     ->with(['coordinator', 'shift'])
                     ->get()
-                    ->map(fn($b) => [
+                    ->map(fn ($b) => [
                         'id' => $b->id,
                         'start_at' => optional($b->start_at)->toISOString(),
                         'end_at' => optional($b->end_at)->toISOString(),
@@ -570,18 +589,18 @@ class ClientController extends Controller
                     ->orderByDesc('requested_start')
                     ->limit(10)
                     ->get()
-                    ->map(fn($r) => [
+                    ->map(fn ($r) => [
                         'id' => $r->id,
                         'requested_start' => optional($r->requested_start)->toISOString(),
                         'requested_end' => optional($r->requested_end)->toISOString(),
                         'status' => $r->status,
                     ])->values(),
             ],
-            'consents' => \App\Models\ClientConsent::where('client_id', $client->id)
+            'consents' => ClientConsent::where('client_id', $client->id)
                 ->with('consentType:id,name,category')
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(fn($c) => [
+                ->map(fn ($c) => [
                     'id' => $c->id,
                     'consent_type' => $c->consentType?->name ?? 'Unknown',
                     'consent_type_category' => $c->consentType?->category,
@@ -612,10 +631,10 @@ class ClientController extends Controller
                 'record_clinical_observation' => $request->user()?->canDo('clinical.observations.recordClinical') ?? false,
                 'record_event' => $request->user()?->canDo('clinical.events.record') ?? false,
             ],
-            'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
+            'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'pending_consent_requests_count' => $this->buildPendingConsentRequestCount($client),
-            'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
-            'family_notes' => \App\Models\FamilyNote::where('client_id', $client->id)
+            'family_notes_open_count' => FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
+            'family_notes' => FamilyNote::where('client_id', $client->id)
                 ->with([
                     'creator:id,name',
                     'completer:id,name',
@@ -658,11 +677,11 @@ class ClientController extends Controller
                     'created_at' => $n->created_at?->toISOString(),
                     'is_overdue' => $n->due_date && $n->due_date->isPast() && in_array($n->status, ['open', 'in_progress']),
                 ]),
-            'photos' => \App\Models\ClientPhoto::where('client_id', $client->id)
+            'photos' => ClientPhoto::where('client_id', $client->id)
                 ->with('uploadedBy:id,name')
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(fn($p) => [
+                ->map(fn ($p) => [
                     'id' => $p->id,
                     'url' => $p->url,
                     'thumbnail_url' => $p->thumbnail_url,
@@ -678,7 +697,7 @@ class ClientController extends Controller
                 ->with(['recordedBy:id,name', 'site:id,name', 'room:id,site_id,name', 'tracker'])
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(fn($a) => [
+                ->map(fn ($a) => [
                     'id' => $a->id,
                     'name' => $a->name,
                     'category' => $a->category,
@@ -725,14 +744,14 @@ class ClientController extends Controller
                     'recorded_by' => $a->recordedBy?->name,
                     'created_at' => $a->created_at?->toISOString(),
                 ])->values(),
-            'asset_locations' => \App\Models\Site::where('is_active', true)
+            'asset_locations' => Site::where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'type'])
-                ->map(fn($s) => [
+                ->map(fn ($s) => [
                     'id' => $s->id,
                     'name' => $s->name,
                     'type' => $s->type,
-                    'rooms' => $s->houseRooms()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name'])->map(fn($r) => [
+                    'rooms' => $s->houseRooms()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name'])->map(fn ($r) => [
                         'id' => $r->id,
                         'name' => $r->name,
                     ]),
@@ -764,8 +783,8 @@ class ClientController extends Controller
                 'expired_at' => $c->expires_at?->toIso8601String(),
             ]),
             'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
-            'transport' => \Inertia\Inertia::optional(fn () => $this->buildTransportData($client)),
-            'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
+            'transport' => Inertia::optional(fn () => $this->buildTransportData($client)),
+            'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
             'safety' => ClientSafetyPayload::forClient($client),
         ]);
     }
@@ -821,8 +840,8 @@ class ClientController extends Controller
             ->get();
         foreach ($shifts as $s) {
             $events->push([
-                'id' => 'shift-' . $s->id,
-                'title' => ($s->staff?->name ?? 'Staff TBC') . ' — Shift',
+                'id' => 'shift-'.$s->id,
+                'title' => ($s->staff?->name ?? 'Staff TBC').' — Shift',
                 'start' => $s->starts_at?->toIso8601String(),
                 'end' => $s->ends_at?->toIso8601String(),
                 'backgroundColor' => $s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6'),
@@ -832,19 +851,27 @@ class ClientController extends Controller
         }
 
         // Family visits
-        $visits = \App\Models\FamilyVisitRequest::where('client_id', $client->id)
+        $visits = FamilyVisitRequest::where('client_id', $client->id)
             ->where('status', 'approved')
             ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
             ->with('user:id,name')
             ->get();
         foreach ($visits as $v) {
             $vStart = $v->requested_date->copy();
-            if ($v->preferred_time_start) { [$h, $m] = explode(':', $v->preferred_time_start); $vStart->setTime((int)$h, (int)$m); }
+            if ($v->preferred_time_start) {
+                [$h, $m] = explode(':', $v->preferred_time_start);
+                $vStart->setTime((int) $h, (int) $m);
+            }
             $vEnd = $v->requested_date->copy();
-            if ($v->preferred_time_end) { [$h, $m] = explode(':', $v->preferred_time_end); $vEnd->setTime((int)$h, (int)$m); } else { $vEnd = $vStart->copy()->addHour(); }
+            if ($v->preferred_time_end) {
+                [$h, $m] = explode(':', $v->preferred_time_end);
+                $vEnd->setTime((int) $h, (int) $m);
+            } else {
+                $vEnd = $vStart->copy()->addHour();
+            }
             $events->push([
-                'id' => 'visit-' . $v->id,
-                'title' => 'Family Visit — ' . ($v->user?->name ?? 'Family'),
+                'id' => 'visit-'.$v->id,
+                'title' => 'Family Visit — '.($v->user?->name ?? 'Family'),
                 'start' => $vStart->toIso8601String(),
                 'end' => $vEnd->toIso8601String(),
                 'backgroundColor' => '#22c55e',
@@ -854,7 +881,7 @@ class ClientController extends Controller
         }
 
         // Appointments
-        $appointments = \App\Models\ClientAppointment::where('client_id', $client->id)
+        $appointments = ClientAppointment::where('client_id', $client->id)
             ->where('starts_at', '>=', $start)
             ->where('starts_at', '<=', $end)
             ->where('status', '!=', 'cancelled')
@@ -862,7 +889,7 @@ class ClientController extends Controller
         $typeColors = ['gp_visit' => '#f59e0b', 'specialist' => '#8b5cf6', 'therapy' => '#ec4899', 'activity' => '#06b6d4', 'reminder' => '#6366f1', 'other' => '#64748b'];
         foreach ($appointments as $a) {
             $events->push([
-                'id' => 'appt-' . $a->id,
+                'id' => 'appt-'.$a->id,
                 'title' => $a->title,
                 'start' => $a->starts_at->toIso8601String(),
                 'end' => $a->ends_at?->toIso8601String(),
@@ -879,11 +906,15 @@ class ClientController extends Controller
             ->get();
         foreach ($medAdmins as $ma) {
             $medName = $ma->medication?->name ?? 'Medication';
-            $statusColor = match ($ma->status) { 'given' => '#10b981', 'refused' => '#f97316', 'withheld' => '#eab308', 'missed' => '#ef4444', default => '#ec4899' };
-            $statusLabel = match ($ma->status) { 'given' => 'Given', 'refused' => 'Refused', 'withheld' => 'Withheld', 'missed' => 'Missed', default => 'Scheduled' };
+            $statusColor = match ($ma->status) {
+                'given' => '#10b981', 'refused' => '#f97316', 'withheld' => '#eab308', 'missed' => '#ef4444', default => '#ec4899'
+            };
+            $statusLabel = match ($ma->status) {
+                'given' => 'Given', 'refused' => 'Refused', 'withheld' => 'Withheld', 'missed' => 'Missed', default => 'Scheduled'
+            };
             $events->push([
-                'id' => 'med-' . $ma->id,
-                'title' => $medName . ' — ' . $statusLabel,
+                'id' => 'med-'.$ma->id,
+                'title' => $medName.' — '.$statusLabel,
                 'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
                 'backgroundColor' => $statusColor,
                 'borderColor' => 'transparent',
@@ -897,17 +928,19 @@ class ClientController extends Controller
         $activeMeds = ClientMedication::where('client_id', $client->id)->where('active', true)->whereNull('ceased_at')->where('is_prn', false)->get();
         foreach ($activeMeds as $med) {
             $times = $this->parseFrequencyTimes($med->frequency);
-            if (empty($times)) continue;
+            if (empty($times)) {
+                continue;
+            }
             $current = $medStart->copy();
             while ($current->lte($medEnd)) {
                 foreach ($times as $time) {
                     $scheduledAt = $current->copy()->setTimeFromTimeString($time);
                     $alreadyRecorded = $medAdmins->contains(fn ($ma) => $ma->client_medication_id === $med->id && $ma->scheduled_for && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i'));
-                    if (!$alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
+                    if (! $alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
                         $isPast = $scheduledAt->lt(now());
                         $events->push([
-                            'id' => 'medsched-' . $med->id . '-' . $scheduledAt->format('YmdHi'),
-                            'title' => $med->name . ($isPast ? ' — Overdue' : ' — Due'),
+                            'id' => 'medsched-'.$med->id.'-'.$scheduledAt->format('YmdHi'),
+                            'title' => $med->name.($isPast ? ' — Overdue' : ' — Due'),
                             'start' => $scheduledAt->toIso8601String(),
                             'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
                             'borderColor' => 'transparent',
@@ -924,11 +957,14 @@ class ClientController extends Controller
 
     private function parseFrequencyTimes(?string $frequency): array
     {
-        if (!$frequency) return [];
+        if (! $frequency) {
+            return [];
+        }
         $freq = strtolower(trim($frequency));
         if (preg_match_all('/(\d{1,2}):(\d{2})/', $freq, $matches, PREG_SET_ORDER)) {
             return array_map(fn ($m) => sprintf('%02d:%02d', $m[1], $m[2]), $matches);
         }
+
         return match (true) {
             str_contains($freq, 'twice daily'), str_contains($freq, 'bd'), str_contains($freq, 'bid') => ['08:00', '20:00'],
             str_contains($freq, 'three times'), str_contains($freq, 'tds'), str_contains($freq, 'tid') => ['08:00', '14:00', '20:00'],
@@ -984,7 +1020,7 @@ class ClientController extends Controller
         }
 
         try {
-            return \App\Models\ConsentRequest::forClient($client->id)->pending()->count();
+            return ConsentRequest::forClient($client->id)->pending()->count();
         } catch (QueryException $exception) {
             report($exception);
 
@@ -1025,7 +1061,7 @@ class ClientController extends Controller
     {
         $overrides = $client->onboardingOverrides
             ->keyBy('key')
-            ->map(fn($o) => (bool) $o->value)
+            ->map(fn ($o) => (bool) $o->value)
             ->toArray();
 
         $hasProfile = (bool) ($client->first_name && $client->last_name)
@@ -1086,11 +1122,12 @@ class ClientController extends Controller
 
         $items = array_map(function ($i) {
             $i['complete'] = (bool) ($i['has_data'] || $i['override']);
+
             return $i;
         }, $items);
 
         $total = count($items);
-        $completed = count(array_filter($items, fn($i) => $i['complete']));
+        $completed = count(array_filter($items, fn ($i) => $i['complete']));
         $percent = $total > 0 ? (int) round(($completed / $total) * 100) : 0;
 
         return [
@@ -1101,8 +1138,6 @@ class ClientController extends Controller
             'status' => $completed === $total ? 'complete' : 'incomplete',
         ];
     }
-
-
 
     // public function show(Client $client)
     // {
@@ -1151,7 +1186,7 @@ class ClientController extends Controller
             ])->all();
 
             // Default to onboarding status for new clients
-            if (!isset($clientFields['status']) || $clientFields['status'] === 'active') {
+            if (! isset($clientFields['status']) || $clientFields['status'] === 'active') {
                 $clientFields['status'] = 'onboarding';
             }
 
@@ -1160,12 +1195,12 @@ class ClientController extends Controller
             $client = DB::transaction(function () use ($clientFields, $data, $auth) {
                 $client = Client::create($clientFields);
 
-                \App\Models\ClientOnboardingWorkflow::createForClient($client, $auth->id);
+                ClientOnboardingWorkflow::createForClient($client, $auth->id);
 
-                if (!empty($data['create_client_portal_user'])) {
+                if (! empty($data['create_client_portal_user'])) {
                     $clientEmail = trim((string) ($data['email'] ?? $client->email ?? ''));
                     if ($clientEmail !== '') {
-                        $name = trim($client->first_name . ' ' . $client->last_name);
+                        $name = trim($client->first_name.' '.$client->last_name);
                         $clientUser = $this->findOrCreatePortalUser($clientEmail, $name, 'client');
                         $client->portalUsers()->syncWithoutDetaching([
                             $clientUser->id => ['relation' => 'client'],
@@ -1187,9 +1222,10 @@ class ClientController extends Controller
                 ->with('success', 'Client created successfully.');
         } catch (\Throwable $e) {
             report($e);
+
             return back()
                 ->withInput()
-                ->with('error', 'Failed to create client: ' . $e->getMessage());
+                ->with('error', 'Failed to create client: '.$e->getMessage());
         }
     }
 
@@ -1197,7 +1233,7 @@ class ClientController extends Controller
     {
         $user = User::where('email', $email)->first();
 
-        if (!$user) {
+        if (! $user) {
             $user = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -1207,7 +1243,7 @@ class ClientController extends Controller
                 'approved_at' => now(),
             ]);
         } else {
-            if (!$user->approved_at) {
+            if (! $user->approved_at) {
                 $user->forceFill(['approved_at' => now()])->save();
             }
             if (empty($user->role)) {
@@ -1215,7 +1251,7 @@ class ClientController extends Controller
             }
         }
 
-        $role = \App\Models\Role::where('name', $roleName)->first();
+        $role = Role::where('name', $roleName)->first();
         if ($role) {
             $user->roles()->syncWithoutDetaching([$role->id]);
         }
@@ -1250,9 +1286,9 @@ class ClientController extends Controller
 
         $payload = [
             'client' => $client->only([
-                'id','site_id','service_context_id','nhi_number','first_name','last_name','preferred_name','date_of_birth','gender','status',
-                'phone','email','address_line_1','address_line_2','suburb','city','postcode',
-                'profile_photo_path','funding_type','funding_notes',
+                'id', 'site_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'status',
+                'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
+                'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
@@ -1292,9 +1328,10 @@ class ClientController extends Controller
                 ->with('success', 'Client updated successfully.');
         } catch (\Throwable $e) {
             report($e);
+
             return back()
                 ->withInput()
-                ->with('error', 'Failed to update client: ' . $e->getMessage());
+                ->with('error', 'Failed to update client: '.$e->getMessage());
         }
     }
 
@@ -1316,7 +1353,6 @@ class ClientController extends Controller
 
         return redirect()->back()->with('success', 'Updated.');
     }
-
 
     public function updatePhoto(Request $request, Client $client)
     {
@@ -1390,21 +1426,23 @@ class ClientController extends Controller
                     $thumb = $src;
                 }
                 $thumbDir = "client-photos/{$client->id}/thumbs";
-                $thumbName = pathinfo($path, PATHINFO_FILENAME) . '.jpg';
+                $thumbName = pathinfo($path, PATHINFO_FILENAME).'.jpg';
                 $thumbPath = "{$thumbDir}/{$thumbName}";
                 $absPath = \Storage::disk('public')->path($thumbPath);
-                if (!is_dir(dirname($absPath))) {
+                if (! is_dir(dirname($absPath))) {
                     mkdir(dirname($absPath), 0755, true);
                 }
                 imagejpeg($thumb, $absPath, 85);
-                if ($thumb !== $src) imagedestroy($thumb);
+                if ($thumb !== $src) {
+                    imagedestroy($thumb);
+                }
                 imagedestroy($src);
             }
         } catch (\Throwable $e) {
             // Thumbnail generation failed, continue without it
         }
 
-        \App\Models\ClientPhoto::create([
+        ClientPhoto::create([
             'client_id' => $client->id,
             'uploaded_by_user_id' => $request->user()->id,
             'storage_path' => $path,
@@ -1420,7 +1458,7 @@ class ClientController extends Controller
             'approved_at' => now(),
         ]);
 
-        \App\Services\AuditLogger::log('client.photo.upload', $client);
+        AuditLogger::log('client.photo.upload', $client);
 
         return back()->with('success', 'Photo uploaded.');
     }
@@ -1428,7 +1466,7 @@ class ClientController extends Controller
     /**
      * Delete a gallery photo.
      */
-    public function destroyGalleryPhoto(Request $request, Client $client, \App\Models\ClientPhoto $photo)
+    public function destroyGalleryPhoto(Request $request, Client $client, ClientPhoto $photo)
     {
         $this->authorize('update', $client);
         abort_unless($photo->client_id === $client->id, 404);
@@ -1439,7 +1477,7 @@ class ClientController extends Controller
         }
         $photo->delete();
 
-        \App\Services\AuditLogger::log('client.photo.delete', $client);
+        AuditLogger::log('client.photo.delete', $client);
 
         return back()->with('success', 'Photo deleted.');
     }
@@ -1452,7 +1490,7 @@ class ClientController extends Controller
         try {
             $data = file_get_contents($file->getRealPath());
             $src = @imagecreatefromstring($data);
-            if (!$src) {
+            if (! $src) {
                 throw new \RuntimeException('Unable to read image');
             }
 
@@ -1463,7 +1501,7 @@ class ClientController extends Controller
             $y = (int) floor(($h - $size) / 2);
 
             $crop = imagecrop($src, ['x' => $x, 'y' => $y, 'width' => $size, 'height' => $size]);
-            if (!$crop) {
+            if (! $crop) {
                 $crop = $src;
             }
 
@@ -1482,8 +1520,9 @@ class ClientController extends Controller
             }
             imagedestroy($src);
 
-            $filename = trim($dir, '/') . '/' . Str::uuid()->toString() . '.jpg';
+            $filename = trim($dir, '/').'/'.Str::uuid()->toString().'.jpg';
             Storage::disk('public')->put($filename, $jpg);
+
             return $filename;
         } catch (\Throwable $e) {
             return $file->storePublicly($dir, 'public');
@@ -1652,6 +1691,8 @@ class ClientController extends Controller
             $meta = $device->meta ?? [];
             $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
+            $address = $lat !== null && $lng !== null ? $this->latestAddressForDevice($device) : null;
+            $coordinates = $this->formatCoordinates($lat, $lng);
             $battery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
             $batteryThreshold = (int) ($meta['battery_low_threshold'] ?? 20);
             $batteryStatus = $meta['battery_status'] ?? (
@@ -1689,6 +1730,9 @@ class ClientController extends Controller
                 $currentLocation = [
                     'lat' => (float) $lat,
                     'lng' => (float) $lng,
+                    'address' => $address,
+                    'coordinates' => $coordinates,
+                    'display_location' => $address ?: $coordinates,
                     'speed' => $meta['speed'] ?? null,
                     'heading' => $meta['heading'] ?? null,
                     'accuracy' => $meta['accuracy'] ?? null,
@@ -1703,7 +1747,7 @@ class ClientController extends Controller
 
         $trackingConsent = null;
         if ($trackingConsentType) {
-            $consent = \App\Models\ClientConsent::query()
+            $consent = ClientConsent::query()
                 ->where('client_id', $client->id)
                 ->where('consent_type_id', $trackingConsentType->id)
                 ->active()
@@ -1790,7 +1834,7 @@ class ClientController extends Controller
             ->where('domain', 'tracking')
             ->first();
 
-        $locations = app(\App\Services\Integration\IntegrationEventHistoryService::class)
+        $locations = app(IntegrationEventHistoryService::class)
             ->forDevice($device, $request->only(['date_from', 'date_to']));
 
         return response()->json(['locations' => $locations]);
@@ -1826,4 +1870,25 @@ class ClientController extends Controller
             || $value === 'yes';
     }
 
+    private function latestAddressForDevice(Device $device): ?string
+    {
+        return FleetTelemetryEvent::query()
+            ->where('device_id', $device->id)
+            ->where('consent_blocked', false)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereNotNull('address')
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->value('address');
+    }
+
+    private function formatCoordinates(mixed $lat, mixed $lng): ?string
+    {
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        return sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
+    }
 }

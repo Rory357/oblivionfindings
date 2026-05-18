@@ -30,6 +30,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 type Location = {
     lat: number;
     lng: number;
+    address?: string | null;
+    coordinates?: string | null;
+    display_location?: string | null;
     timestamp: string;
     speed: number | null;
     battery: number | null;
@@ -70,6 +73,9 @@ export type ClientLocationData = {
     currentLocation: {
         lat: number;
         lng: number;
+        address?: string | null;
+        coordinates?: string | null;
+        display_location?: string | null;
         speed: number | null;
         heading: number | null;
         accuracy: number | null;
@@ -164,6 +170,18 @@ function safetyEventLabel(event?: string | null): string | null {
     }
 }
 
+function coordinateText(lat: number, lng: number): string {
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+function displayLocation(location: Pick<Location, 'lat' | 'lng' | 'display_location' | 'coordinates'>): string {
+    return location.display_location ?? location.coordinates ?? coordinateText(location.lat, location.lng);
+}
+
+function csvCell(value: unknown): string {
+    return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
 export default function ClientLocationTab({ clientId, clientName, location }: Props) {
     const { tracker, currentLocation, trackingConsent, geofences } = location;
 
@@ -201,6 +219,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
             heading: currentLocation.heading ?? undefined,
             speed: currentLocation.speed ?? undefined,
             popup: `<strong>${clientName}</strong><br/>
+                Location: ${displayLocation(currentLocation)}<br/>
                 ${currentLocation.speed != null ? `Speed: ${currentLocation.speed} km/h<br/>` : ''}
                 Battery: ${battery.label}${battery.detail ? ` (${battery.detail})` : ''}<br/>
                 ${safety ? `Safety: ${safety}<br/>` : ''}
@@ -234,9 +253,16 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
 
     const handleExport = () => {
         if (historyLocations.length === 0) return;
-        const csvHeader = 'Latitude,Longitude,Timestamp,Speed,Battery\n';
+        const csvHeader = 'Address,Latitude,Longitude,Timestamp,Speed,Battery\n';
         const csvBody = historyLocations
-            .map((l) => `${l.lat},${l.lng},${l.timestamp ?? ''},${l.speed ?? ''},${l.battery ?? ''}`)
+            .map((l) => [
+                csvCell(l.address ?? ''),
+                l.lat,
+                l.lng,
+                csvCell(l.timestamp ?? ''),
+                l.speed ?? '',
+                l.battery ?? '',
+            ].join(','))
             .join('\n');
         const blob = new Blob([csvHeader + csvBody], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -427,11 +453,14 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                             </CardTitle>
                             <div className="flex flex-wrap items-center justify-end gap-3">
                                 {currentLocation && (
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                         <span className="flex items-center gap-1">
                                             <MapPin className="h-3 w-3" />
-                                            {currentLocation.lat.toFixed(5)}, {currentLocation.lng.toFixed(5)}
+                                            {displayLocation(currentLocation)}
                                         </span>
+                                        {currentLocation.address && currentLocation.coordinates && (
+                                            <span>{currentLocation.coordinates}</span>
+                                        )}
                                         {currentLocation.speed != null && (
                                             <span className="flex items-center gap-1">
                                                 <Navigation className="h-3 w-3" />
@@ -579,9 +608,12 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                                                     {formatDateTime(loc.timestamp)}
                                                 </p>
                                                 <p className="text-sm">
-                                                    {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                                                    {displayLocation(loc)}
                                                 </p>
                                                 <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                    {loc.address && loc.coordinates && (
+                                                        <span>{loc.coordinates}</span>
+                                                    )}
                                                     {loc.speed != null && (
                                                         <span className="flex items-center gap-1">
                                                             <Navigation className="h-3 w-3" />

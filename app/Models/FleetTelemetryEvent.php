@@ -30,6 +30,9 @@ class FleetTelemetryEvent extends Model
         'event_type',
         'idempotency_key',
         'raw_payload',
+        'address',
+        'reverse_geocoded_at',
+        'reverse_geocode_failed_at',
         'consent_blocked',
     ];
 
@@ -44,6 +47,8 @@ class FleetTelemetryEvent extends Model
         'external_power' => 'boolean',
         'consent_blocked' => 'boolean',
         'raw_payload' => 'array',
+        'reverse_geocoded_at' => 'datetime',
+        'reverse_geocode_failed_at' => 'datetime',
         'accuracy_m' => 'integer',
         'heading_deg' => 'integer',
         'altitude_m' => 'integer',

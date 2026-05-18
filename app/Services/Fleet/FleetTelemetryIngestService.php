@@ -3,12 +3,12 @@
 namespace App\Services\Fleet;
 
 use App\Events\FleetVehiclePositionUpdated;
+use App\Jobs\ReverseGeocodeFleetTelemetryEvent;
 use App\Models\Asset;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetVehicleStateSnapshot;
-use App\Services\Fleet\FleetDrivingMetricsService;
 use App\Services\Fleet\Telemetry\AdapterRegistry;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -22,15 +22,14 @@ class FleetTelemetryIngestService
         protected FleetTripService $trips,
         protected FleetDrivingMetricsService $metrics,
         protected FleetDeviceRuntimeService $deviceRuntime
-    ) {
-    }
+    ) {}
 
     public function ingest(string $vendor, array $payload): array
     {
         $adapter = $this->adapters->adapterFor($vendor);
         $normalized = $adapter->normalize($payload);
 
-        if (!$normalized['device_uid']) {
+        if (! $normalized['device_uid']) {
             return ['ok' => false, 'error' => 'device_uid missing', 'status' => 422];
         }
 
@@ -40,7 +39,7 @@ class FleetTelemetryIngestService
             ->where('status', 'paired')
             ->first();
 
-        if (!$tracker) {
+        if (! $tracker) {
             return ['ok' => false, 'error' => 'tracker not found', 'status' => 404];
         }
 
@@ -52,7 +51,7 @@ class FleetTelemetryIngestService
 
         $consent = $consentContext['consent'] ?? $tracker->consent;
         $consentValid = $consent ? $consent->isValid() : false;
-        $consentBlocked = !$consentValid && !$this->isFleetOwnedVehicle($asset);
+        $consentBlocked = ! $consentValid && ! $this->isFleetOwnedVehicle($asset);
 
         $idempotencyKey = $this->buildIdempotencyKey($vendor, $normalized, $payload);
 
@@ -158,7 +157,7 @@ class FleetTelemetryIngestService
                     unset($meta['battery_status_label']);
                 }
 
-                if (!$consentBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
+                if (! $consentBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
                     $deviceUpdates['latitude'] = $normalized['latitude'];
                     $deviceUpdates['longitude'] = $normalized['longitude'];
                     $deviceUpdates['last_signal_at'] = $occurredAt ?? now();
@@ -208,7 +207,7 @@ class FleetTelemetryIngestService
             $state->save();
 
             // Broadcast real-time position update via WebSocket (requires Reverb/Pusher)
-            if (!$consentBlocked && $normalized['latitude'] !== null) {
+            if (! $consentBlocked && $normalized['latitude'] !== null) {
                 broadcast(new FleetVehiclePositionUpdated(
                     assetId: $asset->id,
                     latitude: (float) $normalized['latitude'],
@@ -220,7 +219,7 @@ class FleetTelemetryIngestService
                 ))->toOthers();
             }
 
-            if (!empty($normalized['sos_flag'])) {
+            if (! empty($normalized['sos_flag'])) {
                 $this->signals->emit([
                     'asset_id' => $asset->id,
                     'asset_tracker_id' => $tracker->id,
@@ -255,7 +254,7 @@ class FleetTelemetryIngestService
                 }
             }
 
-            if (!empty($normalized['tamper_flag'])) {
+            if (! empty($normalized['tamper_flag'])) {
                 $this->signals->emit([
                     'asset_id' => $asset->id,
                     'asset_tracker_id' => $tracker->id,
@@ -288,13 +287,22 @@ class FleetTelemetryIngestService
                 ]);
             }
 
-            if (!$consentBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
+            if (! $consentBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
                 $this->geofences->evaluate(
                     $asset,
                     (float) $normalized['latitude'],
                     (float) $normalized['longitude'],
                     $occurredAt
                 );
+            }
+
+            if (
+                config('fleet.maps.reverse_geocode_enabled')
+                && ! $consentBlocked
+                && $normalized['latitude'] !== null
+                && $normalized['longitude'] !== null
+            ) {
+                ReverseGeocodeFleetTelemetryEvent::dispatch($event->id)->afterCommit();
             }
 
             return ['ok' => true, 'id' => $event->id];

@@ -1,4 +1,4 @@
-import LeafletMap from '@/components/leaflet-map';
+import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,9 @@ import { useMemo, useState } from 'react';
 type Location = {
     lat: number;
     lng: number;
+    address?: string | null;
+    coordinates?: string | null;
+    display_location?: string | null;
     timestamp: string;
     speed: number | null;
     battery: number | null;
@@ -49,6 +52,18 @@ type Props = {
     };
 };
 
+function coordinateText(lat: number, lng: number): string {
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+function displayLocation(location: Location): string {
+    return location.display_location ?? location.coordinates ?? coordinateText(location.lat, location.lng);
+}
+
+function csvCell(value: unknown): string {
+    return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
 export default function ResidentTrackingHistory({ client, tracker, locations, filters }: Props) {
     const [dateFrom, setDateFrom] = useState(filters?.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters?.date_to ?? '');
@@ -67,6 +82,18 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
         return { lat: -41.2865, lng: 174.7762 };
     }, [locations]);
 
+    const markers: MapMarker[] = useMemo(() => {
+        return (locations ?? []).map((location, index) => ({
+            id: `location-${index}`,
+            lat: location.lat,
+            lng: location.lng,
+            title: client?.name ?? 'Location',
+            type: 'default' as const,
+            status: 'idle',
+            popup: `${displayLocation(location)}${location.address && location.coordinates ? `<br/>Coordinates: ${location.coordinates}` : ''}<br/>${formatDateTime(location.timestamp)}`,
+        }));
+    }, [client?.name, locations]);
+
     const handleFilter = () => {
         router.get(`/fleet-assets/resident-tracking/history/${client?.id}`, {
             date_from: dateFrom || undefined,
@@ -76,9 +103,17 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
 
     const handleExport = () => {
         if (!locations || locations.length === 0) return;
-        const csvHeader = 'Latitude,Longitude,Timestamp,Speed,Battery,Event\n';
+        const csvHeader = 'Address,Latitude,Longitude,Timestamp,Speed,Battery,Event\n';
         const csvBody = locations
-            .map((l) => `${l.lat},${l.lng},${l.timestamp ?? ''},${l.speed ?? ''},${l.battery ?? ''},${l.event_type ?? ''}`)
+            .map((l) => [
+                csvCell(l.address ?? ''),
+                l.lat,
+                l.lng,
+                csvCell(l.timestamp ?? ''),
+                l.speed ?? '',
+                l.battery ?? '',
+                csvCell(l.event_type ?? ''),
+            ].join(','))
             .join('\n');
         const blob = new Blob([csvHeader + csvBody], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -204,6 +239,7 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                             <LeafletMap
                                 center={mapCenter}
                                 zoom={locations && locations.length > 0 ? 14 : 6}
+                                markers={markers}
                                 polyline={polyline}
                                 polylineOptions={{
                                     animated: true,
@@ -241,9 +277,12 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                                                     {formatDateTime(loc.timestamp)}
                                                 </p>
                                                 <p className="text-sm">
-                                                    {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                                                    {displayLocation(loc)}
                                                 </p>
-                                                <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                    {loc.address && loc.coordinates && (
+                                                        <span>{loc.coordinates}</span>
+                                                    )}
                                                     {loc.speed != null && (
                                                         <span className="flex items-center gap-1">
                                                             <Navigation className="h-3 w-3" />

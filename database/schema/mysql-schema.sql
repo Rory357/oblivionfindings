@@ -6228,6 +6228,9 @@ CREATE TABLE `fleet_telemetry_events` (
   `event_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `idempotency_key` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `raw_payload` json DEFAULT NULL,
+  `address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reverse_geocoded_at` timestamp NULL DEFAULT NULL,
+  `reverse_geocode_failed_at` timestamp NULL DEFAULT NULL,
   `consent_blocked` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -17712,7 +17715,8 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
     (536, '2026_05_17_120012_create_site_meal_shopping_list_items_table', 1),
     (537, '2026_05_17_130001_create_client_meal_dislikes_table', 1),
     (538, '2026_05_17_130002_add_allergen_override_to_plan_entries', 1),
-    (539, '2026_05_17_140001_add_takeaway_to_plan_entries', 2);
+    (539, '2026_05_17_140001_add_takeaway_to_plan_entries', 2),
+    (540, '2026_05_18_120000_add_address_to_fleet_telemetry_events', 2);
 
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE,'system') */;
@@ -17723,4 +17727,3 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES,1) */;
-
