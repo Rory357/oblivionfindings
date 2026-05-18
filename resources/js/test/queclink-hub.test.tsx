@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     DebugConsoleTab,
     DeviceSettingsTab,
+    default as QueclinkHub,
 } from '@/pages/security-devices/integrations/queclink-hub';
 
 vi.mock('@/layouts/app-layout', () => ({
@@ -47,7 +48,8 @@ const recentFrame = {
     direction: 'inbound',
     frame_type: 'RESP',
     command_word: 'GTFRI',
-    raw_frame: '+RESP:GTFRI,970204,867963069916998,,0,0,1,,,,,,,,0530,0001,A310,0017E102,19,0,4175,100,1,,,20260518020210,0082$',
+    raw_frame:
+        '+RESP:GTFRI,970204,867963069916998,,0,0,1,,,,,,,,0530,0001,A310,0017E102,19,0,4175,100,1,,,20260518020210,0082$',
     parse_ok: true,
     parse_error: null,
     created_at: '2026-05-18T02:07:01Z',
@@ -110,15 +112,77 @@ describe('QueclinkHub debug console', () => {
     it('loads recent frames when the debug console opens instead of showing an empty stream', async () => {
         renderHub();
 
-        expect(
-            await screen.findByText(recentFrame.raw_frame),
-        ).toBeVisible();
+        expect(await screen.findByText(recentFrame.raw_frame)).toBeVisible();
         expect(fetch).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/frames',
             expect.objectContaining({
-                headers: expect.objectContaining({ Accept: 'application/json' }),
+                headers: expect.objectContaining({
+                    Accept: 'application/json',
+                }),
             }),
         );
+    });
+});
+
+describe('QueclinkHub page chrome', () => {
+    it('uses the full-width Sites-style hero and tab rail', () => {
+        render(
+            <QueclinkHub
+                listener={{
+                    port: 8090,
+                    public_hostname: 'oblivionfindings.com',
+                    service_state: 'active',
+                    connected_count: 1,
+                }}
+                devices={{
+                    paired: [
+                        {
+                            id: 2,
+                            imei: '867963069916998',
+                            status: 'paired',
+                            model_hint: 'GL30MEU',
+                            protocol_version: '970204',
+                            firmware_version: null,
+                            connection_state: 'connected',
+                            first_seen_at: null,
+                            last_seen_at: '2026-05-18T02:07:01Z',
+                            last_frame_at: '2026-05-18T02:07:01Z',
+                            remote_address: null,
+                            assignment: {
+                                type: 'client',
+                                target_id: 9012,
+                                assigned_at: '2026-05-18T02:00:00Z',
+                                label: 'Amelia Wilson',
+                            },
+                            configuration: null,
+                            recent_commands: [],
+                        },
+                    ],
+                    pending: [],
+                    rejected: [],
+                    total: 1,
+                }}
+                statistics={{
+                    frames_last_hour: 12,
+                    last_frame_at: '2026-05-18T02:07:01Z',
+                }}
+                imsCloud={null}
+                targets={{
+                    vehicles: [],
+                    staff: [],
+                    clients: [{ id: 9012, label: 'Amelia Wilson' }],
+                }}
+                can={{ manage: true }}
+            />,
+        );
+
+        expect(screen.getByTestId('queclink-page-shell')).toHaveClass('w-full');
+        expect(screen.getByTestId('queclink-hero')).toHaveClass(
+            'bg-gradient-to-br',
+        );
+        expect(screen.getByText('Direct TCP listener')).toBeVisible();
+        expect(screen.getByText('Paired')).toBeVisible();
+        expect(screen.getByTestId('queclink-tab-list')).toHaveClass('border-b');
     });
 });
 
@@ -201,8 +265,11 @@ describe('QueclinkHub device settings', () => {
         );
 
         expect(screen.getByText('Device settings')).toBeVisible();
+        expect(screen.getByText('Connection health')).toBeVisible();
         expect(screen.getByText(/Amelia Wilson/)).toBeVisible();
-        expect(screen.getAllByDisplayValue('oblivionfindings.com')[0]).toBeVisible();
+        expect(
+            screen.getAllByDisplayValue('oblivionfindings.com')[0],
+        ).toBeVisible();
         expect(screen.getAllByDisplayValue('30')[0]).toBeVisible();
         expect(screen.getByText('Read full config')).toBeVisible();
     });
