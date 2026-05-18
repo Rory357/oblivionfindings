@@ -33,6 +33,8 @@ type Location = {
     battery: number | null;
 };
 
+type CommandStatus = 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | null;
+
 type Geofence = {
     id: string;
     name?: string;
@@ -53,6 +55,8 @@ export type ClientLocationData = {
         status: string;
         last_seen_at: string | null;
         battery: number | null;
+        locate_now_url?: string;
+        last_command_status?: CommandStatus;
     } | null;
     currentLocation: {
         lat: number;
@@ -76,6 +80,23 @@ type Props = {
 };
 
 const REFRESH_INTERVAL = 30_000;
+
+function commandStatusLabel(status?: CommandStatus): string | null {
+    switch (status) {
+        case 'queued':
+            return 'Queued';
+        case 'sent':
+            return 'Sent';
+        case 'acked':
+            return 'Acknowledged';
+        case 'failed':
+            return 'Failed';
+        case 'expired':
+            return 'Expired';
+        default:
+            return null;
+    }
+}
 
 export default function ClientLocationTab({ clientId, clientName, location }: Props) {
     const { tracker, currentLocation, trackingConsent, geofences } = location;
@@ -159,6 +180,11 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
     const hasConsent = trackingConsent?.status === 'active' || trackingConsent?.status === 'granted';
     const hasTracker = tracker !== null;
     const isOnline = tracker?.status === 'online';
+    const commandLabel = commandStatusLabel(tracker?.last_command_status);
+    const locateNowUrl = tracker?.locate_now_url ?? `/operations/clients/${clientId}/location/locate-now`;
+    const handleLocateNow = useCallback(() => {
+        router.post(locateNowUrl, {}, { preserveScroll: true });
+    }, [locateNowUrl]);
 
     return (
         <div className="space-y-4 mt-4">
@@ -217,9 +243,16 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                             <div>
                                 <p className="text-xs text-muted-foreground">Tracker</p>
                                 <p className="font-semibold text-sm">{tracker.name}</p>
-                                <Badge variant={isOnline ? 'default' : 'secondary'} className="mt-0.5 text-[10px] capitalize">
-                                    {tracker.status}
-                                </Badge>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                    <Badge variant={isOnline ? 'default' : 'secondary'} className="text-[10px] capitalize">
+                                        {tracker.status}
+                                    </Badge>
+                                    {commandLabel && (
+                                        <Badge variant="secondary" className="text-[10px]">
+                                            {commandLabel}
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -313,7 +346,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                                 <MapPin className="h-4 w-4" />
                                 {showHistory ? 'Movement History' : 'Current Location'}
                             </CardTitle>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center justify-end gap-3">
                                 {currentLocation && (
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span className="flex items-center gap-1">
@@ -333,6 +366,22 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                                         )}
                                     </div>
                                 )}
+                                <div className="flex items-center gap-2">
+                                    {commandLabel && (
+                                        <Badge variant="secondary" className="text-[10px]">
+                                            {commandLabel}
+                                        </Badge>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleLocateNow}
+                                        disabled={!tracker}
+                                    >
+                                        <MapPin className="mr-1 h-4 w-4" />
+                                        Locate Now
+                                    </Button>
+                                </div>
                                 <Link
                                     href="/fleet-assets/resident-tracking"
                                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"

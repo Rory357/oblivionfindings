@@ -11,6 +11,7 @@ use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
+use App\Models\Queclink\QueclinkPendingCommand;
 use App\Services\Queclink\LocateNowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -144,6 +145,8 @@ class ResidentTrackingController extends Controller
                 'speed' => $meta['speed'] ?? null,
                 'geofence_status' => $geofenceStatus,
                 'on_outing' => $onOuting,
+                'locate_now_url' => route('fleet-assets.resident-tracking.locate-now', ['client' => $client->id], false),
+                'last_command_status' => $this->latestLocateCommandStatus($device),
                 'detail_url' => "/security-devices/devices/{$device->id}",
             ];
         })->filter()->values();
@@ -436,6 +439,15 @@ class ResidentTrackingController extends Controller
         }
 
         return array_unique($clientIds);
+    }
+
+    private function latestLocateCommandStatus(Device $device): ?string
+    {
+        return QueclinkPendingCommand::query()
+            ->where('command_word', 'GTRTO')
+            ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
+            ->latest()
+            ->value('status');
     }
 
     private function buildMapGeofences($geofences): array

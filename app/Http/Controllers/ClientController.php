@@ -46,6 +46,7 @@ use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetIncident;
+use App\Models\Queclink\QueclinkPendingCommand;
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Queclink\LocateNowService;
@@ -1663,6 +1664,12 @@ class ClientController extends Controller
                 'health_status' => $device->health_status?->value ?? 'unknown',
                 'last_seen_at' => $device->last_seen_at?->toISOString(),
                 'battery' => $device->battery_level,
+                'locate_now_url' => route('operations.clients.location.locate-now', ['client' => $client->id], false),
+                'last_command_status' => QueclinkPendingCommand::query()
+                    ->where('command_word', 'GTRTO')
+                    ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
+                    ->latest()
+                    ->value('status'),
                 'detail_url' => "/security-devices/devices/{$device->id}",
             ];
 

@@ -55,6 +55,8 @@ type Resident = {
     speed: number | null;
     geofence_status: 'in_zone' | 'outside_zone' | 'unknown';
     on_outing: boolean;
+    locate_now_url?: string;
+    last_command_status?: 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | null;
 };
 
 type Props = {
@@ -146,6 +148,23 @@ function formatAlertType(alertType: string): string {
     return alertType
         .replace(/[._]/g, ' ')
         .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function commandStatusLabel(status?: Resident['last_command_status']): string | null {
+    switch (status) {
+        case 'queued':
+            return 'Queued';
+        case 'sent':
+            return 'Sent';
+        case 'acked':
+            return 'Acknowledged';
+        case 'failed':
+            return 'Failed';
+        case 'expired':
+            return 'Expired';
+        default:
+            return null;
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -252,6 +271,14 @@ export default function ResidentTrackingIndex({
 
     const handleMarkerClick = useCallback((id: string | number) => {
         router.visit(`/fleet-assets/resident-tracking/history/${id}`);
+    }, []);
+
+    const handleLocateNow = useCallback((resident: Resident) => {
+        router.post(
+            resident.locate_now_url ?? `/fleet-assets/resident-tracking/${resident.client_id}/locate-now`,
+            {},
+            { preserveScroll: true },
+        );
     }, []);
 
     // Safety score gauge color
@@ -415,53 +442,78 @@ export default function ResidentTrackingIndex({
                                         filteredResidents.map((resident) => {
                                             const zone = getZoneBadge(resident);
                                             const batteryColor = getBatteryBarColor(resident.battery);
+                                            const commandLabel = commandStatusLabel(resident.last_command_status);
+
                                             return (
-                                                <Link
+                                                <div
                                                     key={resident.id}
-                                                    href={`/fleet-assets/resident-tracking/history/${resident.client_id}`}
                                                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
                                                 >
-                                                    {/* Photo with status dot */}
-                                                    <div className="relative shrink-0">
-                                                        <img
-                                                            src={resident.photo ?? '/images/avatar-placeholder.svg'}
-                                                            alt={resident.name}
-                                                            className="h-10 w-10 rounded-full border object-cover"
-                                                        />
-                                                        <div
-                                                            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${getStatusDotColor(resident)}`}
-                                                        />
-                                                    </div>
-                                                    {/* Info */}
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="truncate text-sm font-medium">
-                                                                {resident.preferred_name ?? resident.name}
-                                                            </span>
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={`text-[10px] ${zone.className}`}
-                                                            >
-                                                                {zone.text}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {resident.house} &middot; {formatRelativeTime(resident.last_seen_at)}
-                                                        </div>
-                                                    </div>
-                                                    {/* Battery bar */}
-                                                    <div className="flex shrink-0 flex-col items-end gap-0.5">
-                                                        <span className="text-[10px] tabular-nums">
-                                                            {resident.battery != null ? `${resident.battery}%` : '--'}
-                                                        </span>
-                                                        <div className="h-1.5 w-10 overflow-hidden rounded-full bg-muted">
+                                                    <Link
+                                                        href={`/fleet-assets/resident-tracking/history/${resident.client_id}`}
+                                                        className="flex min-w-0 flex-1 items-center gap-3"
+                                                    >
+                                                        {/* Photo with status dot */}
+                                                        <div className="relative shrink-0">
+                                                            <img
+                                                                src={resident.photo ?? '/images/avatar-placeholder.svg'}
+                                                                alt={resident.name}
+                                                                className="h-10 w-10 rounded-full border object-cover"
+                                                            />
                                                             <div
-                                                                className={`h-full rounded-full ${batteryColor}`}
-                                                                style={{ width: `${resident.battery ?? 0}%` }}
+                                                                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${getStatusDotColor(resident)}`}
                                                             />
                                                         </div>
+                                                        {/* Info */}
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="truncate text-sm font-medium">
+                                                                    {resident.preferred_name ?? resident.name}
+                                                                </span>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={`text-[10px] ${zone.className}`}
+                                                                >
+                                                                    {zone.text}
+                                                                </Badge>
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {resident.house} &middot; {formatRelativeTime(resident.last_seen_at)}
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                    <div className="flex shrink-0 flex-col items-end gap-1">
+                                                        <div className="flex items-center gap-2">
+                                                            {commandLabel && (
+                                                                <Badge variant="secondary" className="text-[10px]">
+                                                                    {commandLabel}
+                                                                </Badge>
+                                                            )}
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-9"
+                                                                onClick={() => handleLocateNow(resident)}
+                                                            >
+                                                                <MapPin className="mr-1 h-4 w-4" />
+                                                                Locate Now
+                                                            </Button>
+                                                        </div>
+                                                        {/* Battery bar */}
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <span className="text-[10px] tabular-nums">
+                                                                {resident.battery != null ? `${resident.battery}%` : '--'}
+                                                            </span>
+                                                            <div className="h-1.5 w-10 overflow-hidden rounded-full bg-muted">
+                                                                <div
+                                                                    className={`h-full rounded-full ${batteryColor}`}
+                                                                    style={{ width: `${resident.battery ?? 0}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </Link>
+                                                </div>
                                             );
                                         })
                                     )}
