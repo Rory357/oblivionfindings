@@ -1,4 +1,12 @@
-import LeafletMap, { type MapMarker, type MapGeofence } from '@/components/leaflet-map';
+import ResidentMap from '@/components/resident-tracking/resident-map';
+import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
+import type {
+    CommandStatus,
+    Geofence,
+    GeofenceStatus,
+    Resident,
+} from '@/components/resident-tracking/types';
+import type { MapMarker } from '@/components/leaflet-map';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +16,6 @@ import { Separator } from '@/components/ui/separator';
 import { formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
 import { Link, router } from '@inertiajs/react';
 import {
-    Battery,
-    BatteryLow,
-    BatteryWarning,
     Calendar,
     Clock,
     Download,
@@ -19,13 +24,11 @@ import {
     Navigation,
     Radio,
     RotateCcw,
-    Shield,
-    ShieldAlert,
     ShieldOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-type Location = {
+type HistoryPoint = {
     lat: number;
     lng: number;
     address?: string | null;
@@ -36,37 +39,54 @@ type Location = {
     battery: number | null;
 };
 
-type CommandStatus = 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | null;
-
-type Geofence = {
-    id: string;
-    name?: string;
-    type: 'circle' | 'polygon';
-    center?: { lat: number; lng: number };
-    radius_m?: number;
-    coordinates?: { lat: number; lng: number }[];
-    color?: string;
-};
-
 export type ClientLocationData = {
     tracker: {
         id: number;
+        device_uid?: string | null;
         name: string;
         serial: string | null;
         mac: string | null;
+        imei?: string | null;
+        model?: string | null;
+        manufacturer?: string | null;
+        firmware_version?: string | null;
+        hardware_version?: string | null;
+        ble_firmware?: string | null;
+        ble_mac?: string | null;
+        sim_iccid?: string | null;
+        imsi?: string | null;
+        network_type?: string | null;
+        rsrp?: number | string | null;
+        band?: string | null;
+        mcc?: string | null;
+        mnc?: string | null;
+        cell_id?: string | null;
+        lac?: string | null;
+        satellites?: number | null;
+        last_frame_at?: string | null;
+        last_location_at?: string | null;
+        config_snapshot?: Record<string, unknown> | null;
         provider: string | null;
         status: string;
+        health_status?: string;
         last_seen_at: string | null;
         battery: number | null;
         battery_status?: 'low' | 'normal' | 'unknown' | string | null;
         battery_voltage_mv?: number | null;
         battery_low_threshold?: number | null;
+        battery_updated_at?: string | null;
         charging_status?: string | null;
         external_power?: boolean | null;
         last_power_event?: string | null;
         last_safety_event?: string | null;
+        last_safety_event_at?: string | null;
+        panic_active?: boolean;
         locate_now_url?: string;
+        acknowledge_panic_url?: string;
+        fleet_dashboard_url?: string;
+        history_url?: string;
         last_command_status?: CommandStatus;
+        detail_url?: string;
     } | null;
     currentLocation: {
         lat: number;
@@ -77,6 +97,7 @@ export type ClientLocationData = {
         speed: number | null;
         heading: number | null;
         accuracy: number | null;
+        altitude?: number | null;
     } | null;
     trackingConsent: {
         status: string;
@@ -84,146 +105,162 @@ export type ClientLocationData = {
         expires_at: string | null;
     } | null;
     geofences: Geofence[];
+    geofenceStatus?: GeofenceStatus;
 };
 
 type Props = {
     clientId: number;
     clientName: string;
+    clientHouse?: string;
+    clientPhoto?: string | null;
     location: ClientLocationData;
 };
 
 const REFRESH_INTERVAL = 30_000;
 
-function commandStatusLabel(status?: CommandStatus): string | null {
-    switch (status) {
-        case 'queued':
-            return 'Queued';
-        case 'sent':
-            return 'Sent';
-        case 'acked':
-            return 'Acknowledged';
-        case 'failed':
-            return 'Failed';
-        case 'expired':
-            return 'Expired';
-        default:
-            return null;
-    }
-}
-
-function getBatteryState(tracker: ClientLocationData['tracker']) {
-    const battery = tracker?.battery ?? null;
-    const threshold = tracker?.battery_low_threshold ?? 20;
-    const isCharging =
-        tracker?.charging_status === 'charging' || tracker?.external_power === true;
-
-    if (isCharging) {
-        return {
-            label: 'Charging',
-            detail: battery != null ? `${battery}%` : undefined,
-            icon: Battery,
-            textClass: 'text-status-success',
-            bgClass: 'bg-status-success-bg',
-        };
-    }
-
-    if (battery == null) {
-        return {
-            label: 'Battery not reported',
-            detail: undefined,
-            icon: BatteryWarning,
-            textClass: 'text-status-warning',
-            bgClass: 'bg-status-warning-bg',
-        };
-    }
-
-    if (tracker?.battery_status === 'low' || battery <= threshold) {
-        return {
-            label: 'Low battery',
-            detail: `${battery}%`,
-            icon: BatteryLow,
-            textClass: 'text-status-critical',
-            bgClass: 'bg-status-critical-bg',
-        };
-    }
-
-    return {
-        label: `${battery}%`,
-        detail: undefined,
-        icon: Battery,
-        textClass: 'text-status-success',
-        bgClass: 'bg-status-success-bg',
-    };
-}
-
-function safetyEventLabel(event?: string | null): string | null {
-    switch (event) {
-        case 'vehicle_sos':
-        case 'sos':
-            return 'SOS received';
-        case 'man_down':
-            return 'Man down alert';
-        default:
-            return null;
-    }
-}
-
-function coordinateText(lat: number, lng: number): string {
-    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-}
-
-function displayLocation(location: Pick<Location, 'lat' | 'lng' | 'display_location' | 'coordinates'>): string {
-    return location.display_location ?? location.coordinates ?? coordinateText(location.lat, location.lng);
-}
-
 function csvCell(value: unknown): string {
     return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
-export default function ClientLocationTab({ clientId, clientName, location }: Props) {
-    const { tracker, currentLocation, trackingConsent, geofences } = location;
+function displayLocation(loc: {
+    lat: number;
+    lng: number;
+    display_location?: string | null;
+    coordinates?: string | null;
+}): string {
+    return (
+        loc.display_location ??
+        loc.coordinates ??
+        `${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}`
+    );
+}
+
+export default function ClientLocationTab({
+    clientId,
+    clientName,
+    clientHouse,
+    clientPhoto,
+    location,
+}: Props) {
+    const { tracker, currentLocation, trackingConsent, geofences, geofenceStatus } = location;
 
     const [showHistory, setShowHistory] = useState(false);
-    const [historyLocations, setHistoryLocations] = useState<Location[]>([]);
+    const [historyLocations, setHistoryLocations] = useState<HistoryPoint[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(new Date().toISOString());
 
-    // Auto-refresh
     useEffect(() => {
         const interval = setInterval(() => {
-            router.reload({ only: ['location'] });
+            router.reload({
+                only: ['location'],
+                onSuccess: () => setLastUpdatedAt(new Date().toISOString()),
+            });
         }, REFRESH_INTERVAL);
         return () => clearInterval(interval);
     }, []);
 
+    const hasConsent =
+        trackingConsent?.status === 'active' || trackingConsent?.status === 'granted';
+    const hasTracker = tracker !== null;
+    const hasLocation = currentLocation !== null;
+
+    const resident: Resident | null = useMemo(() => {
+        if (!tracker) return null;
+        return {
+            id: tracker.id,
+            device_uid: tracker.device_uid,
+            client_id: clientId,
+            name: clientName,
+            preferred_name: null,
+            house: clientHouse ?? '',
+            site_id: null,
+            photo: clientPhoto ?? null,
+            tracker_name: tracker.name,
+            tracker_serial: tracker.serial,
+            status: tracker.status,
+            health_status: tracker.health_status,
+            last_seen_at: tracker.last_seen_at,
+            lat: currentLocation?.lat ?? null,
+            lng: currentLocation?.lng ?? null,
+            address: currentLocation?.address ?? null,
+            coordinates: currentLocation?.coordinates ?? null,
+            display_location: currentLocation?.display_location ?? null,
+            battery: tracker.battery,
+            battery_status: tracker.battery_status,
+            battery_voltage_mv: tracker.battery_voltage_mv,
+            battery_low_threshold: tracker.battery_low_threshold,
+            battery_updated_at: tracker.battery_updated_at,
+            charging_status: tracker.charging_status,
+            external_power: tracker.external_power,
+            last_power_event: tracker.last_power_event,
+            last_safety_event: tracker.last_safety_event,
+            last_safety_event_at: tracker.last_safety_event_at,
+            panic_active: tracker.panic_active,
+            speed: currentLocation?.speed ?? null,
+            heading: currentLocation?.heading ?? null,
+            accuracy: currentLocation?.accuracy ?? null,
+            altitude: currentLocation?.altitude ?? null,
+            motion: null,
+            imei: tracker.imei,
+            mac: tracker.mac,
+            model: tracker.model,
+            manufacturer: tracker.manufacturer,
+            firmware_version: tracker.firmware_version,
+            provider: tracker.provider,
+            hardware_version: tracker.hardware_version,
+            ble_firmware: tracker.ble_firmware,
+            ble_mac: tracker.ble_mac,
+            sim_iccid: tracker.sim_iccid,
+            imsi: tracker.imsi,
+            network_type: tracker.network_type,
+            rsrp: tracker.rsrp,
+            band: tracker.band,
+            mcc: tracker.mcc,
+            mnc: tracker.mnc,
+            cell_id: tracker.cell_id,
+            lac: tracker.lac,
+            satellites: tracker.satellites,
+            last_frame_at: tracker.last_frame_at,
+            last_location_at: tracker.last_location_at,
+            config_snapshot: tracker.config_snapshot,
+            geofence_status: geofenceStatus ?? 'unknown',
+            on_outing: false,
+            house_geofence: geofences[0] ?? null,
+            locate_now_url: tracker.locate_now_url,
+            acknowledge_panic_url: tracker.acknowledge_panic_url,
+            profile_url: undefined,
+            history_url: tracker.history_url,
+            detail_url: tracker.detail_url,
+            last_command_status: tracker.last_command_status,
+        };
+    }, [tracker, currentLocation, geofences, geofenceStatus, clientId, clientName, clientHouse, clientPhoto]);
+
     const mapCenter = useMemo(() => {
         if (currentLocation) return { lat: currentLocation.lat, lng: currentLocation.lng };
+        if (geofences[0]?.center) return geofences[0].center;
         return { lat: -41.2865, lng: 174.7762 };
-    }, [currentLocation]);
+    }, [currentLocation, geofences]);
 
     const markers: MapMarker[] = useMemo(() => {
         if (!currentLocation) return [];
-        const battery = getBatteryState(tracker);
-        const safety = safetyEventLabel(tracker?.last_safety_event);
-
-        return [{
-            id: `client-${clientId}`,
-            lat: currentLocation.lat,
-            lng: currentLocation.lng,
-            title: clientName,
-            type: 'default',
-            status: tracker?.status === 'online' ? 'online' : 'offline',
-            heading: currentLocation.heading ?? undefined,
-            speed: currentLocation.speed ?? undefined,
-            popup: `<strong>${clientName}</strong><br/>
-                Location: ${displayLocation(currentLocation)}<br/>
-                ${currentLocation.speed != null ? `Speed: ${currentLocation.speed} km/h<br/>` : ''}
-                Battery: ${battery.label}${battery.detail ? ` (${battery.detail})` : ''}<br/>
-                ${safety ? `Safety: ${safety}<br/>` : ''}
-                ${currentLocation.accuracy != null ? `Accuracy: ${currentLocation.accuracy}m<br/>` : ''}
-                Last seen: ${formatRelativeTime(tracker?.last_seen_at)}`,
-        }];
+        return [
+            {
+                id: `client-${clientId}`,
+                lat: currentLocation.lat,
+                lng: currentLocation.lng,
+                title: clientName,
+                type: 'default',
+                status: tracker?.status === 'online' ? 'online' : 'offline',
+                heading: currentLocation.heading ?? undefined,
+                speed: currentLocation.speed ?? undefined,
+                popup: `<strong>${clientName}</strong><br/>
+                    ${displayLocation(currentLocation)}<br/>
+                    ${currentLocation.speed != null ? `Speed: ${currentLocation.speed} km/h<br/>` : ''}
+                    Last seen: ${formatRelativeTime(tracker?.last_seen_at)}`,
+            },
+        ];
     }, [currentLocation, clientId, clientName, tracker]);
 
     const polyline = useMemo(() => {
@@ -238,7 +275,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
         if (dateTo) params.set('date_to', dateTo);
 
         fetch(`/operations/clients/${clientId}/location/history?${params.toString()}`, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         })
             .then((res) => res.json())
             .then((data) => {
@@ -253,61 +290,74 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
         if (historyLocations.length === 0) return;
         const csvHeader = 'Address,Latitude,Longitude,Timestamp,Speed,Battery\n';
         const csvBody = historyLocations
-            .map((l) => [
-                csvCell(l.address ?? ''),
-                l.lat,
-                l.lng,
-                csvCell(l.timestamp ?? ''),
-                l.speed ?? '',
-                l.battery ?? '',
-            ].join(','))
+            .map((l) =>
+                [
+                    csvCell(l.address ?? ''),
+                    l.lat,
+                    l.lng,
+                    csvCell(l.timestamp ?? ''),
+                    l.speed ?? '',
+                    l.battery ?? '',
+                ].join(','),
+            )
             .join('\n');
         const blob = new Blob([csvHeader + csvBody], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `location-${clientName.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `location-${clientName.replace(/\s+/g, '-')}-${new Date()
+            .toISOString()
+            .slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
     };
 
-    const hasConsent = trackingConsent?.status === 'active' || trackingConsent?.status === 'granted';
-    const hasTracker = tracker !== null;
-    const commandLabel = commandStatusLabel(tracker?.last_command_status);
-    const batteryState = getBatteryState(tracker);
-    const BatteryIcon = batteryState.icon;
-    const safetyLabel = safetyEventLabel(tracker?.last_safety_event);
-    const locateNowUrl = tracker?.locate_now_url ?? `/operations/clients/${clientId}/location/locate-now`;
     const handleLocateNow = useCallback(() => {
-        router.post(locateNowUrl, {}, { preserveScroll: true });
-    }, [locateNowUrl]);
+        const url =
+            tracker?.locate_now_url ??
+            `/operations/clients/${clientId}/location/locate-now`;
+        router.post(url, {}, { preserveScroll: true });
+    }, [tracker, clientId]);
+
+    const handleAcknowledgePanic = useCallback(() => {
+        const url =
+            tracker?.acknowledge_panic_url ??
+            `/operations/clients/${clientId}/location/acknowledge-panic`;
+        router.post(url, {}, { preserveScroll: true });
+    }, [tracker, clientId]);
 
     return (
-        <div className="space-y-4 mt-4">
-            {/* Consent Warning */}
+        <div className="mt-4 space-y-4">
+            {/* Consent banner */}
             {!hasConsent && (
-                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
+                <Card className="border-status-warning/30 bg-status-warning-bg">
                     <CardContent className="flex items-center gap-3 p-4">
-                        <ShieldOff className="h-5 w-5 text-status-warning dark:text-status-warning shrink-0" />
+                        <ShieldOff className="h-5 w-5 shrink-0 text-status-warning" />
                         <div>
-                            <p className="font-medium text-status-warning dark:text-status-warning">Location Tracking Consent Not Active</p>
-                            <p className="text-sm text-status-warning dark:text-status-warning">
-                                Location tracking requires active consent. Update consent in the Consents tab or contact the care team.
+                            <p className="font-medium text-status-warning">
+                                Location Tracking Consent Not Active
+                            </p>
+                            <p className="text-sm text-status-warning">
+                                Location tracking requires active consent. Update consent in the
+                                Consents tab or contact the care team.
                             </p>
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {/* No Tracker */}
+            {/* No tracker assigned */}
             {!hasTracker && (
-                <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">
+                <Card className="border-status-info/30 bg-status-info-bg">
                     <CardContent className="flex items-center gap-3 p-4">
-                        <Radio className="h-5 w-5 text-status-info dark:text-status-info shrink-0" />
+                        <Radio className="h-5 w-5 shrink-0 text-status-info" />
                         <div className="flex-1">
-                            <p className="font-medium text-status-info dark:text-status-info">No Personal Tracker Assigned</p>
-                            <p className="text-sm text-status-info dark:text-status-info">
-                                Assign a tracker device from the Fleet & Assets module to enable location tracking.
+                            <p className="font-medium text-status-info">
+                                No Personal Tracker Assigned
+                            </p>
+                            <p className="text-sm text-status-info">
+                                Assign a tracker device from the Fleet & Assets module to enable
+                                location tracking.
                             </p>
                         </div>
                         <Link
@@ -321,177 +371,87 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                 </Card>
             )}
 
-            {/* Status Cards */}
-            {hasTracker && (
-                <div className="grid gap-3 sm:grid-cols-3">
-                    {/* Battery */}
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${batteryState.bgClass}`}>
-                                <BatteryIcon className={`h-5 w-5 ${batteryState.textClass}`} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Battery</p>
-                                <p className={`text-sm font-semibold ${batteryState.textClass}`}>
-                                    {batteryState.label}
-                                </p>
-                                {batteryState.detail && (
-                                    <p className="text-[10px] text-muted-foreground">
-                                        {batteryState.detail}
-                                    </p>
-                                )}
-                            </div>
+            {/* Main map + sidebar grid */}
+            {hasTracker && resident && (
+                <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+                    {/* Map */}
+                    <Card className="overflow-hidden">
+                        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Navigation className="h-4 w-4" />
+                                Current location
+                            </CardTitle>
+                            <Link
+                                href={tracker.fleet_dashboard_url ?? `/fleet-assets/resident-tracking?focus=${clientId}`}
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                Open in Fleet Dashboard
+                                <ExternalLink className="h-3 w-3" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {hasLocation ? (
+                                <ResidentMap
+                                    center={mapCenter}
+                                    zoom={showHistory && historyLocations.length > 0 ? 14 : 16}
+                                    markers={markers}
+                                    geofences={geofences}
+                                    polyline={polyline}
+                                    polylineOptions={
+                                        showHistory
+                                            ? {
+                                                  animated: true,
+                                                  showArrows: true,
+                                                  showEndpoints: true,
+                                                  color: '#7c3aed',
+                                              }
+                                            : undefined
+                                    }
+                                    height={520}
+                                    updatedAt={lastUpdatedAt}
+                                />
+                            ) : (
+                                <div className="flex h-[520px] items-center justify-center text-muted-foreground">
+                                    <div className="text-center">
+                                        <MapPin className="mx-auto h-10 w-10 opacity-30" />
+                                        <p className="mt-2 text-sm">
+                                            No location data available
+                                        </p>
+                                        <p className="text-xs">
+                                            The tracker may be offline or not yet reporting
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
-                    {/* Last Seen */}
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg">
-                                <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Last Seen</p>
-                                <p className="font-semibold text-sm">
-                                    {formatRelativeTime(tracker.last_seen_at)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Consent */}
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
-                                <Shield className="h-5 w-5 text-primary dark:text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Consent</p>
-                                {hasConsent ? (
-                                    <Badge variant="default" className="text-[10px] capitalize bg-status-success">
-                                        {trackingConsent?.status ?? 'Active'}
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="secondary" className="text-[10px]">Not Active</Badge>
-                                )}
-                                {trackingConsent?.expires_at && (
-                                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                                        Expires {formatDateTime(trackingConsent.expires_at)}
-                                    </p>
-                                )}
-                            </div>
+                    {/* Sidebar */}
+                    <Card className="flex flex-col">
+                        <CardContent className="flex h-full flex-col p-4">
+                            <ResidentSidebar
+                                resident={resident}
+                                variant="profile-detail"
+                                canManage={true}
+                                onLocateNow={handleLocateNow}
+                                onAcknowledgePanic={handleAcknowledgePanic}
+                            />
                         </CardContent>
                     </Card>
                 </div>
             )}
 
-            {/* Map */}
-            {hasTracker && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Navigation className="h-4 w-4" />
-                                {showHistory ? 'Movement History' : 'Current Location'}
-                            </CardTitle>
-                            <div className="flex flex-wrap items-center justify-end gap-3">
-                                {currentLocation && (
-                                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                            <MapPin className="h-3 w-3" />
-                                            {displayLocation(currentLocation)}
-                                        </span>
-                                        {currentLocation.address && currentLocation.coordinates && (
-                                            <span>{currentLocation.coordinates}</span>
-                                        )}
-                                        {currentLocation.speed != null && (
-                                            <span className="flex items-center gap-1">
-                                                <Navigation className="h-3 w-3" />
-                                                {currentLocation.speed} km/h
-                                            </span>
-                                        )}
-                                        {currentLocation.accuracy != null && (
-                                            <span className="text-muted-foreground">
-                                                ~{currentLocation.accuracy}m accuracy
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                    {commandLabel && (
-                                        <Badge variant="secondary" className="text-[10px]">
-                                            {commandLabel}
-                                        </Badge>
-                                    )}
-                                    {safetyLabel && (
-                                        <Badge
-                                            variant="outline"
-                                            className="gap-1 border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
-                                        >
-                                            <ShieldAlert className="h-3 w-3" />
-                                            {safetyLabel}
-                                        </Badge>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={handleLocateNow}
-                                        disabled={!tracker}
-                                    >
-                                        <Navigation className="mr-1 h-4 w-4" />
-                                        Locate Now
-                                    </Button>
-                                </div>
-                                <Link
-                                    href="/fleet-assets/resident-tracking"
-                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    Fleet Dashboard
-                                    <ExternalLink className="h-3 w-3" />
-                                </Link>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {currentLocation ? (
-                            <LeafletMap
-                                center={mapCenter}
-                                zoom={showHistory && historyLocations.length > 0 ? 14 : 16}
-                                markers={markers}
-                                polyline={polyline}
-                                polylineOptions={showHistory ? {
-                                    animated: true,
-                                    showArrows: true,
-                                    showEndpoints: true,
-                                    color: '#7c3aed',
-                                } : undefined}
-                                geofences={geofences as MapGeofence[]}
-                                height={420}
-                            />
-                        ) : (
-                            <div className="flex h-[420px] items-center justify-center text-muted-foreground">
-                                <div className="text-center">
-                                    <MapPin className="mx-auto h-10 w-10 opacity-30" />
-                                    <p className="mt-2 text-sm">No location data available</p>
-                                    <p className="text-xs">The tracker may be offline or not yet reporting</p>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Movement History */}
+            {/* Movement history */}
             {hasTracker && (
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Clock className="h-4 w-4" />
-                            Movement History
+                            Movement history
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex flex-wrap items-end gap-4">
+                        <div className="flex flex-wrap items-end gap-3">
                             <div className="space-y-1">
                                 <Label className="text-xs">From</Label>
                                 <Input
@@ -512,7 +472,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                             </div>
                             <Button onClick={fetchHistory} size="sm" disabled={loadingHistory}>
                                 <Calendar className="mr-2 h-4 w-4" />
-                                {loadingHistory ? 'Loading...' : 'Show History'}
+                                {loadingHistory ? 'Loading...' : 'Show history'}
                             </Button>
                             {showHistory && (
                                 <>
@@ -545,23 +505,20 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                             )}
                         </div>
 
-                        {/* History Timeline */}
                         {showHistory && historyLocations.length > 0 && (
                             <>
                                 <Separator className="my-4" />
-                                <div className="max-h-[300px] overflow-y-auto divide-y rounded-md border">
+                                <div className="max-h-[300px] divide-y overflow-y-auto rounded-md border">
                                     {historyLocations.map((loc, i) => (
                                         <div key={i} className="flex items-start gap-3 px-4 py-3">
-                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
-                                                <MapPin className="h-3.5 w-3.5 text-primary dark:text-primary" />
+                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                                <MapPin className="h-3.5 w-3.5 text-primary" />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs text-muted-foreground">
                                                     {formatDateTime(loc.timestamp)}
                                                 </p>
-                                                <p className="text-sm">
-                                                    {displayLocation(loc)}
-                                                </p>
+                                                <p className="text-sm">{displayLocation(loc)}</p>
                                                 <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                                                     {loc.address && loc.coordinates && (
                                                         <span>{loc.coordinates}</span>
@@ -584,7 +541,7 @@ export default function ClientLocationTab({ clientId, clientName, location }: Pr
                         )}
 
                         {showHistory && historyLocations.length === 0 && !loadingHistory && (
-                            <div className="mt-4 text-center text-sm text-muted-foreground py-8">
+                            <div className="mt-4 py-8 text-center text-sm text-muted-foreground">
                                 No movement data found for the selected period.
                             </div>
                         )}

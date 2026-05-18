@@ -32,6 +32,7 @@ use App\Models\ClientPhoto;
 use App\Models\ClientRisk;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
+use App\Models\ControlRoomAlert;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\FleetIncident;
@@ -61,6 +62,7 @@ use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\NotificationService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\ShiftCoverageService;
+use App\Services\Tracking\GeofenceStatusService;
 use App\Support\ClientSafetyPayload;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -1693,7 +1695,8 @@ class ClientController extends Controller
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
             $address = $lat !== null && $lng !== null ? $this->latestAddressForDevice($device) : null;
             $coordinates = $this->formatCoordinates($lat, $lng);
-            $battery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
+            $rawBattery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
+            $battery = $rawBattery === null ? null : (int) $rawBattery;
             $batteryThreshold = (int) ($meta['battery_low_threshold'] ?? 20);
             $batteryStatus = $meta['battery_status'] ?? (
                 $battery === null ? 'unknown' : ((float) $battery <= $batteryThreshold ? 'low' : 'normal')
@@ -1705,6 +1708,26 @@ class ClientController extends Controller
                 'name' => $device->name,
                 'serial' => $device->serial_number,
                 'mac' => $device->mac_address,
+                'imei' => $device->imei,
+                'model' => $device->model,
+                'manufacturer' => $device->manufacturer,
+                'firmware_version' => $device->firmware_version,
+                'hardware_version' => $meta['hardware_version'] ?? null,
+                'ble_firmware' => $meta['ble_firmware'] ?? null,
+                'ble_mac' => $meta['ble_mac'] ?? null,
+                'sim_iccid' => $meta['iccid'] ?? null,
+                'imsi' => $meta['imsi'] ?? null,
+                'network_type' => $meta['network_type'] ?? null,
+                'rsrp' => $meta['rsrp'] ?? null,
+                'band' => $meta['band'] ?? null,
+                'mcc' => $meta['mcc'] ?? null,
+                'mnc' => $meta['mnc'] ?? null,
+                'cell_id' => $meta['cell_id'] ?? null,
+                'lac' => $meta['lac'] ?? null,
+                'satellites' => $meta['satellites'] ?? null,
+                'last_frame_at' => $meta['last_frame_at'] ?? null,
+                'last_location_at' => $meta['last_location_at'] ?? null,
+                'config_snapshot' => $meta['config_snapshot'] ?? null,
                 'provider' => $device->provider,
                 'status' => $device->status?->value ?? 'unknown',
                 'health_status' => $device->health_status?->value ?? 'unknown',
@@ -1713,11 +1736,17 @@ class ClientController extends Controller
                 'battery_status' => $batteryStatus,
                 'battery_voltage_mv' => $meta['battery_voltage_mv'] ?? null,
                 'battery_low_threshold' => $batteryThreshold,
+                'battery_updated_at' => optional($device->battery_updated_at)->toISOString(),
                 'charging_status' => $meta['charging_status'] ?? null,
                 'external_power' => $this->isTruthy($meta['external_power'] ?? false),
                 'last_power_event' => $meta['power_event'] ?? null,
                 'last_safety_event' => $meta['last_safety_event'] ?? null,
+                'last_safety_event_at' => $meta['last_safety_event_at'] ?? null,
+                'panic_active' => (bool) ($meta['panic_active'] ?? false),
                 'locate_now_url' => route('operations.clients.location.locate-now', ['client' => $client->id], false),
+                'acknowledge_panic_url' => route('operations.clients.location.acknowledge-panic', ['client' => $client->id], false),
+                'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
+                'history_url' => "/fleet-assets/resident-tracking/history/{$client->id}",
                 'last_command_status' => QueclinkPendingCommand::query()
                     ->where('command_word', 'GTRTO')
                     ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
@@ -1736,6 +1765,7 @@ class ClientController extends Controller
                     'speed' => $meta['speed'] ?? null,
                     'heading' => $meta['heading'] ?? null,
                     'accuracy' => $meta['accuracy'] ?? null,
+                    'altitude' => $meta['altitude'] ?? null,
                 ];
             }
         }
@@ -1763,57 +1793,76 @@ class ClientController extends Controller
             }
         }
 
-        // Geofences for client's site
+        // Only the resident's specific house geofence (with legacy fallback).
         $geofences = [];
+        $houseGeofence = null;
         try {
-            if ($client->site_id && Schema::hasTable('asset_geofences')) {
-                $siteId = $client->site_id;
-                $geofences = AssetGeofence::where('is_active', true)
-                    ->where(function ($q) use ($siteId) {
-                        $q->where(function ($q2) use ($siteId) {
-                            $q2->where('scope', 'resident')->where('site_id', $siteId);
-                        })->orWhereHas('asset', function ($q2) use ($siteId) {
-                            $q2->where('site_id', $siteId)->where('asset_type', 'house');
-                        });
-                    })
-                    ->get()
-                    ->map(function ($gf) {
-                        $shape = $gf->shape ?? [];
-                        $result = [
-                            'id' => (string) $gf->id,
-                            'name' => $gf->name,
-                            'type' => $gf->type ?? 'circle',
-                            'color' => $shape['color'] ?? '#8b5cf6',
-                        ];
+            if (Schema::hasTable('asset_geofences')) {
+                $houseGeofence = $client->houseGeofence
+                    ?: AssetGeofence::query()
+                        ->where('is_active', true)
+                        ->when($client->site_id, fn ($q) => $q->where('site_id', $client->site_id))
+                        ->where(function ($q) {
+                            $q->where('scope', 'house')->orWhere('scope', 'resident');
+                        })
+                        ->orderByRaw("CASE scope WHEN 'house' THEN 0 WHEN 'resident' THEN 1 ELSE 2 END")
+                        ->first();
+            }
 
-                        if ($gf->type === 'circle') {
-                            $result['center'] = [
-                                'lat' => $shape['lat'] ?? $shape['latitude'] ?? 0,
-                                'lng' => $shape['lng'] ?? $shape['lon'] ?? $shape['longitude'] ?? 0,
-                            ];
-                            $result['radius_m'] = $shape['radius_m'] ?? $shape['radius'] ?? 100;
-                        } elseif ($gf->type === 'polygon') {
-                            $points = $shape['coordinates'] ?? $shape['points'] ?? [];
-                            $result['coordinates'] = collect($points)->map(fn ($p) => [
-                                'lat' => $p['lat'] ?? $p['latitude'] ?? 0,
-                                'lng' => $p['lng'] ?? $p['lon'] ?? $p['longitude'] ?? 0,
-                            ])->toArray();
-                        }
-
-                        return $result;
-                    })
-                    ->toArray();
+            if ($houseGeofence) {
+                $geofences = [$this->serialiseGeofence($houseGeofence)];
             }
         } catch (\Throwable $e) {
             $geofences = [];
         }
+
+        $geofenceStatus = $currentLocation
+            ? app(GeofenceStatusService::class)->evaluate(
+                $currentLocation['lat'],
+                $currentLocation['lng'],
+                $houseGeofence,
+            )
+            : GeofenceStatusService::STATUS_UNKNOWN;
 
         return [
             'tracker' => $trackerInfo,
             'currentLocation' => $currentLocation,
             'trackingConsent' => $trackingConsent,
             'geofences' => $geofences,
+            'geofenceStatus' => $geofenceStatus,
         ];
+    }
+
+    private function serialiseGeofence($gf): ?array
+    {
+        if (! $gf) {
+            return null;
+        }
+
+        $shape = $gf->shape ?? [];
+        $result = [
+            'id' => (string) $gf->id,
+            'name' => $gf->name,
+            'type' => $gf->type ?? 'circle',
+            'scope' => $gf->scope,
+            'color' => $shape['color'] ?? '#8b5cf6',
+        ];
+
+        if ($gf->type === 'circle') {
+            $result['center'] = [
+                'lat' => $shape['lat'] ?? $shape['latitude'] ?? 0,
+                'lng' => $shape['lng'] ?? $shape['lon'] ?? $shape['longitude'] ?? 0,
+            ];
+            $result['radius_m'] = $shape['radius_m'] ?? $shape['radius'] ?? 100;
+        } elseif ($gf->type === 'polygon') {
+            $points = $shape['coordinates'] ?? $shape['points'] ?? [];
+            $result['coordinates'] = collect($points)->map(fn ($p) => [
+                'lat' => $p['lat'] ?? $p['latitude'] ?? 0,
+                'lng' => $p['lng'] ?? $p['lon'] ?? $p['longitude'] ?? 0,
+            ])->toArray();
+        }
+
+        return $result;
     }
 
     /**
@@ -1859,6 +1908,39 @@ class ClientController extends Controller
         $locateNow->queueForDevice($device, $request->user());
 
         return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
+    }
+
+    public function acknowledgePanic(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+
+        $tenantId = $client->tenant_id ?? 1;
+        $device = app(DeviceRegistryService::class)
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
+            ->first();
+
+        if ($device) {
+            $meta = $device->meta ?? [];
+            $meta['panic_active'] = false;
+            $meta['panic_acknowledged_at'] = now()->toISOString();
+            $meta['panic_acknowledged_by'] = $request->user()?->id;
+            $device->forceFill(['meta' => $meta])->save();
+        }
+
+        if (Schema::hasTable('control_room_alerts')) {
+            ControlRoomAlert::query()
+                ->where('client_id', $client->id)
+                ->whereIn('source', ['tracker', 'resident_tracker'])
+                ->whereIn('status', ['open', 'triaging'])
+                ->update([
+                    'status' => 'ack',
+                    'acknowledged_at' => now(),
+                    'acknowledged_by_user_id' => $request->user()?->id,
+                ]);
+        }
+
+        return back()->with('success', 'Panic acknowledged.');
     }
 
     private function isTruthy(mixed $value): bool

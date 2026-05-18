@@ -7226,6 +7226,8 @@ export default function ClientShow({
                     <ClientLocationTab
                         clientId={client.id}
                         clientName={name}
+                        clientHouse={client.site?.name ?? ''}
+                        clientPhoto={client.profile_photo_url ?? null}
                         location={location}
                     />
                 )}

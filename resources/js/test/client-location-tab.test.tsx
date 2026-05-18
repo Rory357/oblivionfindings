@@ -11,7 +11,9 @@ const inertiaMocks = vi.hoisted(() => ({
 
 vi.mock('@inertiajs/react', () => ({
     Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
-        <a href={href} {...props}>{children}</a>
+        <a href={href} {...props}>
+            {children}
+        </a>
     ),
     router: {
         post: inertiaMocks.post,
@@ -27,11 +29,13 @@ beforeEach(() => {
     inertiaMocks.post.mockClear();
 });
 
-it('queues Locate Now from the client location tab and shows command state', async () => {
+it('renders the unified resident sidebar and queues Locate Now', () => {
     render(
         <ClientLocationTab
             clientId={9012}
             clientName="Amelia Wilson"
+            clientHouse="Harbour Respite"
+            clientPhoto={null}
             location={{
                 tracker: {
                     id: 12,
@@ -47,8 +51,11 @@ it('queues Locate Now from the client location tab and shows command state', asy
                     charging_status: 'charging',
                     external_power: true,
                     last_power_event: 'power_on',
-                    last_safety_event: 'vehicle_sos',
+                    last_safety_event: null,
+                    last_safety_event_at: null,
+                    panic_active: false,
                     locate_now_url: '/operations/clients/9012/location/locate-now',
+                    acknowledge_panic_url: '/operations/clients/9012/location/acknowledge-panic',
                     last_command_status: 'acked',
                 },
                 currentLocation: {
@@ -64,23 +71,68 @@ it('queues Locate Now from the client location tab and shows command state', asy
                     expires_at: null,
                 },
                 geofences: [],
+                geofenceStatus: 'unknown',
             }}
         />,
     );
 
-    expect(screen.getAllByText('Acknowledged')[0]).toBeVisible();
-    expect(screen.getByText('Battery')).toBeVisible();
-    expect(screen.getByText('Last Seen')).toBeVisible();
-    expect(screen.getByText('Consent')).toBeVisible();
-    expect(screen.getByText('Charging')).toBeVisible();
-    expect(screen.getByText('SOS received')).toBeVisible();
-    expect(screen.queryByText('Tracker')).not.toBeInTheDocument();
-    expect(screen.queryByText('Device')).not.toBeInTheDocument();
+    expect(screen.getByText('Panic not currently active')).toBeVisible();
+    expect(screen.getByText('No panic events recorded')).toBeVisible();
+    expect(screen.getAllByText(/Charging/i).length).toBeGreaterThan(0);
+    expect(screen.getByText('Acknowledged')).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
 
     expect(inertiaMocks.post).toHaveBeenCalledWith(
         '/operations/clients/9012/location/locate-now',
+        {},
+        expect.objectContaining({ preserveScroll: true }),
+    );
+});
+
+it('shows the active panic banner and acknowledges it', () => {
+    render(
+        <ClientLocationTab
+            clientId={42}
+            clientName="Test Person"
+            clientHouse="House 1"
+            clientPhoto={null}
+            location={{
+                tracker: {
+                    id: 1,
+                    name: 'Pendant',
+                    serial: 'SN-1',
+                    mac: null,
+                    provider: 'queclink',
+                    status: 'online',
+                    last_seen_at: '2026-05-18T04:00:00Z',
+                    battery: 64,
+                    battery_status: 'normal',
+                    battery_low_threshold: 20,
+                    panic_active: true,
+                    last_safety_event: 'sos',
+                    last_safety_event_at: '2026-05-18T04:00:00Z',
+                    locate_now_url: '/operations/clients/42/location/locate-now',
+                    acknowledge_panic_url: '/operations/clients/42/location/acknowledge-panic',
+                },
+                currentLocation: {
+                    lat: 0,
+                    lng: 0,
+                    speed: null,
+                    heading: null,
+                    accuracy: null,
+                },
+                trackingConsent: { status: 'active', given_at: null, expires_at: null },
+                geofences: [],
+                geofenceStatus: 'unknown',
+            }}
+        />,
+    );
+
+    expect(screen.getByText('SOS received')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Acknowledge/i }));
+    expect(inertiaMocks.post).toHaveBeenCalledWith(
+        '/operations/clients/42/location/acknowledge-panic',
         {},
         expect.objectContaining({ preserveScroll: true }),
     );

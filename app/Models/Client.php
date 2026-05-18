@@ -3,16 +3,16 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class Client extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
@@ -58,6 +58,7 @@ class Client extends Model
         'key_worker_id',
         'risk_level',
         'safeguarding_flag',
+        'house_geofence_id',
     ];
 
     protected $casts = [
@@ -87,7 +88,7 @@ class Client extends Model
 
     public function getFullNameAttribute(): string
     {
-        return $this->first_name . ' ' . $this->last_name;
+        return $this->first_name.' '.$this->last_name;
     }
 
     /**
@@ -103,6 +104,11 @@ class Client extends Model
         return $this->belongsTo(Site::class);
     }
 
+    public function houseGeofence()
+    {
+        return $this->belongsTo(AssetGeofence::class, 'house_geofence_id');
+    }
+
     public function serviceContext()
     {
         return $this->belongsTo(ServiceContext::class);
@@ -110,12 +116,12 @@ class Client extends Model
 
     public function keyWorker()
     {
-        return $this->belongsTo(\App\Models\User::class, 'key_worker_id');
+        return $this->belongsTo(User::class, 'key_worker_id');
     }
 
     public function supportWorkers()
     {
-        return $this->belongsToMany(\App\Models\User::class)->withTimestamps();
+        return $this->belongsToMany(User::class)->withTimestamps();
     }
 
     public function notes()
@@ -125,7 +131,7 @@ class Client extends Model
 
     public function portalUsers()
     {
-        return $this->belongsToMany(\App\Models\User::class, 'client_portal_users')
+        return $this->belongsToMany(User::class, 'client_portal_users')
             ->withPivot('relation')
             ->withTimestamps();
     }
@@ -140,92 +146,92 @@ class Client extends Model
 
     public function medicalProfile()
     {
-        return $this->hasOne(\App\Models\ClientMedicalProfile::class);
+        return $this->hasOne(ClientMedicalProfile::class);
     }
 
     public function medications()
     {
-        return $this->hasMany(\App\Models\ClientMedication::class);
+        return $this->hasMany(ClientMedication::class);
     }
 
     public function medicationAdministrations()
     {
-        return $this->hasMany(\App\Models\ClientMedicationAdministration::class);
+        return $this->hasMany(ClientMedicationAdministration::class);
     }
 
     public function breakGlassAccesses()
     {
-        return $this->hasMany(\App\Models\ClientBreakGlassAccess::class);
+        return $this->hasMany(ClientBreakGlassAccess::class);
     }
 
     public function emergencyContacts()
     {
-        return $this->hasMany(\App\Models\ClientEmergencyContact::class);
+        return $this->hasMany(ClientEmergencyContact::class);
     }
 
     public function conditions()
     {
-        return $this->hasMany(\App\Models\ClientCondition::class);
+        return $this->hasMany(ClientCondition::class);
     }
 
     public function controlledDrugDiscrepancies()
     {
-        return $this->hasMany(\App\Models\ClientControlledDrugDiscrepancy::class);
+        return $this->hasMany(ClientControlledDrugDiscrepancy::class);
     }
 
     public function medicationAllergies()
     {
-        return $this->hasMany(\App\Models\MedicationAllergy::class);
+        return $this->hasMany(MedicationAllergy::class);
     }
 
     public function documents()
     {
-        return $this->hasMany(\App\Models\ClientDocument::class);
+        return $this->hasMany(ClientDocument::class);
     }
 
     public function documentFolders()
     {
-        return $this->hasMany(\App\Models\ClientDocumentFolder::class);
+        return $this->hasMany(ClientDocumentFolder::class);
     }
 
     public function familyPortalSetting()
     {
-        return $this->hasOne(\App\Models\FamilyPortalSetting::class);
+        return $this->hasOne(FamilyPortalSetting::class);
     }
 
     public function supportPlan()
     {
-        return $this->hasOne(\App\Models\ClientSupportPlan::class);
+        return $this->hasOne(ClientSupportPlan::class);
     }
 
     public function assessments()
     {
-        return $this->hasMany(\App\Models\ClientAssessment::class);
+        return $this->hasMany(ClientAssessment::class);
     }
 
     public function incidents()
     {
-        return $this->hasMany(\App\Models\ClientIncident::class);
+        return $this->hasMany(ClientIncident::class);
     }
 
     public function respiteBookings()
     {
-        return $this->hasMany(\App\Models\RespiteBooking::class);
+        return $this->hasMany(RespiteBooking::class);
     }
 
     public function respiteBookingRequests()
     {
-        return $this->hasMany(\App\Models\RespiteBookingRequest::class);
+        return $this->hasMany(RespiteBookingRequest::class);
     }
 
     public function risks()
     {
-        return $this->hasMany(\App\Models\ClientRisk::class);
+        return $this->hasMany(ClientRisk::class);
     }
 
     public function onboardingOverrides()
     {
-        return $this->hasMany(\App\Models\ClientOnboardingOverride::class);
+        return $this->hasMany(ClientOnboardingOverride::class);
     }
 
     /**
@@ -279,12 +285,12 @@ class Client extends Model
 
     public function onboardingWorkflow()
     {
-        return $this->hasOne(\App\Models\ClientOnboardingWorkflow::class, 'client_id')->latest();
+        return $this->hasOne(ClientOnboardingWorkflow::class, 'client_id')->latest();
     }
 
     public function onboardingWorkflows()
     {
-        return $this->hasMany(\App\Models\ClientOnboardingWorkflow::class, 'client_id');
+        return $this->hasMany(ClientOnboardingWorkflow::class, 'client_id');
     }
 
     public function invoices()
@@ -294,7 +300,7 @@ class Client extends Model
 
     public function personalAssets()
     {
-        return $this->hasMany(\App\Models\ClientPersonalAsset::class);
+        return $this->hasMany(ClientPersonalAsset::class);
     }
 
     // ── Fleet relationships ──────────────────────────────────────────────────

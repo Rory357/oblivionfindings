@@ -27,6 +27,7 @@ use App\Http\Controllers\Operations\CareNoteTemplateController;
 // New Operations controllers
 use App\Http\Controllers\Operations\CarePlanController;
 use App\Http\Controllers\Operations\CarePlanGoalController;
+use App\Http\Controllers\Operations\ClientCareController;
 use App\Http\Controllers\Operations\ClientConsentController;
 use App\Http\Controllers\Operations\ClientFundController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
@@ -110,6 +111,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::post('/clients/{client}/location/locate-now', [ClientController::class, 'locateNow'])
             ->whereNumber('client')
             ->name('operations.clients.location.locate-now');
+        Route::post('/clients/{client}/location/acknowledge-panic', [ClientController::class, 'acknowledgePanic'])
+            ->whereNumber('client')
+            ->name('operations.clients.location.acknowledge-panic');
 
         // Documents
         Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])
@@ -163,10 +167,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         // Worker-facing landing for a single client. Uses StaffPageShell,
         // ClientSafetyRibbon and the shared PRN sheet; admin show/medical/
         // risks remain at their existing routes for manager flows.
-        Route::get('/clients/{client}/care', [\App\Http\Controllers\Operations\ClientCareController::class, 'show'])
+        Route::get('/clients/{client}/care', [ClientCareController::class, 'show'])
             ->whereNumber('client')
             ->name('operations.clients.care');
-        Route::post('/clients/{client}/care/prn', [\App\Http\Controllers\Operations\ClientCareController::class, 'recordPrn'])
+        Route::post('/clients/{client}/care/prn', [ClientCareController::class, 'recordPrn'])
             ->whereNumber('client')
             ->name('operations.clients.care.prn');
     });

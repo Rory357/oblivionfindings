@@ -1,34 +1,35 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\FleetAssets\DashboardController;
-use App\Http\Controllers\FleetAssets\AssetController;
-use App\Http\Controllers\FleetAssets\VehicleController;
-use App\Http\Controllers\FleetAssets\DriverController;
-use App\Http\Controllers\FleetAssets\VehicleBookingController;
-use App\Http\Controllers\FleetAssets\DeviceController;
-use App\Http\Controllers\FleetAssets\GeofenceController;
-use App\Http\Controllers\FleetAssets\WorkOrderController;
-use App\Http\Controllers\FleetAssets\ChecklistController;
-use App\Http\Controllers\FleetAssets\ServiceScheduleController;
-use App\Http\Controllers\FleetAssets\ReportController;
-use App\Http\Controllers\FleetAssets\LiveMapController;
 use App\Http\Controllers\FleetAssets\AlertController;
-use App\Http\Controllers\FleetAssets\InspectionController;
+use App\Http\Controllers\FleetAssets\AssetController;
+use App\Http\Controllers\FleetAssets\ChecklistController;
+use App\Http\Controllers\FleetAssets\CommunityAccessController;
 use App\Http\Controllers\FleetAssets\ComplianceController;
-use App\Http\Controllers\FleetAssets\KeyController;
+use App\Http\Controllers\FleetAssets\CostAllocationController;
 use App\Http\Controllers\FleetAssets\DailyCheckController;
-use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
-use App\Http\Controllers\FleetAssets\ResidentTransportController;
-use App\Http\Controllers\FleetAssets\ResidentTrackingController;
-use App\Http\Controllers\FleetAssets\WanderingAlertController;
+use App\Http\Controllers\FleetAssets\DashboardController;
+use App\Http\Controllers\FleetAssets\DeviceController;
+use App\Http\Controllers\FleetAssets\DriverController;
+use App\Http\Controllers\FleetAssets\GeofenceController;
 use App\Http\Controllers\FleetAssets\HandoverController;
 use App\Http\Controllers\FleetAssets\IncidentController;
-use App\Http\Controllers\FleetAssets\OutingController;
+use App\Http\Controllers\FleetAssets\InspectionController;
+use App\Http\Controllers\FleetAssets\KeyController;
+use App\Http\Controllers\FleetAssets\LiveMapController;
+use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
 use App\Http\Controllers\FleetAssets\MileageController;
 use App\Http\Controllers\FleetAssets\MobileController;
-use App\Http\Controllers\FleetAssets\CostAllocationController;
-use App\Http\Controllers\FleetAssets\CommunityAccessController;
+use App\Http\Controllers\FleetAssets\OutingController;
+use App\Http\Controllers\FleetAssets\ReportController;
+use App\Http\Controllers\FleetAssets\ResidentTrackingController;
+use App\Http\Controllers\FleetAssets\ResidentTransportController;
+use App\Http\Controllers\FleetAssets\ServiceScheduleController;
+use App\Http\Controllers\FleetAssets\VehicleBookingController;
+use App\Http\Controllers\FleetAssets\VehicleController;
+use App\Http\Controllers\FleetAssets\WanderingAlertController;
+use App\Http\Controllers\FleetAssets\WorkOrderController;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Mobile / Driver App
@@ -91,7 +92,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Settings
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
-        Route::get('/settings/notifications', fn () => \Inertia\Inertia::render('fleet-assets/settings/notifications'))->name('fleet-assets.settings.notifications');
+        Route::get('/settings/notifications', fn () => Inertia::render('fleet-assets/settings/notifications'))->name('fleet-assets.settings.notifications');
     });
 
     // Drivers
@@ -206,6 +207,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.manage')->group(function () {
         Route::post('/resident-tracking/assign', [ResidentTrackingController::class, 'assign'])->name('fleet-assets.resident-tracking.assign.store');
         Route::post('/resident-tracking/{device}/unassign', [ResidentTrackingController::class, 'unassign'])->whereNumber('device')->name('fleet-assets.resident-tracking.unassign');
+        Route::post('/resident-tracking/{client}/acknowledge-panic', [ResidentTrackingController::class, 'acknowledgePanic'])->whereNumber('client')->name('fleet-assets.resident-tracking.acknowledge-panic');
     });
 
     // Wandering Alerts

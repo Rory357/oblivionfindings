@@ -89,10 +89,13 @@ function renderResidentTracking() {
                     external_power: false,
                     last_power_event: null,
                     last_safety_event: 'vehicle_sos',
+                    last_safety_event_at: '2026-05-18T04:00:00Z',
+                    panic_active: false,
                     speed: 0,
                     geofence_status: 'in_zone',
                     on_outing: false,
                     locate_now_url: '/fleet-assets/resident-tracking/9012/locate-now',
+                    acknowledge_panic_url: '/fleet-assets/resident-tracking/9012/acknowledge-panic',
                     last_command_status: 'queued',
                 },
                 {
@@ -116,10 +119,13 @@ function renderResidentTracking() {
                     external_power: false,
                     last_power_event: null,
                     last_safety_event: 'man_down',
+                    last_safety_event_at: '2026-05-18T04:00:00Z',
+                    panic_active: true,
                     speed: 0,
                     geofence_status: 'in_zone',
                     on_outing: false,
                     locate_now_url: '/fleet-assets/resident-tracking/9013/locate-now',
+                    acknowledge_panic_url: '/fleet-assets/resident-tracking/9013/acknowledge-panic',
                     last_command_status: null,
                 },
                 {
@@ -143,10 +149,13 @@ function renderResidentTracking() {
                     external_power: true,
                     last_power_event: 'power_on',
                     last_safety_event: null,
+                    last_safety_event_at: null,
+                    panic_active: false,
                     speed: 0,
                     geofence_status: 'in_zone',
                     on_outing: false,
                     locate_now_url: '/fleet-assets/resident-tracking/9014/locate-now',
+                    acknowledge_panic_url: '/fleet-assets/resident-tracking/9014/acknowledge-panic',
                     last_command_status: null,
                 },
             ]}
@@ -174,21 +183,17 @@ beforeEach(() => {
     inertiaMocks.post.mockClear();
 });
 
-it('queues Locate Now from the resident tracking list and shows command state', async () => {
+it('renders the resident sidebar and queues Locate Now from a list row', async () => {
     renderResidentTracking();
 
     expect(screen.getByText('Tracked: 3')).toBeVisible();
     expect(screen.getByText('Online: 3')).toBeVisible();
-    expect(screen.getByText('Offline: 0')).toBeVisible();
     expect(screen.getByText('Low Battery: 1')).toBeVisible();
-    expect(screen.getByText('Queued')).toBeVisible();
     expect(screen.getByText('Battery not reported')).toBeVisible();
-    expect(screen.getByText('SOS received')).toBeVisible();
     expect(screen.getByText('Low battery')).toBeVisible();
-    expect(screen.getByText('Man down alert')).toBeVisible();
     expect(screen.getByText('Charging')).toBeVisible();
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Locate Now/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Locate/i })[0]);
 
     expect(inertiaMocks.post).toHaveBeenCalledWith(
         '/fleet-assets/resident-tracking/9012/locate-now',

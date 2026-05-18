@@ -149,6 +149,9 @@ class FleetTelemetryIngestService
                     $meta['last_safety_event_at'] = $occurredAt instanceof Carbon
                         ? $occurredAt->toISOString()
                         : now()->toISOString();
+                    $meta['panic_active'] = true;
+                } elseif (! array_key_exists('panic_active', $meta)) {
+                    $meta['panic_active'] = false;
                 }
 
                 if (($meta['charging_status'] ?? null) === 'charging' || ($meta['external_power'] ?? false)) {
