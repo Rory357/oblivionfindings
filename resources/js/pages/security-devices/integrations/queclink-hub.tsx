@@ -55,7 +55,7 @@ import {
     Unlink,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -129,6 +129,27 @@ type Props = {
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
+
+function mergeFrames(existing: Frame[], incoming: Frame[]): Frame[] {
+    const byId = new Map<number, Frame>();
+    for (const frame of existing) {
+        byId.set(frame.id, frame);
+    }
+    for (const frame of incoming) {
+        byId.set(frame.id, frame);
+    }
+
+    return [...byId.values()]
+        .sort((a, b) => a.id - b.id)
+        .slice(-500);
+}
+
+function framesUrl(imeiFilter: string): string {
+    const params = new URLSearchParams();
+    if (imeiFilter) params.set('imei', imeiFilter);
+
+    return `/security-devices/integrations/queclink/frames${params.toString() ? '?' + params.toString() : ''}`;
+}
 
 function fmt(iso: string | null): string {
     if (!iso) return '—';
@@ -931,13 +952,40 @@ function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
 
 // ── Debug Console tab ─────────────────────────────────────────────
 
-function DebugConsoleTab({ devices, can }: { devices: Device[]; can: Props['can'] }) {
+export function DebugConsoleTab({ devices, can }: { devices: Device[]; can: Props['can'] }) {
     const [frames, setFrames] = useState<Frame[]>([]);
     const [imeiFilter, setImeiFilter] = useState<string>('');
     const [streaming, setStreaming] = useState(true);
     const esRef = useRef<EventSource | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [autoscroll, setAutoscroll] = useState(true);
+    const loadRecentFrames = useCallback(
+        async (signal?: AbortSignal) => {
+            let response: Response;
+
+            try {
+                response = await fetch(framesUrl(imeiFilter), {
+                    headers: { Accept: 'application/json' },
+                    signal,
+                });
+            } catch {
+                return;
+            }
+
+            if (!response.ok) return;
+            const payload = (await response.json()) as { frames?: Frame[] };
+            setFrames((prev) => mergeFrames(prev, payload.frames ?? []));
+        },
+        [imeiFilter],
+    );
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setFrames([]);
+        void loadRecentFrames(controller.signal);
+
+        return () => controller.abort();
+    }, [loadRecentFrames]);
 
     useEffect(() => {
         if (!streaming) {
@@ -952,7 +1000,7 @@ function DebugConsoleTab({ devices, can }: { devices: Device[]; can: Props['can'
         es.onmessage = (e) => {
             try {
                 const frame = JSON.parse(e.data) as Frame;
-                setFrames((prev) => [...prev.slice(-499), frame]);
+                setFrames((prev) => mergeFrames(prev, [frame]));
             } catch {
                 /* heartbeat or malformed line — ignore */
             }
@@ -966,6 +1014,16 @@ function DebugConsoleTab({ devices, can }: { devices: Device[]; can: Props['can'
             esRef.current = null;
         };
     }, [streaming, imeiFilter]);
+
+    useEffect(() => {
+        if (!streaming) return;
+
+        const timer = window.setInterval(() => {
+            void loadRecentFrames();
+        }, 10_000);
+
+        return () => window.clearInterval(timer);
+    }, [loadRecentFrames, streaming]);
 
     useEffect(() => {
         if (autoscroll && containerRef.current) {
