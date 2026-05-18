@@ -417,6 +417,18 @@ class QueclinkHubController extends Controller
         return back()->with('success', 'Global tracking settings update queued.');
     }
 
+    public function applyResidentSafetyProfile(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
+        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+
+        $built = $builder->gl30ResidentSafetyProfile();
+        $this->queueCommand($request, $queclinkDevice, $built);
+
+        return back()->with('success', 'Resident safety profile queued.');
+    }
+
     /**
      * Newest-first paged list of frames. Used by both the debug console
      * polling fallback and the initial render.

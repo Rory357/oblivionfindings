@@ -107,3 +107,18 @@ test('gl30m global configuration command can apply continuous GNSS testing setti
     expect($command['command_word'])->toBe('GTCFG')
         ->and($command['raw'])->toBe('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,00AD$');
 });
+
+test('gl30m resident safety profile enables panic sos and battery threshold', function () {
+    $serials = new class extends SerialNumberAllocator
+    {
+        public function next(): string
+        {
+            return '00AE';
+        }
+    };
+
+    $command = (new CommandBuilder($serials))->gl30ResidentSafetyProfile();
+
+    expect($command['command_word'])->toBe('GTCFG')
+        ->and($command['raw'])->toBe('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,20,1,,1,2,1,0,00AE$');
+});

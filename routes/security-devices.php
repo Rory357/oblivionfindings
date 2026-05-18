@@ -271,6 +271,8 @@ Route::middleware([
                 ->name('security-devices.integrations.queclink.configuration.server');
             Route::post('/devices/{queclinkDevice}/configuration/global', [QueclinkHubController::class, 'updateGlobalConfiguration'])
                 ->name('security-devices.integrations.queclink.configuration.global');
+            Route::post('/devices/{queclinkDevice}/configuration/resident-safety-profile', [QueclinkHubController::class, 'applyResidentSafetyProfile'])
+                ->name('security-devices.integrations.queclink.configuration.resident-safety-profile');
 
             // IMS cloud credential management (legacy scaffold endpoints).
             Route::post('/key', [QueclinkController::class, 'saveKey'])

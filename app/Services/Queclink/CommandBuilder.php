@@ -150,6 +150,21 @@ class CommandBuilder
         ]);
     }
 
+    public function gl30ResidentSafetyProfile(): array
+    {
+        return $this->gl30GlobalConfiguration([
+            'continuous_send_interval_seconds' => 30,
+            'battery_low_percentage' => 20,
+            'function_button_mode' => 1,
+            'sos_report_mode' => 1,
+            'gnss_enable' => 1,
+            'agps_mode' => 1,
+            'wifi_report' => 2,
+            'led_on' => 1,
+            'charge_standby_mode' => 0,
+        ]);
+    }
+
     public function setReportingInterval(string $family, int $seconds): array
     {
         if ($seconds < 5 || $seconds > 86400) {

@@ -1687,6 +1687,23 @@ export function DeviceSettingsTab({
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-5">
+                                <div className="flex justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={!can.manage || !target}
+                                        onClick={() => {
+                                            if (!target) return;
+                                            post(
+                                                `/security-devices/integrations/queclink/devices/${target.id}/configuration/resident-safety-profile`,
+                                                {},
+                                            );
+                                        }}
+                                    >
+                                        <ShieldCheck className="mr-2 h-3 w-3" />
+                                        Resident safety profile
+                                    </Button>
+                                </div>
                                 <div className="space-y-4">
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <Field

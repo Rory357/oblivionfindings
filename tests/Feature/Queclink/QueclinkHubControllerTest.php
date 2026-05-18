@@ -363,6 +363,23 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertStringContainsString('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,', $cmd->raw_command);
     }
 
+    public function test_resident_safety_profile_queues_gl30_cfg_command()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/resident-safety-profile")
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTCFG', $cmd->command_word);
+        $this->assertStringContainsString('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,20,1,,1,2,1,0,', $cmd->raw_command);
+    }
+
     public function test_update_global_configuration_rejects_invalid_short_gl30_interval()
     {
         $device = QueclinkDevice::create([

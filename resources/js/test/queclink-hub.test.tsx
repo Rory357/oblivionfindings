@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +12,13 @@ vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => (
         <main>{children}</main>
     ),
+}));
+
+const inertiaMocks = vi.hoisted(() => ({
+    router: {
+        post: vi.fn(),
+        get: vi.fn(),
+    },
 }));
 
 vi.mock('@inertiajs/react', () => ({
@@ -28,10 +35,7 @@ vi.mock('@inertiajs/react', () => ({
             {children}
         </a>
     ),
-    router: {
-        post: vi.fn(),
-        get: vi.fn(),
-    },
+    router: inertiaMocks.router,
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),
@@ -188,6 +192,8 @@ describe('QueclinkHub page chrome', () => {
 
 describe('QueclinkHub device settings', () => {
     it('renders the latest config snapshot and safe GL30 controls', () => {
+        inertiaMocks.router.post.mockClear();
+
         render(
             <DeviceSettingsTab
                 can={{ manage: true }}
@@ -272,5 +278,18 @@ describe('QueclinkHub device settings', () => {
         ).toBeVisible();
         expect(screen.getAllByDisplayValue('30')[0]).toBeVisible();
         expect(screen.getByText('Read full config')).toBeVisible();
+        expect(screen.getByText('Resident safety profile')).toBeVisible();
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Resident safety profile',
+            }),
+        );
+
+        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/devices/2/configuration/resident-safety-profile',
+            {},
+            { preserveScroll: true },
+        );
     });
 });
