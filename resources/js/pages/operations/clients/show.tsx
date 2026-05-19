@@ -1106,18 +1106,9 @@ export default function ClientShow({
                                             <span
                                                 key={`sep-${group}`}
                                                 aria-hidden
-                                                className="mx-1 h-5 w-px bg-border"
+                                                title={groupMeta?.label}
+                                                className="mx-2 h-4 w-px shrink-0 bg-border/80"
                                             />,
-                                        );
-                                    }
-                                    if (groupMeta) {
-                                        elements.push(
-                                            <span
-                                                key={`label-${group}`}
-                                                className="hidden text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:inline"
-                                            >
-                                                {groupMeta.label}
-                                            </span>,
                                         );
                                     }
                                     lastGroup = group;
