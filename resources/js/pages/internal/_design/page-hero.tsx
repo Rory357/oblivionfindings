@@ -99,8 +99,8 @@ export default function PageHeroShowcase() {
                         }
                     />
                 }
-                tabs={<PageTabs value={tab} onValueChange={setTab} items={SHOWCASE_TABS} />}
-            >
+                tabs={
+                    <PageTabs value={tab} onValueChange={setTab} items={SHOWCASE_TABS}>
                 <TabsContent value="hero" className="space-y-6">
                     <Section title="Hero — Site Detail reference (icon + meta + badges + stats + actions)">
                         <PageHero
@@ -239,7 +239,9 @@ export default function PageHeroShowcase() {
                 <TabsContent value="overflow-c">
                     <DemoCard title="Overflow tab C" />
                 </TabsContent>
-            </PageLayout>
+                    </PageTabs>
+                }
+            />
         </AppLayout>
     );
 }
