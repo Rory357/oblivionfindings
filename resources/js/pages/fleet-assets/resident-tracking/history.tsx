@@ -81,6 +81,34 @@ const RANGE_PILLS = [
 ];
 
 const SAFETY_EVENTS = ['vehicle_sos', 'sos', 'man_down', 'battery_low', 'tamper'];
+const IMPORTANT_MAP_EVENTS = new Set([
+    ...SAFETY_EVENTS,
+    'power_on',
+    'power_off',
+    'charging_started',
+    'charging_stopped',
+    'charge_full',
+]);
+
+type MapPinMode = 'important' | 'balanced' | 'all';
+
+const MAP_PIN_OPTIONS: Array<{ value: MapPinMode; label: string; description: string }> = [
+    {
+        value: 'important',
+        label: 'Important pins',
+        description: 'Live, start, end, and safety or battery events',
+    },
+    {
+        value: 'balanced',
+        label: 'More pins',
+        description: 'Important pins plus regular samples',
+    },
+    {
+        value: 'all',
+        label: 'All pins',
+        description: 'Every loaded point',
+    },
+];
 
 function eventTypeMeta(t: string | null): {
     label: string;
@@ -139,6 +167,51 @@ function csvCell(value: unknown): string {
     return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
+function uniqueSortedIndices(indices: number[], total: number): number[] {
+    return [...new Set(indices.filter((index) => index >= 0 && index < total))].sort(
+        (a, b) => a - b,
+    );
+}
+
+function importantLocationIndices(locations: Location[]): number[] {
+    const lastIndex = locations.length - 1;
+    const important = [0, lastIndex];
+
+    locations.forEach((location, index) => {
+        if (location.event_type && IMPORTANT_MAP_EVENTS.has(location.event_type)) {
+            important.push(index);
+        }
+    });
+
+    return uniqueSortedIndices(important, locations.length);
+}
+
+function sampledLocationIndices(locations: Location[], sampleEvery = 10): number[] {
+    const important = importantLocationIndices(locations);
+    const sampled = locations.map((_, index) => index).filter((index) => index % sampleEvery === 0);
+
+    return uniqueSortedIndices([...important, ...sampled], locations.length);
+}
+
+function mapPinIndices(locations: Location[], mode: MapPinMode): number[] {
+    if (locations.length === 0) return [];
+    if (mode === 'all') return locations.map((_, index) => index);
+    if (mode === 'balanced') return sampledLocationIndices(locations);
+
+    return importantLocationIndices(locations);
+}
+
+function mapPathIndices(locations: Location[], mode: MapPinMode): number[] {
+    if (locations.length === 0) return [];
+    if (mode === 'all') return locations.map((_, index) => index);
+
+    const maxPathPoints = mode === 'balanced' ? 120 : 80;
+    const step = Math.max(1, Math.ceil(locations.length / maxPathPoints));
+    const sampled = locations.map((_, index) => index).filter((index) => index % step === 0);
+
+    return uniqueSortedIndices([...sampled, ...importantLocationIndices(locations)], locations.length);
+}
+
 export default function ResidentTrackingHistory({
     client,
     resident,
@@ -149,6 +222,7 @@ export default function ResidentTrackingHistory({
 }: Props) {
     const safeLocations = locations ?? [];
     const safeAvailableTypes = available_event_types ?? [];
+    const availableSafetyTypes = SAFETY_EVENTS.filter((t) => safeAvailableTypes.includes(t));
 
     const [activeRange, setActiveRange] = useState<string>(filters.range ?? '24h');
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
@@ -156,6 +230,8 @@ export default function ResidentTrackingHistory({
     const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>(
         filters.event_types ?? [],
     );
+    const [timelineEventTypes, setTimelineEventTypes] = useState<string[]>([]);
+    const [mapPinMode, setMapPinMode] = useState<MapPinMode>('important');
     const [hoveredLocationIdx, setHoveredLocationIdx] = useState<number | null>(null);
     const [activeLocationIdx, setActiveLocationIdx] = useState<number | null>(null);
     const [mapExpanded, setMapExpanded] = useState(false);
@@ -204,9 +280,8 @@ export default function ResidentTrackingHistory({
     };
 
     const handleSafetyOnly = () => {
-        const next = SAFETY_EVENTS.filter((t) => safeAvailableTypes.includes(t));
-        setSelectedEventTypes(next);
-        applyRange(activeRange, { event_types: next });
+        setSelectedEventTypes(availableSafetyTypes);
+        applyRange(activeRange, { event_types: availableSafetyTypes });
     };
 
     const handleClearEventTypes = () => {
@@ -214,10 +289,40 @@ export default function ResidentTrackingHistory({
         applyRange(activeRange, { event_types: [] });
     };
 
+    const handleTimelineEventTypeToggle = (type: string) => {
+        setTimelineEventTypes((current) =>
+            current.includes(type)
+                ? current.filter((t) => t !== type)
+                : [...current, type],
+        );
+    };
+
+    const handleTimelineSafetyOnly = (checked: boolean | 'indeterminate') => {
+        setTimelineEventTypes(checked === true ? availableSafetyTypes : []);
+    };
+
+    const handleTimelineClear = () => {
+        setTimelineEventTypes([]);
+    };
+
+    const mapPointIndices = useMemo(
+        () => mapPinIndices(safeLocations, mapPinMode),
+        [mapPinMode, safeLocations],
+    );
+
+    const mapPathPointIndices = useMemo(
+        () => mapPathIndices(safeLocations, mapPinMode),
+        [mapPinMode, safeLocations],
+    );
+
     const polyline = useMemo(() => {
-        if (safeLocations.length < 2) return undefined;
-        return [...safeLocations].reverse().map((l) => ({ lat: l.lat, lng: l.lng }));
-    }, [safeLocations]);
+        if (mapPathPointIndices.length < 2) return undefined;
+        return [...mapPathPointIndices]
+            .reverse()
+            .map((index) => safeLocations[index])
+            .filter(Boolean)
+            .map((l) => ({ lat: l.lat, lng: l.lng }));
+    }, [mapPathPointIndices, safeLocations]);
 
     const mapCenter = useMemo(() => {
         if (activeLocationIdx !== null && safeLocations[activeLocationIdx]) {
@@ -233,8 +338,9 @@ export default function ResidentTrackingHistory({
     }, [activeLocationIdx, latestLocation, safeLocations]);
 
     const markers: MapMarker[] = useMemo(() => {
-        if (safeLocations.length === 0) return [];
-        return safeLocations.map((location, index) => {
+        if (mapPointIndices.length === 0) return [];
+        return mapPointIndices.map((index) => {
+            const location = safeLocations[index];
             const meta = eventTypeMeta(location.event_type);
             const isLive = index === 0;
             const isHovered = hoveredLocationIdx === index;
@@ -254,7 +360,22 @@ export default function ResidentTrackingHistory({
                 popup: `${meta.label} · ${formatDateTime(location.timestamp)}<br/>${displayLocation(location)}${location.speed != null ? `<br/>Speed: ${location.speed} km/h` : ''}${location.battery != null ? `<br/>Battery: ${location.battery}%` : ''}`,
             };
         });
-    }, [activeLocationIdx, hoveredLocationIdx, safeLocations]);
+    }, [activeLocationIdx, hoveredLocationIdx, mapPointIndices, safeLocations]);
+
+    const timelineLocations = useMemo(() => {
+        return safeLocations
+            .map((location, index) => ({ location, index }))
+            .filter(({ location }) => {
+                if (timelineEventTypes.length === 0) return true;
+
+                return location.event_type !== null && timelineEventTypes.includes(location.event_type);
+            });
+    }, [safeLocations, timelineEventTypes]);
+
+    const timelineSafetyOnlySelected =
+        availableSafetyTypes.length > 0 &&
+        timelineEventTypes.length === availableSafetyTypes.length &&
+        availableSafetyTypes.every((t) => timelineEventTypes.includes(t));
 
     const handleMarkerClick = useCallback((id: string | number) => {
         const idx = typeof id === 'number' ? id : parseInt(String(id), 10);
@@ -385,6 +506,14 @@ export default function ResidentTrackingHistory({
                             <span>Live point {formatRelativeTime(latestLocation.timestamp)}</span>
                         </>
                     )}
+                    {safeLocations.length > 0 && (
+                        <>
+                            <span>·</span>
+                            <span>
+                                {markers.length} of {safeLocations.length} pins shown
+                            </span>
+                        </>
+                    )}
                 </div>
 
                 {/* Quick-range pills + event filter + export */}
@@ -482,6 +611,26 @@ export default function ResidentTrackingHistory({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
+                    <div className="flex flex-wrap items-center gap-1 rounded-md border bg-background p-1">
+                        <span className="px-2 text-xs font-medium text-muted-foreground">
+                            Map pins
+                        </span>
+                        {MAP_PIN_OPTIONS.map((option) => (
+                            <Button
+                                key={option.value}
+                                type="button"
+                                variant={mapPinMode === option.value ? 'default' : 'ghost'}
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                aria-pressed={mapPinMode === option.value}
+                                title={option.description}
+                                onClick={() => setMapPinMode(option.value)}
+                            >
+                                {option.label}
+                            </Button>
+                        ))}
+                    </div>
+
                     <Button
                         variant="outline"
                         size="sm"
@@ -544,7 +693,71 @@ export default function ResidentTrackingHistory({
 
                     {!mapExpanded && (
                         <Card className="flex flex-col">
-                            <div className="border-b px-4 py-3 text-sm font-medium">Timeline</div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                                <div>
+                                    <div className="text-sm font-medium">Timeline</div>
+                                    {safeLocations.length > 0 && (
+                                        <div className="text-xs text-muted-foreground">
+                                            {timelineLocations.length} of {safeLocations.length} shown
+                                        </div>
+                                    )}
+                                </div>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-8 gap-1">
+                                            <Filter className="h-3.5 w-3.5" />
+                                            {timelineEventTypes.length === 0
+                                                ? 'Timeline events'
+                                                : `${timelineEventTypes.length} timeline type${timelineEventTypes.length > 1 ? 's' : ''}`}
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-56">
+                                        <DropdownMenuLabel className="flex items-center justify-between">
+                                            Timeline events
+                                            {timelineEventTypes.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleTimelineClear}
+                                                    className="text-[10px] text-muted-foreground hover:underline"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuCheckboxItem
+                                            checked={timelineSafetyOnlySelected}
+                                            onCheckedChange={handleTimelineSafetyOnly}
+                                        >
+                                            <ShieldAlert className="mr-2 h-3.5 w-3.5 text-status-critical" />
+                                            Safety only
+                                        </DropdownMenuCheckboxItem>
+                                        <DropdownMenuSeparator />
+                                        {safeAvailableTypes.length === 0 && (
+                                            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                                No event types in this range
+                                            </div>
+                                        )}
+                                        {safeAvailableTypes.map((t) => {
+                                            const meta = eventTypeMeta(t);
+                                            const Icon = meta.icon;
+
+                                            return (
+                                                <DropdownMenuCheckboxItem
+                                                    key={t}
+                                                    checked={timelineEventTypes.includes(t)}
+                                                    onCheckedChange={() =>
+                                                        handleTimelineEventTypeToggle(t)
+                                                    }
+                                                >
+                                                    <Icon className="mr-2 h-3.5 w-3.5" />
+                                                    {meta.label}
+                                                </DropdownMenuCheckboxItem>
+                                            );
+                                        })}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                             <div
                                 ref={timelineRef}
                                 className="flex-1 overflow-y-auto"
@@ -554,9 +767,13 @@ export default function ResidentTrackingHistory({
                                     <div className="p-6 text-center text-sm text-muted-foreground">
                                         No events to display.
                                     </div>
+                                ) : timelineLocations.length === 0 ? (
+                                    <div className="p-6 text-center text-sm text-muted-foreground">
+                                        No events match this timeline filter.
+                                    </div>
                                 ) : (
                                     <div className="divide-y">
-                                        {safeLocations.map((location, idx) => {
+                                        {timelineLocations.map(({ location, index: idx }) => {
                                             const meta = eventTypeMeta(location.event_type);
                                             const Icon = meta.icon;
                                             const isLive = idx === 0;

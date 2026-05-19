@@ -6,6 +6,7 @@ import ResidentTrackingIndex from '@/pages/fleet-assets/resident-tracking';
 import ResidentTrackingHistory from '@/pages/fleet-assets/resident-tracking/history';
 
 const inertiaMocks = vi.hoisted(() => ({
+    get: vi.fn(),
     post: vi.fn(),
     reload: vi.fn(),
     visit: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('@inertiajs/react', () => ({
         <a href={href} {...props}>{children}</a>
     ),
     router: {
+        get: inertiaMocks.get,
         post: inertiaMocks.post,
         reload: inertiaMocks.reload,
         visit: inertiaMocks.visit,
@@ -180,8 +182,25 @@ function renderResidentTracking() {
 }
 
 beforeEach(() => {
+    inertiaMocks.get.mockClear();
     inertiaMocks.post.mockClear();
 });
+
+function historyLocation(
+    index: number,
+    eventType: string | null = 'location_report',
+    label = `Point ${index}`,
+) {
+    return {
+        lat: -37.723657 - index * 0.00001,
+        lng: 175.241655 + index * 0.00001,
+        display_location: label,
+        timestamp: `2026-05-18T08:${String(59 - index).padStart(2, '0')}:00Z`,
+        speed: index % 2 === 0 ? 0 : 1,
+        battery: index === 0 ? 100 : 95,
+        event_type: eventType,
+    };
+}
 
 it('renders the resident sidebar and queues Locate Now from a list row', async () => {
     renderResidentTracking();
@@ -249,4 +268,70 @@ it('renders the new history page with quick range pills and event filter', async
     expect(screen.getByRole('button', { name: /^7d$/i })).toBeVisible();
     expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '2');
     expect(screen.getByText(/points/i)).toBeVisible();
+});
+
+it('defaults the history map to important pins and lets the user show all pins', async () => {
+    const locations = Array.from({ length: 12 }, (_, index) =>
+        historyLocation(index, index === 3 ? 'battery_low' : 'location_report'),
+    );
+
+    render(
+        <ResidentTrackingHistory
+            client={{
+                id: 9012,
+                name: 'Amelia Wilson',
+                house: 'Harbour House',
+                photo: null,
+            }}
+            resident={null}
+            tracker={null}
+            available_event_types={['location_report', 'battery_low']}
+            filters={{ range: '24h', date_from: null, date_to: null, event_types: [] }}
+            locations={locations}
+        />,
+    );
+
+    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '3');
+    expect(screen.getByText('3 of 12 pins shown')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: /All pins/i }));
+
+    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '12');
+    expect(screen.getByText('12 of 12 pins shown')).toBeVisible();
+});
+
+it('filters the timeline without changing the loaded map data', async () => {
+    render(
+        <ResidentTrackingHistory
+            client={{
+                id: 9012,
+                name: 'Amelia Wilson',
+                house: 'Harbour House',
+                photo: null,
+            }}
+            resident={null}
+            tracker={null}
+            available_event_types={['location_report', 'battery_low', 'power_on']}
+            filters={{ range: '24h', date_from: null, date_to: null, event_types: [] }}
+            locations={[
+                historyLocation(0, 'location_report', 'Normal location'),
+                historyLocation(1, 'battery_low', 'Low battery location'),
+                historyLocation(2, 'power_on', 'Power event location'),
+            ]}
+        />,
+    );
+
+    expect(screen.getByText('Timeline')).toBeVisible();
+    expect(screen.getByText('Normal location')).toBeVisible();
+    expect(screen.getByText('Low battery location')).toBeVisible();
+    expect(screen.getByText('Power event location')).toBeVisible();
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /Timeline events/i }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Battery low/i }));
+
+    expect(screen.getByText('1 of 3 shown')).toBeVisible();
+    expect(screen.queryByText('Normal location')).not.toBeInTheDocument();
+    expect(screen.getByText('Low battery location')).toBeVisible();
+    expect(screen.queryByText('Power event location')).not.toBeInTheDocument();
+    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '3');
 });
