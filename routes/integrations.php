@@ -27,4 +27,4 @@ Route::middleware(['auth'])->group(function () {
 Route::post('/webhooks/{provider}', [WebhookReceiverController::class, 'receive'])
     ->middleware('throttle:60,1')
     ->name('webhooks.receive')
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class]);
