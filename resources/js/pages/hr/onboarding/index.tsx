@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +17,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ClipboardList, Plus } from 'lucide-react';
+import { ClipboardList, Plus, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
 const formatDate = (value: string | null) => {
@@ -236,21 +237,37 @@ export default function OnboardingIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Onboarding" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">
-                        Onboarding Checklists
-                    </h1>
-                    {can.manage && (
-                        <Button asChild>
-                            <Link href="/hr/onboarding/create">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create Checklist
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={UserPlus}
+                        title="Onboarding Checklists"
+                        description="Track and manage onboarding checklists for new employees."
+                        stats={[
+                            { label: 'Total', value: checklists.total },
+                            { label: 'Templates', value: templates.length },
+                            {
+                                label: 'In progress',
+                                value: checklists.data.filter((c) => c.status === 'in_progress').length,
+                            },
+                            {
+                                label: 'Overdue',
+                                value: checklists.data.filter((c) => c.status === 'overdue').length,
+                            },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button asChild>
+                                    <Link href="/hr/onboarding/create">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create Checklist
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Input
@@ -901,7 +918,7 @@ export default function OnboardingIndex({
                         )}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

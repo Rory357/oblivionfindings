@@ -25,6 +25,7 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    ArrowLeftRight,
     ArrowRightLeft,
     CheckCircle2,
     ClipboardList,
@@ -678,10 +679,16 @@ export default function Handovers({ handovers, shifts }: Props) {
     return (
         <AppLayout>
             <Head title="eMAR - Handovers" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={ArrowLeftRight}
                 title="Medication Handovers"
                 description="Medication-focused handover notes now run on the shared shift handover workflow so incoming teams, operations, and eMAR stay in sync."
-                backHref="/emar"
+                stats={[
+                    { label: 'Total', value: totals.total },
+                    { label: 'Drafts', value: totals.draft },
+                    { label: 'Submitted', value: totals.submitted },
+                    { label: 'Acknowledged', value: totals.acknowledged },
+                ]}
                 actions={
                     <Button
                         onClick={openCreateDialog}

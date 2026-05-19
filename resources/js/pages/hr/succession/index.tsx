@@ -60,22 +60,27 @@ export default function SuccessionIndex({ plans, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Succession Planning" />
+            <PageHero
+                icon={Users}
+                title="Succession Planning"
+                description="Identify and develop talent for key roles."
+                stats={[
+                    { label: 'Total plans', value: plans.total },
+                    { label: 'Critical', value: plans.data.filter((p) => p.risk_level === 'critical').length },
+                    { label: 'High risk', value: plans.data.filter((p) => p.risk_level === 'high').length },
+                ]}
+                actions={
+                    can.manage ? (
+                        <Button asChild>
+                            <Link href="/hr/succession/create">
+                                <Plus className="mr-2 h-4 w-4" />
+                                New Plan
+                            </Link>
+                        </Button>
+                    ) : undefined
+                }
+            />
             <PageShell>
-                <PageHero variant="compact"
-                    title="Succession Planning"
-                    description="Identify and develop talent for key roles."
-                    actions={
-                        can.manage ? (
-                            <Button asChild>
-                                <Link href="/hr/succession/create">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    New Plan
-                                </Link>
-                            </Button>
-                        ) : undefined
-                    }
-                />
-
                 {plans.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-12 text-center text-muted-foreground">

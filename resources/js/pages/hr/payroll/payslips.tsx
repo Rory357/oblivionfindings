@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +15,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Download, FileText, Plus } from 'lucide-react';
+import { Download, FileText, Plus, Receipt } from 'lucide-react';
 import { useState } from 'react';
 
 interface Payslip {
@@ -124,18 +125,29 @@ export default function PayslipsIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payslips" />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Payslips</h1>
-                    {can.generate && (
-                        <Button onClick={() => setShowGenerate(!showGenerate)}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Generate Payslips
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Receipt}
+                        title="Payslips"
+                        description="Generate, review, and distribute employee payslips."
+                        stats={[
+                            { label: 'Total', value: payslips.total },
+                            { label: 'Drafts', value: payslips.data.filter((p) => p.status === 'draft').length },
+                            { label: 'Approved', value: payslips.data.filter((p) => p.status === 'approved').length },
+                            { label: 'Paid', value: payslips.data.filter((p) => p.status === 'paid').length },
+                        ]}
+                        actions={
+                            can.generate ? (
+                                <Button onClick={() => setShowGenerate(!showGenerate)}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Generate Payslips
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Generate Form */}
                 {showGenerate && (
                     <Card>
@@ -405,7 +417,7 @@ export default function PayslipsIndex({
                         <LaravelPagination links={payslips.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, Award, CheckCircle, Clock, Pencil, Plus, Trash2, UserX, XCircle } from 'lucide-react';
+import { AlertTriangle, Award, CheckCircle, Clock, GraduationCap, Pencil, Plus, Trash2, UserX, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -392,7 +392,21 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
     return (
         <AppLayout>
             <Head title="eMAR - Competency" />
-            <PageHero variant="compact" title="Medication Competency" description="Staff competency assessments for medication administration. Track certifications, renewals, and compliance." backHref="/emar" />
+            <PageHero
+                icon={GraduationCap}
+                title="Medication Competency"
+                description="Staff competency assessments for medication administration. Track certifications, renewals, and compliance."
+                stats={[
+                    { label: 'Expired', value: expired.length },
+                    { label: 'Expiring soon', value: expiringSoon.length },
+                    { label: 'Unassessed', value: staffWithoutAssessment.length },
+                ]}
+                actions={
+                    canManageCompetency ? (
+                        <NewAssessmentDialog staff={staff} staffWithoutAssessment={staffWithoutAssessment} />
+                    ) : null
+                }
+            />
             <PageShell>
                 {/* Stats */}
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -415,13 +429,6 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                         </CardContent>
                     </Card>
                 </div>
-
-                {/* New Assessment Button */}
-                {canManageCompetency && (
-                    <div className="mb-4 flex justify-end">
-                        <NewAssessmentDialog staff={staff} staffWithoutAssessment={staffWithoutAssessment} />
-                    </div>
-                )}
 
                 <Tabs defaultValue="assessments">
                     <TabsList className="mb-4">

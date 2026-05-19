@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ import {
     AlertTriangle,
     Briefcase,
     Clock3,
+    Folder,
     FolderOpen,
     Plus,
     Search,
@@ -175,26 +177,31 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="HR Cases" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">HR Cases</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Manage disciplinary, grievance, and investigation
-                            workflows.
-                        </p>
-                    </div>
-
-                    {can.manage && (
-                        <Link href="/hr/cases/create">
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Open Case
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Folder}
+                        title="HR Cases"
+                        description="Manage disciplinary, grievance, and investigation workflows."
+                        stats={[
+                            { label: 'Open', value: summary.open_cases },
+                            { label: 'Unassigned', value: summary.unassigned_open_cases },
+                            { label: 'High severity', value: summary.high_severity_open_cases },
+                            { label: 'SLA overdue', value: summary.disciplinary_sla_overdue },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Link href="/hr/cases/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Open Case
+                                    </Button>
+                                </Link>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
@@ -568,7 +575,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         )}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

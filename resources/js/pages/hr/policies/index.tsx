@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle, FileText, Plus, ShieldCheck } from 'lucide-react';
+import { BookOpen, CheckCircle, FileText, Plus, ShieldCheck } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -105,36 +106,41 @@ export default function PoliciesIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Policy Library" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Policy Library
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Organisation policies, procedures, and staff
-                            attestations
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/hr/policies/attestations">
-                            <Button size="sm" variant="outline">
-                                <ShieldCheck className="mr-1.5 h-4 w-4" />
-                                Attestations
-                            </Button>
-                        </Link>
-                        {can.manage && (
-                            <Link href="/hr/policies/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Create Policy
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BookOpen}
+                        title="Policy Library"
+                        description="Organisation policies, procedures, and staff attestations."
+                        stats={[
+                            { label: 'Total', value: policies.data.length },
+                            { label: 'Active', value: policies.data.filter((p) => p.is_active).length },
+                            {
+                                label: 'Need attestation',
+                                value: policies.data.filter((p) => p.requires_attestation).length,
+                            },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link href="/hr/policies/attestations">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <ShieldCheck className="mr-1.5 h-4 w-4" />
+                                        Attestations
+                                    </Button>
+                                </Link>
+                                {can.manage && (
+                                    <Link href="/hr/policies/create">
+                                        <Button size="sm">
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Create Policy
+                                        </Button>
+                                    </Link>
+                                )}
+                            </div>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -329,7 +335,7 @@ export default function PoliciesIndex({
                 {policies?.links?.length ? (
                     <LaravelPagination links={policies.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

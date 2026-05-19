@@ -1,4 +1,5 @@
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -281,72 +282,76 @@ export default function PerformanceIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Performance & Supervision" />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Performance & Supervision
-                        </h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Supervision notes, performance reviews, and staff
-                            development
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="w-40">
-                            <Select
-                                value={
-                                    filters.staff_id
-                                        ? String(filters.staff_id)
-                                        : '__all__'
-                                }
-                                onValueChange={(value) =>
-                                    onFilter({
-                                        staff_id:
-                                            value === '__all__' ? null : value,
-                                    })
-                                }
-                            >
-                                <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="All staff" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__all__">
-                                        All staff
-                                    </SelectItem>
-                                    {staff.map((row) => (
-                                        <SelectItem
-                                            key={row.id}
-                                            value={String(row.id)}
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Target}
+                        title="Performance & Supervision"
+                        description="Supervision notes, performance reviews, and staff development."
+                        stats={[
+                            { label: 'Notes this month', value: notesThisMonth },
+                            { label: 'Overdue reviews', value: overdueReviews },
+                            { label: '1:1 overdue', value: oneToOneSla.overdue_count },
+                            { label: 'Open action plans', value: engagementActionPlanSla.open_total },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Link href="/hr/performance/supervision/create">
+                                        <Button size="sm" disabled={processing}>
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add Note
+                                        </Button>
+                                    </Link>
+                                    <Link href="/hr/performance/reviews/create">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={processing}
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
-                                            {row.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {can.manage && (
-                            <>
-                                <Link href="/hr/performance/supervision/create">
-                                    <Button size="sm" disabled={processing}>
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Note
-                                    </Button>
-                                </Link>
-                                <Link href="/hr/performance/reviews/create">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={processing}
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            New Review
+                                        </Button>
+                                    </Link>
+                                </div>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
+                <div className="flex items-center gap-2">
+                    <div className="w-40">
+                        <Select
+                            value={
+                                filters.staff_id
+                                    ? String(filters.staff_id)
+                                    : '__all__'
+                            }
+                            onValueChange={(value) =>
+                                onFilter({
+                                    staff_id:
+                                        value === '__all__' ? null : value,
+                                })
+                            }
+                        >
+                            <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="All staff" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__all__">
+                                    All staff
+                                </SelectItem>
+                                {staff.map((row) => (
+                                    <SelectItem
+                                        key={row.id}
+                                        value={String(row.id)}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Review
-                                    </Button>
-                                </Link>
-                            </>
-                        )}
+                                        {row.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
 
@@ -1127,7 +1132,7 @@ export default function PerformanceIndex({
                 {supervisionNotes?.links?.length ? (
                     <LaravelPagination links={supervisionNotes.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarOff, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LeaveEntry {
     id: number;
@@ -103,42 +104,45 @@ export default function TimeOffCalendar({
 
     const today = new Date().toISOString().split('T')[0];
 
+    const totalOff = calendarDays.reduce((sum, d) => sum + d.leave.length, 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Time Off Calendar - ${monthLabel}`} />
 
-            <div className="space-y-4">
-                {/* Header with month navigation */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Time Off Calendar
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            See who is off each day, color-coded by leave type
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => navigateMonth(-1)}
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="min-w-[140px] text-center text-sm font-medium">
-                            {monthLabel}
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => navigateMonth(1)}
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarOff}
+                        title="Time Off Calendar"
+                        description="See who is off each day, colour-coded by leave type."
+                        stats={[
+                            { label: 'Month', value: monthLabel },
+                            { label: 'Off this month', value: totalOff },
+                        ]}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => navigateMonth(-1)}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => navigateMonth(1)}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader>
@@ -293,7 +297,7 @@ export default function TimeOffCalendar({
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

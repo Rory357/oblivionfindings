@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -81,11 +82,19 @@ export default function ComplianceCalendar({ events, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Compliance Calendar" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Compliance Calendar</h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        title="Compliance Calendar"
+                        description="Upcoming compliance events, vetting checks, and training expiry dates."
+                        stats={[
+                            { label: 'Total events', value: events.length },
+                            { label: 'Months', value: sortedMonths.length },
+                        ]}
+                    />
+                }
+            >
                 {/* Filter */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Select
@@ -202,7 +211,7 @@ export default function ComplianceCalendar({ events, filters }: Props) {
                         </Card>
                     ))
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Download, FileText, Plus } from 'lucide-react';
+import { Download, FileText, Folder, Plus } from 'lucide-react';
 
 interface HrDocument {
     id: number;
@@ -65,27 +66,36 @@ export default function DocumentsIndex({ documents, filters, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="HR Documents" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">HR Documents</h1>
-                    {can.manage && (
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" asChild>
-                                <Link href="/hr/documents/templates">
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Generate from Template
-                                </Link>
-                            </Button>
-                            <Button asChild>
-                                <Link href="/hr/documents/upload">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Upload Document
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Folder}
+                        title="HR Documents"
+                        description="Manage employee contracts, policies, certificates, and offer letters."
+                        stats={[
+                            { label: 'Total', value: documents.total },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <Link href="/hr/documents/templates">
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            Generate from Template
+                                        </Link>
+                                    </Button>
+                                    <Button asChild>
+                                        <Link href="/hr/documents/upload">
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Upload Document
+                                        </Link>
+                                    </Button>
+                                </div>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Input
@@ -232,7 +242,7 @@ export default function DocumentsIndex({ documents, filters, can }: Props) {
                         <LaravelPagination links={documents.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

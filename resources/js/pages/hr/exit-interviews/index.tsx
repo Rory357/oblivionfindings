@@ -22,7 +22,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { BarChart3, Plus, Star } from 'lucide-react';
+import { BarChart3, LogOut, Plus, Star } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -111,11 +111,18 @@ export default function ExitInterviewsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Exit Interviews" />
 
-            <PageShell>
-                <PageHero variant="compact"
-                    title="Exit Interviews"
-                    description="Track departure feedback and identify retention insights."
-                >
+            <PageHero
+                icon={LogOut}
+                title="Exit Interviews"
+                description="Track departure feedback and identify retention insights."
+                stats={[
+                    { label: 'Total', value: interviews.data.length },
+                    {
+                        label: 'Would recommend',
+                        value: interviews.data.filter((i) => i.would_recommend === true).length,
+                    },
+                ]}
+                actions={
                     <div className="flex flex-wrap items-center gap-2">
                         <Link href="/hr/exit-interviews/trends">
                             <Button size="sm" variant="outline">
@@ -132,8 +139,10 @@ export default function ExitInterviewsIndex({
                             </Link>
                         )}
                     </div>
-                </PageHero>
+                }
+            />
 
+            <PageShell>
                 {/* Filters */}
                 <Card className="mb-4">
                     <CardHeader>

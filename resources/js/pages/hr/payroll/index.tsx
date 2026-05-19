@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Download, Plus } from 'lucide-react';
+import { Banknote, Download, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 interface PayrollRun {
@@ -331,17 +332,29 @@ export default function PayrollIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payroll" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Payroll Runs</h1>
-                    {can.manage && (
-                        <Button onClick={openCreateRunDialog}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create Run
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Banknote}
+                        title="Payroll Runs"
+                        description="Manage payroll periods, lock runs, and export to your payroll provider."
+                        stats={[
+                            { label: 'Total runs', value: runs.total },
+                            { label: 'Drafts', value: runs.data.filter((r) => r.status === 'draft').length },
+                            { label: 'Locked', value: runs.data.filter((r) => r.status === 'locked').length },
+                            { label: 'Exported', value: runs.data.filter((r) => r.status === 'exported').length },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button onClick={openCreateRunDialog}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create Run
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 <div className="text-xs text-muted-foreground">
                     Tip: use the Create Run button to enter period dates and
                     generate draft payroll items.
@@ -970,7 +983,7 @@ export default function PayrollIndex({
                         <LaravelPagination links={runs.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

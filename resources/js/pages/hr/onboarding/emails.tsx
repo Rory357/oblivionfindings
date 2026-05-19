@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,13 +76,16 @@ export default function OnboardingEmails({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Onboarding Email Templates" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">
-                        Onboarding Email Templates
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/onboarding"
+                        title="Onboarding Email Templates"
+                        description="Configure and preview the automated emails sent during onboarding."
+                    />
+                }
+            >
                 {/* Tab Navigation */}
                 <div className="flex gap-1 border-b">
                     {tabs
@@ -354,7 +358,7 @@ export default function OnboardingEmails({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

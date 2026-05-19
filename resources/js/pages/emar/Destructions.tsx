@@ -76,14 +76,22 @@ export default function Destructions({ destructions, filters, staff, clients, me
     return (
         <AppLayout>
             <Head title="eMAR - Destruction Records" />
-            <PageHero variant="compact" title="Medication Destruction / Disposal" description="Records of medication destruction and disposal with dual-witness verification." backHref="/emar" />
-            <PageShell>
-                {/* Actions */}
-                <div className="mb-4 flex justify-end">
-                    <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <PageHero
+                    icon={Trash2}
+                    title="Medication Destruction / Disposal"
+                    description="Records of medication destruction and disposal with dual-witness verification."
+                    stats={[
+                        { label: 'Total records', value: destructions.data.length },
+                        { label: 'Controlled drug', value: destructions.data.filter((d: any) => d.is_controlled_drug).length },
+                    ]}
+                    actions={
                         <DialogTrigger asChild>
                             <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Record Destruction</Button>
                         </DialogTrigger>
+                    }
+                />
+                <PageShell>
                         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Record Medication Destruction</DialogTitle>
@@ -248,8 +256,6 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                 </div>
                             </form>
                         </DialogContent>
-                    </Dialog>
-                </div>
 
                 <Card>
                     <CardContent className="p-0">
@@ -312,7 +318,8 @@ export default function Destructions({ destructions, filters, staff, clients, me
                         </table>
                     </CardContent>
                 </Card>
-            </PageShell>
+                </PageShell>
+            </Dialog>
         </AppLayout>
     );
 }

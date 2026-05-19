@@ -163,10 +163,16 @@ export default function CarePlansIndex({
     return (
         <AppLayout>
             <Head title="Care Plans" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={ClipboardList}
                 title="Care Plans"
                 description="Manage support plans, behaviour plans, health plans, and transition plans."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: s.total },
+                    { label: 'Active', value: s.active },
+                    { label: 'Review due', value: s.review_due },
+                    { label: 'Drafts', value: s.draft },
+                ]}
                 actions={
                     <Button asChild size="sm">
                         <Link href="/operations/care-plans/create">

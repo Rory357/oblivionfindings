@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Briefcase, Gift, Heart, Pin, Star, Trophy } from 'lucide-react';
+import { Briefcase, Gift, Heart, Pin, Rss, Star, Trophy } from 'lucide-react';
 import { useState } from 'react';
 
 type User = { id: number; name: string };
@@ -155,22 +156,31 @@ export default function FeedIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Community Feed" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Community Feed</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Stay connected with your team
-                        </p>
-                    </div>
-                    <Dialog open={kudosOpen} onOpenChange={setKudosOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm">
-                                <Heart className="mr-1.5 h-4 w-4" />
-                                Send Kudos
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
+            <Dialog open={kudosOpen} onOpenChange={setKudosOpen}>
+                <PageLayout
+                    hero={
+                        <PageHero
+                            icon={Rss}
+                            title="Community Feed"
+                            description="Stay connected with your team."
+                            stats={[
+                                { label: 'Posts', value: posts.data.length },
+                                { label: 'Birthdays', value: milestones.birthdays.length },
+                                { label: 'Anniversaries', value: milestones.anniversaries.length },
+                                { label: 'New hires', value: milestones.new_hires.length },
+                            ]}
+                            actions={
+                                <DialogTrigger asChild>
+                                    <Button size="sm">
+                                        <Heart className="mr-1.5 h-4 w-4" />
+                                        Send Kudos
+                                    </Button>
+                                </DialogTrigger>
+                            }
+                        />
+                    }
+                >
+                    <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Send Kudos</DialogTitle>
                                 <DialogDescription>
@@ -275,8 +285,6 @@ export default function FeedIndex({
                                 </div>
                             </form>
                         </DialogContent>
-                    </Dialog>
-                </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                     {/* Left Sidebar — Milestones */}
@@ -594,7 +602,8 @@ export default function FeedIndex({
                         </Card>
                     </div>
                 </div>
-            </div>
+                </PageLayout>
+            </Dialog>
         </AppLayout>
     );
 }

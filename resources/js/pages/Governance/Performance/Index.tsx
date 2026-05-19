@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as performanceIndex, create as createPerformance, show as showPerformance } from '@/routes/governance/performance';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,20 +59,28 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
     >
       <Head title="Performance Reviews" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Performance Reviews</h1>
-              <p className="text-muted-foreground mt-1">CEO and executive performance management</p>
-            </div>
-            {(auth.can as any)?.governance?.performance?.create && (
-              <Button asChild>
-                <Link href={createPerformance.url()}>New Review</Link>
-              </Button>
-            )}
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Target}
+            title="Performance Reviews"
+            description="Manage CEO and executive review cycles, goals, and ratings."
+            stats={[
+              { label: 'Active reviews', value: reviews.data.filter((r) => r.status !== 'completed').length },
+              { label: 'Completed', value: reviews.data.filter((r) => r.status === 'completed').length },
+              { label: 'Pending board review', value: reviews.data.filter((r) => r.status === 'board_review').length },
+              { label: 'Current cycle', value: review_cycles[0]?.label ?? '—' },
+            ]}
+            actions={
+              (auth.can as any)?.governance?.performance?.create ? (
+                <Button asChild>
+                  <Link href={createPerformance.url()}>New Review</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        }
+      >
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
@@ -174,7 +183,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               </div>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

@@ -2,10 +2,11 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { show as showAction } from '@/routes/governance/actions';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Clock, User } from 'lucide-react';
+import { AlertTriangle, CheckSquare, Clock, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActionItem {
@@ -69,15 +70,21 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
     >
       <Head title="Actions" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Actions</h1>
-              <p className="text-muted-foreground mt-1">Track board decisions and follow-ups</p>
-            </div>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={CheckSquare}
+            title="Actions"
+            description="Track board decisions and follow-ups through to completion."
+            stats={[
+              { label: 'Open', value: summary.total_open },
+              { label: 'Overdue', value: summary.overdue },
+              { label: 'My open', value: summary.my_open },
+              { label: 'High priority', value: summary.high_priority },
+            ]}
+          />
+        }
+      >
           {/* Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
@@ -150,7 +157,7 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
               </div>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

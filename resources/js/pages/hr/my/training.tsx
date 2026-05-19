@@ -1,13 +1,13 @@
 import { DonutChart } from '@/components/dashboard/donut-chart';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     BookOpen,
     Calendar,
     CheckCircle2,
@@ -151,31 +151,21 @@ export default function MyTraining({ complianceStatuses }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Training & Compliance" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                            <GraduationCap className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold md:text-2xl">
-                                My Training & Compliance
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Track your compliance requirements and
-                                certifications
-                            </p>
-                        </div>
-                    </div>
-                    <Link href="/hr/my">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-1.5 h-4 w-4" />
-                            My HR
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={GraduationCap}
+                        title="My Training & Compliance"
+                        description="Track your compliance requirements and certifications."
+                        stats={[
+                            { label: 'Compliant', value: summary.compliant },
+                            { label: 'Expiring', value: summary.expiring_soon },
+                            { label: 'Expired', value: summary.expired },
+                            { label: 'Compliance rate', value: `${complianceRate}%` },
+                        ]}
+                    />
+                }
+            >
                 {/* Urgency Banner */}
                 {urgentItems.length > 0 && (
                     <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50">
@@ -593,7 +583,7 @@ export default function MyTraining({ complianceStatuses }: Props) {
                         </Card>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

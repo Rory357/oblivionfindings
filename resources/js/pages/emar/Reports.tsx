@@ -16,6 +16,7 @@ import {
     CheckCircle,
     Clock,
     Download,
+    FileBarChart,
     FileText,
     Lock,
     Package,
@@ -212,7 +213,17 @@ export default function EmarReports({
     return (
         <AppLayout>
             <Head title="eMAR Reports" />
-            <PageHero variant="compact" title="eMAR Reports" description="Comprehensive medication administration reporting and analytics." />
+            <PageHero
+                icon={FileBarChart}
+                title="eMAR Reports"
+                description="Comprehensive medication administration reporting and analytics."
+                stats={[
+                    { label: 'Given', value: adminSummary.given },
+                    { label: 'Refused', value: adminSummary.refused },
+                    { label: 'Missed', value: adminSummary.missed },
+                    { label: 'Compliance', value: `${adminSummary.compliance_rate}%` },
+                ]}
+            />
             <PageShell>
                 {/* ── Filters ────────────────────────────────────── */}
                 <Card className="mb-6">

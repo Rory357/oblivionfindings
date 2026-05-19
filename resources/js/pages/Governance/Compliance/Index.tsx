@@ -3,11 +3,12 @@ import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as complianceIndex, create as createCompliance, show as showCompliance } from '@/routes/governance/compliance';
 import { calendar as complianceCalendar } from '@/routes/governance/compliance';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, CheckCircle, Clock, AlertTriangle, FileCheck } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, AlertTriangle, FileCheck, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Obligation {
@@ -81,25 +82,40 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
     >
       <Head title="Compliance" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Compliance</h1>
-              <p className="text-muted-foreground mt-1">Track regulatory obligations and deadlines</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link href={complianceCalendar.url()}>Calendar View</Link>
-              </Button>
-              {(auth.can as any)?.governance?.compliance?.create && (
-                <Button asChild>
-                  <Link href={createCompliance.url()}>New Obligation</Link>
+      <PageLayout
+        hero={
+          <PageHero
+            icon={ShieldCheck}
+            title="Compliance"
+            description="Track regulatory obligations, deadlines, and evidence across compliance frameworks."
+            stats={[
+              { label: 'Overdue', value: summary.total_overdue },
+              { label: 'Due soon', value: summary.total_due_soon },
+              { label: 'Next 30 days', value: summary.next_30_days.length },
+              {
+                label: 'Compliance rate',
+                value: `${(() => {
+                  const total = Object.values(summary.by_framework).reduce((a, f) => a + f.total, 0);
+                  const complete = Object.values(summary.by_framework).reduce((a, f) => a + f.complete, 0);
+                  return total > 0 ? Math.round((complete / total) * 100) : 0;
+                })()}%`,
+              },
+            ]}
+            actions={
+              <div className="flex gap-2">
+                <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                  <Link href={complianceCalendar.url()}>Calendar View</Link>
                 </Button>
-              )}
-            </div>
-          </div>
-
+                {(auth.can as any)?.governance?.compliance?.create && (
+                  <Button asChild>
+                    <Link href={createCompliance.url()}>New Obligation</Link>
+                  </Button>
+                )}
+              </div>
+            }
+          />
+        }
+      >
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
@@ -243,7 +259,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
               </div>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

@@ -2,10 +2,11 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as resolutionsIndex, create as createResolution, show as showResolution } from '@/routes/governance/resolutions';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Vote, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Vote, Clock, AlertCircle, CheckCircle, Gavel } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Resolution {
@@ -65,18 +66,25 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
     >
       <Head title="Resolutions" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Resolutions</h1>
-              <p className="text-muted-foreground mt-1">Board voting and decisions</p>
-            </div>
-            <Button asChild>
-              <Link href={createResolution.url()}>New Resolution</Link>
-            </Button>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Gavel}
+            title="Resolutions"
+            description="Record board voting outcomes and track decisions through to implementation."
+            stats={[
+              { label: 'Total', value: resolutions.data.length },
+              { label: 'Awaiting your vote', value: my_pending_votes.length },
+              { label: 'Carried', value: resolutions.data.filter((r) => r.outcome === 'carried').length },
+            ]}
+            actions={
+              <Button asChild>
+                <Link href={createResolution.url()}>New Resolution</Link>
+              </Button>
+            }
+          />
+        }
+      >
           {/* Pending Votes Alert */}
           {my_pending_votes.length > 0 && (
             <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
@@ -167,7 +175,7 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
               </div>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

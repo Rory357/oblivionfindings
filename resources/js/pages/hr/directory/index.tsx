@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -143,58 +144,52 @@ export default function DirectoryIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Employee Directory" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                            <Users className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold md:text-2xl">
-                                Employee Directory
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                {employees.total} team member
-                                {employees.total !== 1 ? 's' : ''} across the
-                                organisation
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* View toggle */}
-                    <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-0.5">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setViewMode('grid')}
-                            className={`h-auto w-auto rounded-md p-1.5 ${
-                                viewMode === 'grid'
-                                    ? 'bg-background text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="Grid view"
-                        >
-                            <Grid3X3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setViewMode('list')}
-                            className={`h-auto w-auto rounded-md p-1.5 ${
-                                viewMode === 'list'
-                                    ? 'bg-background text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title="List view"
-                        >
-                            <LayoutList className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Users}
+                        title="Employee Directory"
+                        description={`${employees.total} team member${employees.total !== 1 ? 's' : ''} across the organisation.`}
+                        stats={[
+                            { label: 'Total', value: employees.total },
+                            { label: 'Departments', value: departments.length },
+                            { label: 'Sites', value: sites.length },
+                        ]}
+                        actions={
+                            <div className="flex items-center gap-1 rounded-lg border border-primary-foreground/15 bg-primary-foreground/10 p-0.5 backdrop-blur-sm">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setViewMode('grid')}
+                                    className={`h-auto w-auto rounded-md p-1.5 ${
+                                        viewMode === 'grid'
+                                            ? 'bg-primary-foreground/20 text-primary-foreground'
+                                            : 'text-primary-foreground/70 hover:text-primary-foreground'
+                                    }`}
+                                    title="Grid view"
+                                >
+                                    <Grid3X3 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setViewMode('list')}
+                                    className={`h-auto w-auto rounded-md p-1.5 ${
+                                        viewMode === 'list'
+                                            ? 'bg-primary-foreground/20 text-primary-foreground'
+                                            : 'text-primary-foreground/70 hover:text-primary-foreground'
+                                    }`}
+                                    title="List view"
+                                >
+                                    <LayoutList className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Search & Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <form
@@ -547,7 +542,7 @@ export default function DirectoryIndex({
                         )}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

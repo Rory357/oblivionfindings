@@ -29,11 +29,13 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
+import { PageHero, PageLayout } from '@/components/page';
 import {
     AlertTriangle,
     CalendarClock,
     CheckCircle2,
     ClipboardList,
+    Map,
     RefreshCw,
     ShieldCheck,
     Wallet,
@@ -1135,41 +1137,45 @@ export default function RoadmapDashboard({
         >
             <Head title="Roadmap Dashboard" />
 
-            <div className="space-y-6">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Roadmap
-                        </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Quarterly initiatives, budgets, rollout, and board
-                            decisions in one place.
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Map}
+                        title="Roadmap"
+                        description="Quarterly initiatives, budgets, rollout, and board decisions in one place."
+                        stats={[
+                            { label: 'Initiatives', value: summary.initiatives.total },
+                            { label: 'In progress', value: summary.initiatives.in_progress },
+                            { label: 'Blocked', value: summary.initiatives.blocked },
+                            { label: 'Decisions required', value: summary.decisions_required },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => void refreshAll()}
+                                    disabled={loading}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <RefreshCw
+                                        className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+                                    />
+                                    Refresh
+                                </Button>
+                                <Link href="/governance/dashboard">
+                                    <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        Back to Governance
+                                    </Button>
+                                </Link>
+                            </div>
+                        }
+                    >
+                        <p className="text-xs text-primary-foreground/70">
+                            Last refreshed {new Date(generatedAt).toLocaleString()}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Last refreshed{' '}
-                            {new Date(generatedAt).toLocaleString()}
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => void refreshAll()}
-                            disabled={loading}
-                        >
-                            <RefreshCw
-                                className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-                            />
-                            Refresh
-                        </Button>
-                        <Link href="/governance/dashboard">
-                            <Button variant="outline">
-                                Back to Governance
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-
+                    </PageHero>
+                }
+            >
                 {summary.status === 'unavailable' && (
                     <Card className="border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="space-y-2 py-4 text-sm">
@@ -2738,7 +2744,7 @@ export default function RoadmapDashboard({
                         )}
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

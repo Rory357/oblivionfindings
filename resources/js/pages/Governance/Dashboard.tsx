@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { data as dashboardData } from '@/routes/governance/dashboard';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -191,43 +192,42 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     <AppLayout user={auth.user} breadcrumbs={[{ title: 'Governance', href: '/governance/dashboard' }]}>
       <Head title="Governance Dashboard" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Governance Dashboard</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold text-foreground" dusk="governance-cockpit-heading">Executive & Board Cockpit</h1>
-              {isBoardMember && boardRole && (
-                <Badge className="bg-status-info-bg text-status-info border-status-info/30">
-                  {formatLabel(boardRole)}
-                </Badge>
-              )}
-            </div>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              A single governance map for meetings, plans, risk, compliance, workforce, finance, safety, privacy, and operational control.
-            </p>
-            {cockpit?.period_label && (
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">{cockpit.period_label}</p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={fetchData} disabled={loading}>
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </div>
-        </div>
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Landmark}
+            title="Executive & Board Cockpit"
+            description="A single governance map for meetings, plans, risk, compliance, workforce, finance, safety, privacy, and operational control."
+            stats={[
+              { label: 'Open actions', value: workflow?.summary.total ?? 0 },
+              { label: 'Critical', value: workflow?.summary.critical ?? 0 },
+              { label: 'Overdue', value: workflow?.summary.overdue ?? 0 },
+            ]}
+            badges={isBoardMember && boardRole ? [{ label: formatLabel(boardRole) }] : undefined}
+            actions={
+              <div className="flex items-center gap-3">
+                <Select value={period} onValueChange={setPeriod}>
+                  <SelectTrigger className="w-40 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={fetchData} disabled={loading} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </Button>
+              </div>
+            }
+          />
+        }
+      >
+        {cockpit?.period_label && (
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{cockpit.period_label}</p>
+        )}
 
         <div className="mb-6 grid gap-6 lg:grid-cols-[2fr,1fr]">
           <Card>
@@ -378,7 +378,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
             ))}
           </div>
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

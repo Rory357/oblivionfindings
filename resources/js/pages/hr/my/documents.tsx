@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -232,47 +233,20 @@ export default function MyDocuments({ documents, categories }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Documents" />
 
-            <div className="space-y-4 p-4 lg:p-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-xl font-bold">My Documents</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Your employment documents and records
-                    </p>
-                </div>
-
-                {/* Stats Bar */}
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
-                        <div className="text-xl font-bold text-primary">
-                            {stats.total}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-primary uppercase">
-                            Total
-                        </div>
-                    </div>
-                    <div className="rounded-xl border p-3 text-center">
-                        <div
-                            className={`text-xl font-bold ${stats.expiring > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
-                        >
-                            {stats.expiring}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Expiring
-                        </div>
-                    </div>
-                    <div className="rounded-xl border p-3 text-center">
-                        <div
-                            className={`text-xl font-bold ${stats.expired > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                        >
-                            {stats.expired}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Expired
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        title="My Documents"
+                        description="Your employment documents and records."
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Expiring', value: stats.expiring },
+                            { label: 'Expired', value: stats.expired },
+                        ]}
+                    />
+                }
+            >
                 {/* Folder breadcrumb */}
                 {currentFolder && (
                     <div className="flex items-center gap-2 text-sm">
@@ -648,7 +622,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

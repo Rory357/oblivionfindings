@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -244,26 +245,27 @@ export default function EmployeesIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="People" />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            People
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage your workforce &mdash; {profiles.total}{' '}
-                            {profiles.total === 1 ? 'person' : 'people'} total
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <Download className="h-4 w-4" />
-                            Export
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Users}
+                        title="People"
+                        description={`Manage your workforce — ${profiles.total} ${profiles.total === 1 ? 'person' : 'people'} total.`}
+                        stats={[
+                            { label: 'Active', value: summary.active },
+                            { label: 'New hires', value: summary.new_hires },
+                            { label: 'On probation', value: summary.on_probation },
+                            { label: 'Compliance alerts', value: summary.compliance_alerts },
+                        ]}
+                        actions={
+                            <Button variant="outline" size="sm" className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Download className="h-4 w-4" />
+                                Export
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <StatCard
@@ -605,7 +607,7 @@ export default function EmployeesIndex({
                 {profiles.last_page > 1 && (
                     <LaravelPagination links={profiles.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

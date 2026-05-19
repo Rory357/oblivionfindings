@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,6 +26,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     Briefcase,
+    Building,
     Pencil,
     Plus,
     Search,
@@ -368,24 +370,25 @@ export default function DepartmentsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Departments" />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Departments
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage organisational departments &mdash;{' '}
-                            {departments.total} total
-                        </p>
-                    </div>
-                    <Button onClick={openCreate} className="gap-1.5">
-                        <Plus className="h-4 w-4" />
-                        Add Department
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Building}
+                        title="Departments"
+                        description={`Manage organisational departments — ${departments.total} total.`}
+                        stats={[
+                            { label: 'Total', value: departments.total },
+                            { label: 'Active', value: departments.data.filter((d) => d.is_active).length },
+                        ]}
+                        actions={
+                            <Button onClick={openCreate} className="gap-1.5">
+                                <Plus className="h-4 w-4" />
+                                Add Department
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
@@ -594,7 +597,7 @@ export default function DepartmentsIndex({
                 {departments.last_page > 1 && (
                     <LaravelPagination links={departments.links} />
                 )}
-            </div>
+            </PageLayout>
 
             <DepartmentDialog
                 open={dialogOpen}

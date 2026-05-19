@@ -2,12 +2,13 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as risksIndex, create as createRisk, heatmap as risksHeatmap, show as showRisk } from '@/routes/governance/risks';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, TrendingUp, Shield, AlertCircle } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Shield, ShieldAlert, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -71,25 +72,33 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
     >
       <Head title="Risk Register" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Risk Register</h1>
-              <p className="text-muted-foreground mt-1">Enterprise risk management</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link href={risksHeatmap.url()}>Risk Heatmap</Link>
-              </Button>
-              {(auth.can as any)?.governance?.risks?.create && (
-                <Button asChild>
-                  <Link href={createRisk.url()}>New Risk</Link>
+      <PageLayout
+        hero={
+          <PageHero
+            icon={ShieldAlert}
+            title="Risk Register"
+            description="Track enterprise risks, residual scores, and treatments across the organisation."
+            stats={[
+              { label: 'Total risks', value: totalStats.total },
+              { label: 'Critical', value: totalStats.critical },
+              { label: 'High', value: totalStats.high },
+              { label: 'Above appetite', value: totalStats.above_appetite },
+            ]}
+            actions={
+              <div className="flex items-center gap-2">
+                <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                  <Link href={risksHeatmap.url()}>Risk Heatmap</Link>
                 </Button>
-              )}
-            </div>
-          </div>
-
+                {(auth.can as any)?.governance?.risks?.create && (
+                  <Button asChild>
+                    <Link href={createRisk.url()}>New Risk</Link>
+                  </Button>
+                )}
+              </div>
+            }
+          />
+        }
+      >
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
@@ -253,7 +262,7 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
               )}
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

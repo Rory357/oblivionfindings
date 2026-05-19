@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { Eye, PenTool } from 'lucide-react';
+import { Eye, PenSquare, PenTool } from 'lucide-react';
 
 type SignatureRequest = {
     id: number;
@@ -52,19 +53,23 @@ const statusConfig: Record<string, { className: string; label: string }> = {
 };
 
 export default function PendingSignatures({ signatures }: Props) {
+    const pendingCount = signatures.filter((s) => s.status === 'pending').length;
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Pending Signatures" />
-            <div className="flex flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold">
-                        Documents Awaiting Signature
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Review and sign documents that require your signature
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={PenSquare}
+                        title="Documents Awaiting Signature"
+                        description="Review and sign documents that require your signature."
+                        stats={[
+                            { label: 'Total', value: signatures.length },
+                            { label: 'Pending', value: pendingCount },
+                        ]}
+                    />
+                }
+            >
                 <Card>
                     <CardContent className="p-0">
                         <Table>
@@ -141,7 +146,7 @@ export default function PendingSignatures({ signatures }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -22,6 +22,7 @@ import {
     ClipboardCheck,
     Edit,
     FileText,
+    History,
     Loader2,
     Package,
     Pill,
@@ -362,9 +363,15 @@ export default function AuditLog({
     return (
         <AppLayout>
             <Head title="Medication Audit Trail" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={History}
                 title="Medication Audit Trail"
                 description="Comprehensive timeline of all medication-related events across clients."
+                stats={[
+                    { label: 'Total events', value: stats.total.toLocaleString() },
+                    { label: 'This week', value: stats.this_week.toLocaleString() },
+                    { label: 'This month', value: stats.this_month.toLocaleString() },
+                ]}
             />
             <PageShell>
                 {/* ── Stats Bar ─────────────────────────────────────── */}

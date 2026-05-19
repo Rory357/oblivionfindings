@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -121,39 +122,43 @@ export default function LeaveReports({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Leave Reports" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Leave Reports</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Absenteeism trends, Bradford Factor analysis, and
-                            leave utilisation
-                        </div>
-                    </div>
-
-                    <Select
-                        value={String(year)}
-                        onValueChange={(val) =>
-                            router.get(
-                                '/hr/leave/reports',
-                                { year: val },
-                                { preserveState: true },
-                            )
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Leave Reports"
+                        description="Absenteeism trends, Bradford Factor analysis, and leave utilisation."
+                        stats={[
+                            { label: 'Top absentees', value: absenteeism.top_absentees.length },
+                            { label: 'Tracked employees', value: utilization.employees.length },
+                            { label: 'Year', value: year },
+                        ]}
+                        actions={
+                            <Select
+                                value={String(year)}
+                                onValueChange={(val) =>
+                                    router.get(
+                                        '/hr/leave/reports',
+                                        { year: val },
+                                        { preserveState: true },
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="w-32 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {yearOptions.map((y) => (
+                                        <SelectItem key={y} value={String(y)}>
+                                            {y}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         }
-                    >
-                        <SelectTrigger className="w-32">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {yearOptions.map((y) => (
-                                <SelectItem key={y} value={String(y)}>
-                                    {y}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
+                    />
+                }
+            >
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList>
                         <TabsTrigger value="absenteeism">
@@ -403,7 +408,7 @@ export default function LeaveReports({
                         </Card>
                     </TabsContent>
                 </Tabs>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

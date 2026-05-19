@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +20,7 @@ import {
     Clock,
     Search,
     Shield,
+    ShieldCheck,
     Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -119,20 +121,30 @@ export default function ComplianceIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Staff Compliance" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Staff Compliance</h1>
-                    <div className="flex items-center gap-2">
-                        {can.manage && (
-                            <Button asChild variant="outline">
-                                <Link href="/hr/compliance/matrix">
-                                    Manage Requirements
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldCheck}
+                        title="Staff Compliance"
+                        description="Monitor staff compliance with training and certification requirements."
+                        stats={[
+                            { label: 'Total staff', value: summary.total_staff },
+                            { label: 'Fully compliant', value: summary.fully_compliant },
+                            { label: 'Has expired', value: summary.has_expired },
+                            { label: 'Compliance rate', value: `${complianceRate}%` },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button asChild variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Link href="/hr/compliance/matrix">
+                                        Manage Requirements
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -455,7 +467,7 @@ export default function ComplianceIndex({
                         )}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

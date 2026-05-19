@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -93,25 +94,31 @@ export default function JobPostingIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Job Postings" />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Job Postings</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage job listings for your career portal
-                        </p>
-                    </div>
-                    {can.manage && (
-                        <Button asChild size="sm">
-                            <Link href="/hr/job-postings/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Posting
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Briefcase}
+                        title="Job Postings"
+                        description="Manage job listings for your career portal."
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Published', value: stats.published },
+                            { label: 'Draft', value: stats.draft },
+                            { label: 'Pending', value: stats.pending_approval },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button asChild size="sm">
+                                    <Link href="/hr/job-postings/create">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Posting
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* KPI Stats */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                     <Card
@@ -489,7 +496,7 @@ export default function JobPostingIndex({
                 {postings.links?.length > 3 && (
                     <LaravelPagination links={postings.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

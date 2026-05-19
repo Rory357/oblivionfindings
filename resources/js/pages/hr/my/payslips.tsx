@@ -1,4 +1,5 @@
 import { MiniSparkline } from '@/components/dashboard/mini-sparkline';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,15 +8,14 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Banknote,
     ChevronRight,
     Download,
     Eye,
     FileText,
     Landmark,
+    Receipt,
     TrendingUp,
-    Wallet,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
@@ -211,30 +211,21 @@ export default function MyPayslips({ payslips }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Payslips" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-success">
-                            <Wallet className="h-5 w-5 text-status-success" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold md:text-2xl">
-                                My Payslips
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                View your pay history and download payslips
-                            </p>
-                        </div>
-                    </div>
-                    <Link href="/hr/my">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-1.5 h-4 w-4" />
-                            My HR
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Receipt}
+                        title="My Payslips"
+                        description="View your pay history and download payslips."
+                        stats={[
+                            { label: 'Latest net', value: latest ? nzdShort(latest.net_pay) : '—' },
+                            { label: 'YTD gross', value: nzdShort(ytdGross) },
+                            { label: 'YTD net', value: nzdShort(ytdNet) },
+                            { label: 'Payslips', value: payslips.total },
+                        ]}
+                    />
+                }
+            >
                 {/* Summary Cards */}
                 {payslips.data.length > 0 && (
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -935,7 +926,7 @@ export default function MyPayslips({ payslips }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

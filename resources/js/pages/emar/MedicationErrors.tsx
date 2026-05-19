@@ -570,10 +570,17 @@ export default function MedicationErrors({
     return (
         <AppLayout>
             <Head title="eMAR - Medication Errors" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={AlertTriangle}
                 title="Medication Errors"
                 description="Record, review, and resolve medication errors. Track trends and implement preventive actions."
-                backHref="/emar"
+                stats={[
+                    { label: 'Open', value: stats.total_open },
+                    { label: 'Critical', value: stats.critical },
+                    { label: 'This month', value: stats.this_month },
+                    { label: 'Resolved this month', value: stats.resolved_this_month },
+                ]}
+                actions={<ReportErrorDialog clients={clients} />}
             />
             <PageShell>
                 {/* Stats Cards */}

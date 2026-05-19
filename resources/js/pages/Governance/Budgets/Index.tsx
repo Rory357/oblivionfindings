@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { show as showBudget } from '@/routes/governance/budgets';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,20 +68,27 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
     >
       <Head title="Budgets" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Budgets</h1>
-            <p className="text-muted-foreground mt-1">Financial planning and oversight</p>
-          </div>
-          {(auth.can as any)?.governance?.budgets?.create && (
-            <Button asChild>
-              <Link href="/governance/budgets/create">New Budget</Link>
-            </Button>
-          )}
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={DollarSign}
+            title="Budgets"
+            description="Plan, approve, and monitor financial budgets across fiscal years."
+            stats={[
+              { label: 'Total budgets', value: budgetItems.length },
+              { label: 'Approved', value: budgetItems.filter((b) => b.status === 'approved').length },
+              { label: 'Pending review', value: budgetItems.filter((b) => ['proposed', 'under_review'].includes(b.status)).length },
+            ]}
+            actions={
+              (auth.can as any)?.governance?.budgets?.create ? (
+                <Button asChild>
+                  <Link href="/governance/budgets/create">New Budget</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        }
+      >
         {/* Summary Stats */}
         {budgetItems.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -211,7 +219,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
             })}
           </div>
         )}
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

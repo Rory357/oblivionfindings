@@ -17,6 +17,7 @@ import {
     Download,
     FileText,
     Upload,
+    UploadCloud,
     XCircle,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -105,11 +106,17 @@ export default function ImportExportIndex() {
             ]}
         >
             <Head title="Employee Import / Export" />
+            <PageHero
+                icon={UploadCloud}
+                title="Employee Import / Export"
+                description="Bulk import or export employee records via CSV."
+                actions={
+                    <Button onClick={handleExport} size="sm">
+                        <Download className="mr-2 h-4 w-4" /> Export CSV
+                    </Button>
+                }
+            />
             <PageShell>
-                <PageHero variant="compact"
-                    title="Employee Import / Export"
-                    description="Bulk import or export employee records via CSV."
-                />
                 <div className="grid gap-6 lg:grid-cols-2">
                     <Card>
                         <CardHeader>

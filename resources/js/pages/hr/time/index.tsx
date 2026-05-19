@@ -495,40 +495,46 @@ export default function TimeIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Timekeeping" />
-            <PageShell>
-                <PageHero variant="compact"
-                    title="Timekeeping"
-                    description="Clocking, time entries, period timesheets, and shift timesheets."
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
+            <PageHero
+                icon={Clock}
+                title="Timekeeping"
+                description="Clocking, time entries, period timesheets, and shift timesheets."
+                stats={[
+                    { label: 'Hours this week', value: `${kpiStats.total_hours_this_week}h` },
+                    { label: 'Active', value: kpiStats.active_clocked_in },
+                    { label: 'Pending', value: kpiStats.pending_timesheets },
+                    { label: 'Overtime', value: `${kpiStats.overtime_hours}h` },
+                ]}
+                actions={
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <a href="/operations/timesheets">
+                                <FileText className="mr-1.5 h-4 w-4" />
+                                Shift Timesheets
+                            </a>
+                        </Button>
+                        {can.approveAny && (
                             <Button variant="outline" size="sm" asChild>
-                                <a href="/operations/timesheets">
-                                    <FileText className="mr-1.5 h-4 w-4" />
-                                    Shift Timesheets
+                                <a href="/operations/timesheets/approvals">
+                                    <ArrowRight className="mr-1.5 h-4 w-4" />
+                                    Shift Approvals
                                 </a>
                             </Button>
-                            {can.approveAny && (
-                                <Button variant="outline" size="sm" asChild>
-                                    <a href="/operations/timesheets/approvals">
-                                        <ArrowRight className="mr-1.5 h-4 w-4" />
-                                        Shift Approvals
-                                    </a>
-                                </Button>
-                            )}
-                            {can.clockOnBehalf && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowClockOnBehalf(true)}
-                                >
-                                    <UserPlus className="mr-1.5 h-4 w-4" />{' '}
-                                    Clock On Behalf
-                                </Button>
-                            )}
-                        </div>
-                    }
-                />
-
+                        )}
+                        {can.clockOnBehalf && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowClockOnBehalf(true)}
+                            >
+                                <UserPlus className="mr-1.5 h-4 w-4" />{' '}
+                                Clock On Behalf
+                            </Button>
+                        )}
+                    </div>
+                }
+            />
+            <PageShell>
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                     <KpiCard

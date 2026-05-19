@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -276,25 +277,36 @@ export default function ReportsIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="HR Reports" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">HR Reports</h1>
-                    {can.export_data && (
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" asChild>
-                                <Link href="/hr/reports/automations">
-                                    Automations
-                                </Link>
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <Link href="/hr/reports/webhooks">
-                                    Webhooks
-                                </Link>
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="HR Reports"
+                        description="Export, schedule, and subscribe to HR analytics reports."
+                        stats={[
+                            { label: 'Available', value: availableReports.length },
+                            { label: 'Recent exports', value: recentExports.length },
+                            { label: 'Subscriptions', value: subscriptions.length },
+                        ]}
+                        actions={
+                            can.export_data ? (
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <Link href="/hr/reports/automations">
+                                            Automations
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <Link href="/hr/reports/webhooks">
+                                            Webhooks
+                                        </Link>
+                                    </Button>
+                                </div>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
@@ -952,7 +964,7 @@ export default function ReportsIndex({
                         </Card>
                     </>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

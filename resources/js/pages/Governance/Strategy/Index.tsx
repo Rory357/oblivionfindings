@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as strategyIndex, create as createStrategy, show as showStrategy } from '@/routes/governance/strategy';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,18 +54,25 @@ export default function StrategyIndex({ auth, plans }: Props) {
     >
       <Head title="Strategic Plans" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Strategic Planning</h1>
-              <p className="text-muted-foreground mt-1">Long-term goals and initiatives</p>
-            </div>
-            <Button asChild>
-              <Link href={createStrategy.url()}>New Strategic Plan</Link>
-            </Button>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Compass}
+            title="Strategic Planning"
+            description="Set long-term direction with multi-year plans, goals, and initiatives."
+            stats={[
+              { label: 'Plans', value: plans.data.length },
+              { label: 'Approved', value: plans.data.filter((p) => p.status === 'approved').length },
+              { label: 'In consultation', value: plans.data.filter((p) => p.status === 'consultation').length },
+            ]}
+            actions={
+              <Button asChild>
+                <Link href={createStrategy.url()}>New Strategic Plan</Link>
+              </Button>
+            }
+          />
+        }
+      >
           {/* Active Plan Highlight */}
           {plans.data.find(p => p.status === 'approved') && (
             <Card className="mb-6 border-status-success/30 bg-status-success-bg">
@@ -133,7 +141,7 @@ export default function StrategyIndex({ auth, plans }: Props) {
               </Card>
             ))}
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

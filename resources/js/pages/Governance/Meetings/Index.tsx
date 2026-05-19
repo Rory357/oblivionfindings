@@ -2,10 +2,11 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { create as createMeeting, show as showMeeting } from '@/routes/governance/meetings';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, MapPin, CalendarDays, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Meeting {
@@ -80,26 +81,32 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
     >
       <Head title="Meetings" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Board Meetings</h1>
-              <p className="text-muted-foreground mt-1">Schedule and manage governance meetings</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/governance/meetings/calendar">
-                  <CalendarDays className="w-4 h-4 mr-1" />
-                  Calendar View
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href={createMeeting.url()}>Schedule Meeting</Link>
-              </Button>
-            </div>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Users}
+            title="Board Meetings"
+            description="Schedule and manage governance meetings."
+            stats={[
+              { label: 'Total', value: meetings.data.length },
+              { label: 'Quorum met', value: meetings.data.filter((m) => m.quorum_met).length },
+            ]}
+            actions={
+              <div className="flex items-center gap-2">
+                <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                  <Link href="/governance/meetings/calendar">
+                    <CalendarDays className="w-4 h-4 mr-1" />
+                    Calendar View
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href={createMeeting.url()}>Schedule Meeting</Link>
+                </Button>
+              </div>
+            }
+          />
+        }
+      >
           {/* Meetings List */}
           <Card>
             <CardHeader>
@@ -199,7 +206,7 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
               )}
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }
