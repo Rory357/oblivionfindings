@@ -35,8 +35,9 @@ class GeofenceStatusService
 
     private function evaluateCircle(float $lat, float $lng, array $shape): string
     {
-        $centerLat = $shape['lat'] ?? $shape['latitude'] ?? null;
-        $centerLng = $shape['lng'] ?? $shape['lon'] ?? $shape['longitude'] ?? null;
+        $center = $shape['center'] ?? $shape;
+        $centerLat = $center['lat'] ?? $center['latitude'] ?? null;
+        $centerLng = $center['lng'] ?? $center['lon'] ?? $center['longitude'] ?? null;
         $radiusM = $shape['radius_m'] ?? $shape['radius'] ?? null;
 
         if ($centerLat === null || $centerLng === null || $radiusM === null) {
@@ -57,7 +58,7 @@ class GeofenceStatusService
 
     private function evaluatePolygon(float $lat, float $lng, array $shape): string
     {
-        $rawPoints = $shape['coordinates'] ?? $shape['points'] ?? [];
+        $rawPoints = $shape['coordinates'] ?? $shape['points'] ?? $shape['vertices'] ?? [];
         $points = [];
         foreach ($rawPoints as $point) {
             $pLat = $point['lat'] ?? $point['latitude'] ?? null;
