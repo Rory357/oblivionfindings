@@ -65,20 +65,15 @@ export interface PageHeroProps {
     className?: string;
 }
 
-function isIconComponent(value: unknown): value is IconLike {
-    return typeof value === 'function';
-}
-
 function renderIcon(icon: IconLike | ReactNode, className: string): ReactNode {
     if (icon == null) return null;
-    if (isIconComponent(icon)) {
-        const IconComp = icon;
-        return <IconComp className={className} />;
-    }
-    if (isValidElement(icon)) {
-        return icon;
-    }
-    return icon;
+    // Already a JSX element (e.g. <Building2 className="..." />): render as-is.
+    if (isValidElement(icon)) return icon;
+    // Otherwise treat as a component reference (function OR forwardRef object).
+    // lucide-react icons are forwardRef exotic components — `typeof` is 'object',
+    // NOT 'function' — so we can't gate on typeof alone.
+    const IconComp = icon as IconLike;
+    return <IconComp className={className} />;
 }
 
 function HeroVariant(props: PageHeroProps) {
