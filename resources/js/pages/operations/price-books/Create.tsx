@@ -1,10 +1,10 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -25,7 +25,7 @@ export default function PriceBookCreate() {
     return (
         <AppLayout>
             <Head title="Create Price Book" />
-            <PageHeader title="Create Price Book" description="Create a new price book for service rates." backHref="/operations/price-books" />
+            <PageHero variant="compact" title="Create Price Book" description="Create a new price book for service rates." backHref="/operations/price-books" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

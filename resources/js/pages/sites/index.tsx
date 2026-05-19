@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, usePage, router } from '@inertiajs/react';
 import { Building2, Home, MapPin, Warehouse, AlertTriangle, AlertCircle, CheckCircle2, Plus, Search, X, Eye, Pencil, Calendar, ShieldAlert, ClipboardCheck, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -247,31 +247,33 @@ export default function SitesIndex() {
         <AppLayout breadcrumbs={[{ title: sitePlural, href: '/sites' }]}>
             <Head title={sitePlural} />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Hero Header */}
-                <FleetHero
-                    title={sitePlural}
-                    description={`Manage locations and facilities — ${sites.length} ${sites.length === 1 ? siteSingular.toLowerCase() : sitePlural.toLowerCase()} total`}
-                    icon={<Building2 className="h-7 w-7 text-primary-foreground" />}
-                    stats={[
-                        { label: 'Total', value: sites.length },
-                        { label: 'Active', value: activeSites },
-                        { label: 'Active but incomplete', value: savedViewCounts.active_incomplete },
-                        { label: 'Open hazards', value: openHazardsTotal },
-                        { label: 'Audit overdue', value: overdueTotal },
-                    ]}
-                    actions={
-                        can?.sites?.create ? (
-                            <Button size="sm" asChild>
-                                <Link href="/sites/create">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add {siteSingular}
-                                </Link>
-                            </Button>
-                        ) : undefined
-                    }
-                />
-
+            <PageLayout
+                hero={
+                    <PageHero
+                    category="sites"
+                        title={sitePlural}
+                        description={`Manage locations and facilities — ${sites.length} ${sites.length === 1 ? siteSingular.toLowerCase() : sitePlural.toLowerCase()} total`}
+                        icon={Building2}
+                        stats={[
+                            { label: 'Total', value: sites.length },
+                            { label: 'Active', value: activeSites },
+                            { label: 'Active but incomplete', value: savedViewCounts.active_incomplete },
+                            { label: 'Open hazards', value: openHazardsTotal },
+                            { label: 'Audit overdue', value: overdueTotal },
+                        ]}
+                        actions={
+                            can?.sites?.create ? (
+                                <Button size="sm" asChild>
+                                    <Link href="/sites/create">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add {siteSingular}
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
@@ -533,7 +535,7 @@ export default function SitesIndex() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

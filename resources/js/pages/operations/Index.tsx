@@ -1,9 +1,9 @@
 import { BarChart, DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -113,7 +113,8 @@ export default function OperationsDashboard({ stats, client_status_breakdown, sh
     return (
         <AppLayout>
             <Head title="Operations" />
-            <PageHeader
+            <PageHero
+                    category="ops" variant="compact"
                 title="Operations Dashboard"
                 description="Overview of clients, shifts, timesheets, and operational activity."
             />

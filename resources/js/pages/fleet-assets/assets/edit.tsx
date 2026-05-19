@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,7 +97,7 @@ export default function AssetEdit({ asset, categories, sites }: Props) {
         >
             <Head title={`Edit: ${asset.name}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={`Edit: ${asset.name}`}
                     description="Update asset information."
                     backHref={`/fleet-assets/assets/${asset.id}`}

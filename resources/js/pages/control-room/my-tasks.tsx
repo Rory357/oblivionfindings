@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Head, Link, router } from '@inertiajs/react';
@@ -15,6 +14,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import {
     AlertTriangle,
     ArrowRight,
@@ -218,7 +218,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
             <Head title="My Tasks - Control Room" />
 
             <PageShell>
-                <PageHeader title="My Tasks" subtitle="Your personal control room dashboard" actions={
+                <PageHero variant="compact" title="My Tasks" subtitle="Your personal control room dashboard" actions={
                     <Button variant="outline" size="sm" asChild>
                         <Link href="/my-tasks">
                             <Calendar className="mr-2 h-4 w-4" />

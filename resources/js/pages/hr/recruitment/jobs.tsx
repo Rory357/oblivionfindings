@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -275,7 +275,7 @@ export default function RecruitmentJobs({
         >
             <Head title="Job Requisitions" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Job Requisitions"
                     description="Create and publish roles to the public careers page."
                     actions={

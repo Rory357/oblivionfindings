@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -270,7 +270,7 @@ export default function FeedbackIndex({
             <Head title={`${site.name} — Quality & Feedback`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={`${site.name} — Quality & Feedback`}
                     description="Manage whanau, client, and staff feedback for continuous quality improvement"
                     actions={

@@ -1,5 +1,4 @@
 import { OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle, CalendarDays, DollarSign, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
@@ -137,7 +137,7 @@ export default function ServiceAgreementsIndex({
     return (
         <AppLayout>
             <Head title="Service Agreements" />
-            <PageHeader title="Service Agreements" description="Manage funding agreements, budgets, and service contracts." backHref="/operations" />
+            <PageHero variant="compact" title="Service Agreements" description="Manage funding agreements, budgets, and service contracts." backHref="/operations" />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

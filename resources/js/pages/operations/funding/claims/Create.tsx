@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -87,7 +87,7 @@ export default function FundingClaimCreate({ agreements }: Props) {
     return (
         <AppLayout>
             <Head title="Create Funding Claim" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Create Funding Claim"
                 description="Assemble a draft claim from a service agreement and billable line items."
                 backHref="/operations/funding/claims"

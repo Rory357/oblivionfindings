@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -272,7 +272,7 @@ export default function ShiftHandover({
         >
             <Head title={`Handover - ${shift.name}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Shift Handover"
                     description={`Hand over ${shift.name} to the incoming team.`}
                     backHref="/control-room/shifts"

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +24,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { ChevronDown, ChevronRight, FileSearch } from 'lucide-react';
@@ -177,7 +177,7 @@ export default function AuditLogIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Audit Log - HR Settings" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Audit Log"
                     description="View all HR module activity and changes."
                 />

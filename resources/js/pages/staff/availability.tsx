@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
+import { PageHero } from '@/components/page';
 type Availability = {
     id: number;
     day_of_week: number;
@@ -48,7 +48,7 @@ export default function StaffAvailability({ user, availability, canManage }: Pro
             <Head title={`Availability: ${user.name}`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Availability"
                     description={`${user.name} • ${user.email}`}
                 />

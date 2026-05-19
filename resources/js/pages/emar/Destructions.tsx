@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -76,7 +76,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
     return (
         <AppLayout>
             <Head title="eMAR - Destruction Records" />
-            <PageHeader title="Medication Destruction / Disposal" description="Records of medication destruction and disposal with dual-witness verification." backHref="/emar" />
+            <PageHero variant="compact" title="Medication Destruction / Disposal" description="Records of medication destruction and disposal with dual-witness verification." backHref="/emar" />
             <PageShell>
                 {/* Actions */}
                 <div className="mb-4 flex justify-end">

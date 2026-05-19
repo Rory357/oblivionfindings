@@ -1,7 +1,7 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -164,7 +164,7 @@ export default function HandoversShow({ handover }: Props) {
     return (
         <AppLayout>
             <Head title={`Shift Handover #${handover.id}`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={`Shift Handover #${handover.id}`}
                 description="Review outgoing notes, pending work, and the shift-to-shift handover trail."
                 backHref="/operations/handovers"

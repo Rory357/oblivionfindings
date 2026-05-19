@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -128,7 +128,7 @@ export default function WorkOrderCreate({
         >
             <Head title="Create Work Order" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Create Work Order"
                     description="Create a new maintenance work order."
                     backHref="/fleet-assets/maintenance/work-orders"

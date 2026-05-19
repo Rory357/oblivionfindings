@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Calendar, CheckCircle, Clock, Search, User, XCircle } from 'lucide-react';
@@ -71,7 +71,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
     return (
         <AppLayout>
             <Head title="Staff Availability" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Staff Availability"
                 description="View staff availability, time-off, and scheduling constraints for rostering."
                 backHref="/operations"

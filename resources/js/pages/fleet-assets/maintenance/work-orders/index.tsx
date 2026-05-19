@@ -1,6 +1,6 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -235,7 +235,7 @@ export default function WorkOrdersIndex({
         >
             <Head title="Work Orders" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Work Orders"
                     description="Track maintenance work orders for assets."
                     actions={

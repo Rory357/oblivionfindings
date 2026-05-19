@@ -1,5 +1,5 @@
 import { HalfMoonGauge, FLEET_COLORS } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -98,7 +98,7 @@ export default function DriverScorecard({
         >
             <Head title={`Scorecard: ${driver.name}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={`Driver Scorecard: ${driver.name}`}
                     description="Safety score and driving behavior analysis."
                     backHref={`/fleet-assets/drivers/${driver.id}`}

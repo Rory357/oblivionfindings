@@ -821,14 +821,14 @@ export default function ClientShow({
 
             <PageShell>
                 {/* ── Hero Header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                         {/* Avatar */}
-                        <Avatar className="h-24 w-24 shrink-0 border-4 border-white/20 shadow-xl md:h-28 md:w-28">
+                        <Avatar className="h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28">
                             <AvatarImage
                                 src={
                                     client.avatar ??
@@ -837,7 +837,7 @@ export default function ClientShow({
                                 }
                                 alt={name}
                             />
-                            <AvatarFallback className="bg-white/10 text-2xl font-bold text-white md:text-3xl">
+                            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-bold text-primary-foreground md:text-3xl">
                                 {getInitials(name)}
                             </AvatarFallback>
                         </Avatar>
@@ -849,12 +849,12 @@ export default function ClientShow({
                             </h1>
                             {client.preferred_name &&
                                 client.preferred_name !== name && (
-                                    <p className="mt-0.5 text-sm text-white/60">
+                                    <p className="mt-0.5 text-sm text-primary-foreground/60">
                                         Preferred: {client.preferred_name}
                                     </p>
                                 )}
                             {client.nhi_number && (
-                                <p className="mt-0.5 text-sm text-white/60">
+                                <p className="mt-0.5 text-sm text-primary-foreground/60">
                                     NHI: {client.nhi_number}
                                 </p>
                             )}
@@ -866,25 +866,25 @@ export default function ClientShow({
                                             ? 'border-status-success/30 bg-status-success-bg text-status-success'
                                             : client.status === 'onboarding'
                                               ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                              : 'border-white/20 bg-white/10 text-white/90'
+                                              : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
                                     }
                                 >
                                     {client.status}
                                 </Badge>
                                 {client.funding_type && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                         {client.funding_type}
                                     </Badge>
                                 )}
                                 {client.service_context && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                         {client.service_context.name}
                                     </Badge>
                                 )}
                                 {client.site && (
                                     <Link
                                         href={`/sites/${client.site.id}`}
-                                        className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/90 transition hover:bg-white/20"
+                                        className="inline-flex items-center rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-0.5 text-xs font-semibold text-primary-foreground/90 transition hover:bg-primary-foreground/20"
                                         title={`Open ${client.site.name}`}
                                     >
                                         <Home className="mr-1 h-3 w-3" />
@@ -916,7 +916,7 @@ export default function ClientShow({
                             </div>
 
                             {client.service_start_date && (
-                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-white/60 md:justify-start">
+                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/60 md:justify-start">
                                     <Clock className="h-3.5 w-3.5" />
                                     Since{' '}
                                     {new Date(
@@ -937,7 +937,7 @@ export default function ClientShow({
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                         >
                                             <Phone className="mr-1.5 h-3.5 w-3.5" />
                                             Call
@@ -947,7 +947,7 @@ export default function ClientShow({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                     asChild
                                 >
                                     <Link
@@ -967,7 +967,7 @@ export default function ClientShow({
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                         onClick={() => setEditDialogOpen(true)}
                                     >
                                         <Pencil className="mr-1.5 h-3.5 w-3.5" />
@@ -989,7 +989,7 @@ export default function ClientShow({
                                                 : '—';
                                         })()}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/50">
                                         Care Plan
                                     </p>
                                 </div>
@@ -1011,7 +1011,7 @@ export default function ClientShow({
                                                 : '—';
                                         })()}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/50">
                                         Goals
                                     </p>
                                 </div>
@@ -1019,7 +1019,7 @@ export default function ClientShow({
                                     <p className="text-2xl font-bold">
                                         {shifts_summary?.next ? 'Yes' : '—'}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/50">
                                         Next Shift
                                     </p>
                                 </div>
@@ -1485,7 +1485,7 @@ export default function ClientShow({
                                             </div>
                                         </CardHeader>
                                         <CardContent className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr_1fr]">
-                                            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
+                                            <div className="rounded-2xl border border-primary-foreground/70 bg-primary-foreground/80 p-4 shadow-sm dark:bg-muted/40">
                                                 <div className="flex items-center gap-6">
                                                     <DonutChart
                                                         segments={
@@ -1532,7 +1532,7 @@ export default function ClientShow({
                                             </div>
 
                                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                                                <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
+                                                <div className="rounded-2xl border border-primary-foreground/70 bg-primary-foreground/80 p-4 shadow-sm dark:bg-muted/40">
                                                     <HalfMoonGauge
                                                         value={siteCoverageRate}
                                                         label="Covered windows"
@@ -1541,7 +1541,7 @@ export default function ClientShow({
                                                         color="#6366f1"
                                                     />
                                                 </div>
-                                                <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
+                                                <div className="rounded-2xl border border-primary-foreground/70 bg-primary-foreground/80 p-4 shadow-sm dark:bg-muted/40">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div>
                                                             <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
@@ -1589,7 +1589,7 @@ export default function ClientShow({
                                                 </div>
                                             </div>
 
-                                            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:bg-muted/40">
+                                            <div className="rounded-2xl border border-primary-foreground/70 bg-primary-foreground/80 p-4 shadow-sm dark:bg-muted/40">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div>
                                                         <p className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
@@ -1740,7 +1740,7 @@ export default function ClientShow({
                                                     // eslint-disable-next-line no-restricted-syntax -- Recurring series tiles are nested inside the overview Card content.
                                                     <div
                                                         key={series.id}
-                                                        className="rounded-xl border border-primary/70 bg-white/80 p-4 dark:bg-muted/40"
+                                                        className="rounded-xl border border-primary/70 bg-primary-foreground/80 p-4 dark:bg-muted/40"
                                                     >
                                                         <div className="flex flex-wrap gap-2">
                                                             <Badge
@@ -1856,7 +1856,7 @@ export default function ClientShow({
                                         {hasAboutMe && (
                                             <Card className="overflow-hidden border-primary">
                                                 <div className="bg-primary px-5 py-3">
-                                                    <h3 className="text-sm font-semibold text-white">
+                                                    <h3 className="text-sm font-semibold text-primary-foreground">
                                                         About{' '}
                                                         {client.first_name}
                                                     </h3>
@@ -3778,7 +3778,7 @@ export default function ClientShow({
                                             </div>
                                             <Button
                                                 size="sm"
-                                                className="bg-status-warning text-white hover:bg-status-warning"
+                                                className="bg-status-warning text-primary-foreground hover:bg-status-warning"
                                                 asChild
                                             >
                                                 <Link
@@ -3914,7 +3914,7 @@ export default function ClientShow({
                                         <div className="bg-gradient-to-r from-status-info to-primary px-5 py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
-                                                    <h3 className="text-sm font-semibold text-white">
+                                                    <h3 className="text-sm font-semibold text-primary-foreground">
                                                         Scheduled Medications
                                                     </h3>
                                                     <p className="text-xs text-status-info">
@@ -4002,7 +4002,7 @@ export default function ClientShow({
                                         <div className="bg-primary px-5 py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
-                                                    <h3 className="text-sm font-semibold text-white">
+                                                    <h3 className="text-sm font-semibold text-primary-foreground">
                                                         PRN (As Needed)
                                                     </h3>
                                                     <p className="text-xs text-primary/70">
@@ -4271,7 +4271,7 @@ export default function ClientShow({
                                         </div>
                                         <Button
                                             size="sm"
-                                            className="bg-status-warning text-white hover:bg-status-warning"
+                                            className="bg-status-warning text-primary-foreground hover:bg-status-warning"
                                             asChild
                                         >
                                             <Link
@@ -4340,7 +4340,7 @@ export default function ClientShow({
                                                     <div className="bg-primary px-5 py-3">
                                                         <div className="flex items-center justify-between">
                                                             <div>
-                                                                <h3 className="text-sm font-semibold text-white">
+                                                                <h3 className="text-sm font-semibold text-primary-foreground">
                                                                     {
                                                                         activePlan.title
                                                                     }
@@ -4472,7 +4472,7 @@ export default function ClientShow({
                                                 {hasAboutMe && (
                                                     <Card className="overflow-hidden border-primary">
                                                         <div className="bg-gradient-to-r from-status-critical to-status-critical px-5 py-2.5">
-                                                            <h3 className="text-sm font-semibold text-white">
+                                                            <h3 className="text-sm font-semibold text-primary-foreground">
                                                                 About{' '}
                                                                 {
                                                                     client.first_name
@@ -5039,7 +5039,7 @@ export default function ClientShow({
                                 {/* Add Note Form */}
                                 <Card className="overflow-hidden border-primary">
                                     <div className="bg-primary px-4 py-2.5">
-                                        <h3 className="text-sm font-semibold text-white">
+                                        <h3 className="text-sm font-semibold text-primary-foreground">
                                             Add Progress Note
                                         </h3>
                                     </div>
@@ -8487,7 +8487,7 @@ function AssessmentsTab({
                 <Card className="overflow-hidden border-primary">
                     <div className="bg-primary px-4 py-2.5">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-white">
+                            <h3 className="text-sm font-semibold text-primary-foreground">
                                 {editingId
                                     ? 'Edit Assessment'
                                     : 'Record Assessment'}
@@ -8495,7 +8495,7 @@ function AssessmentsTab({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-white hover:bg-white/20 hover:text-white"
+                                className="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 onClick={resetForm}
                             >
                                 Cancel
@@ -8593,7 +8593,7 @@ function AssessmentsTab({
                         </div>
                         <div className="mt-3 flex items-center gap-2">
                             <Button
-                                className="bg-primary text-white hover:bg-primary"
+                                className="bg-primary text-primary-foreground hover:bg-primary"
                                 onClick={submitForm}
                                 disabled={
                                     form.processing ||
@@ -8617,7 +8617,7 @@ function AssessmentsTab({
                 {canEdit && !showForm && (
                     <Button
                         size="sm"
-                        className="gap-1.5 bg-primary text-white hover:bg-primary"
+                        className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary"
                         onClick={() => {
                             resetForm();
                             setShowForm(true);
@@ -8987,7 +8987,7 @@ function PhotoGalleryTab({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => deletePhoto(p.id)}
-                                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical"
+                                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 p-1 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical"
                                         title="Delete photo"
                                     >
                                         <svg
@@ -9389,7 +9389,7 @@ function PersonalAssetsTab({
                         </div>
                         {a.portal_visible && (
                             <div className="absolute top-2 right-2">
-                                <span className="rounded-full bg-status-info px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">
+                                <span className="rounded-full bg-status-info px-1.5 py-0.5 text-[9px] font-medium text-primary-foreground shadow-sm">
                                     Portal
                                 </span>
                             </div>
@@ -9412,7 +9412,7 @@ function PersonalAssetsTab({
                         </div>
                         {a.portal_visible && (
                             <div className="absolute top-2 right-2">
-                                <span className="rounded-full bg-status-info px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">
+                                <span className="rounded-full bg-status-info px-1.5 py-0.5 text-[9px] font-medium text-primary-foreground shadow-sm">
                                     Portal
                                 </span>
                             </div>

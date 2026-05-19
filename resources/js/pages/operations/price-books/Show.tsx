@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { CalendarDays, Pencil, Plus } from 'lucide-react';
@@ -77,7 +77,7 @@ export default function PriceBookShow({ price_book }: Props) {
     return (
         <AppLayout>
             <Head title={price_book.name} />
-            <PageHeader title={price_book.name} description={price_book.description ?? ''} backHref="/operations/price-books" />
+            <PageHero variant="compact" title={price_book.name} description={price_book.description ?? ''} backHref="/operations/price-books" />
             <PageShell>
                 {/* Header info */}
                 <div className="flex flex-wrap items-center gap-2">

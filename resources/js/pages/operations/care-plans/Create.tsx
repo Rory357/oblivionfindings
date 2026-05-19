@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
@@ -317,7 +317,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
     return (
         <AppLayout>
             <Head title="Create Care Plan" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Create Care Plan"
                 description={`Create a new care plan for a ${clientSingular.toLowerCase()}.`}
                 backHref="/operations/care-plans"

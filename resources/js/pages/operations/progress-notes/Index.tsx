@@ -1,7 +1,6 @@
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import DictateButton from '@/components/dictate-button';
+import { PageHero } from '@/components/page';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
 import AppLayout from '@/layouts/app-layout';
 import { submitOffline } from '@/lib/offline-queue';
@@ -309,7 +309,7 @@ export default function ProgressNotesIndex({
     return (
         <AppLayout>
             <Head title="Progress Notes" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Progress Notes"
                 description="Goal updates, observations, and progress tracking across all clients."
                 backHref={

@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -307,7 +307,7 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
         <AppLayout>
             <Head title="eMAR - Medication Reviews" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="Medication Reviews"
                     description="Schedule and track medication reviews — routine, triggered, and comprehensive"
                     icon={<Calendar className="h-7 w-7 text-white" />}

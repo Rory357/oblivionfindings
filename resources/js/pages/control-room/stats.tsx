@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import {
     BarChart,
     Bar,
@@ -145,7 +145,7 @@ export default function ControlRoomStats({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Live Statistics - Control Room" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Live Statistics"
                     description="Real-time KPIs and analytics for the control room."
                     actions={

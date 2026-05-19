@@ -1,10 +1,10 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -89,7 +89,7 @@ export default function ClientAssignments({
             ]}
         >
             <Head title={`Assign Workers - ${name}`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Assign Workers"
                 description={`Manage which support workers are assigned to ${client.first_name}.`}
                 backHref={`/operations/clients/${client.id}`}

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +28,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -496,7 +496,7 @@ export default function TimeIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Timekeeping" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Timekeeping"
                     description="Clocking, time entries, period timesheets, and shift timesheets."
                     actions={

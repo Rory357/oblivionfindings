@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,7 +84,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
         <AppLayout>
             <Head title="eMAR - PRN Records" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="PRN Records"
                     description="As-needed medication administration records and effectiveness tracking"
                     icon={<ClipboardCheck className="h-7 w-7 text-white" />}

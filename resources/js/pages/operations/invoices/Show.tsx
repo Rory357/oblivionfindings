@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Ban, CalendarDays, CheckCircle2, Send } from 'lucide-react';
@@ -75,7 +75,7 @@ export default function InvoiceShow({ invoice }: Props) {
     return (
         <AppLayout>
             <Head title={`Invoice ${invoice.invoice_number}`} />
-            <PageHeader title={`Invoice ${invoice.invoice_number}`} description={clientDisplay} backHref="/operations/invoices" />
+            <PageHero variant="compact" title={`Invoice ${invoice.invoice_number}`} description={clientDisplay} backHref="/operations/invoices" />
             <PageShell>
                 {/* Header */}
                 <div className="flex flex-wrap items-center gap-2">

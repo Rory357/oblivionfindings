@@ -1,6 +1,6 @@
 import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -200,7 +200,7 @@ export default function DriversIndex({
         >
             <Head title="Drivers" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Drivers"
                     description="Manage fleet drivers, licenses, and assignments."
                     actions={

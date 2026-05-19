@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
@@ -144,7 +144,7 @@ export default function DevelopmentGoals({
         >
             <Head title="Development Goals" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Development Goals"
                     description="Track growth plans, competency progression, and manager coaching outcomes."
                 />

@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, Circle, Clock3 } from 'lucide-react';
@@ -40,7 +40,7 @@ export default function OnboardingShow({ workflow }: Props) {
     return (
         <AppLayout>
             <Head title="Onboarding Workflow" />
-            <PageHeader
+            <PageHero variant="compact"
                 title={workflow.client
                     ? `${workflow.client.first_name} ${workflow.client.last_name} Onboarding`
                     : `Onboarding Workflow #${workflow.id}`}

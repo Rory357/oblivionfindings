@@ -1,5 +1,4 @@
 import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, Clock, Eye, Flag, MapPin, Search, Shield } from 'lucide-react';
@@ -82,7 +82,7 @@ export default function EvvIndex({ records = { data: [], links: [], current_page
     return (
         <AppLayout>
             <Head title="Electronic Visit Verification" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Electronic Visit Verification"
                 description="Track and verify support worker visits with GPS and time validation."
                 backHref="/operations"

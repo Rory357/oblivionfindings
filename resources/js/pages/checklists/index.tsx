@@ -29,7 +29,7 @@ import {
     TabsRoot,
     TabsTrigger,
 } from '@/components/ui/tabs';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
@@ -391,7 +391,7 @@ export default function ChecklistsDashboard({
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Checklists"
                     description="Operational checklists, walkthroughs and inspections across every site."
                     icon={<ClipboardCheck className="h-7 w-7 text-white" />}

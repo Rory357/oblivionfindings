@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -185,7 +185,7 @@ export default function CalendarIndex({
             <Head title="Company Calendar" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Company Calendar"
                     description="View company events, training, and approved leave."
                 >
@@ -198,7 +198,7 @@ export default function CalendarIndex({
                             New Event
                         </Button>
                     )}
-                </PageHeader>
+                </PageHero>
 
                 {/* Legend */}
                 <div className="mb-4 flex flex-wrap items-center gap-3">

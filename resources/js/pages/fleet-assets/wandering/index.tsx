@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -160,7 +160,7 @@ export default function WanderingAlertsIndex({ alerts, stats, filters, can }: Pr
         >
             <Head title="Wandering Alerts" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Wandering Alerts"
                     subtitle="Resident geofence breach and safety alerts"
                 />

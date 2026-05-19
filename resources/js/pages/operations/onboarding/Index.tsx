@@ -1,5 +1,4 @@
 import { DonutChart, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, Clock, ExternalLink, ListChecks, Search, Timer, UserPlus, Users } from 'lucide-react';
@@ -80,7 +80,7 @@ export default function OnboardingDashboard({ workflows = { data: [], links: [],
     return (
         <AppLayout>
             <Head title="Onboarding Pipeline" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Onboarding Pipeline"
                 description={`Overview of all ${clientsLabel.toLowerCase()} currently being onboarded.`}
                 backHref="/operations"

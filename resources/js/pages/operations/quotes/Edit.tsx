@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -134,7 +134,7 @@ export default function QuoteEdit({ quote, clients, price_book_items }: Props) {
     return (
         <AppLayout>
             <Head title={`Edit: ${quote.title}`} />
-            <PageHeader title={`Edit: ${quote.title}`} backHref={`/operations/quotes/${quote.id}`} />
+            <PageHero variant="compact" title={`Edit: ${quote.title}`} backHref={`/operations/quotes/${quote.id}`} />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     {/* Client Details */}

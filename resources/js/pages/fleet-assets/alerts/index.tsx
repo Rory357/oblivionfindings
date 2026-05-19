@@ -1,6 +1,6 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -329,7 +329,7 @@ export default function AlertsIndex({
         >
             <Head title="Alerts" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Alerts"
                     description="Active fleet and asset operations alerts from Control Room, with archived legacy asset alert history kept separately below."
                     actions={

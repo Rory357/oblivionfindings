@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -111,7 +111,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
             { title: 'Consents' },
         ]}>
             <Head title={`Consents - ${name}`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Consent Management"
                 description={`Manage consent records for ${name}.`}
                 backHref={`/operations/clients/${client.id}`}

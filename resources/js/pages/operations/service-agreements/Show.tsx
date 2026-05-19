@@ -1,5 +1,4 @@
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -670,7 +670,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
     return (
         <AppLayout>
             <Head title={ag.title} />
-            <PageHeader title={ag.title} description={ag.client ? `${ag.client.first_name} ${ag.client.last_name}` : ''} backHref="/operations/service-agreements" />
+            <PageHero variant="compact" title={ag.title} description={ag.client ? `${ag.client.first_name} ${ag.client.last_name}` : ''} backHref="/operations/service-agreements" />
             <PageShell>
                 {/* Header Row */}
                 <div className="flex flex-wrap items-center gap-2">

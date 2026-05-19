@@ -1,6 +1,6 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -356,7 +356,7 @@ export default function MedicationTransitIndex({
         >
             <Head title="Medication Transit" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Medication-in-Transit"
                     description={
                         transportScope

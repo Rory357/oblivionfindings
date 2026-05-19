@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import { Edit, GitBranch, Minus, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -106,7 +106,7 @@ export default function DeviceGroupShow({ group, members, availableDevices }: Pr
             <Head title={`${group.name} - Device Groups`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={
                         <div className="flex items-center gap-3">
                             <GitBranch className="h-6 w-6 text-primary" />

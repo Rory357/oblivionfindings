@@ -1,7 +1,12 @@
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 import { MissingFieldButton } from '@/components/missing-field-button';
 import { DonutChart } from '@/components/ops-stat-card';
-import PageShell from '@/components/page-shell';
+import {
+    PageHero,
+    PageLayout,
+    PageTabs,
+    type PageTabItem,
+} from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,12 +18,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -29,12 +28,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/fleet-utils';
@@ -68,7 +62,6 @@ import {
     Lock,
     Mail,
     MapPin,
-    MoreHorizontal,
     Navigation,
     Package,
     Phone,
@@ -1474,9 +1467,6 @@ export default function SiteShow({
             (readiness?.is_active_but_incomplete ? 'readiness' : 'overview'),
     );
     const readinessRef = useRef<HTMLDivElement | null>(null);
-    const tabsListRef = useRef<HTMLDivElement | null>(null);
-    const [tabsCanScrollLeft, setTabsCanScrollLeft] = useState(false);
-    const [tabsCanScrollRight, setTabsCanScrollRight] = useState(false);
     const canManageGeofences = !!(
         canGlobal?.assets?.geofencesManage ?? can_edit
     );
@@ -1490,27 +1480,6 @@ export default function SiteShow({
                   | ContactRecord
                   | undefined) ?? null
             : null;
-
-    useEffect(() => {
-        const el = tabsListRef.current;
-        if (!el) return;
-
-        const update = () => {
-            setTabsCanScrollLeft(el.scrollLeft > 1);
-            setTabsCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-        };
-
-        update();
-        el.addEventListener('scroll', update, { passive: true });
-
-        const ro = new ResizeObserver(update);
-        ro.observe(el);
-
-        return () => {
-            el.removeEventListener('scroll', update);
-            ro.disconnect();
-        };
-    }, [activeTab]);
 
     const handleReadinessAction = (action: string) => {
         if (['add_phone', 'add_email'].includes(action)) {
@@ -1633,65 +1602,130 @@ export default function SiteShow({
         }
     };
 
-    const typePlanTab = {
-        value: 'type-plan',
-        label: typePlanSummary.tab_label,
-        icon:
-            site.type === 'head_office'
-                ? Building2
-                : site.type === 'facility'
-                  ? LayoutGrid
-                  : Home,
-    };
-    const moreTabs = [
-        { value: 'meal-planner', label: 'Meal Planner', icon: Utensils },
-        { value: 'financials', label: 'Financials', icon: DollarSign },
-        ...(canSeeVendorsCredentials
-            ? [
-                  {
-                      value: 'vendors-credentials',
-                      label: 'Vendors & Credentials',
-                      icon: Truck,
-                  },
-              ]
-            : []),
+    const TypePlanTabIcon =
+        site.type === 'head_office'
+            ? Building2
+            : site.type === 'facility'
+              ? LayoutGrid
+              : Home;
+
+    const siteTabs: PageTabItem[] = [
+        { value: 'overview', label: 'Overview', icon: LayoutGrid },
+        {
+            value: 'readiness',
+            label: 'Readiness',
+            icon: ShieldAlert,
+            'data-test': 'site-readiness-tab',
+            badge: readiness ? (
+                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                    {readiness.score}%
+                </Badge>
+            ) : undefined,
+        },
+        {
+            value: 'clients',
+            label: `Clients (${clients.length})`,
+            icon: Users,
+        },
+        {
+            value: 'assets',
+            label: `Assets (${assets.length})`,
+            icon: Package,
+        },
+        {
+            value: 'contacts',
+            label: `Contacts (${contacts.length})`,
+            icon: FileText,
+        },
+        {
+            value: 'documents',
+            label: `Documents (${documents.length})`,
+            icon: FileText,
+        },
+        { value: 'calendar', label: 'Calendar', icon: Calendar },
+        { value: 'checklists', label: 'Checklists', icon: ClipboardCheck },
+        { value: 'hazards', label: 'Hazards', icon: ShieldAlert },
+        {
+            value: 'fleet',
+            label: 'Fleet',
+            icon: Car,
+            badge:
+                fleet && fleet.vehicles.length > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {fleet.vehicles.length}
+                    </Badge>
+                ) : undefined,
+        },
+        { value: 'meal-planner', label: 'Meal Planner', icon: Utensils, overflowable: true },
+        { value: 'financials', label: 'Financials', icon: DollarSign, overflowable: true },
+        {
+            value: 'vendors-credentials',
+            label: 'Vendors & Credentials',
+            icon: Truck,
+            overflowable: true,
+            hidden: !canSeeVendorsCredentials,
+        },
         {
             value: 'hardware',
-            label: hardwareCount > 0 ? `Hardware (${hardwareCount})` : 'Hardware',
+            label: 'Hardware',
             icon: Cpu,
+            overflowable: true,
+            badge:
+                hardwareCount > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {hardwareCount}
+                    </Badge>
+                ) : undefined,
         },
-        typePlanTab,
+        {
+            value: 'type-plan',
+            label: typePlanSummary.tab_label,
+            icon: TypePlanTabIcon,
+            overflowable: true,
+        },
         {
             value: 'emergency-plan',
             label: 'Emergency Plan',
             icon: ShieldAlert,
+            overflowable: true,
         },
         {
             value: 'staff-requirements',
-            label:
-                staffRequirements.length > 0
-                    ? `Staff Requirements (${staffRequirements.length})`
-                    : 'Staff Requirements',
+            label: 'Staff Requirements',
             icon: GraduationCap,
+            overflowable: true,
+            badge:
+                staffRequirements.length > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {staffRequirements.length}
+                    </Badge>
+                ) : undefined,
         },
         {
             value: 'shift-coverage',
-            label:
-                coverageRequirements.length > 0
-                    ? `Shift Coverage (${coverageRequirements.length})`
-                    : 'Shift Coverage',
+            label: 'Shift Coverage',
             icon: Layers,
+            overflowable: true,
+            badge:
+                coverageRequirements.length > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {coverageRequirements.length}
+                    </Badge>
+                ) : undefined,
         },
         {
             value: 'service-contexts',
-            label:
-                (site.service_contexts ?? []).length > 0
-                    ? `Services (${(site.service_contexts ?? []).length})`
-                    : 'Services',
+            label: 'Services',
             icon: Layers,
+            overflowable: true,
+            badge:
+                (site.service_contexts ?? []).length > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {(site.service_contexts ?? []).length}
+                    </Badge>
+                ) : undefined,
         },
     ];
-    const TypePlanTabIcon = typePlanTab.icon;
     const publishedEmergencyPins =
         typePlanSummary.published?.pins.filter((pin) =>
             (typePlanSummary.emergency_pin_kinds ?? []).includes(pin.kind),
@@ -1706,368 +1740,67 @@ export default function SiteShow({
         >
             <Head title={site.name} />
 
-            <PageShell>
-                {/* ── Hero Header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
-
-                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                        {/* Site icon */}
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
-                            <TypeIcon className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-2xl font-bold md:text-3xl">
-                                {site.name}
-                            </h1>
-                            {site.address && (
-                                <p className="mt-0.5 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/60 md:justify-start">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    {site.address}
-                                </p>
-                            )}
-
-                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                    <TypeIcon className="mr-1 h-3 w-3" />
-                                    {site.display_type}
-                                </Badge>
-                                {site.is_high_risk && (
-                                    <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                        <AlertTriangle className="mr-1 h-3 w-3" />
-                                        High Risk
-                                    </Badge>
-                                )}
-                                {site.is_high_needs && (
-                                    <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                        <AlertCircle className="mr-1 h-3 w-3" />
-                                        High Needs
-                                    </Badge>
-                                )}
-                                <Badge
-                                    className={
-                                        site.is_active
-                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                            : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
-                                    }
-                                >
-                                    {site.is_active ? 'Active' : 'Inactive'}
-                                </Badge>
-                                {readiness?.is_active_but_incomplete && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveTab('readiness');
-                                            window.requestAnimationFrame(() => {
-                                                readinessRef.current?.scrollIntoView({
-                                                    block: 'start',
-                                                    behavior: 'smooth',
-                                                });
-                                            });
-                                        }}
-                                    >
-                                        <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                            <AlertCircle className="mr-1 h-3 w-3" />
-                                            Setup incomplete
-                                        </Badge>
-                                    </button>
-                                )}
-                                {site.region && (
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        {site.region}
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Right: Actions + KPIs */}
-                        <div className="flex flex-col items-center gap-3 md:items-end">
-                            <div className="flex flex-wrap gap-2">
-                                {can_edit && (
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                    >
-                                        <Link href={`/sites/${site.id}/edit`}>
-                                            Edit
-                                        </Link>
-                                    </Button>
-                                )}
-                            </div>
-
-                            {/* KPI Stats */}
-                            <div className="hidden gap-6 text-center md:flex">
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {clients.length}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/60">
-                                        Clients
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {assets.length}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/60">
-                                        Assets
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {contacts.length}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/60">
-                                        Contacts
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Main Tabs */}
-                <Tabs
-                    value={activeTab}
-                    onValueChange={(value) => {
-                        setActiveTab(value);
-                        if (value === 'fleet') loadFleet();
-                    }}
-                    className="space-y-4"
-                >
-                    <div className="relative">
-                        {tabsCanScrollLeft && (
-                            <span className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent" />
-                        )}
-                        {tabsCanScrollRight && (
-                            <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent" />
-                        )}
-                    <TabsList ref={tabsListRef} className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1">
-                        <TabsTrigger
-                            value="overview"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                            Overview
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="readiness"
-                            data-test="site-readiness-tab"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <ShieldAlert className="h-4 w-4" />
-                            Readiness
-                            {readiness && (
-                                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
-                                    {readiness.score}%
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="clients"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <Users className="h-4 w-4" />
-                            Clients ({clients.length})
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="assets"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <Package className="h-4 w-4" />
-                            Assets ({assets.length})
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="contacts"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <FileText className="h-4 w-4" />
-                            Contacts ({contacts.length})
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="documents"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <FileText className="h-4 w-4" />
-                            Documents ({documents.length})
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="calendar"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <Calendar className="h-4 w-4" />
-                            Calendar
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="checklists"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <ClipboardCheck className="h-4 w-4" />
-                            Checklists
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="hazards"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <ShieldAlert className="h-4 w-4" />
-                            Hazards
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="fleet"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                            onClick={loadFleet}
-                        >
-                            <Car className="h-4 w-4" />
-                            Fleet
-                            {fleet && fleet.vehicles.length > 0 && (
-                                <Badge
-                                    variant="outline"
-                                    className="ml-1 px-1.5 py-0 text-xs"
-                                >
-                                    {fleet.vehicles.length}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="meal-planner"
-                            className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none"
-                        >
-                            <Utensils className="h-4 w-4" />
-                            Meal Planner
-                        </TabsTrigger>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground 2xl:hidden"
-                                >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    More
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={TypeIcon}
+                        title={site.name}
+                        meta={site.address ? [{ icon: MapPin, label: site.address }] : undefined}
+                        badges={[
+                            { icon: TypeIcon, label: site.display_type },
+                            ...(site.is_high_risk
+                                ? ([{ icon: AlertTriangle, label: 'High Risk', tone: 'warning' }] as const)
+                                : []),
+                            ...(site.is_high_needs
+                                ? ([{ icon: AlertCircle, label: 'High Needs', tone: 'warning' }] as const)
+                                : []),
+                            {
+                                label: site.is_active ? 'Active' : 'Inactive',
+                                tone: site.is_active ? 'success' : 'default',
+                            },
+                            ...(readiness?.is_active_but_incomplete
+                                ? [
+                                      {
+                                          icon: AlertCircle,
+                                          label: 'Setup incomplete',
+                                          tone: 'warning' as const,
+                                          onClick: () => {
+                                              setActiveTab('readiness');
+                                              window.requestAnimationFrame(() => {
+                                                  readinessRef.current?.scrollIntoView({
+                                                      block: 'start',
+                                                      behavior: 'smooth',
+                                                  });
+                                              });
+                                          },
+                                      },
+                                  ]
+                                : []),
+                            ...(site.region ? [{ label: site.region }] : []),
+                        ]}
+                        stats={[
+                            { label: 'Clients', value: clients.length },
+                            { label: 'Assets', value: assets.length },
+                            { label: 'Contacts', value: contacts.length },
+                        ]}
+                        actions={
+                            can_edit ? (
+                                <Button asChild size="sm" variant="outline">
+                                    <Link href={`/sites/${site.id}/edit`}>Edit</Link>
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-64">
-                                {moreTabs.map((tab) => {
-                                    const MoreIcon = tab.icon;
-
-                                    return (
-                                        <DropdownMenuItem
-                                            key={tab.value}
-                                            onSelect={() => {
-                                                setActiveTab(tab.value);
-                                            }}
-                                            className={
-                                                activeTab === tab.value
-                                                    ? 'bg-primary/10 text-primary'
-                                                    : ''
-                                            }
-                                        >
-                                            <MoreIcon className="mr-2 h-4 w-4" />
-                                            {tab.label}
-                                        </DropdownMenuItem>
-                                    );
-                                })}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <TabsTrigger
-                            value="financials"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <DollarSign className="h-4 w-4" />
-                            Financials
-                        </TabsTrigger>
-                        {canSeeVendorsCredentials && (
-                            <TabsTrigger
-                                value="vendors-credentials"
-                                className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                            >
-                                <Truck className="h-4 w-4" />
-                                Vendors & Credentials
-                            </TabsTrigger>
-                        )}
-                        <TabsTrigger
-                            value="hardware"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <Cpu className="h-4 w-4" />
-                            Hardware
-                            {hardwareCount > 0 && (
-                                <Badge
-                                    variant="outline"
-                                    className="ml-1 px-1.5 py-0 text-xs"
-                                >
-                                    {hardwareCount}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="type-plan"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <TypePlanTabIcon className="h-4 w-4" />
-                            {typePlanTab.label}
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="emergency-plan"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <ShieldAlert className="h-4 w-4" />
-                            Emergency Plan
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="staff-requirements"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <GraduationCap className="h-4 w-4" />
-                            Staff Requirements
-                            {staffRequirements.length > 0 && (
-                                <Badge
-                                    variant="outline"
-                                    className="ml-1 px-1.5 py-0 text-xs"
-                                >
-                                    {staffRequirements.length}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="shift-coverage"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <Layers className="h-4 w-4" />
-                            Shift Coverage
-                            {coverageRequirements.length > 0 && (
-                                <Badge
-                                    variant="outline"
-                                    className="ml-1 px-1.5 py-0 text-xs"
-                                >
-                                    {coverageRequirements.length}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="service-contexts"
-                            className="hidden h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none 2xl:inline-flex"
-                        >
-                            <Layers className="h-4 w-4" />
-                            Services
-                            {(site.service_contexts ?? []).length > 0 && (
-                                <Badge
-                                    variant="outline"
-                                    className="ml-1 px-1.5 py-0 text-xs"
-                                >
-                                    {(site.service_contexts ?? []).length}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                    </TabsList>
-                    </div>
-
+                            ) : null
+                        }
+                    />
+                }
+                tabs={
+                    <PageTabs
+                        value={activeTab}
+                        onValueChange={(value) => {
+                            setActiveTab(value);
+                            if (value === 'fleet') loadFleet();
+                        }}
+                        items={siteTabs}
+                    >
                     {/* Readiness Tab */}
                     <TabsContent value="readiness" className="space-y-4">
                         {readiness && (
@@ -3878,8 +3611,9 @@ export default function SiteShow({
                             ledgerData={houseLedger}
                         />
                     </TabsContent>
-                </Tabs>
-            </PageShell>
+                    </PageTabs>
+                }
+            />
 
             <SiteTypePlanBuilderDialog
                 site={site}

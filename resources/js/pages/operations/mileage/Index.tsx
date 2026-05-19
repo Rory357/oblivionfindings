@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Car, Clock, DollarSign, Eye, MapPin, Pencil, Plus, Route, Search, Send } from 'lucide-react';
@@ -73,7 +73,7 @@ export default function MileageIndex({ claims = { data: [], links: [], current_p
     return (
         <AppLayout>
             <Head title="Mileage Claims" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Mileage Claims"
                 description="Track and manage travel distance claims for support workers."
                 backHref="/operations"

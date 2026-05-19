@@ -1,10 +1,10 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -36,7 +36,7 @@ export default function PriceBookEdit({ price_book }: Props) {
     return (
         <AppLayout>
             <Head title={`Edit: ${price_book.name}`} />
-            <PageHeader title={`Edit: ${price_book.name}`} backHref={`/operations/price-books/${price_book.id}`} />
+            <PageHero variant="compact" title={`Edit: ${price_book.name}`} backHref={`/operations/price-books/${price_book.id}`} />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

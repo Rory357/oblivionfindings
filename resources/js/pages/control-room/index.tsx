@@ -1,5 +1,4 @@
 import { KpiCard } from '@/components/dashboard/kpi-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -388,7 +388,7 @@ export default function ControlRoomIndex({
         >
             <Head title="Control Room" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Control Room"
                     description="Centralized alert management and triage system."
                     actions={

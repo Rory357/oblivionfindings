@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -45,7 +45,7 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
     return (
         <AppLayout>
             <Head title="Edit Recurring Charge" />
-            <PageHeader title="Edit Recurring Charge" description="Update an existing recurring billing charge." backHref="/operations/recurring-charges" />
+            <PageHero variant="compact" title="Edit Recurring Charge" description="Update an existing recurring billing charge." backHref="/operations/recurring-charges" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

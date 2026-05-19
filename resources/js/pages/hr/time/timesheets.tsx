@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import {
     AlertDialog,
@@ -31,6 +30,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
@@ -207,7 +207,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
             <Head title="Period Timesheets" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Period Timesheets"
                     description="Review and manage HR period timesheets."
                     backHref="/hr/time"

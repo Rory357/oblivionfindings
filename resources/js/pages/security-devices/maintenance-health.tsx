@@ -1,11 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -142,7 +142,7 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
             <Head title="Maintenance & Health - Security & Devices" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={<span className="flex items-center gap-3"><Wrench className="h-6 w-6 text-primary" /> Maintenance & Health</span>}
                     description="Device maintenance scheduling, health monitoring, and operational attention tracking."
                 />

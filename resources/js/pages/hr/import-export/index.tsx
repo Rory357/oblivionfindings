@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -106,7 +106,7 @@ export default function ImportExportIndex() {
         >
             <Head title="Employee Import / Export" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Employee Import / Export"
                     description="Bulk import or export employee records via CSV."
                 />

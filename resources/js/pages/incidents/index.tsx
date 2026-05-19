@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -166,7 +166,8 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
+                    category="incidents"
                     title={filters.type === 'near_miss' ? 'Near Misses' : 'Incidents'}
                     description={filters.type
                         ? `Filtered by type: ${filters.type.replace(/_/g, ' ')}`

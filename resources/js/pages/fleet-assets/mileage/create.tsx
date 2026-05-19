@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,7 +65,7 @@ export default function MileageCreate({ clients, ird_rate }: Props) {
         >
             <Head title="Log Personal Trip" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Log Personal Vehicle Trip"
                     description="Record a trip using your personal vehicle for mileage reimbursement."
                     backHref="/fleet-assets/mileage"

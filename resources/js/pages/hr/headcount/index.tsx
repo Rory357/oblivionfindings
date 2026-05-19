@@ -1,7 +1,7 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { AlertTriangle, Briefcase, Users } from 'lucide-react';
@@ -69,7 +69,7 @@ export default function HeadcountIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Headcount Planning" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Headcount Planning"
                     description="Workforce planning, forecasting, and attrition analysis."
                 />

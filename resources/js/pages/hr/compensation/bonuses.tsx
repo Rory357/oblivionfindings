@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, DollarSign } from 'lucide-react';
@@ -59,7 +59,7 @@ export default function BonusIndex({ bonuses, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bonus Payments" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Bonus Payments"
                     description="Track and manage employee bonuses and incentives."
                 />

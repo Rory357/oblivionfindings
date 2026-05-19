@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -162,7 +162,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
         >
             <Head title="Mileage Claims" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Staff Mileage Claims"
                     description="Personal vehicle mileage reimbursement claims. NZ IRD rate: $0.95/km."
                 >
@@ -180,7 +180,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                             </Link>
                         </Button>
                     </div>
-                </FleetHero>
+                </PageHero>
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">

@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -171,7 +171,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
         >
             <Head title={`Alerts: ${asset.name}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={`Alert Configuration: ${asset.name}`}
                     description="Configure alert rules and thresholds for this vehicle."
                     backHref={`/fleet-assets/vehicles/${asset.id}`}

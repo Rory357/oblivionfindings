@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import {
@@ -68,7 +68,7 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Reports - Security & Devices" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={
                         <span className="flex items-center gap-3">
                             <span className="rounded-xl border bg-primary/5 p-2 text-primary">

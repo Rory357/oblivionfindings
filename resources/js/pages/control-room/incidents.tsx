@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { PageHero } from '@/components/page';
 import {
     AlertTriangle,
     Bell,
@@ -212,7 +212,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
         >
             <Head title="Incident Tracker - Control Room" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Incident Tracker"
                     description="Live feed of incidents across all modules."
                 />

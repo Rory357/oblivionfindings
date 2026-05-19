@@ -1,5 +1,5 @@
 import LeafletMap, { MapGeofence } from '@/components/leaflet-map';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -223,7 +223,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
         >
             <Head title={`Edit Geofence - ${geofence?.name ?? ''}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={`Edit: ${geofence?.name ?? 'Geofence'}`}
                     description="Modify the geofence boundary and settings."
                     backHref="/fleet-assets/geofences"

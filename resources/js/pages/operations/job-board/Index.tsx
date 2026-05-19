@@ -3,7 +3,6 @@ import {
     deriveEligibilityStatus,
 } from '@/components/eligibility/eligibility-status-badge';
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -151,7 +151,7 @@ export default function JobBoardIndex({
     return (
         <AppLayout>
             <Head title="Job Board" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Job Board"
                 description="Open shifts and positions available for support workers."
                 backHref="/operations"

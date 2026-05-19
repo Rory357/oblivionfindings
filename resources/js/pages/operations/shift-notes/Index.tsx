@@ -1,5 +1,4 @@
 import { BarChart, DonutChart, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -231,7 +231,7 @@ export default function ShiftNotesIndex({
     return (
         <AppLayout>
             <Head title="Shift Notes" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Shift Notes"
                 description="Manager dashboard for shift documentation and audit trail."
                 backHref="/operations"

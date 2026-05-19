@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 
@@ -486,7 +486,7 @@ export default function RosteringConflicts({
         >
             <Head title="Rostering conflict queue" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Conflict queue"
                     description={`Work through overlaps, leave clashes, open coverage, and replacements for ${weekStart} to ${weekEnd}.`}
                     actions={

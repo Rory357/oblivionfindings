@@ -1,10 +1,10 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { CheckCircle2, Clock, Flag, MapPin, Shield } from 'lucide-react';
@@ -66,7 +66,7 @@ export default function EvvShow({ record }: Props) {
     return (
         <AppLayout>
             <Head title={`EVV Record #${record.id}`} />
-            <PageHeader title={`EVV Record #${record.id}`} description="Review visit timing, location evidence, and verification status." backHref="/operations/evv" />
+            <PageHero variant="compact" title={`EVV Record #${record.id}`} description="Review visit timing, location evidence, and verification status." backHref="/operations/evv" />
             <PageShell>
                 <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
                     <div className="space-y-4">

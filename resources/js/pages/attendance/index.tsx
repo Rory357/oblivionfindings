@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
@@ -131,7 +131,7 @@ export default function AttendanceIndex({
             <Head title="Attendance" />
 
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Attendance"
                     description="Clock in and out of shifts, and track attendance sessions."
                     icon={<Timer className="h-7 w-7 text-white" />}

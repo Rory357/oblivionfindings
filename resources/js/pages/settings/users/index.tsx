@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +27,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -248,7 +248,7 @@ export default function UsersIndex({
 
     const content = (
         <div className="space-y-6">
-                    <PageHeader
+                    <PageHero variant="compact"
                         title="System Users"
                         description="Manage user accounts, roles, and access across your organisation"
                         actions={

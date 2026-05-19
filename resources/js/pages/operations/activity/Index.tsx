@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Activity, CalendarDays, Clock, Filter, Users } from 'lucide-react';
@@ -80,7 +80,7 @@ export default function ActivityFeed({ activities, filter }: Props) {
     return (
         <AppLayout>
             <Head title="Activity Feed" />
-            <PageHeader title="Activity Feed" description={`Recent operational activity across shifts, timesheets, and ${clientPlural.toLowerCase()}.`} backHref="/operations" />
+            <PageHero variant="compact" title="Activity Feed" description={`Recent operational activity across shifts, timesheets, and ${clientPlural.toLowerCase()}.`} backHref="/operations" />
             <PageShell>
                 {/* Filters */}
                 <div className="mb-4 flex flex-wrap gap-1.5">

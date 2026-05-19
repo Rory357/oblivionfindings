@@ -107,6 +107,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/today', TodayDashboardController::class)->name('today');
     Route::get('/quality/checklist', QualityChecklistController::class)->name('quality.checklist');
+
+    // Internal design-system showcase. Admin-only outside local/testing env so
+    // we keep a single canonical reference for the shared PageHero/PageTabs/etc.
+    // platform-wide hero standardisation initiative.
+    Route::get('/internal/_design/page-hero', function () {
+        $user = auth()->user();
+        $isAdmin = $user && method_exists($user, 'canDo')
+            && $user->canDo('settings.access.impersonate');
+        if (! $isAdmin && ! app()->environment(['local', 'testing'])) {
+            abort(403);
+        }
+        return Inertia::render('internal/_design/page-hero');
+    })->name('internal.design.page-hero');
 });
 
 // Canonical frontline home.

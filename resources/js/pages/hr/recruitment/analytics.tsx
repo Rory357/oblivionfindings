@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import {
@@ -14,6 +13,7 @@ import {
     TabsList,
     TabsTrigger,
 } from '@/components/ui/tabs';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Briefcase, Clock, TrendingUp, Users } from 'lucide-react';
@@ -142,7 +142,7 @@ export default function RecruitmentAnalytics({
         >
             <Head title="Recruitment Analytics" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Recruitment Analytics"
                     description="Insights into your recruitment pipeline performance."
                     actions={

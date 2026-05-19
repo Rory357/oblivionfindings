@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -166,7 +166,7 @@ export default function InterviewKits({ kits, roles, can }: Props) {
         >
             <Head title="Interview Kits" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Interview Kits"
                     description="Structured scorecards and interview criteria for consistent hiring decisions."
                     actions={

@@ -1,5 +1,5 @@
 import { FilterBar, type FilterField } from '@/components/filter-bar';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
@@ -156,7 +156,7 @@ export default function ShiftsIndex({
             <Head title={shiftPlural} />
 
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={shiftPlural}
                     description="Rostered shifts and appointments. Filter by date, status, or staff."
                     icon={<CalendarDays className="h-7 w-7 text-white" />}

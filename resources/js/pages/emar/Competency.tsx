@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, Award, CheckCircle, Clock, Pencil, Plus, Trash2, UserX, XCircle } from 'lucide-react';
@@ -392,7 +392,7 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
     return (
         <AppLayout>
             <Head title="eMAR - Competency" />
-            <PageHeader title="Medication Competency" description="Staff competency assessments for medication administration. Track certifications, renewals, and compliance." backHref="/emar" />
+            <PageHero variant="compact" title="Medication Competency" description="Staff competency assessments for medication administration. Track certifications, renewals, and compliance." backHref="/emar" />
             <PageShell>
                 {/* Stats */}
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">

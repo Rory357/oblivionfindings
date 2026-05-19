@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
 
             <div className="flex flex-col gap-4 p-4 md:p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Checklist Templates"
                     description="Manage reusable checklists for site inspections and walkthroughs"
                     icon={<ClipboardCheck className="h-7 w-7 text-white" />}

@@ -1,7 +1,7 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
+import { PageHero } from '@/components/page';
 import { Head } from '@inertiajs/react';
 
 export default function FleetMapsUsage({ rows, reverse_geocode }) {
@@ -14,7 +14,7 @@ export default function FleetMapsUsage({ rows, reverse_geocode }) {
         >
             <Head title="Fleet Map Usage" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Fleet Map Usage"
                     description="Basic counts for Google Maps usage by context."
                 />

@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRight, CalendarDays, CheckCircle2, FileText, Mail, Pencil, Send } from 'lucide-react';
@@ -71,7 +71,7 @@ export default function QuoteShow({ quote }: Props) {
     return (
         <AppLayout>
             <Head title={quote.title} />
-            <PageHeader title={quote.title} description={clientDisplay} backHref="/operations/quotes" />
+            <PageHero variant="compact" title={quote.title} description={clientDisplay} backHref="/operations/quotes" />
             <PageShell>
                 {/* Header */}
                 <div className="flex flex-wrap items-center gap-2">

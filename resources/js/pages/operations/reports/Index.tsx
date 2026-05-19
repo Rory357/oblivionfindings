@@ -1,6 +1,6 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
@@ -73,7 +73,7 @@ export default function ReportsIndex() {
     return (
         <AppLayout>
             <Head title="Operations Reports" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Reports & Analytics"
                 description={`Operational reports across ${clientPlural.toLowerCase()}, staff, shifts, billing, and compliance.`}
                 backHref="/operations"

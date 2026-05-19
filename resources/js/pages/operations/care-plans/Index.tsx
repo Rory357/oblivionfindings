@@ -5,7 +5,6 @@ import {
     OPS_COLORS,
     OpsStatCard,
 } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -163,7 +163,7 @@ export default function CarePlansIndex({
     return (
         <AppLayout>
             <Head title="Care Plans" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Care Plans"
                 description="Manage support plans, behaviour plans, health plans, and transition plans."
                 backHref="/operations"

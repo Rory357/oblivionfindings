@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import TimesheetReturnBanner from '@/components/timesheet-return-banner';
@@ -113,7 +113,7 @@ export default function TimesheetEdit({
             <Head title={`${timesheetLabel} — ${clientName}`} />
 
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={clientName}
                     description={`${timesheetLabel} #${timesheet.id} — ${timesheet.work_date}`}
                     icon={<FileText className="h-7 w-7 text-white" />}

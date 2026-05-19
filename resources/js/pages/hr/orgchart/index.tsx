@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
@@ -238,7 +238,7 @@ export default function OrgChartIndex({ hierarchy, can }: Props) {
             <Head title="Organisation Chart" />
             <PageShell>
                 <div className="px-6 pt-6">
-                    <PageHeader
+                    <PageHero variant="compact"
                         title={
                             <span className="flex items-center gap-2">
                                 <Users className="h-6 w-6" />

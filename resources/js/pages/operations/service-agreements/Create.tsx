@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -175,7 +175,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
     return (
         <AppLayout>
             <Head title="Create Service Agreement" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Create Service Agreement"
                 description="Set up a new funding agreement for a client."
                 backHref={initialClientId ? `/operations/clients/${initialClientId}` : '/operations/service-agreements'}

@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -124,7 +124,8 @@ export default function SafeguardingIndex({ filters, concerns, stats }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
+                    category="incidents"
                     title="Safeguarding Concerns"
                     description="Manage safeguarding concerns, investigations, and external referrals"
                     icon={<Shield className="h-7 w-7 text-white" />}

@@ -1,11 +1,11 @@
 import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
 import { EligibilityStatusBadge } from '@/components/eligibility/eligibility-status-badge';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import {
     create as createShift,
@@ -373,7 +373,7 @@ export default function ShiftCreate({
             <Head title={`Create ${shiftLabel}`} />
             <PageShell>
                 <div className="max-w-2xl">
-                    <PageHeader
+                    <PageHero variant="compact"
                         title={`Create ${shiftLabel}`}
                         backHref={shiftsIndex.url()}
                         description="Create an appointment / rostered shift. Add tasks and (optionally) repeat weekly."

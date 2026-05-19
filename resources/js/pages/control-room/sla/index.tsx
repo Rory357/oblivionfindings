@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router } from '@inertiajs/react';
@@ -1000,7 +1000,7 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
         >
             <Head title="SLA Management - Control Room" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="SLA Management"
                     description="Configure service level agreements for alert acknowledgement, response, and resolution times."
                     actions={

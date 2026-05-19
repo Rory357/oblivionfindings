@@ -160,17 +160,17 @@ export default function FeedbackIndex({
             <Head title="360 Feedback" />
 
             <div className="space-y-6 p-4 lg:p-6">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-white/5" />
-                    <div className="absolute -top-4 left-1/3 h-28 w-28 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
+                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute -top-4 left-1/3 h-28 w-28 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 className="text-2xl font-bold">
                                 360-Degree Feedback
                             </h1>
-                            <p className="mt-1 text-white/70">
+                            <p className="mt-1 text-primary-foreground/70">
                                 Manage and respond to feedback requests across
                                 your team
                             </p>
@@ -184,11 +184,11 @@ export default function FeedbackIndex({
                                             <div className="text-3xl font-bold">
                                                 {pendingTotal}
                                             </div>
-                                            <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                            <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                                 Pending
                                             </div>
                                         </div>
-                                        <div className="h-10 w-px bg-white/20" />
+                                        <div className="h-10 w-px bg-primary-foreground/20" />
                                     </>
                                 )}
 
@@ -196,7 +196,7 @@ export default function FeedbackIndex({
                                     <div className="text-3xl font-bold">
                                         {responseRate}%
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Response Rate
                                     </div>
                                 </div>
@@ -205,7 +205,7 @@ export default function FeedbackIndex({
                             {can.manage && (
                                 <Button
                                     size="sm"
-                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-white/90"
+                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
                                     asChild
                                 >
                                     <Link href="/hr/feedback/request">
@@ -315,12 +315,12 @@ export default function FeedbackIndex({
                                     : 'secondary'
                             }
                             onClick={() => setStatusFilter(tab.key)}
-                            className={`gap-1.5 text-xs ${statusFilter === tab.key ? 'text-white' : 'text-muted-foreground'}`}
+                            className={`gap-1.5 text-xs ${statusFilter === tab.key ? 'text-primary-foreground' : 'text-muted-foreground'}`}
                         >
                             {tab.label}
                             <Badge
                                 variant="secondary"
-                                className={`text-[9px] ${statusFilter === tab.key ? 'bg-white/20 text-white' : ''}`}
+                                className={`text-[9px] ${statusFilter === tab.key ? 'bg-primary-foreground/20 text-primary-foreground' : ''}`}
                             >
                                 {tab.count}
                             </Badge>
@@ -376,7 +376,7 @@ export default function FeedbackIndex({
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="flex min-w-0 items-center gap-3">
                                                 <div
-                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColor(request.subject?.id ?? 0)}`}
+                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-primary-foreground ${avatarColor(request.subject?.id ?? 0)}`}
                                                 >
                                                     {getInitials(
                                                         request.subject?.name ??

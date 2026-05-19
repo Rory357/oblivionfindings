@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, ChevronDown, ChevronUp, Star } from 'lucide-react';
@@ -146,7 +146,7 @@ export default function ScorecardSummary({
         >
             <Head title={`Scorecards - ${fullName}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Scorecard Summary"
                     description={`${fullName} - ${application.position_title} (${scorecards.length} scorecards)`}
                     actions={

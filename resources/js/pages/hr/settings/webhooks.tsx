@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus, TestTube, Trash2, Webhook } from 'lucide-react';
@@ -132,7 +132,7 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Webhooks - HR Settings" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Webhooks"
                     description="Manage webhook endpoints for HR event notifications."
                 >
@@ -226,7 +226,7 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                             </form>
                         </DialogContent>
                     </Dialog>
-                </PageHeader>
+                </PageHero>
 
                 <Card>
                     <CardHeader>

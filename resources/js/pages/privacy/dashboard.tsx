@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Head, Link } from '@inertiajs/react';
 import { Shield, AlertTriangle, Clock, FileText, Lock, Scale, Activity } from 'lucide-react';
@@ -60,7 +60,7 @@ export default function PrivacyDashboard({
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Privacy & GDPR Dashboard"
                     description="Data protection compliance overview and management"
                     icon={<Shield className="h-7 w-7 text-white" />}

@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, Award, CheckCircle2, Search, ShieldCheck, XCircle } from 'lucide-react';
@@ -45,7 +45,7 @@ export default function QualificationsIndex({ requirements = { data: [], links: 
     return (
         <AppLayout>
             <Head title="Qualifications" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Qualifications"
                 description="Manage qualification requirements by client and check worker compliance."
                 backHref="/operations"

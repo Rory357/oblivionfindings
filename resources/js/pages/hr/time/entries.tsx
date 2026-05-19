@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { CalendarClock, ChevronDown, Plus } from 'lucide-react';
@@ -137,7 +137,7 @@ export default function TimeEntries({ entries, filters, can }: Props) {
             <Head title="Time Entries" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Time Entries"
                     description="View and manage clock entries that feed period timesheets."
                     backHref="/hr/time"

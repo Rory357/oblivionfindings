@@ -1,5 +1,4 @@
 import { OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle, DollarSign, Eye, FileText, Plus, Receipt, Search } from 'lucide-react';
@@ -73,7 +73,7 @@ export default function InvoicesIndex({ invoices = { data: [], links: [], curren
     return (
         <AppLayout>
             <Head title="Invoices" />
-            <PageHeader title="Invoices" description="Create and manage invoices for clients and funding bodies." backHref="/operations" />
+            <PageHero variant="compact" title="Invoices" description="Create and manage invoices for clients and funding bodies." backHref="/operations" />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

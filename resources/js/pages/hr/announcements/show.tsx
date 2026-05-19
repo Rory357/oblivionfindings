@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle, Pin } from 'lucide-react';
@@ -124,7 +124,7 @@ export default function AnnouncementShow({
             <Head title={announcement.title} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={announcement.title}
                     description={`Published ${formatDate(announcement.published_at)}`}
                 />

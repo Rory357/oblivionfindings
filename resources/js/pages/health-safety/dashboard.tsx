@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -634,7 +634,8 @@ export default function HealthSafetyDashboard({
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
+                    category="compliance"
                     title="Health & Safety Dashboard"
                     description="Real-time overview of workplace safety performance"
                     icon={<Shield className="h-7 w-7 text-white" />}

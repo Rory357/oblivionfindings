@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -37,7 +37,7 @@ export default function ClientFundCreate({ clients }: Props) {
     return (
         <AppLayout>
             <Head title="Create Client Fund" />
-            <PageHeader title="Create Client Fund" description="Set up a new funding allocation for a client." backHref="/operations/client-funds" />
+            <PageHero variant="compact" title="Create Client Fund" description="Set up a new funding allocation for a client." backHref="/operations/client-funds" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

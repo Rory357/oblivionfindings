@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Head, router } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -63,7 +63,8 @@ export default function RiskAssessmentsIndex({ assessments, filters }: Props) {
             <div className="flex flex-col gap-6 p-6">
 
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
+                    category="compliance"
                     title="Risk Assessments"
                     description={`${assessments.total} assessment${assessments.total !== 1 ? 's' : ''} registered`}
                     icon={<Shield className="h-7 w-7 text-white" />}

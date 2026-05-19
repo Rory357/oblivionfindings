@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, Bell, BellOff, CalendarDays, CheckCircle2, Info, Mail, MessageSquare } from 'lucide-react';
@@ -68,7 +68,7 @@ export default function NotificationsIndex({ notifications = { data: [], links: 
     return (
         <AppLayout>
             <Head title="Notifications" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Notifications"
                 description="View and manage your notifications."
                 backHref="/operations"

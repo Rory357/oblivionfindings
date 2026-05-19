@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -362,7 +362,7 @@ export default function AuditLog({
     return (
         <AppLayout>
             <Head title="Medication Audit Trail" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Medication Audit Trail"
                 description="Comprehensive timeline of all medication-related events across clients."
             />

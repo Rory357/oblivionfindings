@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -449,7 +449,8 @@ export default function FleetAssetsDashboard({
         >
             <Head title="Fleet & Assets" />
             <PageShell>
-                <FleetHero
+                <PageHero
+                    category="fleet"
                     title="Fleet & Assets"
                     description="Real-time fleet tracking, asset management, and operational insights."
                     icon={<Car className="h-7 w-7" />}

@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -98,7 +98,7 @@ export default function PayrollExportIndex({
     return (
         <AppLayout>
             <Head title="Payroll Export" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Payroll Export"
                 description="Generate and manage payroll export files."
                 backHref="/operations"

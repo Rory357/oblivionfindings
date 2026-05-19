@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,7 +81,7 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero */}
-                <FleetHero
+                <PageHero
                     title="Executive Financial Dashboard"
                     description="Organisation-wide financial overview and risk indicators"
                     icon={<BarChart3 className="h-7 w-7 text-white" />}

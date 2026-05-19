@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
@@ -557,7 +557,7 @@ export default function TransportShow({
         >
             <Head title={`Transport #${t.id ?? ''}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={`Transport #${t.id ?? ''}`}
                     backHref="/fleet-assets/transports"
                     backLabel="Back to Transport Logs"

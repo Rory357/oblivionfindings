@@ -1,0 +1,238 @@
+import { Link } from '@inertiajs/react';
+import { ArrowLeft } from 'lucide-react';
+import type { CSSProperties, ComponentType, ReactNode } from 'react';
+import { isValidElement } from 'react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+
+import { PageHeroActions } from './page-hero-actions';
+import { PageHeroBadges, type PageHeroBadge } from './page-hero-badges';
+import { PageHeroMeta, type PageHeroMetaItem } from './page-hero-meta';
+import { PageHeroStats, type PageHeroStat } from './page-hero-stats';
+
+export type PageHeroVariant = 'hero' | 'compact' | 'inline';
+
+export type PageHeroCategory =
+    | 'ops'
+    | 'hr'
+    | 'compliance'
+    | 'incidents'
+    | 'governance'
+    | 'sites'
+    | 'fleet';
+
+type IconLike = ComponentType<{ className?: string }>;
+
+export type PageHeroAvatar = {
+    src?: string | null;
+    fallback: string;
+};
+
+export interface PageHeroProps {
+    /** Visual density. Default 'hero' renders the full gradient banner. */
+    variant?: PageHeroVariant;
+
+    /** Optional category-themed gradient — swaps the base from --primary to --category-*. */
+    category?: PageHeroCategory;
+
+    /** Top-of-hero back link. */
+    backHref?: string;
+    backLabel?: string;
+
+    /** Big circular icon on the left (variant='hero' only). */
+    icon?: IconLike | ReactNode;
+    /** Avatar takes precedence over icon when both supplied (use for person detail). */
+    avatar?: PageHeroAvatar;
+
+    title: ReactNode;
+    description?: ReactNode;
+    /** Alias for `description` — preserved for FleetHero migration compatibility. */
+    subtitle?: ReactNode;
+
+    /** Sub-meta line(s) under title (e.g. address with MapPin). */
+    meta?: PageHeroMetaItem[];
+
+    badges?: PageHeroBadge[];
+    stats?: PageHeroStat[];
+
+    /** Right-column buttons. Auto-wrapped in PageHeroActions for hero variant. */
+    actions?: ReactNode;
+
+    /** Escape hatch — rendered under the badges row, full width. */
+    children?: ReactNode;
+
+    className?: string;
+}
+
+function isIconComponent(value: unknown): value is IconLike {
+    return typeof value === 'function';
+}
+
+function renderIcon(icon: IconLike | ReactNode, className: string): ReactNode {
+    if (icon == null) return null;
+    if (isIconComponent(icon)) {
+        const IconComp = icon;
+        return <IconComp className={className} />;
+    }
+    if (isValidElement(icon)) {
+        return icon;
+    }
+    return icon;
+}
+
+function HeroVariant(props: PageHeroProps) {
+    const {
+        category,
+        backHref,
+        backLabel = 'Back',
+        icon,
+        avatar,
+        title,
+        description,
+        subtitle,
+        meta,
+        badges,
+        stats,
+        actions,
+        children,
+        className,
+    } = props;
+    const supportingText = description ?? subtitle;
+
+    const style: CSSProperties | undefined = category
+        ? ({ ['--hero-base' as string]: `var(--category-${category})` } as CSSProperties)
+        : undefined;
+
+    const gradientClass = category
+        ? 'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]'
+        : 'bg-gradient-to-br from-primary/90 via-primary to-primary/80';
+
+    const renderedIcon = avatar ? null : renderIcon(icon, 'h-12 w-12 text-primary-foreground md:h-14 md:w-14');
+
+    return (
+        <div
+            style={style}
+            className={cn(
+                'relative overflow-hidden rounded-2xl p-6 text-primary-foreground md:p-8',
+                gradientClass,
+                className,
+            )}
+        >
+            {/* Decorative orbs — purely visual, no interactive content */}
+            <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+            <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+            <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+
+            <div className="relative">
+                {backHref ? (
+                    <Link
+                        href={backHref}
+                        className="mb-3 inline-flex items-center gap-1.5 text-xs text-primary-foreground/60 transition-colors hover:text-primary-foreground/90"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        {backLabel}
+                    </Link>
+                ) : null}
+
+                <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
+                    {avatar ? (
+                        <Avatar className="h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28">
+                            {avatar.src ? (
+                                <AvatarImage src={avatar.src} alt={avatar.fallback} />
+                            ) : null}
+                            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
+                                {avatar.fallback}
+                            </AvatarFallback>
+                        </Avatar>
+                    ) : renderedIcon ? (
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
+                            {renderedIcon}
+                        </div>
+                    ) : null}
+
+                    <div className="min-w-0 flex-1 text-center md:text-left">
+                        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{title}</h1>
+                        {supportingText ? (
+                            <p className="mt-1 text-sm text-primary-foreground/70">{supportingText}</p>
+                        ) : null}
+                        {meta && meta.length > 0 ? <PageHeroMeta items={meta} /> : null}
+                        {badges && badges.length > 0 ? <PageHeroBadges badges={badges} /> : null}
+                        {children ? <div className="mt-3">{children}</div> : null}
+                    </div>
+
+                    {(actions || (stats && stats.length > 0)) && (
+                        <div className="flex flex-col items-center gap-3 md:items-end">
+                            {actions ? <PageHeroActions>{actions}</PageHeroActions> : null}
+                            {stats && stats.length > 0 ? (
+                                <PageHeroStats stats={stats} layout="inline" />
+                            ) : null}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CompactVariant(props: PageHeroProps) {
+    const { backHref, backLabel = 'Back', title, description, subtitle, actions, children, className } = props;
+    const supportingText = description ?? subtitle;
+    return (
+        <div
+            className={cn(
+                'flex flex-col gap-4 md:flex-row md:items-start md:justify-between',
+                className,
+            )}
+        >
+            <div className="min-w-0">
+                {backHref ? (
+                    <Link
+                        href={backHref}
+                        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        {backLabel}
+                    </Link>
+                ) : null}
+                <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">{title}</h1>
+                {supportingText ? (
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                        {supportingText}
+                    </p>
+                ) : null}
+                {children ? <div className="mt-3">{children}</div> : null}
+            </div>
+            {actions ? (
+                <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+            ) : null}
+        </div>
+    );
+}
+
+function InlineVariant(props: PageHeroProps) {
+    const { title, description, subtitle, actions, className } = props;
+    const supportingText = description ?? subtitle;
+    return (
+        <div className={cn('flex items-start justify-between gap-3', className)}>
+            <div className="min-w-0">
+                <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+                {supportingText ? (
+                    <p className="mt-1 text-sm text-muted-foreground">{supportingText}</p>
+                ) : null}
+            </div>
+            {actions ? (
+                <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            ) : null}
+        </div>
+    );
+}
+
+export function PageHero(props: PageHeroProps) {
+    const variant = props.variant ?? 'hero';
+    if (variant === 'compact') return <CompactVariant {...props} />;
+    if (variant === 'inline') return <InlineVariant {...props} />;
+    return <HeroVariant {...props} />;
+}
+
+export default PageHero;

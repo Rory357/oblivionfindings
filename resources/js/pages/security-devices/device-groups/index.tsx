@@ -1,10 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import { GitBranch, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
@@ -68,7 +68,7 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
             <Head title="Device Groups - Security & Devices" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={<span className="flex items-center gap-3"><GitBranch className="h-6 w-6 text-primary" /> Device Groups</span>}
                     description="Organise devices into logical groups for management, reporting, and operational visibility."
                     actions={

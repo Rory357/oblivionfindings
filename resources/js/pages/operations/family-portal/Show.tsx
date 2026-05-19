@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { Bell, CalendarDays, FileText, Pencil, Pill, Shield } from 'lucide-react';
@@ -51,7 +51,7 @@ export default function FamilyPortalShow({ client }: Props) {
     return (
         <AppLayout>
             <Head title={`Family Portal - ${client.first_name} ${client.last_name}`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={`${client.first_name} ${client.last_name}`}
                 description="Family portal visibility and notification settings."
                 backHref="/operations/family-portal"

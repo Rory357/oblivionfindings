@@ -1,5 +1,5 @@
 import { HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -289,7 +289,8 @@ export default function MaintenanceDashboard({
         >
             <Head title="Maintenance Overview" />
             <PageShell>
-                <FleetHero
+                <PageHero
+                    category="fleet"
                     title="Maintenance Overview"
                     description="Cost analytics and maintenance health at a glance."
                     actions={

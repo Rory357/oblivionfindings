@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -22,7 +22,7 @@ export default function PayrollExportCreate() {
     return (
         <AppLayout>
             <Head title="Generate Payroll Export" />
-            <PageHeader title="Generate Payroll Export" description="Create a new payroll export from approved timesheets." backHref="/operations/payroll-export" />
+            <PageHero variant="compact" title="Generate Payroll Export" description="Create a new payroll export from approved timesheets." backHref="/operations/payroll-export" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

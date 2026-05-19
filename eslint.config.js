@@ -86,6 +86,41 @@ export default [
         },
     },
     {
+        // Theme-purity guardrail for the shared PageHero component family.
+        // The hero gradient is built on --primary / --primary-foreground tokens
+        // so brand changes propagate. text-white / bg-white/* and hex literals
+        // inside these files bypass that token system and break dark-mode +
+        // white-label support.
+        //
+        // Scoped narrowly to the page hero source so the rest of the codebase
+        // (including marketing pages that genuinely render on coloured photo
+        // hero backgrounds) is unaffected.
+        files: ['resources/js/components/page/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector:
+                        "JSXAttribute[name.name='className'] Literal[value=/\\b(text|bg|border|ring|from|to|via)-(white|black)(\\/\\d+)?\\b/]",
+                    message:
+                        'Hero components must use --primary-foreground tokens (text-primary-foreground, bg-primary-foreground/10). text-white / bg-white/* bypass the theme system.',
+                },
+                {
+                    selector:
+                        "TemplateElement[value.raw=/\\b(text|bg|border|ring|from|to|via)-(white|black)(\\/\\d+)?\\b/]",
+                    message:
+                        'Hero components must use --primary-foreground tokens, not text-white / bg-white/*.',
+                },
+                {
+                    selector:
+                        "JSXAttribute[name.name='className'] Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+                    message:
+                        'No hex colours in className inside hero components. Use theme tokens.',
+                },
+            ],
+        },
+    },
+    {
         ignores: [
             'vendor',
             'node_modules',

@@ -1,7 +1,6 @@
 import SupportingEvidenceDialog, {
     type SupportingEvidenceAttachment,
 } from '@/components/medications/SupportingEvidenceDialog';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
@@ -570,7 +570,7 @@ export default function MedicationErrors({
     return (
         <AppLayout>
             <Head title="eMAR - Medication Errors" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Medication Errors"
                 description="Record, review, and resolve medication errors. Track trends and implement preventive actions."
                 backHref="/emar"

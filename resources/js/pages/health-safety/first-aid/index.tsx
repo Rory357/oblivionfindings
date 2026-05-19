@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -119,7 +119,7 @@ export default function FirstAidIndex({
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="First Aid Records"
                     description="Record and track first aid treatments"
                     icon={<Heart className="h-7 w-7 text-white" />}

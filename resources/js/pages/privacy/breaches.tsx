@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -76,7 +76,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Data Breach Management"
                     description="GDPR Article 33 — 72 hour ICO notification requirement"
                     icon={<Shield className="h-7 w-7 text-white" />}

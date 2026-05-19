@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -142,7 +142,7 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
     return (
         <AppLayout>
             <Head title="Roadmap Suggestions" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Roadmap Suggestions"
                 description="Triage backlog for operational signals that should become roadmap work."
                 backHref="/roadmap/dashboard"

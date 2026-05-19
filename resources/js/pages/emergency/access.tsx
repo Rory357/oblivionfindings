@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { ShieldAlert } from 'lucide-react';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -100,7 +100,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
             <Head title="Emergency Access" />
 
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="Emergency Access"
                     description="Urgent medication access for clients you are not assigned to. A reason is required and access is time-limited."
                     icon={<ShieldAlert className="h-7 w-7 text-white" />}

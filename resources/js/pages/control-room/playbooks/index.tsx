@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -323,7 +323,7 @@ export default function PlaybooksIndex({
 
             <div className="flex flex-col gap-6 p-6">
                 <PageShell>
-                    <PageHeader
+                    <PageHero variant="compact"
                         title="Playbooks"
                         description="Create and manage response procedure playbooks for consistent incident handling."
                         backHref="/control-room"

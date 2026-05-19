@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -92,7 +92,7 @@ export default function InitiativeIndex({ items, filters }: Props) {
     return (
         <AppLayout>
             <Head title="Roadmap Initiatives" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Roadmap Initiatives"
                 description="Prioritised initiative register for roadmap planning and governance review."
                 backHref="/roadmap/dashboard"

@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
@@ -137,7 +137,7 @@ export default function HealthClinicalDashboard({
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Health & Clinical"
                     description="Clinical observation compliance and event oversight"
                     icon={<Heart className="h-7 w-7 text-white" />}

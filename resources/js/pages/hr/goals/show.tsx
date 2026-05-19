@@ -135,10 +135,10 @@ const statusColours: Record<string, string> = {
 };
 
 const statusBadgeWhite: Record<string, string> = {
-    not_started: 'bg-white/10 text-white/90 border-white/20',
-    in_progress: 'bg-white/10 text-white/90 border-white/20',
-    completed: 'bg-status-success text-white border-status-success/30',
-    cancelled: 'bg-status-critical text-white border-status-critical/30',
+    not_started: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
+    in_progress: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
+    completed: 'bg-status-success text-primary-foreground border-status-success/30',
+    cancelled: 'bg-status-critical text-primary-foreground border-status-critical/30',
 };
 
 const priorityColours: Record<string, string> = {
@@ -149,17 +149,17 @@ const priorityColours: Record<string, string> = {
 };
 
 const priorityBadgeWhite: Record<string, string> = {
-    low: 'bg-white/10 text-white/80 border-white/20',
-    medium: 'bg-status-warning text-white border-status-warning/30',
-    high: 'bg-status-critical text-white border-status-critical/30',
-    critical: 'bg-status-critical text-white border-status-critical/40',
+    low: 'bg-primary-foreground/10 text-primary-foreground/80 border-primary-foreground/20',
+    medium: 'bg-status-warning text-primary-foreground border-status-warning/30',
+    high: 'bg-status-critical text-primary-foreground border-status-critical/30',
+    critical: 'bg-status-critical text-primary-foreground border-status-critical/40',
 };
 
 const typeBadgeWhite: Record<string, string> = {
-    individual: 'bg-white/10 text-white/90 border-white/20',
-    team: 'bg-white/10 text-white/90 border-white/20',
-    company: 'bg-white/10 text-white/90 border-white/20',
-    department: 'bg-white/10 text-white/90 border-white/20',
+    individual: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
+    team: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
+    company: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
+    department: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
 };
 
 function progressBarColour(pct: number): string {
@@ -326,11 +326,11 @@ export default function GoalShow({ goal, users, can }: Props) {
                 {/* ============================================================ */}
                 {/*  PURPLE GRADIENT HEADER                                       */}
                 {/* ============================================================ */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
                     {/* Decorative circles */}
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                         {/* Left side: title + badges + meta */}
@@ -340,7 +340,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                             </h1>
 
                             {goal.description && (
-                                <p className="mt-1 max-w-2xl text-sm text-white/70">
+                                <p className="mt-1 max-w-2xl text-sm text-primary-foreground/70">
                                     {goal.description}
                                 </p>
                             )}
@@ -350,7 +350,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <Badge
                                     className={
                                         statusBadgeWhite[goal.status] ??
-                                        'border-white/20 bg-white/10 text-white/90'
+                                        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
                                     }
                                 >
                                     {capitalize(goal.status)}
@@ -358,7 +358,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <Badge
                                     className={
                                         priorityBadgeWhite[goal.priority] ??
-                                        'border-white/20 bg-white/10 text-white/80'
+                                        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/80'
                                     }
                                 >
                                     {capitalize(goal.priority)} Priority
@@ -366,7 +366,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <Badge
                                     className={
                                         typeBadgeWhite[goal.goal_type] ??
-                                        'border-white/20 bg-white/10 text-white/90'
+                                        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
                                     }
                                 >
                                     {capitalize(goal.goal_type)}
@@ -374,7 +374,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                             </div>
 
                             {/* Meta row: assignee, dates, category */}
-                            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
+                            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-primary-foreground/80">
                                 {goal.user && (
                                     <span className="flex items-center gap-1.5">
                                         <User className="h-3.5 w-3.5" />
@@ -395,7 +395,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 {goal.parent_goal && (
                                     <Link
                                         href={`/hr/goals/${goal.parent_goal.id}`}
-                                        className="flex items-center gap-1.5 underline decoration-white/30 transition-colors hover:text-white"
+                                        className="flex items-center gap-1.5 underline decoration-white/30 transition-colors hover:text-primary-foreground"
                                     >
                                         Parent: {goal.parent_goal.title}
                                     </Link>
@@ -409,16 +409,16 @@ export default function GoalShow({ goal, users, can }: Props) {
                                 <span className="text-4xl font-bold">
                                     {goal.progress_percentage}
                                 </span>
-                                <span className="text-xl font-semibold text-white/80">
+                                <span className="text-xl font-semibold text-primary-foreground/80">
                                     %
                                 </span>
                             </div>
-                            <span className="mt-1 text-sm font-medium text-white/70">
+                            <span className="mt-1 text-sm font-medium text-primary-foreground/70">
                                 Progress
                             </span>
                             {goal.target_value !== null &&
                                 goal.target_value !== undefined && (
-                                    <span className="mt-1 text-xs text-white/60">
+                                    <span className="mt-1 text-xs text-primary-foreground/60">
                                         {goal.current_value ?? 0} /{' '}
                                         {goal.target_value} {goal.unit ?? ''}
                                     </span>

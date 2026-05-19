@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import {
@@ -37,6 +36,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -375,7 +375,8 @@ export default function LeaveIndex({
             <Head title="Leave Management" />
 
             <PageShell>
-                <PageHeader
+                <PageHero
+                    category="hr" variant="compact"
                     title="Leave Management"
                     description="Manage leave requests, approvals, balances, and absence analytics."
                     actions={

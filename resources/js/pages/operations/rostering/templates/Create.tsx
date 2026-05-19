@@ -1,5 +1,5 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import TemplateForm from './TemplateForm';
@@ -50,7 +50,7 @@ export default function CreateTemplate({
         >
             <Head title="Create roster template" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Create roster template"
                     description="Build a repeatable roster pattern with the same operational fields used by live shifts."
                     backHref="/operations/rostering/templates"

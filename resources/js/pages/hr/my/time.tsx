@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -219,7 +219,7 @@ export default function MyTime({
             <Head title="My Time" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="My Time"
                     backHref="/hr/my"
                     backLabel="Back to My HR"

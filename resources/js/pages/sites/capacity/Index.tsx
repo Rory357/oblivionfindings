@@ -1,9 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageHero } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import { Users, Home, UserPlus, Clock, BarChart3 } from 'lucide-react';
 
@@ -97,7 +97,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
             <Head title={`${site.name} — Capacity & Occupancy`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={`${site.name} — Capacity & Occupancy`}
                     description="Monitor room assignments, occupancy levels, and waitlist status"
                     actions={

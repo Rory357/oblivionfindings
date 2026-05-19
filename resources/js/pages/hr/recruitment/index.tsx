@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { ActivityItem } from '@/components/recruitment/activity-item';
 import { KpiCard } from '@/components/recruitment/kpi-card';
@@ -19,6 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -170,7 +170,8 @@ export default function RecruitmentIndex({
         >
             <Head title="Recruitment Pipeline" />
             <PageShell>
-                <PageHeader
+                <PageHero
+                    category="hr" variant="compact"
                     title="Recruitment Pipeline"
                     description="Track candidates through the hiring process."
                     actions={

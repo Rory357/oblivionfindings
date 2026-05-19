@@ -1,7 +1,7 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Star, Users } from 'lucide-react';
@@ -49,7 +49,7 @@ export default function SuccessionShow({ plan, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Succession: ${plan.role_title}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={plan.role_title}
                     description={plan.department || 'Succession Plan'}
                 />

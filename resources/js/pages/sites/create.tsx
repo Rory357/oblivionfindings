@@ -8,6 +8,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { PageHero } from '@/components/page';
 import WizardStepper from '@/components/wizard-stepper';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -212,25 +213,24 @@ export default function CreateSite() {
             <Head title={`Add ${siteSingular}`} />
 
             <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-8 lg:max-w-5xl">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Add a {siteSingular.toLowerCase()}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Eight quick steps. You can update anything later.
-                        </p>
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={cancel}
-                        aria-label="Cancel and return to sites list"
-                        className="shrink-0"
-                    >
-                        Cancel
-                    </Button>
-                </div>
+                <PageHero
+                    variant="compact"
+                    backHref="/sites"
+                    backLabel={`Back to ${sitePlural}`}
+                    title={`Add a ${siteSingular.toLowerCase()}`}
+                    description="Eight quick steps. You can update anything later."
+                    actions={
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={cancel}
+                            aria-label="Cancel and return to sites list"
+                            className="shrink-0"
+                        >
+                            Cancel
+                        </Button>
+                    }
+                />
 
                 <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
                     <div className="min-w-0 space-y-6 lg:space-y-8">

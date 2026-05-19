@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
@@ -194,7 +194,7 @@ export default function ShiftReports({ filters, sites, staff, export_url, report
     return (
         <AppLayout>
             <Head title="Shift Operations Reports" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Shift Operations Reports"
                 description="Decision-grade reporting for staffing, coverage, reconciliation, attendance variance, and payroll risk."
                 backHref="/operations/reports"

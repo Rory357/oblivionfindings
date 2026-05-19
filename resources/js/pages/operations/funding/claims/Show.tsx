@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, CheckCircle2, Send } from 'lucide-react';
@@ -56,7 +56,7 @@ export default function FundingClaimShow({ claim }: Props) {
     return (
         <AppLayout>
             <Head title="Funding Claim" />
-            <PageHeader
+            <PageHero variant="compact"
                 title={claim.claim_reference || `Funding Claim #${claim.id}`}
                 description="Review the claim summary, line items, and approval state."
                 backHref="/operations/funding/claims"

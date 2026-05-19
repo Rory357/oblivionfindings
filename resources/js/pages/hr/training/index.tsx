@@ -133,16 +133,16 @@ export default function TrainingIndex({
             <Head title="Training Dashboard" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-white/5" />
-                    <div className="absolute top-0 left-1/2 h-32 w-32 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground shadow-lg">
+                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute top-0 left-1/2 h-32 w-32 rounded-full bg-primary-foreground/5" />
                     <div className="relative flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 className="text-2xl font-bold">
                                 Training Dashboard
                             </h1>
-                            <p className="mt-1 text-white/70">
+                            <p className="mt-1 text-primary-foreground/70">
                                 Monitor training renewals, compliance and
                                 overdue records
                             </p>
@@ -153,16 +153,16 @@ export default function TrainingIndex({
                                     <div className="text-3xl font-bold">
                                         {complianceRate}%
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Compliance
                                     </div>
                                 </div>
-                                <div className="h-10 w-px bg-white/20" />
+                                <div className="h-10 w-px bg-primary-foreground/20" />
                                 <div className="text-center">
                                     <div className="text-3xl font-bold">
                                         {stats.totalRecords}
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Records
                                     </div>
                                 </div>
@@ -171,7 +171,7 @@ export default function TrainingIndex({
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    className="gap-1.5 border-white/20 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25"
+                                    className="gap-1.5 border-primary-foreground/20 bg-primary-foreground/15 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/25"
                                     asChild
                                 >
                                     <Link href="/hr/compliance">
@@ -181,7 +181,7 @@ export default function TrainingIndex({
                                 </Button>
                                 <Button
                                     size="sm"
-                                    className="gap-1.5 bg-white text-primary shadow-md hover:bg-white/90"
+                                    className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
                                     asChild
                                 >
                                     <Link href="/hr/training/catalog">

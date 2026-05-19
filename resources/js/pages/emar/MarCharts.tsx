@@ -1,6 +1,6 @@
 import ClientAllergyBanner from '@/components/emar/ClientAllergyBanner';
 import DrugInteractionAlert from '@/components/emar/DrugInteractionAlert';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import AdministrationEvidenceDialog from '@/components/medications/AdministrationEvidenceDialog';
 import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
 import RefusalFollowUpDialog from '@/components/medications/RefusalFollowUpDialog';
@@ -759,7 +759,7 @@ export default function MarCharts({
         <AppLayout>
             <Head title="eMAR - MAR Charts" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="MAR Charts"
                     description="Medication Administration Record charts by client and date"
                     icon={<Pill className="h-7 w-7 text-white" />}

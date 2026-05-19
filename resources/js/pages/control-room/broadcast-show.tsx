@@ -1,10 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import {
     ArrowLeft,
     CheckCircle,
@@ -119,7 +119,7 @@ export default function BroadcastShow({ summary, recipients }: Props) {
                     </Button>
                 </div>
 
-                <PageHeader title="Broadcast Detail" description="View delivery status for each recipient." />
+                <PageHero variant="compact" title="Broadcast Detail" description="View delivery status for each recipient." />
 
                 {/* Summary Card */}
                 <Card className="mb-6">

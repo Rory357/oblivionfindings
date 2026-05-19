@@ -1,5 +1,5 @@
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -169,7 +169,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
         >
             <Head title={`Outing: ${safeOuting.title ?? ''}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={safeOuting.title ?? 'Outing Details'}
                     backHref="/fleet-assets/outings"
                     backLabel="Back to Outings"

@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowRight, FileDown, MapPinned, Pencil, Plus, ShieldAlert } from 'lucide-react';
@@ -65,7 +65,7 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
         <AppLayout>
             <Head title={`${site.name} ${typePlan.tab_label}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={typePlan.tab_label}
                     description={`${site.name} ${site.display_type}`}
                     actions={

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -64,7 +64,7 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
     return (
         <AppLayout>
             <Head title="Roadmap Quarterly Plans" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Roadmap Quarterly Plans"
                 description="Plan history by fiscal quarter, revision, status, and approval state."
                 backHref="/roadmap/dashboard"

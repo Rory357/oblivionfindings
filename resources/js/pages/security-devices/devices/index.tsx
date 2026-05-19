@@ -1,9 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -69,7 +69,7 @@ export default function DevicesIndex({ devices, stats, filters, filterOptions }:
             <Head title="Devices - Security & Devices" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Devices"
                     description="Canonical device registry across all hardware domains."
                     actions={

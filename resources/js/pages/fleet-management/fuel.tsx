@@ -1,5 +1,4 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency, formatDateTime } from '@/lib/fleet-utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -130,7 +130,7 @@ export default function FleetFuelIndex({
         >
             <Head title="Fuel Logs" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Fuel Logs"
                     description="Track fuel purchases and vehicle efficiency"
                     actions={

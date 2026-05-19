@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +28,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
@@ -1241,7 +1241,7 @@ export default function ControlRoomSettings({
         <AppLayout>
             <Head title="Control Room Settings" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Settings"
                     description="Configure signal rules, triage queues, sources, and maintenance windows."
                 />

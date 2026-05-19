@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Briefcase, Plus, Search, Users } from 'lucide-react';
@@ -94,7 +94,7 @@ export default function PositionsIndex({
             <Head title="Positions" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Positions"
                     description="Manage job positions, headcount budgets and organisational structure."
                     actions={

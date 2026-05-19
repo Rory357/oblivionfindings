@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +28,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
@@ -153,7 +153,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Custom Fields - HR Settings" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Custom Fields"
                     description="Define custom fields for employee profiles."
                 >
@@ -316,7 +316,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                             </form>
                         </DialogContent>
                     </Dialog>
-                </PageHeader>
+                </PageHero>
 
                 <Card>
                     <CardHeader>

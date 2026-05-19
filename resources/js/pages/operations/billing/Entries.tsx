@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, DollarSign, FileText, UserRound } from 'lucide-react';
@@ -79,7 +79,7 @@ export default function BillingEntriesPage({
     return (
         <AppLayout>
             <Head title="Billing Entries" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Billing Entries"
                 description="Review generated billing rows by client, service date, and status."
                 backHref="/operations/billing"

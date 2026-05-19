@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, Star, ThumbsUp, TrendingUp, Users } from 'lucide-react';
@@ -107,7 +107,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
             <Head title="Exit Interview Trends" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Exit Interview Trends"
                     description="Aggregate analysis of departure feedback."
                 >
@@ -119,7 +119,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                         <ArrowLeft className="mr-1.5 h-4 w-4" />
                         Back to List
                     </Button>
-                </PageHeader>
+                </PageHero>
 
                 {/* Date Filter */}
                 <form onSubmit={handleFilter} className="mb-4">

@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -482,7 +482,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
             <Head title={`${device.name} - Security & Devices`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={
                         <div className="flex flex-wrap items-center gap-3">
                             <span>{device.name}</span>

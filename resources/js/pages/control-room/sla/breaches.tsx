@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -159,7 +159,7 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
         >
             <Head title="SLA Breach Report - Control Room" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="SLA Breach Report"
                     description="View and analyse SLA breaches across all alert types."
                     actions={

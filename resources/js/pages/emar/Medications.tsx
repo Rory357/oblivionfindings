@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import DrugInteractionManager from '@/components/medications/DrugInteractionManager';
 import MedicationVersionHistory from '@/components/medications/MedicationVersionHistory';
 import { Badge } from '@/components/ui/badge';
@@ -1098,7 +1098,7 @@ export default function Medications({
         <AppLayout>
             <Head title="eMAR - Medications" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="Medications Database"
                     description="Central medication directory with search, filtering, and status tracking"
                     icon={<Pill className="h-7 w-7 text-white" />}

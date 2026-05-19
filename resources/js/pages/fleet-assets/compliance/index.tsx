@@ -1,5 +1,5 @@
 import { HalfMoonGauge, FLEET_COLORS } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -126,7 +126,7 @@ export default function ComplianceIndex({ vehicles, summary, filters }: Props) {
         >
             <Head title="Compliance & Registrations" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Compliance & Registrations"
                     description="Track vehicle registrations, WOF, and COF expiry dates."
                 />

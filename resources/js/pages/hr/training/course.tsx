@@ -214,16 +214,16 @@ export default function CourseDetail({ course, users, can }: Props) {
             <Head title={course.title} />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
+                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
                     <div className="relative flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-start gap-4">
                             <Link href="/hr/training/catalog">
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="shrink-0 text-white/70 hover:bg-white/10 hover:text-white"
+                                    className="shrink-0 text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
                                 >
                                     <ArrowLeft className="h-5 w-5" />
                                 </Button>
@@ -233,16 +233,16 @@ export default function CourseDetail({ course, users, can }: Props) {
                                     <h1 className="text-2xl font-bold">
                                         {course.title}
                                     </h1>
-                                    <Badge className="border-0 bg-white/20 font-mono text-[10px] text-white">
+                                    <Badge className="border-0 bg-primary-foreground/20 font-mono text-[10px] text-primary-foreground">
                                         {course.code}
                                     </Badge>
                                     {course.is_mandatory && (
-                                        <Badge className="border-0 bg-status-critical text-[10px] text-white">
+                                        <Badge className="border-0 bg-status-critical text-[10px] text-primary-foreground">
                                             Mandatory
                                         </Badge>
                                     )}
                                 </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/70">
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-primary-foreground/70">
                                     <span className="flex items-center gap-1">
                                         <DmIcon className="h-3.5 w-3.5" />
                                         {
@@ -265,7 +265,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                     )}
                                 </div>
                                 {course.description && (
-                                    <p className="mt-2 line-clamp-2 max-w-2xl text-sm text-white/60">
+                                    <p className="mt-2 line-clamp-2 max-w-2xl text-sm text-primary-foreground/60">
                                         {course.description}
                                     </p>
                                 )}
@@ -277,16 +277,16 @@ export default function CourseDetail({ course, users, can }: Props) {
                                     <div className="text-3xl font-bold">
                                         {course.enrollments?.length ?? 0}
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Enrolled
                                     </div>
                                 </div>
-                                <div className="h-10 w-px bg-white/20" />
+                                <div className="h-10 w-px bg-primary-foreground/20" />
                                 <div className="text-center">
                                     <div className="text-3xl font-bold">
                                         {completedCount}
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Completed
                                     </div>
                                 </div>
@@ -294,7 +294,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                             {can.enroll && (
                                 <Button
                                     size="sm"
-                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-white/90"
+                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
                                     onClick={() => setEnrollOpen(true)}
                                 >
                                     <UserPlus className="h-4 w-4" />
@@ -462,7 +462,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                     >
                                         <div className="flex items-center gap-3">
                                             <div
-                                                className={`flex h-9 w-9 items-center justify-center rounded-full text-[10px] font-bold text-white ${avatarColor(e.user.id)}`}
+                                                className={`flex h-9 w-9 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground ${avatarColor(e.user.id)}`}
                                             >
                                                 {getInitials(e.user.name)}
                                             </div>

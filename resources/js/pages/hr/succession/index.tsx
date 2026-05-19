@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, Shield, Users } from 'lucide-react';
@@ -61,7 +61,7 @@ export default function SuccessionIndex({ plans, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Succession Planning" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Succession Planning"
                     description="Identify and develop talent for key roles."
                     actions={

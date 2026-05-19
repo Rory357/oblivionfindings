@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,7 +84,7 @@ export default function ChecklistRun({ templates, assets, can }: Props) {
             >
                 <Head title="Run Checklist" />
                 <PageShell>
-                    <FleetHero
+                    <PageHero
                         title="Run Checklist"
                         description="Complete a checklist inspection or maintenance run."
                         backHref="/fleet-assets/maintenance/checklists"
@@ -115,7 +115,7 @@ export default function ChecklistRun({ templates, assets, can }: Props) {
         >
             <Head title="Run Checklist" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Run Checklist"
                     description="Complete a checklist inspection or maintenance run."
                     backHref="/fleet-assets/maintenance/checklists"

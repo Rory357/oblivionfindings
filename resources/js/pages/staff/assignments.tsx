@@ -1,8 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PageHero } from '@/components/page';
 import { Head, useForm, usePage } from '@inertiajs/react';
 
 type Client = { id: number; first_name: string; last_name: string; status: string };
@@ -40,7 +40,7 @@ export default function StaffAssignments({ user, clients, assignedIds }: Props) 
             <Head title="Staff assignments" />
 
             <PageShell>
-                <PageHeader title={`Assign ${clientPlural}`} description={`Assign ${clientPlural.toLowerCase()} to ${user.name}.`} />
+                <PageHero variant="compact" title={`Assign ${clientPlural}`} description={`Assign ${clientPlural.toLowerCase()} to ${user.name}.`} />
 
                 <form
                     onSubmit={(e) => {

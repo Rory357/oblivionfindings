@@ -1,5 +1,5 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type { Resident } from '@/components/resident-tracking/types';
@@ -436,7 +436,7 @@ export default function ResidentTrackingHistory({
         >
             <Head title={`Location History — ${client?.name ?? ''}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Location History"
                     subtitle={client?.name ?? ''}
                     backHref="/fleet-assets/resident-tracking"

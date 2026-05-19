@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -65,7 +65,7 @@ export default function ConsentRequestsIndex({
             <Head title={`Consent requests — ${client.full_name}`} />
             <PageShell>
                 <div data-test="consent-requests-index">
-                    <PageHeader
+                    <PageHero variant="compact"
                         title="Consent requests"
                         description={`Family-portal consent workflow for ${client.full_name}`}
                         actions={

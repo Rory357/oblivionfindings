@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Calendar, CheckCircle2, Clock, Link2, Plus, RefreshCw, XCircle } from 'lucide-react';
@@ -60,7 +60,7 @@ export default function CalendarSyncIndex({ connections = { data: [], links: [],
     return (
         <AppLayout>
             <Head title="Calendar Sync" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Calendar Sync"
                 description="Manage calendar synchronisation connections."
                 backHref="/operations"

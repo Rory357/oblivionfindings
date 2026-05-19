@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -76,7 +76,7 @@ export default function RespiteIndex({ referrals, filters, stats }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title={`${label} Referrals`}
                     description="Referrals start the intake. Booking requests are reviewed and approved before creating bookings."
                     icon={<CalendarDays className="h-7 w-7 text-white" />}

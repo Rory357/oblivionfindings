@@ -1,7 +1,7 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Lock, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
@@ -116,7 +116,7 @@ export default function ExitInterviewShow({ interview, can }: Props) {
             />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={`Exit Interview: ${interview.employee_profile?.user?.name ?? 'Unknown'}`}
                     description={`Conducted on ${formatDate(interview.interview_date)}`}
                 />

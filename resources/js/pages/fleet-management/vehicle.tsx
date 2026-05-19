@@ -1,8 +1,8 @@
 import LeafletMap from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
@@ -61,7 +61,7 @@ export default function FleetVehicle({
         >
             <Head title={`Fleet • ${asset.name ?? 'Vehicle'}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={asset.name ?? 'Vehicle'}
                     description="Live status, signals, and recent trips."
                     actions={

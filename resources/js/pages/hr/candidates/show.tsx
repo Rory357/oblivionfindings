@@ -987,16 +987,16 @@ export default function CandidateShow({
                 )}
 
                 {/* Hero Header - Gradient Purple Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
                     {/* Decorative circles */}
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                             {/* Avatar */}
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white/20 bg-primary-foreground/20 text-2xl font-bold shadow-xl">
+                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-primary-foreground/20 bg-primary-foreground/20 text-2xl font-bold shadow-xl">
                                 {initials}
                             </div>
                             <div className="min-w-0">
@@ -1004,15 +1004,15 @@ export default function CandidateShow({
                                     {fullName}
                                 </h1>
                                 {candidate.preferred_name && (
-                                    <p className="mt-0.5 text-sm text-white/70">
+                                    <p className="mt-0.5 text-sm text-primary-foreground/70">
                                         Goes by &ldquo;
                                         {candidate.preferred_name}&rdquo;
                                     </p>
                                 )}
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/80">
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-primary-foreground/80">
                                     <a
                                         href={`mailto:${candidate.personal_email}`}
-                                        className="flex items-center gap-1.5 transition-colors hover:text-white"
+                                        className="flex items-center gap-1.5 transition-colors hover:text-primary-foreground"
                                     >
                                         <Mail className="h-3.5 w-3.5" />
                                         {candidate.personal_email}
@@ -1020,7 +1020,7 @@ export default function CandidateShow({
                                     {candidate.personal_phone && (
                                         <a
                                             href={`tel:${candidate.personal_phone}`}
-                                            className="flex items-center gap-1.5 transition-colors hover:text-white"
+                                            className="flex items-center gap-1.5 transition-colors hover:text-primary-foreground"
                                         >
                                             <Phone className="h-3.5 w-3.5" />
                                             {candidate.personal_phone}
@@ -1028,14 +1028,14 @@ export default function CandidateShow({
                                     )}
                                 </div>
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <Badge className="border-white/20 bg-white/10 text-white/90 capitalize">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90 capitalize">
                                         {currentStatus.replace(/_/g, ' ')}
                                     </Badge>
-                                    <Badge className="border-white/20 bg-white/10 text-white/90 capitalize">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90 capitalize">
                                         {candidate.source.replace(/_/g, ' ')}
                                     </Badge>
                                     {candidate.source_detail && (
-                                        <Badge className="border-white/20 bg-white/10 text-white/90">
+                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                             {candidate.source_detail}
                                         </Badge>
                                     )}
@@ -1051,7 +1051,7 @@ export default function CandidateShow({
                                     <div className="flex items-center gap-2">
                                         <Button
                                             size="sm"
-                                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                             variant="outline"
                                             onClick={() =>
                                                 advanceStage(
@@ -1065,7 +1065,7 @@ export default function CandidateShow({
                                         </Button>
                                         <Button
                                             size="sm"
-                                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                             variant="outline"
                                             onClick={() =>
                                                 rejectApplication(
@@ -1092,7 +1092,7 @@ export default function CandidateShow({
                                                     86400000,
                                             )}
                                     </p>
-                                    <p className="text-xs text-white/70">
+                                    <p className="text-xs text-primary-foreground/70">
                                         Days in Pipeline
                                     </p>
                                 </div>
@@ -1100,7 +1100,7 @@ export default function CandidateShow({
                                     <p className="text-2xl font-bold">
                                         {candidate.applications.length}
                                     </p>
-                                    <p className="text-xs text-white/70">
+                                    <p className="text-xs text-primary-foreground/70">
                                         Applications
                                     </p>
                                 </div>
@@ -1108,7 +1108,7 @@ export default function CandidateShow({
                                     <p className="text-2xl font-bold">
                                         {totalInterviews}
                                     </p>
-                                    <p className="text-xs text-white/70">
+                                    <p className="text-xs text-primary-foreground/70">
                                         Interviews
                                     </p>
                                 </div>

@@ -273,14 +273,14 @@ export default function DirectoryShow({
                 {/* ========== HERO BANNER ========== */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 shadow-lg">
                     {/* Decorative shapes */}
-                    <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/5" />
-                    <div className="absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-white/5" />
-                    <div className="absolute right-32 bottom-0 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute right-32 bottom-0 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative p-6 md:p-8">
                         <Link
                             href="/hr/directory"
-                            className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 transition-colors hover:text-white"
+                            className="mb-4 inline-flex items-center gap-1.5 text-sm text-primary-foreground/60 transition-colors hover:text-primary-foreground"
                         >
                             <ArrowLeft className="h-4 w-4" />
                             Back to Directory
@@ -288,7 +288,7 @@ export default function DirectoryShow({
 
                         <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
                             {/* Avatar */}
-                            <Avatar className="h-32 w-32 border-4 border-white/20 shadow-xl md:h-36 md:w-36">
+                            <Avatar className="h-32 w-32 border-4 border-primary-foreground/20 shadow-xl md:h-36 md:w-36">
                                 <AvatarImage
                                     src={
                                         employee.profile_photo_path
@@ -296,7 +296,7 @@ export default function DirectoryShow({
                                             : undefined
                                     }
                                 />
-                                <AvatarFallback className="bg-white/20 text-4xl font-bold text-white">
+                                <AvatarFallback className="bg-primary-foreground/20 text-4xl font-bold text-primary-foreground">
                                     {getInitials(employee.name)}
                                 </AvatarFallback>
                             </Avatar>
@@ -307,12 +307,12 @@ export default function DirectoryShow({
                                     {employee.name}
                                 </h1>
                                 {employee.full_name !== employee.name && (
-                                    <p className="text-sm text-white/60">
+                                    <p className="text-sm text-primary-foreground/60">
                                         ({employee.full_name})
                                     </p>
                                 )}
                                 {employee.position_title && (
-                                    <p className="mt-1 text-lg text-white/80">
+                                    <p className="mt-1 text-lg text-primary-foreground/80">
                                         {employee.position_title}
                                     </p>
                                 )}
@@ -320,17 +320,17 @@ export default function DirectoryShow({
                                 {/* Badges */}
                                 <div className="mt-3 flex flex-wrap justify-center gap-2 md:justify-start">
                                     {employee.department && (
-                                        <Badge className="border-white/20 bg-white/15 text-xs text-white hover:bg-white/25">
+                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/15 text-xs text-primary-foreground hover:bg-primary-foreground/25">
                                             {employee.department}
                                         </Badge>
                                     )}
                                     {employee.team && (
-                                        <Badge className="border-white/15 bg-white/10 text-xs text-white/80">
+                                        <Badge className="border-primary-foreground/15 bg-primary-foreground/10 text-xs text-primary-foreground/80">
                                             {employee.team}
                                         </Badge>
                                     )}
                                     {employee.site && (
-                                        <Badge className="gap-1 border-white/15 bg-white/10 text-xs text-white/80">
+                                        <Badge className="gap-1 border-primary-foreground/15 bg-primary-foreground/10 text-xs text-primary-foreground/80">
                                             <MapPin className="h-3 w-3" />
                                             {employee.site}
                                         </Badge>
@@ -351,7 +351,7 @@ export default function DirectoryShow({
 
                                 {/* Tenure */}
                                 {tenure && (
-                                    <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-white/50 md:justify-start">
+                                    <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/50 md:justify-start">
                                         <Clock className="h-3.5 w-3.5" />
                                         {tenure.years > 0
                                             ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''} ${tenure.months} month${tenure.months !== 1 ? 's' : ''}`
@@ -368,7 +368,7 @@ export default function DirectoryShow({
                                                 setKudosDialogOpen(true)
                                             }
                                             size="sm"
-                                            className="gap-2 rounded-full bg-white font-semibold text-primary shadow-md hover:bg-white/90"
+                                            className="gap-2 rounded-full bg-white font-semibold text-primary shadow-md hover:bg-primary-foreground/90"
                                         >
                                             <Sparkles className="h-4 w-4" />
                                             Send Kudos
@@ -379,7 +379,7 @@ export default function DirectoryShow({
                                             asChild
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                                            className="gap-1.5 rounded-full border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
                                             <a
                                                 href={`mailto:${employee.email}`}
@@ -394,7 +394,7 @@ export default function DirectoryShow({
                                             asChild
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                                            className="gap-1.5 rounded-full border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
                                             <a href={`tel:${employee.phone}`}>
                                                 <Phone className="h-3.5 w-3.5" />{' '}
@@ -408,7 +408,7 @@ export default function DirectoryShow({
                                             disabled={messageSending}
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                                            className="gap-1.5 rounded-full border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
                                             {messageSending ? (
                                                 <Loader2 className="h-3.5 w-3.5" />
@@ -423,33 +423,33 @@ export default function DirectoryShow({
 
                             {/* Right side stats (desktop) */}
                             <div className="hidden items-center gap-4 lg:flex">
-                                <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
-                                    <Clock className="mb-1 h-5 w-5 text-white/70" />
-                                    <span className="text-2xl font-bold text-white">
+                                <div className="flex flex-col items-center rounded-xl bg-primary-foreground/10 px-5 py-3 backdrop-blur-sm">
+                                    <Clock className="mb-1 h-5 w-5 text-primary-foreground/70" />
+                                    <span className="text-2xl font-bold text-primary-foreground">
                                         {tenure
                                             ? `${tenure.years}.${tenure.months}`
                                             : '\u2014'}
                                     </span>
-                                    <span className="text-[10px] text-white/60">
+                                    <span className="text-[10px] text-primary-foreground/60">
                                         Years
                                     </span>
                                 </div>
-                                <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
+                                <div className="flex flex-col items-center rounded-xl bg-primary-foreground/10 px-5 py-3 backdrop-blur-sm">
                                     <Award className="mb-1 h-5 w-5 text-status-warning" />
-                                    <span className="text-2xl font-bold text-white">
+                                    <span className="text-2xl font-bold text-primary-foreground">
                                         {kudosCount}
                                     </span>
-                                    <span className="text-[10px] text-white/60">
+                                    <span className="text-[10px] text-primary-foreground/60">
                                         Kudos
                                     </span>
                                 </div>
                                 {complianceRate != null && (
-                                    <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
+                                    <div className="flex flex-col items-center rounded-xl bg-primary-foreground/10 px-5 py-3 backdrop-blur-sm">
                                         <Shield className="mb-1 h-5 w-5 text-status-success" />
-                                        <span className="text-2xl font-bold text-white">
+                                        <span className="text-2xl font-bold text-primary-foreground">
                                             {complianceRate}%
                                         </span>
-                                        <span className="text-[10px] text-white/60">
+                                        <span className="text-[10px] text-primary-foreground/60">
                                             Compliant
                                         </span>
                                     </div>
@@ -1205,7 +1205,7 @@ export default function DirectoryShow({
                             <Button
                                 onClick={sendKudos}
                                 disabled={!kudosMessage.trim() || kudosSending}
-                                className="gap-2 bg-gradient-to-r from-status-warning to-status-warning text-white hover:from-status-warning hover:to-status-warning"
+                                className="gap-2 bg-gradient-to-r from-status-warning to-status-warning text-primary-foreground hover:from-status-warning hover:to-status-warning"
                             >
                                 <Sparkles className="h-4 w-4" />
                                 {kudosSending ? 'Sending...' : 'Send Kudos'}

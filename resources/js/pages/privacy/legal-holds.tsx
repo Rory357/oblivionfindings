@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,7 +70,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Legal Holds"
                     description="Manage data preservation orders for litigation and investigations"
                     icon={<Scale className="h-7 w-7 text-white" />}

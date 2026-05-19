@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
@@ -67,7 +67,7 @@ export default function ClientFundShow({ fund }: Props) {
     return (
         <AppLayout>
             <Head title={fundName} />
-            <PageHeader title={fundName} description="Review fund balance and record transactions." backHref="/operations/client-funds" />
+            <PageHero variant="compact" title={fundName} description="Review fund balance and record transactions." backHref="/operations/client-funds" />
             <PageShell>
                 <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
                     <div className="space-y-4">

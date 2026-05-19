@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,7 @@ export default function BookingShow({ booking, can }: Props) {
         >
             <Head title={`Booking #${b.id ?? ''}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={`Booking #${b.id ?? ''}`}
                     backHref="/fleet-assets/bookings"
                     backLabel="Back to Bookings"

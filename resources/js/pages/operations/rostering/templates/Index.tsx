@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 
@@ -38,7 +38,7 @@ export default function TemplateIndex({ templates }: Props) {
         >
             <Head title="Roster Templates" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Roster Templates"
                     description="Reusable roster patterns for regular houses, teams, and shift structures."
                     actions={

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -111,7 +111,7 @@ export default function QuarterlyPlanShow({ item, can }: Props) {
     return (
         <AppLayout>
             <Head title={`FY${item.fiscal_year} Q${item.quarter} Roadmap Plan`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={`FY${item.fiscal_year} Q${item.quarter} Roadmap Plan`}
                 description={`Revision ${item.revision_no} ${statusLabel(item.status)} plan detail.`}
                 backHref="/roadmap/quarterly-plans"

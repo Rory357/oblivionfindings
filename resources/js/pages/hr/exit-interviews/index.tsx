@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BarChart3, Plus, Star } from 'lucide-react';
@@ -112,7 +112,7 @@ export default function ExitInterviewsIndex({
             <Head title="Exit Interviews" />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Exit Interviews"
                     description="Track departure feedback and identify retention insights."
                 >
@@ -132,7 +132,7 @@ export default function ExitInterviewsIndex({
                             </Link>
                         )}
                     </div>
-                </PageHeader>
+                </PageHero>
 
                 {/* Filters */}
                 <Card className="mb-4">

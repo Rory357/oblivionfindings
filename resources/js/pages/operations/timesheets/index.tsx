@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import TimesheetReturnBanner from '@/components/timesheet-return-banner';
@@ -213,7 +213,7 @@ export default function TimesheetsIndex({
             />
 
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={
                         isApprovalMode ? 'Timesheet Approvals' : timesheetPlural
                     }

@@ -1,6 +1,6 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 
@@ -23,7 +23,7 @@ export default function CustomFormSubmissions({ form, submissions }: Props) {
     return (
         <AppLayout>
             <Head title={`${form.name} submissions`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={`${form.name} submissions`}
                 description="Review recent submissions captured against this form."
                 backHref={`/operations/forms/${form.id}`}

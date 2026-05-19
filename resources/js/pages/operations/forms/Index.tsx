@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { CheckCircle2, ClipboardList, Eye, FileText, Hash, Pencil, Plus, Search } from 'lucide-react';
@@ -60,7 +60,7 @@ export default function FormsIndex({ forms, filters, stats }: Props) {
     return (
         <AppLayout>
             <Head title="Forms" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Forms"
                 description="Create and manage custom forms for data collection."
                 backHref="/operations"

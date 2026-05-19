@@ -5,7 +5,7 @@ import {
     MiniBarChart,
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -255,7 +255,7 @@ export default function SchedulesIndex({
             >
                 <Head title="Service Schedules" />
                 <PageShell>
-                    <FleetHero
+                    <PageHero
                         title="Service Schedules"
                         description="Manage recurring service and maintenance schedules for assets."
                         actions={
@@ -427,7 +427,7 @@ export default function SchedulesIndex({
         >
             <Head title="Service Schedules" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Service Schedules"
                     description="Manage recurring service and maintenance schedules for assets."
                     actions={

@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
@@ -264,7 +264,7 @@ export default function AuditLogs({
             <Head title="Audit Logs" />
             <SettingsLayout>
                 <div className="space-y-6">
-                    <PageHeader
+                    <PageHero variant="compact"
                         title="Audit Logs"
                         description="Track all changes made across the system"
                         actions={

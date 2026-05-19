@@ -1,4 +1,4 @@
-import PageShell from '@/components/page-shell';
+import { PageHero, PageLayout } from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-    ArrowLeft,
     BedDouble,
     GripVertical,
     History,
@@ -323,22 +322,24 @@ export default function FullBedroomManagement({
         >
             <Head title={`Bedrooms · ${site.name}`} />
 
-            <PageShell>
-                <BedroomsHero
-                    site={site}
-                    summary={summary}
-                    alerts={alerts}
-                    onAdd={() => setDialog({ mode: 'add', target: null })}
-                    canEdit={can_edit}
-                    onSeedDefaults={() =>
-                        router.post(
-                            `/sites/${site.id}/rooms/seed-defaults`,
-                            {},
-                            { preserveScroll: true, preserveState: true },
-                        )
-                    }
-                />
-
+            <PageLayout
+                hero={
+                    <BedroomsHero
+                        site={site}
+                        summary={summary}
+                        alerts={alerts}
+                        onAdd={() => setDialog({ mode: 'add', target: null })}
+                        canEdit={can_edit}
+                        onSeedDefaults={() =>
+                            router.post(
+                                `/sites/${site.id}/rooms/seed-defaults`,
+                                {},
+                                { preserveScroll: true, preserveState: true },
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Filter bar */}
                 <div className="flex flex-col gap-3 rounded-2xl border bg-card/40 p-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-1 items-center gap-2">
@@ -529,7 +530,7 @@ export default function FullBedroomManagement({
                         });
                     }}
                 />
-            </PageShell>
+            </PageLayout>
 
             <AddRoomDialog
                 siteId={site.id}
@@ -589,131 +590,78 @@ function BedroomsHero({
     canEdit: boolean;
     onSeedDefaults: () => void;
 }) {
+    const metaParts = [site.type?.replace('_', ' '), site.region].filter(
+        (s): s is string => typeof s === 'string' && s.length > 0,
+    );
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-            <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-            <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-            <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
-
-            <Link
-                href={`/sites/${site.id}`}
-                className="relative z-10 mb-4 inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1 text-xs font-medium text-primary-foreground/90 transition-colors hover:bg-primary-foreground/20 hover:text-primary-foreground"
-            >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Back to {site.name}
-            </Link>
-
-            <div className="relative flex flex-col gap-6 md:flex-row md:items-start">
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
-                    <BedDouble className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
-                </div>
-                <div className="flex-1">
-                    <p className="text-xs uppercase tracking-wide text-primary-foreground/60">
-                        <Link
-                            href={`/sites/${site.id}`}
-                            className="underline-offset-2 hover:underline"
-                        >
-                            {site.name}
-                        </Link>
-                        {site.type && <> · {site.type.replace('_', ' ')}</>}
-                        {site.region && <> · {site.region}</>}
-                    </p>
-                    <h1 className="mt-1 text-2xl font-bold md:text-3xl">
-                        Bedroom management
-                    </h1>
-                    <p className="mt-1 max-w-2xl text-sm text-primary-foreground/70">
-                        Track who lives where, attach the assets that belong in
-                        each room, surface safeguarding flags and print door
-                        cards for night shift.
-                    </p>
-
-                    {/* Alert chips */}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {alerts.empty_bedrooms > 0 && (
-                            <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
-                                <BedDouble className="mr-1 h-3 w-3" />
-                                {alerts.empty_bedrooms} empty bedroom
-                                {alerts.empty_bedrooms === 1 ? '' : 's'}
-                            </Badge>
-                        )}
-                        {alerts.safeguarding > 0 && (
-                            <Badge className="border-status-critical/40 bg-status-critical-bg/30 text-primary-foreground">
-                                <Shield className="mr-1 h-3 w-3" />
-                                {alerts.safeguarding} safeguarding flag
-                                {alerts.safeguarding === 1 ? '' : 's'}
-                            </Badge>
-                        )}
-                        {alerts.missing_key_worker > 0 && (
-                            <Badge className="border-status-warning/40 bg-status-warning-bg/30 text-primary-foreground">
-                                <UserCog className="mr-1 h-3 w-3" />
-                                {alerts.missing_key_worker} occupant
-                                {alerts.missing_key_worker === 1 ? '' : 's'} without a key worker
-                            </Badge>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-3 md:items-end">
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                        onClick={onAdd}
-                    >
+        <PageHero
+            icon={BedDouble}
+            backHref={`/sites/${site.id}`}
+            backLabel={`Back to ${site.name}`}
+            title="Bedroom management"
+            description="Track who lives where, attach the assets that belong in each room, surface safeguarding flags and print door cards for night shift."
+            meta={
+                metaParts.length > 0
+                    ? [{ label: `${site.name} · ${metaParts.join(' · ')}`, href: `/sites/${site.id}` }]
+                    : [{ label: site.name, href: `/sites/${site.id}` }]
+            }
+            badges={[
+                ...(alerts.empty_bedrooms > 0
+                    ? [
+                          {
+                              icon: BedDouble,
+                              label: `${alerts.empty_bedrooms} empty bedroom${alerts.empty_bedrooms === 1 ? '' : 's'}`,
+                              tone: 'default' as const,
+                          },
+                      ]
+                    : []),
+                ...(alerts.safeguarding > 0
+                    ? [
+                          {
+                              icon: Shield,
+                              label: `${alerts.safeguarding} safeguarding flag${alerts.safeguarding === 1 ? '' : 's'}`,
+                              tone: 'critical' as const,
+                          },
+                      ]
+                    : []),
+                ...(alerts.missing_key_worker > 0
+                    ? [
+                          {
+                              icon: UserCog,
+                              label: `${alerts.missing_key_worker} occupant${alerts.missing_key_worker === 1 ? '' : 's'} without a key worker`,
+                              tone: 'warning' as const,
+                          },
+                      ]
+                    : []),
+            ]}
+            stats={[
+                { label: 'Bedrooms', value: summary.bedrooms },
+                { label: 'Occupied', value: summary.occupied },
+                { label: 'Available', value: summary.available },
+                { label: 'Occupancy', value: `${summary.occupancy_percent}%` },
+                { label: 'Communal', value: summary.communal },
+                { label: 'Assets', value: summary.assets_linked },
+            ]}
+            actions={
+                <>
+                    <Button type="button" size="sm" variant="outline" onClick={onAdd}>
                         <Plus className="mr-1 h-4 w-4" />
                         Add room
                     </Button>
-                    {canEdit && summary.total < 3 && (
+                    {canEdit && summary.total < 3 ? (
                         <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                             onClick={onSeedDefaults}
                         >
                             <Sparkles className="mr-1 h-4 w-4" />
                             Add standard rooms
                         </Button>
-                    )}
-
-                    <div className="hidden gap-2 text-center md:flex md:flex-wrap md:justify-end">
-                        <HeroStat label="Bedrooms" value={summary.bedrooms} />
-                        <HeroStat label="Occupied" value={summary.occupied} />
-                        <HeroStat
-                            label="Available"
-                            value={summary.available}
-                        />
-                        <HeroStat
-                            label="Occupancy"
-                            value={`${summary.occupancy_percent}%`}
-                        />
-                        <HeroStat label="Communal" value={summary.communal} />
-                        <HeroStat
-                            label="Assets"
-                            value={summary.assets_linked}
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function HeroStat({
-    label,
-    value,
-}: {
-    label: string;
-    value: number | string;
-}) {
-    return (
-        <div className="min-w-[68px] rounded-xl bg-primary-foreground/10 px-3 py-2">
-            <p className="text-xl font-bold leading-none">{value}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wide text-primary-foreground/60">
-                {label}
-            </p>
-        </div>
+                    ) : null}
+                </>
+            }
+        />
     );
 }
 

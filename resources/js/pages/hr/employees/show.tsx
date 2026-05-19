@@ -306,14 +306,14 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 const AVATAR_COLORS = [
-    'bg-status-info text-white',
-    'bg-primary text-white',
-    'bg-status-success text-white',
-    'bg-status-warning text-white',
-    'bg-status-critical text-white',
-    'bg-status-info text-white',
-    'bg-status-critical text-white',
-    'bg-primary text-white',
+    'bg-status-info text-primary-foreground',
+    'bg-primary text-primary-foreground',
+    'bg-status-success text-primary-foreground',
+    'bg-status-warning text-primary-foreground',
+    'bg-status-critical text-primary-foreground',
+    'bg-status-info text-primary-foreground',
+    'bg-status-critical text-primary-foreground',
+    'bg-primary text-primary-foreground',
 ];
 
 function getInitials(name: string) {
@@ -573,14 +573,14 @@ export default function EmployeeShow({
                 {/* ============================================================ */}
                 {/*  HERO HEADER                                                  */}
                 {/* ============================================================ */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
 
                     <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
                         <div
-                            className={`flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white/20 text-2xl font-bold shadow-xl md:h-28 md:w-28 md:text-3xl ${getAvatarColor(p.id)}`}
+                            className={`flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-primary-foreground/20 text-2xl font-bold shadow-xl md:h-28 md:w-28 md:text-3xl ${getAvatarColor(p.id)}`}
                         >
                             {getInitials(p.user.name)}
                         </div>
@@ -591,11 +591,11 @@ export default function EmployeeShow({
                             </h1>
                             {p.preferred_name &&
                                 p.preferred_name !== p.user.name && (
-                                    <p className="text-sm text-white/70">
+                                    <p className="text-sm text-primary-foreground/70">
                                         Goes by {p.preferred_name}
                                     </p>
                                 )}
-                            <p className="mt-1 text-lg text-white/80">
+                            <p className="mt-1 text-lg text-primary-foreground/80">
                                 {p.position_title}
                             </p>
 
@@ -609,23 +609,23 @@ export default function EmployeeShow({
                                 >
                                     {p.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
-                                <Badge className="border-white/20 bg-white/10 text-white/90">
+                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                     {formatLabel(p.employment_type)}
                                 </Badge>
                                 {p.department && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                         <Briefcase className="mr-1 h-3 w-3" />
                                         {p.department}
                                     </Badge>
                                 )}
                                 {p.team && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                         <Users className="mr-1 h-3 w-3" />
                                         {p.team}
                                     </Badge>
                                 )}
                                 {p.primary_site && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
+                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                         <MapPin className="mr-1 h-3 w-3" />
                                         {p.primary_site.name}
                                     </Badge>
@@ -651,7 +651,7 @@ export default function EmployeeShow({
                             </div>
 
                             {tenure && (
-                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-white/60 md:justify-start">
+                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/60 md:justify-start">
                                     <Clock className="h-3.5 w-3.5" />
                                     {tenure.years > 0
                                         ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''}, `
@@ -669,7 +669,7 @@ export default function EmployeeShow({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                     >
                                         <Mail className="mr-1.5 h-3.5 w-3.5" />
                                         Email
@@ -680,7 +680,7 @@ export default function EmployeeShow({
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                         >
                                             <Pencil className="mr-1.5 h-3.5 w-3.5" />
                                             Edit
@@ -697,7 +697,7 @@ export default function EmployeeShow({
                                                 : `${tenure.months}m`
                                             : '\u2014'}
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/50">
                                         Tenure
                                     </p>
                                 </div>
@@ -705,7 +705,7 @@ export default function EmployeeShow({
                                     <p className="text-2xl font-bold">
                                         {complianceRate}%
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/50">
                                         Compliance
                                     </p>
                                 </div>
@@ -719,7 +719,7 @@ export default function EmployeeShow({
                                             .toFixed(0)}
                                         h
                                     </p>
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-xs text-primary-foreground/50">
                                         Leave Bal.
                                     </p>
                                 </div>

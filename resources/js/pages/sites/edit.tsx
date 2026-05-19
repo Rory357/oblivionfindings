@@ -8,6 +8,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { PageHero } from '@/components/page';
 import WizardStepper from '@/components/wizard-stepper';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
@@ -379,26 +380,24 @@ export default function EditSite() {
             <Head title={`Edit ${siteSingular}`} />
 
             <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-8 lg:max-w-5xl">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Edit {site.name}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Eight steps. Documents save instantly; everything
-                            else saves on submit.
-                        </p>
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={cancel}
-                        aria-label="Cancel and return to site"
-                        className="shrink-0"
-                    >
-                        Cancel
-                    </Button>
-                </div>
+                <PageHero
+                    variant="compact"
+                    backHref={`/sites/${site.id}`}
+                    backLabel={`Back to ${site.name}`}
+                    title={`Edit ${site.name}`}
+                    description="Eight steps. Documents save instantly; everything else saves on submit."
+                    actions={
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={cancel}
+                            aria-label="Cancel and return to site"
+                            className="shrink-0"
+                        >
+                            Cancel
+                        </Button>
+                    }
+                />
 
                 <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
                     <div className="min-w-0 space-y-6 lg:space-y-8">

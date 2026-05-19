@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 
@@ -194,7 +194,7 @@ export default function ShiftSeriesShow({
                 title={`Recurring series - ${series.client?.name ?? series.id}`}
             />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={series.client?.name ?? 'Recurring support series'}
                     description="Operational view of this recurring shift pattern, including open occurrences and active replacement workflows."
                     actions={

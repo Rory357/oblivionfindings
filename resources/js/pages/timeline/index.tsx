@@ -170,11 +170,11 @@ export default function TimelineIndex(props: Props) {
             <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
                 {/* Hero Header */}
                 {isClient && c && (
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
-                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
+                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
                         <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                            <Avatar className="h-20 w-20 shrink-0 border-4 border-white/20 shadow-xl md:h-24 md:w-24">
+                            <Avatar className="h-20 w-20 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-24 md:w-24">
                                 <AvatarImage
                                     src={
                                         c.avatar ??
@@ -183,7 +183,7 @@ export default function TimelineIndex(props: Props) {
                                     }
                                     alt={name}
                                 />
-                                <AvatarFallback className="bg-white/10 text-xl font-bold text-white md:text-2xl">
+                                <AvatarFallback className="bg-primary-foreground/10 text-xl font-bold text-primary-foreground md:text-2xl">
                                     {getInitials(name)}
                                 </AvatarFallback>
                             </Avatar>
@@ -193,12 +193,12 @@ export default function TimelineIndex(props: Props) {
                                 </h1>
                                 {c.preferred_name &&
                                     c.preferred_name !== name && (
-                                        <p className="mt-0.5 text-sm text-white/60">
+                                        <p className="mt-0.5 text-sm text-primary-foreground/60">
                                             Preferred: {c.preferred_name}
                                         </p>
                                     )}
                                 {c.nhi_number && (
-                                    <p className="mt-0.5 text-sm text-white/60">
+                                    <p className="mt-0.5 text-sm text-primary-foreground/60">
                                         NHI: {c.nhi_number}
                                     </p>
                                 )}
@@ -207,23 +207,23 @@ export default function TimelineIndex(props: Props) {
                                         className={
                                             c.status === 'active'
                                                 ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                : 'border-white/20 bg-white/10 text-white/90'
+                                                : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
                                         }
                                     >
                                         {c.status}
                                     </Badge>
                                     {c.funding_type && (
-                                        <Badge className="border-white/20 bg-white/10 text-white/90">
+                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                             {c.funding_type}
                                         </Badge>
                                     )}
                                     {c.service_context && (
-                                        <Badge className="border-white/20 bg-white/10 text-white/90">
+                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                             {c.service_context.name}
                                         </Badge>
                                     )}
                                     {c.site && (
-                                        <Badge className="border-white/20 bg-white/10 text-white/90">
+                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
                                             <Home className="mr-1 h-3 w-3" />
                                             {c.site.name}
                                         </Badge>
@@ -234,7 +234,7 @@ export default function TimelineIndex(props: Props) {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                     asChild
                                 >
                                     <Link href={`/operations/clients/${c.id}`}>

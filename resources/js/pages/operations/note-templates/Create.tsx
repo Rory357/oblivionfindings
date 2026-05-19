@@ -1,10 +1,10 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -39,7 +39,7 @@ export default function NoteTemplateCreate() {
     return (
         <AppLayout>
             <Head title="Create Note Template" />
-            <PageHeader title="Create Note Template" description="Design a reusable template for care notes." backHref="/operations/note-templates" />
+            <PageHero variant="compact" title="Create Note Template" description="Design a reusable template for care notes." backHref="/operations/note-templates" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

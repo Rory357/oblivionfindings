@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -235,7 +235,7 @@ export default function GlobalVendorsCredentials({
             <Head title="Vendors & Credentials" />
 
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="Vendors & Credentials"
                     description={`Service providers and access codes across every site — ${sites.length} ${sites.length === 1 ? 'site' : 'sites'} in view`}
                     icon={<Truck className="h-7 w-7 text-white" />}

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -379,7 +379,7 @@ export default function WellbeingIndex({
         >
             <Head title="HR Wellbeing" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Wellbeing & Engagement"
                     description="Workload risk indicators, survey sentiment, and action plans."
                 />

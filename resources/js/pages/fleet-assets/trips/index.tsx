@@ -5,7 +5,7 @@ import {
     SparklineChart,
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
@@ -275,7 +275,7 @@ export default function TripsIndex({
         >
             <Head title="Trip History" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Trip History"
                     description="View and analyse all vehicle trips across your fleet."
                     actions={

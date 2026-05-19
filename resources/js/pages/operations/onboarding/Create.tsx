@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -25,7 +25,7 @@ export default function OnboardingCreate({ clients }: Props) {
     return (
         <AppLayout>
             <Head title="Create Onboarding Workflow" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Create Onboarding Workflow"
                 description="Start a new onboarding workflow for a client who is entering service."
                 backHref="/operations/onboarding"

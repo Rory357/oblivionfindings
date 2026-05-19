@@ -133,12 +133,12 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
             <Head title="Submit Feedback" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
+                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
                     <div className="relative flex items-center gap-4">
                         <div
-                            className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-white/30 text-lg font-bold shadow-md ${avatarColor(feedbackRequest.subject?.id ?? 0)}`}
+                            className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-primary-foreground/30 text-lg font-bold shadow-md ${avatarColor(feedbackRequest.subject?.id ?? 0)}`}
                         >
                             {getInitials(feedbackRequest.subject?.name ?? '?')}
                         </div>
@@ -146,16 +146,16 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                             <h1 className="text-xl font-bold">
                                 Provide Feedback
                             </h1>
-                            <p className="text-white/70">
+                            <p className="text-primary-foreground/70">
                                 for{' '}
-                                <strong className="text-white">
+                                <strong className="text-primary-foreground">
                                     {feedbackRequest.subject?.name ?? 'Unknown'}
                                 </strong>
                             </p>
                         </div>
                         <div className="flex items-center gap-4">
                             {feedbackRequest.due_date && (
-                                <div className="flex items-center gap-1.5 text-sm text-white/70">
+                                <div className="flex items-center gap-1.5 text-sm text-primary-foreground/70">
                                     <Calendar className="h-4 w-4" />
                                     Due {feedbackRequest.due_date}
                                 </div>
@@ -164,16 +164,16 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                                 <div className="text-2xl font-bold">
                                     {answeredCount}/{questionKeys.length}
                                 </div>
-                                <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                     Answered
                                 </div>
                             </div>
                         </div>
                     </div>
                     {/* Progress bar */}
-                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/20">
+                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-primary-foreground/20">
                         <div
-                            className="h-full rounded-full bg-white/80 transition-all duration-500"
+                            className="h-full rounded-full bg-primary-foreground/80 transition-all duration-500"
                             style={{
                                 width: `${(answeredCount / questionKeys.length) * 100}%`,
                             }}
@@ -252,7 +252,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                                             }
                                             placeholder="Share your observations... (optional)"
                                             rows={2}
-                                            className="bg-white/80 text-sm"
+                                            className="bg-primary-foreground/80 text-sm"
                                         />
                                     </div>
                                 </CardContent>

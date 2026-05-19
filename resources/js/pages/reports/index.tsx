@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ShieldAlert,
@@ -59,7 +59,7 @@ export default function ReportsIndex() {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
                     title="Reports"
                     description="Overview of key metrics and exportable reports across all modules"
                     icon={<BarChart3 className="h-7 w-7 text-white" />}

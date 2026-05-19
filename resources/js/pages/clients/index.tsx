@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -70,7 +70,8 @@ export default function ClientsIndex({ clients }) {
             <Head title={labels?.['client.plural'] ?? 'Clients'} />
 
             <PageShell>
-                <PageHeader
+                <PageHero
+                    category="ops" variant="compact"
                     title={labels?.['client.plural'] ?? 'Clients'}
                     description={
                         role === 'support_worker'

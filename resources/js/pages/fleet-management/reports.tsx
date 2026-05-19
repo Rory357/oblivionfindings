@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -90,7 +90,7 @@ export default function FleetReports({
         >
             <Head title="Fleet Reports" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Fleet Reports"
                     description="Vehicle usage, trips, and fuel statistics"
                     actions={

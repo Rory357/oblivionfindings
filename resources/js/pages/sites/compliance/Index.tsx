@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -365,7 +365,7 @@ export default function SiteComplianceIndex({
 
             <PageShell>
                 {/* Header */}
-                <PageHeader
+                <PageHero variant="compact"
                     title={`${site.name ?? 'Site'} \u2014 Compliance`}
                     description="Track certifications, compliance checks, and regulatory requirements"
                     backHref={`/sites/${site.id}`}

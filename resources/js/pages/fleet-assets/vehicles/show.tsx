@@ -1,7 +1,7 @@
 import { SparklineChart, ProgressRing, FLEET_COLORS } from '@/components/fleet-charts';
 import LeafletMap, { MapGeofence, MapMarker } from '@/components/leaflet-map';
 import FleetTimeline, { type TimelineEntry } from '@/components/fleet-timeline';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -248,7 +248,7 @@ export default function VehicleShow({
         >
             <Head title={`Vehicle: ${vehicle.name}`} />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title={
                         <div className="flex flex-wrap items-center gap-2">
                             <Car className="h-5 w-5" />

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { FileText, Hash, Pencil, Plus, Search, StickyNote } from 'lucide-react';
@@ -53,7 +53,7 @@ export default function NoteTemplatesIndex({ templates = { data: [], links: [], 
     return (
         <AppLayout>
             <Head title="Note Templates" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Note Templates"
                 description="Manage care note templates and custom fields."
                 backHref="/operations"

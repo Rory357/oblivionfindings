@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BookOpen, CalendarDays, Eye, Hash, Pencil, Plus, Search, Star } from 'lucide-react';
@@ -61,7 +61,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
     return (
         <AppLayout>
             <Head title="Price Books" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Price Books"
                 description="Manage pricing structures and rate schedules for services."
                 backHref="/operations"

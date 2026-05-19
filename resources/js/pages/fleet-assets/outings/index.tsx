@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,7 +112,7 @@ export default function OutingsIndex({ outings, filters, stats, chart_data, can 
         >
             <Head title="Community Outings" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Community Outings"
                     description="Plan and manage resident outings and community access trips."
                     actions={can.manage ? (

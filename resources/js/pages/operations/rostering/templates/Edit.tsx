@@ -1,5 +1,5 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import TemplateForm from './TemplateForm';
@@ -65,7 +65,7 @@ export default function EditTemplate({
         >
             <Head title={`Edit ${template.name}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={`Edit ${template.name}`}
                     description="Keep the roster template aligned with the live shift schema and supported-living workflow."
                     backHref={`/operations/rostering/templates/${template.id}`}

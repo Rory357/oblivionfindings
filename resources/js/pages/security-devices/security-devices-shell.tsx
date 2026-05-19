@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -8,6 +7,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowRight, CheckCircle2, Shield } from 'lucide-react';
@@ -50,7 +50,7 @@ export default function SecurityDevicesShell({ sectionKey }: Props) {
             <Head title={`${section.title} - Security & Devices`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={
                         <span className="flex items-center gap-3">
                             <span className="rounded-xl border bg-primary/5 p-2 text-primary">

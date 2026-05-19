@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -188,7 +188,7 @@ export default function NotificationSettings() {
         >
             <Head title="Notification Settings" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Notification Settings"
                     description="Configure which fleet events trigger notifications and how they are delivered."
                     backHref="/fleet-assets"

@@ -1,6 +1,6 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { Construction } from 'lucide-react';
@@ -13,7 +13,7 @@ export default function EmarPlaceholder({ feature }: Props) {
     return (
         <AppLayout>
             <Head title={`eMAR — ${feature}`} />
-            <PageHeader title={feature} description="This feature is part of the eMAR module." backHref="/emar" />
+            <PageHero variant="compact" title={feature} description="This feature is part of the eMAR module." backHref="/emar" />
             <PageShell>
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16">

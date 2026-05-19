@@ -1,5 +1,5 @@
 import { BarChart, DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -217,7 +217,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
         <AppLayout>
             <Head title="eMAR Dashboard" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="eMAR Dashboard"
                     description="Electronic Medication Administration — real-time overview"
                     icon={<Pill className="h-7 w-7 text-white" />}

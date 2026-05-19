@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
@@ -64,7 +64,7 @@ export default function SecuritySettings({
             <Head title="Security Settings" />
             <SettingsLayout>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <PageHeader
+                    <PageHero variant="compact"
                         title="Security Settings"
                         description="Configure password policies, session security, and two-factor authentication for your organisation"
                     />

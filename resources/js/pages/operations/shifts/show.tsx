@@ -10,7 +10,7 @@ import {
 } from '@/components/eligibility/eligibility-status-badge';
 import type { OverrideableWarning } from '@/components/eligibility/override-confirmation-dialog';
 import { OverrideConfirmationDialog } from '@/components/eligibility/override-confirmation-dialog';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import ShiftFormsCard from '@/components/operations/shift-forms-card';
 import ShiftMedicationCard from '@/components/operations/shift-medication-card';
 import PageShell from '@/components/page-shell';
@@ -714,7 +714,7 @@ export default function ShiftShow({
 
             <PageShell>
                 {/* Hero header */}
-                <FleetHero
+                <PageHero
                     title={name}
                     description={new Date(shift.starts_at).toLocaleDateString(
                         [],
@@ -838,7 +838,7 @@ export default function ShiftShow({
                             </span>
                         ) : null}
                     </div>
-                </FleetHero>
+                </PageHero>
 
                 <ClientSafetyRibbon safety={client_safety} />
 

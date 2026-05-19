@@ -1,7 +1,7 @@
 import SupportingEvidenceDialog, {
     type SupportingEvidenceAttachment,
 } from '@/components/medications/SupportingEvidenceDialog';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -504,7 +504,7 @@ export default function ControlledDrugs({
         <AppLayout>
             <Head title="eMAR - Controlled Drugs" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="Controlled Drug Register"
                     description="Controlled substance registers, balance tracking, and discrepancy management"
                     icon={<Shield className="h-7 w-7 text-white" />}

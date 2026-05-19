@@ -1,5 +1,4 @@
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -988,7 +988,7 @@ export default function CarePlanShow({
     return (
         <AppLayout>
             <Head title={plan.title ?? 'Care Plan'} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={plan.title ?? 'Care Plan'}
                 description={`${plan.client?.first_name ?? ''} ${plan.client?.last_name ?? ''} — Version ${plan.version ?? 1}`}
                 backHref="/operations/care-plans"

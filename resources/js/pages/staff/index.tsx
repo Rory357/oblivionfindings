@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useInitials } from '@/hooks/use-initials';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -87,7 +87,8 @@ export default function StaffIndex({ users, filters }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <FleetHero
+                <PageHero
+                    category="ops"
                     title="Staff"
                     description="Manage staff profiles, assignments, availability and access"
                     icon={<Users className="h-7 w-7 text-white" />}

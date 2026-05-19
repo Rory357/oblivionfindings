@@ -1,9 +1,9 @@
 import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { AlertTriangle, ArrowRight, DollarSign, FileText, PieChart, TrendingUp } from 'lucide-react';
@@ -47,7 +47,7 @@ export default function FundingIndex({ stats = {} as any, claims_by_status = {} 
     return (
         <AppLayout>
             <Head title="Funding" />
-            <PageHeader title="Funding Dashboard" description="Track budgets, utilisation, and claims across all service agreements." backHref="/operations" />
+            <PageHero variant="compact" title="Funding Dashboard" description="Track budgets, utilisation, and claims across all service agreements." backHref="/operations" />
             <PageShell>
                 {/* KPIs */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS, ProgressRing } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -103,7 +103,7 @@ export default function InspectionsIndex({ inspections, vehicles, filters, can }
         >
             <Head title="Vehicle Inspections" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Vehicle Inspections"
                     actions={can.manage ? (
                         <Button asChild>

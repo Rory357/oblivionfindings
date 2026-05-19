@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2 } from 'lucide-react';
@@ -143,7 +143,7 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
     return (
         <AppLayout>
             <Head title={`Edit: ${care_plan?.title ?? 'Care Plan'}`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={`Edit: ${care_plan?.title ?? 'Care Plan'}`}
                 backHref={`/operations/care-plans/${care_plan?.id}`}
             />

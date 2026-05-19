@@ -1,5 +1,4 @@
 import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -212,7 +212,7 @@ export default function EmarReports({
     return (
         <AppLayout>
             <Head title="eMAR Reports" />
-            <PageHeader title="eMAR Reports" description="Comprehensive medication administration reporting and analytics." />
+            <PageHero variant="compact" title="eMAR Reports" description="Comprehensive medication administration reporting and analytics." />
             <PageShell>
                 {/* ── Filters ────────────────────────────────────── */}
                 <Card className="mb-6">

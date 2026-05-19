@@ -1,5 +1,4 @@
 import LeafletMap from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { PageHero } from '@/components/page';
 import { ArrowLeft, CheckCircle, Clock, MapPin, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -119,7 +119,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
         >
             <Head title={`Trip #${trip.id}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={
                         <div className="flex items-center gap-3">
                             <span>Trip #{trip.id}</span>

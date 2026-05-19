@@ -196,16 +196,16 @@ export default function TrainingCatalog({
 
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-white/5" />
-                    <div className="absolute -top-4 left-1/3 h-28 w-28 rounded-full bg-white/5" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
+                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                    <div className="absolute -top-4 left-1/3 h-28 w-28 rounded-full bg-primary-foreground/5" />
                     <div className="relative flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 className="text-2xl font-bold">
                                 Course Catalog
                             </h1>
-                            <p className="mt-1 text-white/70">
+                            <p className="mt-1 text-primary-foreground/70">
                                 Browse and manage training courses for your
                                 organisation
                             </p>
@@ -216,16 +216,16 @@ export default function TrainingCatalog({
                                     <div className="text-3xl font-bold">
                                         {summary.total_courses}
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Courses
                                     </div>
                                 </div>
-                                <div className="h-10 w-px bg-white/20" />
+                                <div className="h-10 w-px bg-primary-foreground/20" />
                                 <div className="text-center">
                                     <div className="text-3xl font-bold">
                                         {summary.completion_rate}%
                                     </div>
-                                    <div className="text-[10px] tracking-wider text-white/60 uppercase">
+                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
                                         Completion
                                     </div>
                                 </div>
@@ -234,7 +234,7 @@ export default function TrainingCatalog({
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    className="gap-1.5 border-white/20 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25"
+                                    className="gap-1.5 border-primary-foreground/20 bg-primary-foreground/15 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/25"
                                     asChild
                                 >
                                     <Link href="/hr/compliance/training">
@@ -245,7 +245,7 @@ export default function TrainingCatalog({
                                 {can.manage && (
                                     <Button
                                         size="sm"
-                                        className="gap-1.5 bg-white text-primary shadow-md hover:bg-white/90"
+                                        className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
                                         onClick={() => {
                                             setForm(emptyForm);
                                             setOpen(true);
@@ -343,7 +343,7 @@ export default function TrainingCatalog({
                 </div>
 
                 {/* Filters Toolbar */}
-                <Card className="flex flex-wrap items-center gap-2 bg-white/50 p-3 shadow-sm">
+                <Card className="flex flex-wrap items-center gap-2 bg-primary-foreground/50 p-3 shadow-sm">
                     <div className="relative min-w-[180px] flex-1">
                         <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                         <Input

@@ -1,6 +1,6 @@
 import { FLEET_COLORS, ProgressRing } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -196,7 +196,7 @@ export default function DevicesIndex({
         >
             <Head title="Tracking Devices" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Tracking Devices"
                     description="Manage GPS trackers and IoT devices paired to assets."
                     actions={

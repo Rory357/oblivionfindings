@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -247,7 +247,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
             >
                 <Head title="Plan Outing" />
                 <PageShell>
-                    <FleetHero
+                    <PageHero
                         title="Plan Community Outing"
                         description="Create a new outing for residents."
                         backHref="/fleet-assets/outings"
@@ -278,7 +278,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
         >
             <Head title="Plan Outing" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Plan Community Outing"
                     description="Create a new outing for residents."
                     backHref="/fleet-assets/outings"

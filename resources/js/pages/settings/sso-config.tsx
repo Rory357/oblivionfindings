@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +29,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
@@ -935,7 +935,7 @@ export default function SsoConfig({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="SSO Configuration" />
             <SettingsLayout>
-                <PageHeader
+                <PageHero variant="compact"
                     title="SSO Configuration"
                     description="Manage single sign-on providers, user provisioning, and group mappings for your organisation."
                 />

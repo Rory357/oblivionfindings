@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -62,7 +62,7 @@ export default function FamilyPortalEdit({ client }: Props) {
     return (
         <AppLayout>
             <Head title={`Edit Portal - ${client.first_name} ${client.last_name}`} />
-            <PageHeader
+            <PageHero variant="compact"
                 title={`Edit Portal Settings`}
                 description={`${client.first_name} ${client.last_name} — configure what families can see and receive.`}
                 backHref={`/operations/family-portal/${client.id}`}

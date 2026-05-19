@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +26,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { PageHero } from '@/components/page';
 import {
     Megaphone,
     Send,
@@ -240,7 +240,7 @@ export default function ControlRoomBroadcast({
         >
             <Head title="Broadcast Messages" />
             <PageShell>
-                <PageHeader title="Broadcast Messages" description="Send urgent messages to staff across multiple channels." />
+                <PageHero variant="compact" title="Broadcast Messages" description="Send urgent messages to staff across multiple channels." />
 
                 {/* Compose Section */}
                 {can.manage && (

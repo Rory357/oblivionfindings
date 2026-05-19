@@ -1,6 +1,6 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import type { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import ResidentMap from '@/components/resident-tracking/resident-map';
@@ -237,7 +237,7 @@ export default function ResidentTrackingIndex({
         >
             <Head title="Resident Tracking" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Resident Tracking"
                     subtitle="Safety command center — monitor tracked residents in real-time"
                     stats={heroStats}

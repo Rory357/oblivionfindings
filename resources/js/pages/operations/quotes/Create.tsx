@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -106,7 +106,7 @@ export default function QuoteCreate({ clients, price_book_items }: Props) {
     return (
         <AppLayout>
             <Head title="Create Quote" />
-            <PageHeader title="Create Quote" description="Create a new quote for a client or prospect." backHref="/operations/quotes" />
+            <PageHero variant="compact" title="Create Quote" description="Create a new quote for a client or prospect." backHref="/operations/quotes" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     {/* Client Details */}

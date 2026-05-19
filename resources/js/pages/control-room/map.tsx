@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import 'leaflet/dist/leaflet.css';
@@ -499,7 +499,7 @@ export default function ControlRoomMap({
             <style dangerouslySetInnerHTML={{ __html: pulseStyle }} />
 
             <div className="w-full space-y-4 p-4">
-                <PageHeader
+                <PageHero variant="compact"
                     title="Live Map"
                     description="Real-time positions of tracked vehicles and residents."
                     backHref="/control-room"

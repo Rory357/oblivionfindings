@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -444,7 +444,7 @@ export default function Prescriptions({ orders, pendingCountersigns, covertAutho
         <AppLayout>
             <Head title="eMAR - Prescriptions" />
             <div className="flex flex-col gap-6 p-6">
-                <FleetHero
+                <PageHero
                     title="Prescriptions & Orders"
                     description="Prescriber orders, verbal/telephone orders, countersignatures, and covert administration authorisations"
                     icon={<FileText className="h-7 w-7 text-white" />}

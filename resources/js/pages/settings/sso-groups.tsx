@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +28,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
@@ -115,7 +115,7 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="SSO Group Mapping" />
             <SettingsLayout>
-                <PageHeader title="SSO Group Mapping" />
+                <PageHero variant="compact" title="SSO Group Mapping" />
 
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-4">

@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,7 +79,7 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
         >
             <Head title="Community Access Analytics" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Community Access Analytics"
                     description="Track resident community participation, outings, and transport usage for MSD/MOH compliance."
                     backHref="/fleet-assets/reports"

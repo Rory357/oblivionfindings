@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { CandidateCard } from '@/components/recruitment/candidate-card';
 import {
@@ -8,6 +7,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { LayoutGrid, List, Plus, Search } from 'lucide-react';
@@ -63,7 +63,7 @@ export default function RecruitmentKanban({ columns, stages, can }: Props) {
         >
             <Head title="Recruitment Kanban" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Recruitment Pipeline"
                     description={`Kanban view - ${totalCandidates} candidates across ${stages.length} stages`}
                     actions={

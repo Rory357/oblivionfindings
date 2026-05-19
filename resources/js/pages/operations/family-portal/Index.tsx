@@ -1,9 +1,9 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Bell, Eye, Home, Mail, MessageSquare, Pencil, Search, Smartphone, Users } from 'lucide-react';
@@ -52,7 +52,7 @@ export default function FamilyPortalIndex({ clients = { data: [], links: [], cur
     return (
         <AppLayout>
             <Head title="Family Portal" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Family Portal"
                 description="Manage client portal access and notification settings for families."
                 backHref="/operations"

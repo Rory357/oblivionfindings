@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -105,7 +105,7 @@ export default function AssetCreate({ categories, sites, clients, prefill }: Pro
         >
             <Head title="Create Asset" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Create Asset"
                     description="Add a new asset to the system."
                     backHref="/fleet-assets/assets"

@@ -1,10 +1,10 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
+import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -120,7 +120,7 @@ export default function StaffShow({
             <Head title={`${staffLabel}: ${user.name}`} />
 
             <PageShell>
-                <PageHeader title={user.name} description={user.email} />
+                <PageHero variant="compact" title={user.name} description={user.email} />
 
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">

@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Briefcase, Calendar, CheckCircle2, Star } from 'lucide-react';
@@ -154,7 +154,7 @@ export default function ScorecardForm({ interview, existing }: Props) {
         >
             <Head title={`Scorecard - ${fullName}`} />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Interview Scorecard"
                     description={`Evaluate ${fullName} for ${interview.application.position_title}`}
                 />

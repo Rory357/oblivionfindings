@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -196,7 +196,7 @@ export default function FleetReports({
         >
             <Head title="Fleet Reports" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Fleet & Asset Reports"
                     description="Analytics and reporting for fleet operations."
                     icon={<FileBarChart className="h-7 w-7" />}

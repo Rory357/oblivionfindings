@@ -1,8 +1,8 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -111,7 +111,7 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
     return (
         <AppLayout>
             <Head title="Timesheet Approvals" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Approval Queue"
                 description="Review submitted timesheets without being redirected out of the approvals workflow."
                 backHref="/operations/timesheets"

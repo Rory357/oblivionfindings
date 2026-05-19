@@ -1,4 +1,3 @@
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import {
     SelectItem,
     SelectTrigger,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -774,7 +774,7 @@ export default function EscalationQueue({
         >
             <Head title="Escalation Queue - Control Room" />
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Escalation Queue"
                     description="Kanban-style triage queue management with SLA tracking and escalation workflows."
                 />

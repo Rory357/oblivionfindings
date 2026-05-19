@@ -1,4 +1,4 @@
-import FleetHero from '@/components/fleet-hero';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -254,7 +254,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
         >
             <Head title="Create Booking" />
             <PageShell>
-                <FleetHero
+                <PageHero
                     title="Create Booking"
                     description="Request a vehicle booking."
                     backHref="/fleet-assets/bookings"

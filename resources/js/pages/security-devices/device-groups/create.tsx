@@ -1,10 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
@@ -39,7 +39,7 @@ export default function DeviceGroupForm({ group, isEdit = false }: Props) {
             <Head title={`${isEdit ? 'Edit' : 'Create'} Group - Security & Devices`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title={isEdit ? `Edit: ${group?.name}` : 'Create Device Group'}
                     backHref="/security-devices/device-groups"
                     backLabel="Device Groups"

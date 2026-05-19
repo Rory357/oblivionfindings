@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRightLeft, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
@@ -73,7 +73,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
     return (
         <AppLayout>
             <Head title="Quotes" />
-            <PageHeader
+            <PageHero variant="compact"
                 title="Quotes"
                 description="Create and manage service quotes for clients."
                 backHref="/operations"

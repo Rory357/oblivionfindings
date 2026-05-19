@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -33,6 +32,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero } from '@/components/page';
 import {
     ArrowRight,
     Ban,
@@ -401,7 +401,7 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
             <Head title={`${site.name} - Hardware`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Hardware at this location"
                     description="Read-only view of devices at this site, with room placement. Device management lives in Security & Devices."
                     actions={

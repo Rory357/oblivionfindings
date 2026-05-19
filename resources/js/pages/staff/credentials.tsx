@@ -1,11 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
-import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import { PageHero } from '@/components/page';
 type Credential = {
     id: number;
     type: string;
@@ -43,7 +43,7 @@ export default function StaffCredentials({ user, credentials, canManage }: Props
             <Head title={`Credentials: ${user.name}`} />
 
             <PageShell>
-                <PageHeader
+                <PageHero variant="compact"
                     title="Credentials"
                     description={`${user.name} • ${user.email}`}
                 />
