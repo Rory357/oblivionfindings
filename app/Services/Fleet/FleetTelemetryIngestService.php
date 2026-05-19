@@ -152,7 +152,7 @@ class FleetTelemetryIngestService
                 }
 
                 foreach (['charging_status', 'battery_voltage_mv', 'power_event', 'external_power'] as $key) {
-                    if (array_key_exists($key, $raw)) {
+                    if (array_key_exists($key, $raw) && $raw[$key] !== null) {
                         $meta[$key] = $raw[$key];
                     }
                 }

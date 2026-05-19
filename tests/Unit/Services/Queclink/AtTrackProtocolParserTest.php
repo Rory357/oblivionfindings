@@ -115,10 +115,11 @@ it('flags GTMAN (personal-tracker man-down) as a critical SOS event', function (
         ->and($frame->payload['sos_flag'])->toBeTrue();
 });
 
-it('extracts battery voltage, percentage and charging from a GL30 GTFRI trailing block', function () {
+it('extracts battery voltage and percentage from a GL30 GTFRI health tail', function () {
     // Real frame captured from a live GL30MEU pendant (IMEI redacted).
-    // Trailing fields after cell_id 0017E102 are: mask=24, sats=0,
-    // voltage=4191mV, battery=100%, charging=1 (not_charging).
+    // Trailing fields after cell_id 0017E102 include current mode, CSQ,
+    // voltage=4191mV, battery=100%, and movement/quality fields. GTFRI does
+    // not carry charge state; that arrives via GTBTC/GTSTC.
     $frame = $this->parser->parse(
         '+RESP:GTFRI,970204,867963069916998,,0,0,1,0,4.3,145,-105.0,'.
         '175.241197,-37.723363,20260518224343,0530,0001,A310,0017E102,'.
@@ -130,7 +131,38 @@ it('extracts battery voltage, percentage and charging from a GL30 GTFRI trailing
         ->and($frame->payload['event_type'])->toBe('location_report')
         ->and($frame->payload['battery'])->toBe(100.0)
         ->and($frame->payload['battery_voltage_mv'])->toBe(4191)
-        ->and($frame->payload['charging_status'])->toBe('not_charging');
+        ->and($frame->payload['charging_status'])->toBeNull();
+});
+
+it('normalizes GL30 battery-starts-charging events', function () {
+    $frame = $this->parser->parse(
+        '+RESP:GTBTC,970204,867963069916998,GL30MEU,4066,95,0530,0001,A310,0017E102,20,0,20260519022646,098F$'
+    );
+
+    expect($frame->isValid())->toBeTrue()
+        ->and($frame->commandWord)->toBe('GTBTC')
+        ->and($frame->payload['event_type'])->toBe('charging_started')
+        ->and($frame->payload['battery'])->toBe(95.0)
+        ->and($frame->payload['battery_voltage_mv'])->toBe(4066)
+        ->and($frame->payload['charging_status'])->toBe('charging')
+        ->and($frame->payload['external_power'])->toBeTrue()
+        ->and($frame->payload['send_time'])->toBe('2026-05-19T02:26:46Z');
+});
+
+it('normalizes GL30 battery-stops-charging events', function () {
+    $frame = $this->parser->parse(
+        '+RESP:GTSTC,970204,867963069916998,GL30MEU,0,4066,95,0530,0001,A310,0017E102,20,0,20260519022632,098E$'
+    );
+
+    expect($frame->isValid())->toBeTrue()
+        ->and($frame->commandWord)->toBe('GTSTC')
+        ->and($frame->payload['event_type'])->toBe('charging_stopped')
+        ->and($frame->payload['charge_event_state'])->toBe(0)
+        ->and($frame->payload['battery'])->toBe(95.0)
+        ->and($frame->payload['battery_voltage_mv'])->toBe(4066)
+        ->and($frame->payload['charging_status'])->toBe('stopped_charging')
+        ->and($frame->payload['external_power'])->toBeFalse()
+        ->and($frame->payload['send_time'])->toBe('2026-05-19T02:26:32Z');
 });
 
 it('does not invent battery values from a GTFRI frame with no voltage in the trail', function () {

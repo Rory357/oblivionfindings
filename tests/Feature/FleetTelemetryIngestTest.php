@@ -637,6 +637,47 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSame('Charging', $device->meta['battery_status_label']);
     }
 
+    public function test_gl30_location_health_report_does_not_clear_last_known_charging_state(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+
+        ['device' => $device] = $this->createConsentedPersonalTracker('QUE-HEALTH-CHARGE-FRI');
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-HEALTH-CHARGE-FRI',
+                'gps_time' => now()->subMinute()->toISOString(),
+                'event_type' => 'charging_started',
+                'battery' => 95,
+                'battery_voltage_mv' => 4066,
+                'external_power' => true,
+                'charging_status' => 'charging',
+                'command_word' => 'GTBTC',
+            ])
+            ->assertStatus(200);
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-HEALTH-CHARGE-FRI',
+                'gps_time' => now()->toISOString(),
+                'event_type' => 'location_report',
+                'battery' => 95,
+                'battery_voltage_mv' => 4067,
+                'charging_status' => null,
+                'command_word' => 'GTFRI',
+            ])
+            ->assertStatus(200);
+
+        $device->refresh();
+
+        $this->assertSame(95, $device->battery_level);
+        $this->assertSame(95, $device->meta['battery']);
+        $this->assertSame(4067, $device->meta['battery_voltage_mv']);
+        $this->assertSame('charging', $device->meta['charging_status']);
+        $this->assertTrue($device->meta['external_power']);
+        $this->assertSame('Charging', $device->meta['battery_status_label']);
+    }
+
     /**
      * @return array{client: Client, consent: ClientConsent, asset: Asset, tracker: AssetTracker, device: Device}
      */

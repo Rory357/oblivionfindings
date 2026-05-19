@@ -183,6 +183,10 @@ class AtTrackProtocolParser
             return $this->normaliseConfigurationReport($payload, $fields);
         }
 
+        if ($commandWord === 'GTBTC' || $commandWord === 'GTSTC') {
+            return $this->normaliseChargingReport($payload, $fields);
+        }
+
         // Generic Location Report layout — applies to GTFRI, GTTOW, GTSPD, GTSOS,
         // GTRTL, GTDOG, GTVGL, GTHBM, GTPNA, GTPFA, GTBPL, GTVGN, GTVGF, etc.
         // Field offsets (counted from 0 after the comma-split):
@@ -295,8 +299,10 @@ class AtTrackProtocolParser
         }
 
         // Walk the trailing fields after the position_append_mask to recover
-        // satellites, battery voltage (mV), battery percentage, and charging
-        // status. The exact bit layout differs across Queclink families, so
+        // satellites, battery voltage (mV), and battery percentage.
+        // Charge state is not present in GL30 location frames; it is reported
+        // by GTBTC/GTSTC, so do not infer it from CSQ/movement tail fields.
+        // The exact bit layout differs across Queclink families, so
         // we use an empirical scan against well-known value ranges. This is
         // safe because (a) the trailing block is bounded by send_time +
         // count_number at the end, and (b) battery percentage 0–100 and
@@ -308,8 +314,52 @@ class AtTrackProtocolParser
     }
 
     /**
-     * Extract battery percentage, voltage, satellites, and charging status
-     * from the trailing fields of a location-style frame.
+     * +RESP:GTBTC reports that the GL30 backup battery starts charging.
+     * +RESP:GTSTC reports that charging stopped or the battery is full.
+     *
+     * GTBTC:
+     *   <cmd>,<proto>,<imei>,<name>,<voltage>,<battery>,<mcc>,<mnc>,<lac>,<cell>,<rssi>,<ber>,<send>,<count>
+     * GTSTC:
+     *   <cmd>,<proto>,<imei>,<name>,<event_state>,<voltage>,<battery>,<mcc>,<mnc>,<lac>,<cell>,<rssi>,<ber>,<send>,<count>
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $fields
+     * @return array<string, mixed>
+     */
+    protected function normaliseChargingReport(array $payload, array $fields): array
+    {
+        $isStarted = ($payload['command_word'] ?? null) === 'GTBTC';
+        $offset = $isStarted ? 0 : 1;
+
+        $payload['event_type'] = $isStarted ? 'charging_started' : 'charging_stopped';
+        $payload['battery_voltage_mv'] = $this->intOrNull($fields[4 + $offset] ?? null);
+        $payload['battery'] = $this->numOrNull($fields[5 + $offset] ?? null);
+        $payload['mcc'] = $fields[6 + $offset] ?? null;
+        $payload['mnc'] = $fields[7 + $offset] ?? null;
+        $payload['lac'] = $fields[8 + $offset] ?? null;
+        $payload['cell_id'] = $fields[9 + $offset] ?? null;
+        $payload['csq_rssi'] = $this->intOrNull($fields[10 + $offset] ?? null);
+        $payload['csq_ber'] = $this->intOrNull($fields[11 + $offset] ?? null);
+        $payload['send_time'] = $this->parseTimestamp($fields[12 + $offset] ?? null);
+
+        if ($isStarted) {
+            $payload['charging_status'] = 'charging';
+            $payload['external_power'] = true;
+
+            return $payload;
+        }
+
+        $eventState = $this->intOrNull($fields[4] ?? null);
+        $payload['charge_event_state'] = $eventState;
+        $payload['charging_status'] = $eventState === 1 ? 'charge_full' : 'stopped_charging';
+        $payload['external_power'] = false;
+
+        return $payload;
+    }
+
+    /**
+     * Extract battery percentage, voltage, and related health fields from
+     * the trailing fields of a location-style frame.
      *
      * @param  array<string, mixed>  $payload
      * @param  array<int, string>  $fields
@@ -368,18 +418,10 @@ class AtTrackProtocolParser
             }
         }
 
-        // Charging status: field after battery percentage.
-        $chargingRaw = $fields[$voltageIdx + 2] ?? null;
-        if ($chargingRaw !== null && $chargingRaw !== '' && is_numeric($chargingRaw)) {
-            $num = (float) $chargingRaw;
-            if ((int) $num == $num && $num >= 0 && $num <= 3) {
-                $payload['charging_status'] = match ((int) $num) {
-                    2 => 'charging',
-                    1 => 'not_charging',
-                    3 => 'stopped_charging',
-                    default => null,
-                };
-            }
+        $payload['csq_ber'] = $this->intOrNull($fields[$voltageIdx + 2] ?? null);
+        $movement = $this->intOrNull($fields[$voltageIdx + 3] ?? null);
+        if ($movement !== null) {
+            $payload['movement_status'] = $movement === 1 ? 'motion' : 'rest';
         }
     }
 
@@ -431,6 +473,17 @@ class AtTrackProtocolParser
         }
 
         return is_numeric($value) ? (float) $value : null;
+    }
+
+    protected function intOrNull(?string $value): ?int
+    {
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return null;
+        }
+
+        $num = (float) $value;
+
+        return (int) $num == $num ? (int) $num : null;
     }
 
     protected function parseTimestamp(?string $value): ?string
