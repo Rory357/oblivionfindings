@@ -11,6 +11,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\Queclink\QueclinkAuditEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
@@ -297,6 +298,126 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertMatchesRegularExpression('/^AT\+GTRTO=gl30,2,,,,,,[0-9A-F]{4}\$$/', $cmd->raw_command);
     }
 
+    public function test_per_section_read_queues_only_that_gl30_section()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/server/read")
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTRTO', $cmd->command_word);
+        $this->assertMatchesRegularExpression('/^AT\+GTRTO=gl30,2,SRI,,,,,[0-9A-F]{4}\$$/', $cmd->raw_command);
+    }
+
+    public function test_generic_section_update_can_queue_watchdog_and_records_audit_event()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'tenant_id' => 1,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/server", [
+                'command' => 'dog',
+                'mode' => 1,
+                'reboot_interval' => 1,
+                'reboot_time' => '0130',
+                'report_before_reboot' => 1,
+                'unit' => 0,
+                'send_failure_timeout' => 60,
+            ])
+            ->assertRedirect();
+
+        $cmd = QueclinkPendingCommand::first();
+        $this->assertSame('GTDOG', $cmd->command_word);
+        $this->assertStringContainsString('AT+GTDOG=gl30,1,,1,0130,,1,,0,,,60,', $cmd->raw_command);
+        $this->assertDatabaseHas('queclink_audit_events', [
+            'queclink_device_id' => $device->id,
+            'event_type' => 'config_write',
+            'section' => 'server',
+            'raw_command' => $cmd->raw_command,
+        ]);
+    }
+
+    public function test_command_queue_cancel_and_retry_are_audited()
+    {
+        $device = QueclinkDevice::create([
+            'imei' => '867963069916998',
+            'tenant_id' => 1,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]);
+        $command = QueclinkPendingCommand::create([
+            'queclink_device_id' => $device->id,
+            'imei' => $device->imei,
+            'tenant_id' => 1,
+            'command_word' => 'GTRTO',
+            'raw_command' => 'AT+GTRTO=gl30,1,,,,,,0001$',
+            'serial_number' => '0001',
+            'status' => QueclinkPendingCommand::STATUS_QUEUED,
+            'created_by_user_id' => $this->admin->id,
+            'expires_at' => now()->addMinute(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/commands/{$command->id}/cancel")
+            ->assertRedirect();
+
+        $this->assertSame(QueclinkPendingCommand::STATUS_CANCELLED, $command->fresh()->status);
+        $this->assertNotNull($command->fresh()->cancelled_at);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/commands/{$command->id}/retry")
+            ->assertRedirect();
+
+        $this->assertSame(2, QueclinkPendingCommand::query()->count());
+        $retry = QueclinkPendingCommand::query()->latest('id')->first();
+        $this->assertSame(QueclinkPendingCommand::STATUS_QUEUED, $retry->status);
+        $this->assertSame($command->raw_command, $retry->raw_command);
+        $this->assertDatabaseHas('queclink_audit_events', [
+            'queclink_device_id' => $device->id,
+            'event_type' => 'cancel',
+        ]);
+        $this->assertDatabaseHas('queclink_audit_events', [
+            'queclink_device_id' => $device->id,
+            'event_type' => 'retry',
+        ]);
+    }
+
+    public function test_bulk_action_queues_commands_for_selected_paired_devices_and_audits_each()
+    {
+        $devices = collect(range(1, 5))->map(fn (int $index) => QueclinkDevice::create([
+            'imei' => '86796306991699'.$index,
+            'tenant_id' => 1,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+        ]));
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/queclink/bulk', [
+                'device_ids' => $devices->pluck('id')->all(),
+                'action' => 'resident_safety_profile',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(5, QueclinkPendingCommand::query()->count());
+        $this->assertSame(5, QueclinkPendingCommand::query()
+            ->where('command_word', 'GTCFG')
+            ->where('status', QueclinkPendingCommand::STATUS_QUEUED)
+            ->count());
+        $this->assertSame(5, QueclinkAuditEvent::query()
+            ->where('event_type', 'bulk_apply')
+            ->count());
+    }
+
     public function test_update_server_registration_queues_gl30_sri_command()
     {
         $device = QueclinkDevice::create([
@@ -460,6 +581,36 @@ class QueclinkHubControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonStructure(['frames' => [['id', 'imei', 'direction', 'frame_type', 'raw_frame']]])
             ->assertJsonCount(1, 'frames');
+    }
+
+    public function test_frames_endpoint_filters_by_command_parse_status_and_search()
+    {
+        QueclinkRawFrame::create([
+            'imei' => '864696060004173',
+            'direction' => 'inbound',
+            'frame_type' => 'RESP',
+            'command_word' => 'GTHBD',
+            'raw_frame' => '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+            'parse_ok' => true,
+        ]);
+
+        QueclinkRawFrame::create([
+            'imei' => '867963069916998',
+            'direction' => 'inbound',
+            'frame_type' => 'RESP',
+            'command_word' => 'GTALM',
+            'raw_frame' => '+RESP:GTALM,bad-payload$',
+            'parse_ok' => false,
+            'parse_error' => 'bad payload',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->getJson('/security-devices/integrations/queclink/frames?command_word=GTALM&parse_status=error&search=bad');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'frames')
+            ->assertJsonPath('frames.0.command_word', 'GTALM')
+            ->assertJsonPath('frames.0.parse_ok', false);
     }
 
     public function test_provisioning_string_requires_hostname_setting()

@@ -127,12 +127,17 @@ type DeviceConfigurationSection = {
     values: string[];
 };
 
+type DeviceConfigurationSummary =
+    | Record<string, string>
+    | Record<string, string>[]
+    | null;
+
 type DeviceConfiguration = {
     available: boolean;
     received_at: string | null;
     raw: string;
     sections: Record<string, DeviceConfigurationSection>;
-    summary: {
+    summary: Record<string, DeviceConfigurationSummary> & {
         server: Record<string, string> | null;
         global: Record<string, string> | null;
     };
@@ -143,12 +148,14 @@ type RecentCommand = {
     command_word: string;
     raw_command: string;
     serial_number: string;
-    status: 'queued' | 'sent' | 'acked' | 'failed' | 'expired';
+    status: 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | 'cancelled';
     created_at: string | null;
     sent_at: string | null;
     acked_at: string | null;
+    cancelled_at?: string | null;
     expires_at: string | null;
     failed_reason: string | null;
+    ack_response?: string | null;
 };
 
 type Props = {
@@ -195,11 +202,42 @@ function mergeFrames(existing: Frame[], incoming: Frame[]): Frame[] {
     return [...byId.values()].sort((a, b) => a.id - b.id).slice(-500);
 }
 
-function framesUrl(imeiFilter: string): string {
+type FrameFilters = {
+    imei: string;
+    direction: 'all' | Direction;
+    commandWord: string;
+    parseStatus: 'all' | 'ok' | 'error';
+    search: string;
+};
+
+function framesUrl(filters: FrameFilters): string {
     const params = new URLSearchParams();
-    if (imeiFilter) params.set('imei', imeiFilter);
+    if (filters.imei) params.set('imei', filters.imei);
+    if (filters.direction !== 'all') params.set('direction', filters.direction);
+    if (filters.commandWord.trim()) {
+        params.set('command_word', filters.commandWord.trim().toUpperCase());
+    }
+    if (filters.parseStatus !== 'all') {
+        params.set('parse_status', filters.parseStatus);
+    }
+    if (filters.search.trim()) params.set('search', filters.search.trim());
 
     return `/security-devices/integrations/queclink/frames${params.toString() ? '?' + params.toString() : ''}`;
+}
+
+function frameStreamUrl(filters: FrameFilters): string {
+    const params = new URLSearchParams();
+    if (filters.imei) params.set('imei', filters.imei);
+    if (filters.direction !== 'all') params.set('direction', filters.direction);
+    if (filters.commandWord.trim()) {
+        params.set('command_word', filters.commandWord.trim().toUpperCase());
+    }
+    if (filters.parseStatus !== 'all') {
+        params.set('parse_status', filters.parseStatus);
+    }
+    if (filters.search.trim()) params.set('search', filters.search.trim());
+
+    return `/security-devices/integrations/queclink/stream${params.toString() ? '?' + params.toString() : ''}`;
 }
 
 function fmt(iso: string | null): string {
@@ -1138,6 +1176,14 @@ function ClaimDialog({
 // ── Devices tab ───────────────────────────────────────────────────
 
 function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [bulkOpen, setBulkOpen] = useState(false);
+    const allSelected =
+        paired.length > 0 && selectedIds.length === paired.length;
+    const selectedDevices = paired.filter((device) =>
+        selectedIds.includes(device.id),
+    );
+
     if (paired.length === 0) {
         return (
             <Card>
@@ -1153,85 +1199,275 @@ function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Paired devices</CardTitle>
-                <CardDescription>
-                    Devices actively reporting to Oblivion. Releasing a device
-                    returns it to the pending tray.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>IMEI</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Linked to</TableHead>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Last seen</TableHead>
-                            <TableHead>Connection</TableHead>
-                            <TableHead className="text-right">
-                                Actions
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {paired.map((d) => (
-                            <TableRow key={d.id}>
-                                <TableCell className="font-mono text-xs">
-                                    {d.imei}
-                                </TableCell>
-                                <TableCell className="text-xs capitalize">
-                                    {d.assignment?.type ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {d.assignment?.label ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                    {d.model_hint ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                    {fmtRel(d.last_seen_at)}
-                                </TableCell>
-                                <TableCell>
-                                    {d.connection_state === 'connected' ? (
-                                        <Badge className="bg-status-success-bg text-status-success">
-                                            online
-                                        </Badge>
-                                    ) : (
-                                        <Badge variant="outline">offline</Badge>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        disabled={!can.manage}
-                                        onClick={() => {
-                                            if (
-                                                confirm(
-                                                    `Release ${d.imei}? It will return to the pending tray and stop receiving commands.`,
-                                                )
-                                            ) {
-                                                router.post(
-                                                    `/security-devices/integrations/queclink/devices/${d.id}/release`,
-                                                    {},
-                                                    { preserveScroll: true },
-                                                );
-                                            }
-                                        }}
-                                    >
-                                        <Unlink className="mr-1 h-3 w-3" />
-                                        Release
-                                    </Button>
-                                </TableCell>
+        <>
+            <Card>
+                <CardHeader>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <CardTitle>Paired devices</CardTitle>
+                            <CardDescription>
+                                Devices actively reporting to Oblivion.
+                                Releasing a device returns it to the pending
+                                tray.
+                            </CardDescription>
+                        </div>
+                        <Button
+                            type="button"
+                            disabled={
+                                !can.manage || selectedDevices.length === 0
+                            }
+                            onClick={() => setBulkOpen(true)}
+                        >
+                            <Send className="mr-2 h-3 w-3" />
+                            Bulk apply ({selectedDevices.length})
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-10">
+                                    <input
+                                        aria-label="Select all paired devices"
+                                        type="checkbox"
+                                        checked={allSelected}
+                                        onChange={(event) =>
+                                            setSelectedIds(
+                                                event.target.checked
+                                                    ? paired.map(
+                                                          (device) => device.id,
+                                                      )
+                                                    : [],
+                                            )
+                                        }
+                                    />
+                                </TableHead>
+                                <TableHead>IMEI</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Linked to</TableHead>
+                                <TableHead>Model</TableHead>
+                                <TableHead>Last seen</TableHead>
+                                <TableHead>Connection</TableHead>
+                                <TableHead className="text-right">
+                                    Actions
+                                </TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                        </TableHeader>
+                        <TableBody>
+                            {paired.map((d) => (
+                                <TableRow key={d.id}>
+                                    <TableCell>
+                                        <input
+                                            aria-label={`Select ${d.imei}`}
+                                            type="checkbox"
+                                            checked={selectedIds.includes(d.id)}
+                                            onChange={(event) =>
+                                                setSelectedIds((current) =>
+                                                    event.target.checked
+                                                        ? [...current, d.id]
+                                                        : current.filter(
+                                                              (id) =>
+                                                                  id !== d.id,
+                                                          ),
+                                                )
+                                            }
+                                        />
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs">
+                                        {d.imei}
+                                    </TableCell>
+                                    <TableCell className="text-xs capitalize">
+                                        {d.assignment?.type ?? '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {d.assignment?.label ?? '—'}
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                        {d.model_hint ?? '—'}
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                        {fmtRel(d.last_seen_at)}
+                                    </TableCell>
+                                    <TableCell>
+                                        {d.connection_state === 'connected' ? (
+                                            <Badge className="bg-status-success-bg text-status-success">
+                                                online
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="outline">
+                                                offline
+                                            </Badge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            disabled={!can.manage}
+                                            onClick={() => {
+                                                if (
+                                                    confirm(
+                                                        `Release ${d.imei}? It will return to the pending tray and stop receiving commands.`,
+                                                    )
+                                                ) {
+                                                    router.post(
+                                                        `/security-devices/integrations/queclink/devices/${d.id}/release`,
+                                                        {},
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <Unlink className="mr-1 h-3 w-3" />
+                                            Release
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            {bulkOpen && (
+                <BulkActionDialog
+                    devices={selectedDevices}
+                    onClose={() => setBulkOpen(false)}
+                />
+            )}
+        </>
+    );
+}
+
+function BulkActionDialog({
+    devices,
+    onClose,
+}: {
+    devices: Device[];
+    onClose: () => void;
+}) {
+    const [action, setAction] = useState<
+        'read_configuration' | 'reboot' | 'resident_safety_profile'
+    >('read_configuration');
+    const [section, setSection] = useState('all');
+
+    return (
+        <Dialog open onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Bulk apply</DialogTitle>
+                    <DialogDescription>
+                        Queue one command per selected paired device. Commands
+                        still send through the normal pending-command queue.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    <div className="rounded-md border bg-muted/20 p-3">
+                        <p className="text-xs font-medium text-muted-foreground">
+                            Selected devices
+                        </p>
+                        <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-y-auto">
+                            {devices.map((device) => (
+                                <Badge
+                                    key={device.id}
+                                    variant="outline"
+                                    className="font-mono"
+                                >
+                                    {device.imei}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Action</Label>
+                        <Select
+                            value={action}
+                            onValueChange={(value) =>
+                                setAction(
+                                    value as
+                                        | 'read_configuration'
+                                        | 'reboot'
+                                        | 'resident_safety_profile',
+                                )
+                            }
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="read_configuration">
+                                    Read full configuration
+                                </SelectItem>
+                                <SelectItem value="resident_safety_profile">
+                                    Apply resident safety profile
+                                </SelectItem>
+                                <SelectItem value="reboot">
+                                    Reboot selected devices
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {action === 'read_configuration' && (
+                        <div className="space-y-2">
+                            <Label>Read section</Label>
+                            <Select value={section} onValueChange={setSection}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    {SECTION_READ_OPTIONS.map((option) => (
+                                        <SelectItem
+                                            key={option.code}
+                                            value={option.code}
+                                        >
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        disabled={devices.length === 0}
+                        onClick={() => {
+                            router.post(
+                                '/security-devices/integrations/queclink/bulk',
+                                {
+                                    device_ids: devices.map(
+                                        (device) => device.id,
+                                    ),
+                                    action,
+                                    section:
+                                        action === 'read_configuration'
+                                            ? section
+                                            : undefined,
+                                },
+                                {
+                                    preserveScroll: true,
+                                    onSuccess: onClose,
+                                },
+                            );
+                        }}
+                    >
+                        Queue {devices.length} command
+                        {devices.length === 1 ? '' : 's'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -1342,6 +1578,542 @@ function globalDefaults(device: Device | null): GlobalSettingsForm {
     };
 }
 
+type SectionReadOption = {
+    section: string;
+    label: string;
+    code: string;
+};
+
+const SECTION_READ_OPTIONS: SectionReadOption[] = [
+    { section: 'identity', label: 'Identity', code: 'BSI' },
+    { section: 'server', label: 'Server', code: 'SRI' },
+    { section: 'tracking', label: 'Tracking', code: 'CFG' },
+    { section: 'identity', label: 'SIM PIN', code: 'PIN' },
+    { section: 'server', label: 'Watchdog', code: 'DOG' },
+    { section: 'tracking', label: 'Non-movement', code: 'NMD' },
+    { section: 'power', label: 'Power', code: 'PDS' },
+    { section: 'alarms', label: 'Geofence', code: 'GEO' },
+    { section: 'connectivity', label: 'Wi-Fi', code: 'WFI' },
+    { section: 'bluetooth', label: 'Bluetooth', code: 'BTS' },
+    { section: 'bluetooth', label: 'BLE accessories', code: 'BID' },
+    { section: 'alarms', label: 'Phone allow-list', code: 'WLT' },
+    { section: 'firmware', label: 'Firmware update', code: 'UPC' },
+    { section: 'firmware', label: 'Firmware version', code: 'FVR' },
+];
+
+type AdvancedField = {
+    name: string;
+    label: string;
+    type?: 'text' | 'number' | 'textarea';
+    options?: Array<[string, string]>;
+    placeholder?: string;
+};
+
+type AdvancedCommandDefinition = {
+    key: string;
+    section: string;
+    label: string;
+    command: string;
+    summaryKey: string;
+    description: string;
+    fields: AdvancedField[];
+    defaults: Record<string, string>;
+    listFields?: string[];
+};
+
+const ADVANCED_COMMANDS: AdvancedCommandDefinition[] = [
+    {
+        key: 'dog',
+        section: 'server',
+        label: 'Watchdog auto-reboot',
+        command: 'dog',
+        summaryKey: 'dog',
+        description:
+            'Keeps a pendant recoverable when it has stopped checking in.',
+        defaults: {
+            mode: '1',
+            reboot_interval: '7',
+            reboot_time: '0200',
+            report_before_reboot: '1',
+            unit: '0',
+            send_failure_timeout: '60',
+        },
+        fields: [
+            {
+                name: 'mode',
+                label: 'Mode',
+                options: [
+                    ['1', 'Enabled'],
+                    ['0', 'Disabled'],
+                ],
+            },
+            {
+                name: 'reboot_interval',
+                label: 'Reboot interval',
+                type: 'number',
+            },
+            { name: 'reboot_time', label: 'Reboot time' },
+            {
+                name: 'report_before_reboot',
+                label: 'Report before reboot',
+                options: [
+                    ['1', 'Yes'],
+                    ['0', 'No'],
+                ],
+            },
+            {
+                name: 'unit',
+                label: 'Interval unit',
+                options: [
+                    ['0', 'Days'],
+                    ['1', 'Hours'],
+                ],
+            },
+            {
+                name: 'send_failure_timeout',
+                label: 'Send failure timeout minutes',
+                type: 'number',
+            },
+        ],
+    },
+    {
+        key: 'time',
+        section: 'identity',
+        label: 'Time zone',
+        command: 'time',
+        summaryKey: 'time',
+        description: 'Sets the GL30 local-time offset used in reports.',
+        defaults: {
+            sign: '+',
+            hour_offset: '12',
+            minute_offset: '0',
+            daylight_saving: '0',
+            utc_time: '',
+        },
+        fields: [
+            {
+                name: 'sign',
+                label: 'Sign',
+                options: [
+                    ['+', '+'],
+                    ['-', '-'],
+                ],
+            },
+            { name: 'hour_offset', label: 'Hour offset', type: 'number' },
+            { name: 'minute_offset', label: 'Minute offset', type: 'number' },
+            {
+                name: 'daylight_saving',
+                label: 'Daylight saving',
+                options: [
+                    ['0', 'Off'],
+                    ['1', 'On'],
+                ],
+            },
+            {
+                name: 'utc_time',
+                label: 'UTC time override',
+                placeholder: 'YYYYMMDDHHMMSS',
+            },
+        ],
+    },
+    {
+        key: 'non_movement',
+        section: 'tracking',
+        label: 'Non-movement detection',
+        command: 'non_movement',
+        summaryKey: 'non_movement',
+        description: 'Controls stillness detection and safe-check reporting.',
+        defaults: {
+            sensor_enable: '0',
+            mode: '0',
+            non_movement_duration: '3',
+            movement_duration: '3',
+            movement_threshold: '2',
+            rest_send_interval: '1440',
+            report_mode: '2',
+            safe_check: '0',
+            location_ignore: '',
+        },
+        fields: [
+            {
+                name: 'sensor_enable',
+                label: 'Sensor',
+                options: [
+                    ['0', 'Disabled'],
+                    ['1', 'Enabled'],
+                ],
+            },
+            { name: 'mode', label: 'Mode', type: 'number' },
+            {
+                name: 'non_movement_duration',
+                label: 'Still duration minutes',
+                type: 'number',
+            },
+            {
+                name: 'movement_duration',
+                label: 'Movement duration seconds',
+                type: 'number',
+            },
+            {
+                name: 'movement_threshold',
+                label: 'Movement threshold',
+                type: 'number',
+            },
+            {
+                name: 'rest_send_interval',
+                label: 'Rest send interval minutes',
+                type: 'number',
+            },
+            { name: 'report_mode', label: 'Report mode', type: 'number' },
+            { name: 'safe_check', label: 'Safe check', type: 'number' },
+            {
+                name: 'location_ignore',
+                label: 'Location ignore',
+                type: 'number',
+            },
+        ],
+    },
+    {
+        key: 'power',
+        section: 'power',
+        label: 'Power saving',
+        command: 'power',
+        summaryKey: 'power',
+        description: 'Controls the PDS sleep profile mask.',
+        defaults: { mode: '1', mask: '00000011' },
+        fields: [
+            {
+                name: 'mode',
+                label: 'Mode',
+                options: [
+                    ['1', 'Enabled'],
+                    ['0', 'Disabled'],
+                ],
+            },
+            { name: 'mask', label: 'Power mask' },
+        ],
+    },
+    {
+        key: 'geo',
+        section: 'alarms',
+        label: 'On-device geofence',
+        command: 'geo',
+        summaryKey: 'geofences',
+        description: 'Queues one GL30 GEO fence slot.',
+        defaults: {
+            slot: '0',
+            mode: '0',
+            longitude: '',
+            latitude: '',
+            radius: '100',
+        },
+        fields: [
+            { name: 'slot', label: 'Slot', type: 'number' },
+            {
+                name: 'mode',
+                label: 'Mode',
+                options: [
+                    ['0', 'Disabled'],
+                    ['1', 'Enter'],
+                    ['2', 'Exit'],
+                    ['3', 'Enter and exit'],
+                ],
+            },
+            { name: 'longitude', label: 'Longitude', type: 'number' },
+            { name: 'latitude', label: 'Latitude', type: 'number' },
+            { name: 'radius', label: 'Radius metres', type: 'number' },
+        ],
+    },
+    {
+        key: 'wifi',
+        section: 'connectivity',
+        label: 'Wi-Fi fallback',
+        command: 'wifi',
+        summaryKey: 'wifi',
+        description: 'Configures GL30 Wi-Fi positioning scan behaviour.',
+        defaults: {
+            mode: '0',
+            scan_interval: '10',
+            send_interval: '0',
+            lost_times: '2',
+            alarm_scan_interval: '10',
+            start_index: '1',
+            end_index: '1',
+            entries: '',
+        },
+        listFields: ['entries'],
+        fields: [
+            { name: 'mode', label: 'Mode', type: 'number' },
+            {
+                name: 'scan_interval',
+                label: 'Scan interval minutes',
+                type: 'number',
+            },
+            {
+                name: 'send_interval',
+                label: 'Send interval minutes',
+                type: 'number',
+            },
+            { name: 'lost_times', label: 'Lost times', type: 'number' },
+            {
+                name: 'alarm_scan_interval',
+                label: 'Alarm scan interval minutes',
+                type: 'number',
+            },
+            { name: 'start_index', label: 'Start index', type: 'number' },
+            { name: 'end_index', label: 'End index', type: 'number' },
+            {
+                name: 'entries',
+                label: 'SSID/MAC entries',
+                type: 'textarea',
+                placeholder: 'One entry per line',
+            },
+        ],
+    },
+    {
+        key: 'bluetooth',
+        section: 'bluetooth',
+        label: 'Bluetooth settings',
+        command: 'bluetooth',
+        summaryKey: 'bluetooth',
+        description:
+            'Uses GTBTS; GL30 v2.04 does not define a separate GTBT write.',
+        defaults: {
+            mode: '0',
+            bluetooth_name: 'GL30MEU_BT',
+            discoverable_mode: '0',
+            discoverable_time: '0',
+            advertising_interval: '1000',
+            advertising_data_type: '0',
+        },
+        fields: [
+            { name: 'mode', label: 'Mode', type: 'number' },
+            { name: 'bluetooth_name', label: 'Bluetooth name' },
+            {
+                name: 'discoverable_mode',
+                label: 'Discoverable mode',
+                options: [
+                    ['0', 'Off'],
+                    ['8', 'Temporary'],
+                    ['9', 'Always'],
+                ],
+            },
+            {
+                name: 'discoverable_time',
+                label: 'Discoverable minutes',
+                type: 'number',
+            },
+            {
+                name: 'advertising_interval',
+                label: 'Advertising interval ms',
+                type: 'number',
+            },
+            {
+                name: 'advertising_data_type',
+                label: 'Advertising data type',
+                type: 'number',
+            },
+        ],
+    },
+    {
+        key: 'beacons',
+        section: 'bluetooth',
+        label: 'BLE accessories',
+        command: 'beacons',
+        summaryKey: 'beacons',
+        description: 'Configures paired BLE accessory scanning.',
+        defaults: {
+            enable: '0',
+            beacon_id_model: '4',
+            append_mask: '000A',
+            scan_interval: '30',
+            beacon_accessory_model: '',
+            mac_list: '',
+        },
+        listFields: ['mac_list'],
+        fields: [
+            {
+                name: 'enable',
+                label: 'Enable',
+                options: [
+                    ['0', 'Disabled'],
+                    ['1', 'Enabled'],
+                ],
+            },
+            {
+                name: 'beacon_id_model',
+                label: 'Beacon ID model',
+                options: [
+                    ['4', 'Model 4'],
+                    ['10', 'Model 10'],
+                ],
+            },
+            { name: 'append_mask', label: 'Append mask' },
+            {
+                name: 'scan_interval',
+                label: 'Scan interval seconds',
+                type: 'number',
+            },
+            { name: 'beacon_accessory_model', label: 'Accessory model' },
+            {
+                name: 'mac_list',
+                label: 'MAC list',
+                type: 'textarea',
+                placeholder: 'One 12-character MAC per line',
+            },
+        ],
+    },
+    {
+        key: 'allowlist',
+        section: 'alarms',
+        label: 'Phone allow-list',
+        command: 'allowlist',
+        summaryKey: 'allowlist',
+        description: 'Controls numbers allowed to call or SMS the pendant.',
+        defaults: {
+            number_filter: '0',
+            phone_number_start: '1',
+            phone_number_end: '1',
+            phone_numbers: '',
+        },
+        listFields: ['phone_numbers'],
+        fields: [
+            {
+                name: 'number_filter',
+                label: 'Number filter',
+                options: [
+                    ['0', 'Disabled'],
+                    ['1', 'Enabled'],
+                ],
+            },
+            {
+                name: 'phone_number_start',
+                label: 'Start index',
+                type: 'number',
+            },
+            { name: 'phone_number_end', label: 'End index', type: 'number' },
+            {
+                name: 'phone_numbers',
+                label: 'Phone numbers',
+                type: 'textarea',
+                placeholder: 'One number per line',
+            },
+        ],
+    },
+    {
+        key: 'firmware_update',
+        section: 'firmware',
+        label: 'Firmware update',
+        command: 'firmware_update',
+        summaryKey: 'firmware_update',
+        description: 'Queues the GL30 OTA update URL command.',
+        defaults: {
+            max_download_retry: '0',
+            download_timeout_minutes: '10',
+            download_protocol: '0',
+            report_enable: '0',
+            update_interval_hours: '0',
+            download_url: '',
+            mode: '0',
+            extended_status_report: '0',
+            identifier_number: '',
+        },
+        fields: [
+            {
+                name: 'max_download_retry',
+                label: 'Max retries',
+                type: 'number',
+            },
+            {
+                name: 'download_timeout_minutes',
+                label: 'Download timeout minutes',
+                type: 'number',
+            },
+            {
+                name: 'download_protocol',
+                label: 'Protocol',
+                options: [
+                    ['0', 'HTTP'],
+                    ['2', 'HTTPS'],
+                ],
+            },
+            {
+                name: 'report_enable',
+                label: 'Report enable',
+                options: [
+                    ['0', 'Disabled'],
+                    ['1', 'Enabled'],
+                ],
+            },
+            {
+                name: 'update_interval_hours',
+                label: 'Update interval hours',
+                type: 'number',
+            },
+            { name: 'download_url', label: 'Download URL' },
+            { name: 'mode', label: 'Mode', type: 'number' },
+            {
+                name: 'extended_status_report',
+                label: 'Extended status',
+                type: 'number',
+            },
+            { name: 'identifier_number', label: 'Identifier number' },
+        ],
+    },
+    {
+        key: 'pin',
+        section: 'identity',
+        label: 'SIM PIN',
+        command: 'pin',
+        summaryKey: 'pin',
+        description: 'Stores SIM PIN unlock settings.',
+        defaults: { auto_unlock_pin: '0', pin: '' },
+        fields: [
+            {
+                name: 'auto_unlock_pin',
+                label: 'Auto unlock',
+                options: [
+                    ['0', 'Disabled'],
+                    ['1', 'Enabled'],
+                ],
+            },
+            { name: 'pin', label: 'PIN' },
+        ],
+    },
+];
+
+function commandDefaults(
+    definition: AdvancedCommandDefinition,
+): Record<string, string> {
+    return { ...definition.defaults };
+}
+
+function splitList(value: string): string[] {
+    return value
+        .split(/[\n,]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function advancedPayload(
+    definition: AdvancedCommandDefinition,
+    values: Record<string, string>,
+): Record<string, string | string[]> {
+    const payload: Record<string, string | string[]> = {
+        command: definition.command,
+    };
+
+    for (const [key, value] of Object.entries(values)) {
+        if (definition.listFields?.includes(key)) {
+            payload[key] = splitList(value);
+        } else {
+            payload[key] = value;
+        }
+    }
+
+    return payload;
+}
+
 function commandStatusBadge(status: RecentCommand['status']) {
     const classes = {
         queued: 'bg-status-info-bg text-status-info',
@@ -1349,6 +2121,7 @@ function commandStatusBadge(status: RecentCommand['status']) {
         acked: 'bg-status-success-bg text-status-success',
         failed: 'bg-status-critical-bg text-status-critical',
         expired: 'bg-muted text-muted-foreground',
+        cancelled: 'bg-muted text-muted-foreground',
     };
 
     return <Badge className={classes[status]}>{status}</Badge>;
@@ -1376,6 +2149,8 @@ export function DeviceSettingsTab({
     const [globalForm, setGlobalForm] = useState<GlobalSettingsForm>(() =>
         globalDefaults(devices[0] ?? null),
     );
+    const [selectedCommand, setSelectedCommand] =
+        useState<RecentCommand | null>(null);
 
     useEffect(() => {
         setServerForm(serverDefaults(target, listener));
@@ -1396,12 +2171,19 @@ export function DeviceSettingsTab({
         );
     }
 
-    const post = (path: string, payload: Record<string, string>) => {
+    const post = (path: string, payload: Record<string, string | string[]>) => {
         router.post(path, payload, { preserveScroll: true });
     };
 
     const config = target?.configuration;
     const recentCommands = target?.recent_commands ?? [];
+    const readSection = (option: SectionReadOption) => {
+        if (!target) return;
+        post(
+            `/security-devices/integrations/queclink/devices/${target.id}/configuration/${option.section}/read`,
+            { command: option.code },
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -1499,6 +2281,40 @@ export function DeviceSettingsTab({
                                 value={recentCommands.length}
                             />
                         </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+                <CardHeader>
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <RefreshCw className="h-4 w-4" />
+                        </div>
+                        <div>
+                            <CardTitle>Read one section</CardTitle>
+                            <CardDescription>
+                                Queue a focused GTRTO readback before changing
+                                the same section.
+                            </CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                        {SECTION_READ_OPTIONS.map((option) => (
+                            <Button
+                                key={`${option.section}-${option.code}`}
+                                type="button"
+                                variant="outline"
+                                className="justify-start"
+                                disabled={!can.manage || !target}
+                                onClick={() => readSection(option)}
+                            >
+                                <RefreshCw className="mr-2 h-3 w-3" />
+                                {option.label}
+                            </Button>
+                        ))}
                     </div>
                 </CardContent>
             </Card>
@@ -1952,6 +2768,12 @@ export function DeviceSettingsTab({
                         </Card>
                     </div>
 
+                    <AdvancedQueclinkSectionForm
+                        target={target}
+                        can={can}
+                        post={post}
+                    />
+
                     <Card className="shadow-sm">
                         <CardHeader>
                             <div className="flex items-start gap-3">
@@ -2036,7 +2858,82 @@ export function DeviceSettingsTab({
                                                         : 'waiting'}
                                                 </dd>
                                             </div>
+                                            {command.failed_reason && (
+                                                <div className="col-span-2">
+                                                    <dt>Failure</dt>
+                                                    <dd>
+                                                        {command.failed_reason}
+                                                    </dd>
+                                                </div>
+                                            )}
+                                            {command.cancelled_at && (
+                                                <div className="col-span-2">
+                                                    <dt>Cancelled</dt>
+                                                    <dd>
+                                                        {fmtRel(
+                                                            command.cancelled_at,
+                                                        )}
+                                                    </dd>
+                                                </div>
+                                            )}
                                         </dl>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setSelectedCommand(command)
+                                                }
+                                            >
+                                                <Database className="mr-1 h-3 w-3" />
+                                                Inspect
+                                            </Button>
+                                            {command.status === 'queued' && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={!can.manage}
+                                                    onClick={() =>
+                                                        router.post(
+                                                            `/security-devices/integrations/queclink/commands/${command.id}/cancel`,
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    <XCircle className="mr-1 h-3 w-3" />
+                                                    Cancel
+                                                </Button>
+                                            )}
+                                            {[
+                                                'failed',
+                                                'expired',
+                                                'cancelled',
+                                            ].includes(command.status) && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={!can.manage}
+                                                    onClick={() =>
+                                                        router.post(
+                                                            `/security-devices/integrations/queclink/commands/${command.id}/retry`,
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    <RefreshCw className="mr-1 h-3 w-3" />
+                                                    Retry
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -2044,6 +2941,60 @@ export function DeviceSettingsTab({
                     </CardContent>
                 </Card>
             </div>
+            <Dialog
+                open={selectedCommand !== null}
+                onOpenChange={(open) => {
+                    if (!open) setSelectedCommand(null);
+                }}
+            >
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Command payload</DialogTitle>
+                        <DialogDescription>
+                            Raw queued command and the latest ACK payload, if
+                            the device has responded.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs">Raw AT command</Label>
+                            <Textarea
+                                readOnly
+                                value={selectedCommand?.raw_command ?? ''}
+                                className="min-h-24 font-mono text-xs"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">ACK response</Label>
+                            <Textarea
+                                readOnly
+                                value={
+                                    selectedCommand?.ack_response ||
+                                    selectedCommand?.failed_reason ||
+                                    'No ACK or failure reason recorded yet.'
+                                }
+                                className="min-h-20 font-mono text-xs"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!selectedCommand}
+                            onClick={() => {
+                                if (!selectedCommand) return;
+                                void navigator.clipboard?.writeText(
+                                    selectedCommand.raw_command,
+                                );
+                            }}
+                        >
+                            <Copy className="mr-2 h-3 w-3" />
+                            Copy raw
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -2131,6 +3082,210 @@ function SelectField({
     );
 }
 
+function AdvancedQueclinkSectionForm({
+    target,
+    can,
+    post,
+}: {
+    target: Device | null;
+    can: Props['can'];
+    post: (path: string, payload: Record<string, string | string[]>) => void;
+}) {
+    const [commandKey, setCommandKey] = useState(ADVANCED_COMMANDS[0].key);
+    const definition =
+        ADVANCED_COMMANDS.find((command) => command.key === commandKey) ??
+        ADVANCED_COMMANDS[0];
+    const [values, setValues] = useState<Record<string, string>>(() =>
+        commandDefaults(definition),
+    );
+
+    useEffect(() => {
+        setValues(commandDefaults(definition));
+    }, [definition]);
+
+    const snapshot =
+        target?.configuration?.summary[definition.summaryKey] ?? null;
+
+    return (
+        <Card className="shadow-sm">
+            <CardHeader>
+                <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <Settings2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <CardTitle>Advanced GL30 sections</CardTitle>
+                        <CardDescription>
+                            Protocol-backed writes for the sections beyond SRI
+                            and CFG.
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,320px)_1fr]">
+                    <div className="space-y-2">
+                        <Label className="text-xs">Section command</Label>
+                        <Select
+                            value={commandKey}
+                            onValueChange={setCommandKey}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {ADVANCED_COMMANDS.map((command) => (
+                                    <SelectItem
+                                        key={command.key}
+                                        value={command.key}
+                                    >
+                                        {command.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            {definition.description}
+                        </p>
+                    </div>
+
+                    <SnapshotSummary value={snapshot} />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {definition.fields.map((field) => {
+                        const value = values[field.name] ?? '';
+
+                        if (field.options) {
+                            return (
+                                <SelectField
+                                    key={field.name}
+                                    label={field.label}
+                                    value={value}
+                                    options={field.options}
+                                    onChange={(nextValue) =>
+                                        setValues((current) => ({
+                                            ...current,
+                                            [field.name]: nextValue,
+                                        }))
+                                    }
+                                />
+                            );
+                        }
+
+                        if (field.type === 'textarea') {
+                            return (
+                                <div
+                                    key={field.name}
+                                    className="space-y-2 md:col-span-2 xl:col-span-3"
+                                >
+                                    <Label className="text-xs">
+                                        {field.label}
+                                    </Label>
+                                    <Textarea
+                                        value={value}
+                                        placeholder={field.placeholder}
+                                        onChange={(event) =>
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.name]:
+                                                    event.target.value,
+                                            }))
+                                        }
+                                        className="min-h-24 font-mono text-xs"
+                                    />
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <Field
+                                key={field.name}
+                                label={field.label}
+                                type={
+                                    field.type === 'number' ? 'number' : 'text'
+                                }
+                                value={value}
+                                onChange={(nextValue) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        [field.name]: nextValue,
+                                    }))
+                                }
+                            />
+                        );
+                    })}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        disabled={!can.manage || !target}
+                        onClick={() => {
+                            if (!target) return;
+                            post(
+                                `/security-devices/integrations/queclink/devices/${target.id}/configuration/${definition.section}`,
+                                advancedPayload(definition, values),
+                            );
+                        }}
+                    >
+                        <Send className="mr-2 h-3 w-3" />
+                        Queue {definition.label}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!can.manage || !target}
+                        onClick={() => setValues(commandDefaults(definition))}
+                    >
+                        Revert fields
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function SnapshotSummary({ value }: { value: DeviceConfigurationSummary }) {
+    if (!value || (Array.isArray(value) && value.length === 0)) {
+        return (
+            <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+                No readback for this section yet.
+            </div>
+        );
+    }
+
+    const rows = Array.isArray(value) ? value : [value];
+    const pairs = rows.flatMap((row, rowIndex) =>
+        Object.entries(row).map(([key, item]) => ({
+            key: rows.length > 1 ? `${rowIndex + 1}.${key}` : key,
+            value: item,
+        })),
+    );
+
+    return (
+        <div className="rounded-md border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Current device value
+            </p>
+            <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
+                {pairs.slice(0, 18).map((pair) => (
+                    <Badge
+                        key={`${pair.key}-${pair.value}`}
+                        variant="outline"
+                        className="max-w-full truncate font-mono"
+                    >
+                        {pair.key}: {pair.value || 'blank'}
+                    </Badge>
+                ))}
+                {pairs.length > 18 && (
+                    <Badge variant="outline">+{pairs.length - 18} more</Badge>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ── Debug Console tab ─────────────────────────────────────────────
 
 export function DebugConsoleTab({
@@ -2141,17 +3296,29 @@ export function DebugConsoleTab({
     can: Props['can'];
 }) {
     const [frames, setFrames] = useState<Frame[]>([]);
-    const [imeiFilter, setImeiFilter] = useState<string>('');
+    const [filters, setFilters] = useState<FrameFilters>({
+        imei: '',
+        direction: 'all',
+        commandWord: '',
+        parseStatus: 'all',
+        search: '',
+    });
     const [streaming, setStreaming] = useState(true);
     const esRef = useRef<EventSource | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [autoscroll, setAutoscroll] = useState(true);
+    const updateFilter = <K extends keyof FrameFilters>(
+        key: K,
+        value: FrameFilters[K],
+    ) => {
+        setFilters((current) => ({ ...current, [key]: value }));
+    };
     const loadRecentFrames = useCallback(
         async (signal?: AbortSignal) => {
             let response: Response;
 
             try {
-                response = await fetch(framesUrl(imeiFilter), {
+                response = await fetch(framesUrl(filters), {
                     headers: { Accept: 'application/json' },
                     signal,
                 });
@@ -2163,7 +3330,7 @@ export function DebugConsoleTab({
             const payload = (await response.json()) as { frames?: Frame[] };
             setFrames((prev) => mergeFrames(prev, payload.frames ?? []));
         },
-        [imeiFilter],
+        [filters],
     );
 
     useEffect(() => {
@@ -2180,9 +3347,7 @@ export function DebugConsoleTab({
             esRef.current = null;
             return;
         }
-        const params = new URLSearchParams();
-        if (imeiFilter) params.set('imei', imeiFilter);
-        const url = `/security-devices/integrations/queclink/stream${params.toString() ? '?' + params.toString() : ''}`;
+        const url = frameStreamUrl(filters);
         const es = new EventSource(url);
         es.onmessage = (e) => {
             try {
@@ -2200,7 +3365,7 @@ export function DebugConsoleTab({
             es.close();
             esRef.current = null;
         };
-    }, [streaming, imeiFilter]);
+    }, [streaming, filters]);
 
     useEffect(() => {
         if (!streaming) return;
@@ -2233,9 +3398,9 @@ export function DebugConsoleTab({
                         </div>
                         <div className="flex items-center gap-2">
                             <Select
-                                value={imeiFilter || 'all'}
+                                value={filters.imei || 'all'}
                                 onValueChange={(v) =>
-                                    setImeiFilter(v === 'all' ? '' : v)
+                                    updateFilter('imei', v === 'all' ? '' : v)
                                 }
                             >
                                 <SelectTrigger className="w-48">
@@ -2279,7 +3444,82 @@ export function DebugConsoleTab({
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs">Direction</Label>
+                            <Select
+                                value={filters.direction}
+                                onValueChange={(value) =>
+                                    updateFilter(
+                                        'direction',
+                                        value as FrameFilters['direction'],
+                                    )
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All directions
+                                    </SelectItem>
+                                    <SelectItem value="inbound">
+                                        Inbound
+                                    </SelectItem>
+                                    <SelectItem value="outbound">
+                                        Outbound
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">Command word</Label>
+                            <Input
+                                value={filters.commandWord}
+                                placeholder="GTFRI, GTALM, GTRTO"
+                                onChange={(event) =>
+                                    updateFilter(
+                                        'commandWord',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">Parse status</Label>
+                            <Select
+                                value={filters.parseStatus}
+                                onValueChange={(value) =>
+                                    updateFilter(
+                                        'parseStatus',
+                                        value as FrameFilters['parseStatus'],
+                                    )
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="ok">Parsed</SelectItem>
+                                    <SelectItem value="error">
+                                        Parse errors
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs">Search raw frame</Label>
+                            <Input
+                                value={filters.search}
+                                placeholder="IMEI, serial, error text"
+                                onChange={(event) =>
+                                    updateFilter('search', event.target.value)
+                                }
+                            />
+                        </div>
+                    </div>
                     <div
                         ref={containerRef}
                         className="h-[480px] overflow-y-auto rounded-md border bg-background font-mono text-xs"

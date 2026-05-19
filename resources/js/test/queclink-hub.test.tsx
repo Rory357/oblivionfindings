@@ -262,9 +262,45 @@ describe('QueclinkHub device settings', () => {
                                     led_on: '1',
                                     charge_standby_mode: '0',
                                 },
+                                dog: {
+                                    mode: '1',
+                                    reboot_interval: '7',
+                                    reboot_time: '0200',
+                                },
                             },
                         },
-                        recent_commands: [],
+                        recent_commands: [
+                            {
+                                id: 44,
+                                command_word: 'GTDOG',
+                                raw_command:
+                                    'AT+GTDOG=gl30,1,,7,0200,,1,,0,,,60,0001$',
+                                serial_number: '0001',
+                                status: 'queued',
+                                created_at: '2026-05-18T03:16:00Z',
+                                sent_at: null,
+                                acked_at: null,
+                                cancelled_at: null,
+                                expires_at: '2026-05-18T03:21:00Z',
+                                failed_reason: null,
+                                ack_response: null,
+                            },
+                            {
+                                id: 45,
+                                command_word: 'GTWFI',
+                                raw_command:
+                                    'AT+GTWFI=gl30,1,10,0,2,10,1,1,,,,0002$',
+                                serial_number: '0002',
+                                status: 'failed',
+                                created_at: '2026-05-18T03:17:00Z',
+                                sent_at: '2026-05-18T03:17:10Z',
+                                acked_at: null,
+                                cancelled_at: null,
+                                expires_at: '2026-05-18T03:22:00Z',
+                                failed_reason: 'expired',
+                                ack_response: '+ACK:GTWFI,0,0002$',
+                            },
+                        ],
                     },
                 ]}
             />,
@@ -278,7 +314,48 @@ describe('QueclinkHub device settings', () => {
         ).toBeVisible();
         expect(screen.getAllByDisplayValue('30')[0]).toBeVisible();
         expect(screen.getByText('Read full config')).toBeVisible();
+        expect(screen.getByText('Read one section')).toBeVisible();
+        expect(screen.getByText('Advanced GL30 sections')).toBeVisible();
         expect(screen.getByText('Resident safety profile')).toBeVisible();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Server' }));
+
+        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/devices/2/configuration/server/read',
+            { command: 'SRI' },
+            { preserveScroll: true },
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Queue Watchdog auto-reboot',
+            }),
+        );
+
+        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/devices/2/configuration/server',
+            expect.objectContaining({
+                command: 'dog',
+                reboot_time: '0200',
+            }),
+            { preserveScroll: true },
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/commands/44/cancel',
+            {},
+            { preserveScroll: true },
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/commands/45/retry',
+            {},
+            { preserveScroll: true },
+        );
 
         fireEvent.click(
             screen.getByRole('button', {

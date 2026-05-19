@@ -267,12 +267,23 @@ Route::middleware([
                 ->name('security-devices.integrations.queclink.command');
             Route::post('/devices/{queclinkDevice}/configuration/read', [QueclinkHubController::class, 'readConfiguration'])
                 ->name('security-devices.integrations.queclink.configuration.read');
+            Route::post('/devices/{queclinkDevice}/configuration/{section}/read', [QueclinkHubController::class, 'readConfigurationSection'])
+                ->name('security-devices.integrations.queclink.configuration.section.read');
             Route::post('/devices/{queclinkDevice}/configuration/server', [QueclinkHubController::class, 'updateServerConfiguration'])
                 ->name('security-devices.integrations.queclink.configuration.server');
             Route::post('/devices/{queclinkDevice}/configuration/global', [QueclinkHubController::class, 'updateGlobalConfiguration'])
                 ->name('security-devices.integrations.queclink.configuration.global');
+            Route::post('/devices/{queclinkDevice}/configuration/{section}', [QueclinkHubController::class, 'updateSectionConfiguration'])
+                ->whereIn('section', ['identity', 'tracking', 'alarms', 'power', 'connectivity', 'bluetooth', 'firmware'])
+                ->name('security-devices.integrations.queclink.configuration.section');
             Route::post('/devices/{queclinkDevice}/configuration/resident-safety-profile', [QueclinkHubController::class, 'applyResidentSafetyProfile'])
                 ->name('security-devices.integrations.queclink.configuration.resident-safety-profile');
+            Route::post('/commands/{command}/cancel', [QueclinkHubController::class, 'cancelCommand'])
+                ->name('security-devices.integrations.queclink.commands.cancel');
+            Route::post('/commands/{command}/retry', [QueclinkHubController::class, 'retryCommand'])
+                ->name('security-devices.integrations.queclink.commands.retry');
+            Route::post('/bulk', [QueclinkHubController::class, 'bulkAction'])
+                ->name('security-devices.integrations.queclink.bulk');
 
             // IMS cloud credential management (legacy scaffold endpoints).
             Route::post('/key', [QueclinkController::class, 'saveKey'])

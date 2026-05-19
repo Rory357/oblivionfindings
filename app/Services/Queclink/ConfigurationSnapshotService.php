@@ -34,6 +34,18 @@ class ConfigurationSnapshotService
                 'summary' => [
                     'server' => null,
                     'global' => null,
+                    'pin' => null,
+                    'dog' => null,
+                    'time' => null,
+                    'non_movement' => null,
+                    'power' => null,
+                    'wifi' => null,
+                    'geofences' => [],
+                    'bluetooth' => null,
+                    'beacons' => null,
+                    'allowlist' => null,
+                    'firmware_update' => null,
+                    'firmware_version' => null,
                 ],
             ];
         }
@@ -82,6 +94,18 @@ class ConfigurationSnapshotService
             'summary' => [
                 'server' => null,
                 'global' => null,
+                'pin' => null,
+                'dog' => null,
+                'time' => null,
+                'non_movement' => null,
+                'power' => null,
+                'wifi' => null,
+                'geofences' => [],
+                'bluetooth' => null,
+                'beacons' => null,
+                'allowlist' => null,
+                'firmware_update' => null,
+                'firmware_version' => null,
             ],
         ];
     }
@@ -89,29 +113,43 @@ class ConfigurationSnapshotService
     /** @return array{sections: array<string, mixed>, summary: array<string, mixed>} */
     public function parseConfigurationText(string $raw): array
     {
-        $sections = $this->splitSections($raw);
+        $rows = $this->splitSectionRows($raw);
+        $sections = $this->rowsToSections($rows);
 
         return [
             'sections' => $sections,
             'summary' => [
-                'server' => $this->mapServer($sections['SRI']['values'] ?? null),
-                'global' => $this->mapGlobal($sections['CFG']['values'] ?? null),
+                'battery' => $this->mapBattery($this->firstSection($rows, 'BSI')),
+                'server' => $this->mapServer($this->firstSection($rows, 'SRI')),
+                'global' => $this->mapGlobal($this->firstSection($rows, 'CFG')),
+                'pin' => $this->mapPin($this->firstSection($rows, 'PIN')),
+                'dog' => $this->mapDog($this->firstSection($rows, 'DOG')),
+                'time' => $this->mapTma($this->firstSection($rows, 'TMA')),
+                'non_movement' => $this->mapNmd($this->firstSection($rows, 'NMD')),
+                'power' => $this->mapPds($this->firstSection($rows, 'PDS')),
+                'wifi' => $this->mapWifi($this->firstSection($rows, 'WFI')),
+                'geofences' => $this->mapGeo($this->allSections($rows, 'GEO')),
+                'bluetooth' => $this->mapBts($this->firstSection($rows, 'BTS')),
+                'beacons' => $this->mapBid($this->firstSection($rows, 'BID')),
+                'allowlist' => $this->mapWlt($this->firstSection($rows, 'WLT')),
+                'firmware_update' => $this->mapUpc($this->firstSection($rows, 'UPC')),
+                'firmware_version' => $this->mapFvr($this->firstSection($rows, 'FVR')),
             ],
         ];
     }
 
-    /** @return array<string, array{name: string, values: list<string>}> */
-    private function splitSections(string $raw): array
+    /** @return list<array{name: string, values: list<string>}> */
+    private function splitSectionRows(string $raw): array
     {
         $markers = array_flip(self::SECTION_ORDER);
-        $sections = [];
+        $rows = [];
         $current = null;
 
         foreach (explode(',', $raw) as $token) {
             $token = trim($token);
             if (isset($markers[$token])) {
                 $current = $token;
-                $sections[$current] = [
+                $rows[] = [
                     'name' => $token,
                     'values' => [],
                 ];
@@ -120,11 +158,75 @@ class ConfigurationSnapshotService
             }
 
             if ($current !== null) {
-                $sections[$current]['values'][] = $token;
+                $rows[array_key_last($rows)]['values'][] = $token;
             }
         }
 
+        return $rows;
+    }
+
+    /**
+     * @param  list<array{name: string, values: list<string>}>  $rows
+     * @return array<string, array{name: string, values: list<string>, repeats?: list<list<string>>}>
+     */
+    private function rowsToSections(array $rows): array
+    {
+        $sections = [];
+
+        foreach ($rows as $row) {
+            $name = $row['name'];
+            if (! isset($sections[$name])) {
+                $sections[$name] = $row;
+
+                continue;
+            }
+
+            $sections[$name]['repeats'] ??= [$sections[$name]['values']];
+            $sections[$name]['repeats'][] = $row['values'];
+        }
+
         return $sections;
+    }
+
+    /**
+     * @param  list<array{name: string, values: list<string>}>  $rows
+     * @return list<string>|null
+     */
+    private function firstSection(array $rows, string $name): ?array
+    {
+        foreach ($rows as $row) {
+            if ($row['name'] === $name) {
+                return $row['values'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<array{name: string, values: list<string>}>  $rows
+     * @return list<list<string>>
+     */
+    private function allSections(array $rows, string $name): array
+    {
+        return array_values(array_map(
+            fn (array $row) => $row['values'],
+            array_filter($rows, fn (array $row) => $row['name'] === $name),
+        ));
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapBattery(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'battery_percentage' => $values[0] ?? '',
+            'voltage_mv' => $values[1] ?? '',
+            'charging_state' => $values[2] ?? '',
+        ];
     }
 
     /** @param  list<string>|null  $values */
@@ -178,6 +280,212 @@ class ConfigurationSnapshotService
             'wifi_report' => $values[24] ?? '2',
             'led_on' => $values[25] ?? '1',
             'charge_standby_mode' => $values[26] ?? '0',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapPin(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'auto_unlock_pin' => $values[0] ?? '0',
+            'pin' => $values[1] ?? '',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapDog(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'mode' => $values[0] ?? '1',
+            'reboot_interval' => $values[2] ?? '7',
+            'reboot_time' => $values[3] ?? '0200',
+            'report_before_reboot' => $values[5] ?? '1',
+            'unit' => $values[7] ?? '0',
+            'send_failure_timeout' => $values[10] ?? '',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapTma(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'sign' => $values[0] ?? '+',
+            'hour_offset' => $values[1] ?? '0',
+            'minute_offset' => $values[2] ?? '0',
+            'daylight_saving' => $values[3] ?? '0',
+            'utc_time' => $values[4] ?? '',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapNmd(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'sensor_enable' => $values[0] ?? '0',
+            'mode' => $values[1] ?? '0',
+            'non_movement_duration' => $values[2] ?? '3',
+            'movement_duration' => $values[3] ?? '3',
+            'movement_threshold' => $values[4] ?? '2',
+            'rest_send_interval' => $values[5] ?? '1440',
+            'report_mode' => $values[6] ?? '2',
+            'safe_check' => $values[9] ?? '0',
+            'location_ignore' => $values[10] ?? '',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapPds(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'mode' => $values[0] ?? '1',
+            'mask' => strtoupper($values[1] ?? '00000011'),
+        ];
+    }
+
+    /**
+     * @param  list<list<string>>  $rows
+     * @return array<int, array<string, string>>
+     */
+    private function mapGeo(array $rows): array
+    {
+        $geofences = [];
+
+        foreach ($rows as $values) {
+            $slot = (int) ($values[0] ?? 0);
+            $geofences[$slot] = [
+                'slot' => (string) $slot,
+                'mode' => $values[1] ?? '0',
+                'longitude' => $values[2] ?? '',
+                'latitude' => $values[3] ?? '',
+                'radius' => $values[4] ?? '50',
+            ];
+        }
+
+        ksort($geofences);
+
+        return $geofences;
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapBts(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'mode' => $values[0] ?? '0',
+            'bluetooth_name' => $values[2] ?? '',
+            'discoverable_mode' => $values[4] ?? '0',
+            'discoverable_time' => $values[5] ?? '0',
+            'advertising_interval' => $values[13] ?? '1000',
+            'advertising_data_type' => $values[14] ?? '0',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapBid(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'enable' => $values[1] ?? '0',
+            'beacon_id_model' => $values[2] ?? '4',
+            'append_mask' => strtoupper($values[3] ?? '000A'),
+            'scan_interval' => $values[11] ?? '30',
+            'beacon_accessory_model' => $values[14] ?? '',
+            'mac_list' => array_values(array_filter(array_slice($values, 15, 4), fn (string $value) => $value !== '')),
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapWifi(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'mode' => $values[0] ?? '0',
+            'scan_interval' => $values[1] ?? '10',
+            'send_interval' => $values[2] ?? '0',
+            'lost_times' => $values[3] ?? '2',
+            'alarm_scan_interval' => $values[4] ?? '10',
+            'start_index' => $values[5] ?? '1',
+            'end_index' => $values[6] ?? '1',
+            'entries' => array_values(array_filter(array_slice($values, 7, 20), fn (string $value) => $value !== '')),
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapWlt(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'number_filter' => $values[0] ?? '0',
+            'phone_number_start' => $values[1] ?? '',
+            'phone_number_end' => $values[2] ?? '',
+            'phone_numbers' => array_values(array_filter(array_slice($values, 3), fn (string $value) => $value !== '')),
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapUpc(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'max_download_retry' => $values[0] ?? '0',
+            'download_timeout_minutes' => $values[1] ?? '10',
+            'download_protocol' => $values[2] ?? '0',
+            'report_enable' => $values[3] ?? '0',
+            'update_interval_hours' => $values[4] ?? '0',
+            'download_url' => $values[5] ?? '',
+            'mode' => $values[6] ?? '0',
+            'extended_status_report' => $values[8] ?? '0',
+            'identifier_number' => $values[9] ?? '',
+        ];
+    }
+
+    /** @param  list<string>|null  $values */
+    private function mapFvr(?array $values): ?array
+    {
+        if ($values === null) {
+            return null;
+        }
+
+        return [
+            'configuration_name' => $values[0] ?? '',
+            'configuration_version' => $values[1] ?? '',
+            'digital_signature' => $values[7] ?? '',
+            'generation_time' => $values[11] ?? '',
         ];
     }
 }
