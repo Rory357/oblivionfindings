@@ -183,7 +183,7 @@ class FrameRouter
             'direction' => $direction,
             'frame_type' => $frame->frameType,
             'command_word' => $frame->commandWord,
-            'raw_frame' => $frame->rawFrame,
+            'raw_frame' => $this->rawFrameForStorage($frame->rawFrame),
             'parsed_payload' => $frame->isValid() ? $frame->payload : null,
             'parse_ok' => $frame->isValid(),
             'parse_error' => $frame->parseError,
@@ -201,12 +201,27 @@ class FrameRouter
             'direction' => 'outbound',
             'frame_type' => str_starts_with($raw, '+SACK') ? 'SACK' : 'AT',
             'command_word' => $commandWord,
-            'raw_frame' => $raw,
+            'raw_frame' => $this->rawFrameForStorage($raw),
             'parsed_payload' => null,
             'parse_ok' => true,
             'session_id' => $state->sessionId,
             'remote_address' => $state->remoteAddress,
         ]);
+    }
+
+    protected function rawFrameForStorage(string $raw): string
+    {
+        if ($raw === '') {
+            return '';
+        }
+
+        $printable = str_replace(["\r", "\n"], '', $raw);
+
+        if ($printable !== '' && ctype_print($printable) && preg_match('//u', $raw) === 1) {
+            return $raw;
+        }
+
+        return '0x'.strtoupper(bin2hex($raw));
     }
 
     protected function correlateAck(AtTrackFrame $frame, QueclinkDevice $device): void

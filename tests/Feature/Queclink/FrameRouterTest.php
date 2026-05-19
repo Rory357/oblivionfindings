@@ -90,6 +90,18 @@ it('does not ingest telemetry for unpaired devices but still logs the frame', fu
     expect(QueclinkRawFrame::outbound()->first()->raw_frame)->toBe('+SACK:0119$');
 });
 
+it('stores binary probe frames as hex text instead of throwing while logging them', function () {
+    $responses = $this->router->handleInbound("\x16\x03\x01\x02\x97\xFF$", $this->state);
+
+    expect($responses)->toBe([]);
+
+    $rawFrame = QueclinkRawFrame::first();
+    expect($rawFrame)->not->toBeNull()
+        ->and($rawFrame->parse_ok)->toBeFalse()
+        ->and($rawFrame->parse_error)->toContain('HEX frame detected')
+        ->and($rawFrame->raw_frame)->toBe('0x1603010297FF24');
+});
+
 it('marks the device disconnected when the connection drops', function () {
     $this->router->handleInbound('+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$', $this->state);
     expect(QueclinkDevice::firstWhere('imei', '864696060004173')->connection_state)->toBe(QueclinkDevice::CONN_CONNECTED);
