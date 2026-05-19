@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import ResidentTrackingIndex from '@/pages/fleet-assets/resident-tracking';
 import ResidentTrackingHistory from '@/pages/fleet-assets/resident-tracking/history';
+import type { Resident } from '@/components/resident-tracking/types';
 
 const inertiaMocks = vi.hoisted(() => ({
     get: vi.fn(),
@@ -202,6 +203,36 @@ function historyLocation(
     };
 }
 
+function historyResident(overrides: Partial<Resident> = {}): Resident {
+    return {
+        id: 12,
+        client_id: 9012,
+        name: 'Amelia Wilson',
+        preferred_name: 'Amelia',
+        house: 'Harbour House',
+        photo: null,
+        status: 'online',
+        last_seen_at: '2026-05-18T08:59:00Z',
+        lat: -37.723657,
+        lng: 175.241655,
+        battery: 100,
+        battery_status: 'normal',
+        battery_voltage_mv: 4117,
+        battery_low_threshold: 20,
+        battery_updated_at: '2026-05-18T08:59:00Z',
+        charging_status: 'charging',
+        external_power: true,
+        last_power_event: null,
+        last_safety_event: null,
+        last_safety_event_at: null,
+        panic_active: false,
+        speed: 0,
+        geofence_status: 'in_zone',
+        on_outing: false,
+        ...overrides,
+    };
+}
+
 it('renders the resident sidebar and queues Locate Now from a list row', async () => {
     renderResidentTracking();
 
@@ -268,6 +299,26 @@ it('renders the new history page with quick range pills and event filter', async
     expect(screen.getByRole('button', { name: /^7d$/i })).toBeVisible();
     expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '2');
     expect(screen.getByText(/points/i)).toBeVisible();
+});
+
+it('shows charging clearly in the history status strip', async () => {
+    render(
+        <ResidentTrackingHistory
+            client={{
+                id: 9012,
+                name: 'Amelia Wilson',
+                house: 'Harbour House',
+                photo: null,
+            }}
+            resident={historyResident()}
+            tracker={null}
+            available_event_types={['location_report']}
+            filters={{ range: '24h', date_from: null, date_to: null, event_types: [] }}
+            locations={[historyLocation(0)]}
+        />,
+    );
+
+    expect(screen.getByLabelText('Charging status: Charging')).toBeVisible();
 });
 
 it('defaults the history map to important pins and lets the user show all pins', async () => {

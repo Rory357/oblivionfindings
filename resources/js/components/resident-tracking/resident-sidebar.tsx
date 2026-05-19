@@ -161,6 +161,15 @@ function formatVoltage(mv: number | null | undefined): string | null {
     return `${(mv / 1000).toFixed(2)} V`;
 }
 
+function formatChargingStatus(status?: string | null, externalPower?: boolean | null): string {
+    if (status === 'charging' || externalPower === true) return 'Charging';
+    if (status === 'not_charging') return 'Not charging';
+    if (status === 'stopped_charging') return 'Stopped charging';
+    if (status === 'charge_full') return 'Charge full';
+
+    return '—';
+}
+
 export default function ResidentSidebar({
     resident,
     variant,
@@ -368,8 +377,7 @@ export default function ResidentSidebar({
                     {fieldRow('Low threshold', `${resident.battery_low_threshold ?? 20}%`)}
                     {fieldRow(
                         'Charging',
-                        resident.charging_status ??
-                            (resident.external_power ? 'External power' : '—'),
+                        formatChargingStatus(resident.charging_status, resident.external_power),
                     )}
                     {fieldRow('Last power event', resident.last_power_event ?? '—')}
                     {fieldRow(

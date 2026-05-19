@@ -28,6 +28,7 @@ import {
     Maximize2,
     Minimize2,
     Navigation,
+    Plug,
     Radio,
     ShieldAlert,
     Zap,
@@ -165,6 +166,15 @@ function displayLocation(location: Location): string {
 
 function csvCell(value: unknown): string {
     return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+function chargingStatusLabel(status?: string | null, externalPower?: boolean | null): string | null {
+    if (status === 'charging' || externalPower === true) return 'Charging';
+    if (status === 'not_charging') return 'Not charging';
+    if (status === 'stopped_charging') return 'Stopped charging';
+    if (status === 'charge_full') return 'Charge full';
+
+    return null;
 }
 
 function uniqueSortedIndices(indices: number[], total: number): number[] {
@@ -376,6 +386,9 @@ export default function ResidentTrackingHistory({
         availableSafetyTypes.length > 0 &&
         timelineEventTypes.length === availableSafetyTypes.length &&
         availableSafetyTypes.every((t) => timelineEventTypes.includes(t));
+    const residentChargingStatus = resident
+        ? chargingStatusLabel(resident.charging_status, resident.external_power)
+        : null;
 
     const handleMarkerClick = useCallback((id: string | number) => {
         const idx = typeof id === 'number' ? id : parseInt(String(id), 10);
@@ -472,6 +485,20 @@ export default function ResidentTrackingHistory({
                                 <span className="text-muted-foreground">
                                     {(resident.battery_voltage_mv / 1000).toFixed(2)} V
                                 </span>
+                            )}
+                            {residentChargingStatus && (
+                                <Badge
+                                    variant="outline"
+                                    aria-label={`Charging status: ${residentChargingStatus}`}
+                                    className={`text-[10px] ${
+                                        residentChargingStatus === 'Charging'
+                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                            : ''
+                                    }`}
+                                >
+                                    <Plug className="mr-1 h-3 w-3" />
+                                    {residentChargingStatus}
+                                </Badge>
                             )}
                             <Badge variant="outline" className="text-[10px]">
                                 {resident.geofence_status === 'in_zone'
