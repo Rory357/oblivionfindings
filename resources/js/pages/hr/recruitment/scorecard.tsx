@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Briefcase, Calendar, CheckCircle2, Star } from 'lucide-react';
+import { Briefcase, Calendar, CheckCircle2, ClipboardCheck, Star } from 'lucide-react';
 import { useState } from 'react';
 
 type Interview = {
@@ -154,9 +154,15 @@ export default function ScorecardForm({ interview, existing }: Props) {
         >
             <Head title={`Scorecard - ${fullName}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={ClipboardCheck}
                     title="Interview Scorecard"
                     description={`Evaluate ${fullName} for ${interview.application.position_title}`}
+                    stats={[
+                        { label: 'Criteria', value: criteria.length },
+                        { label: 'Rated', value: ratedCount },
+                        { label: 'Progress', value: `${progressPct}%` },
+                    ]}
                 />
 
                 {/* Candidate Banner */}

@@ -379,9 +379,16 @@ export default function WellbeingIndex({
         >
             <Head title="HR Wellbeing" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={HeartPulse}
                     title="Wellbeing & Engagement"
                     description="Workload risk indicators, survey sentiment, and action plans."
+                    stats={[
+                        { label: 'Staff', value: wellbeingSummary.total_staff },
+                        { label: 'Red flags', value: wellbeingSummary.flagged_red },
+                        { label: 'Amber flags', value: wellbeingSummary.flagged_amber },
+                        { label: 'Open plans', value: slaSummary.open_total },
+                    ]}
                 />
 
                 <div className="grid gap-4 md:grid-cols-4">

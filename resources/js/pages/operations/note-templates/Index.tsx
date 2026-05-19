@@ -53,10 +53,17 @@ export default function NoteTemplatesIndex({ templates = { data: [], links: [], 
     return (
         <AppLayout>
             <Head title="Note Templates" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={FileText}
                 title="Note Templates"
                 description="Manage care note templates and custom fields."
-                backHref="/operations"
+                stats={[
+                    { label: 'Templates', value: templates?.total ?? 0 },
+                    {
+                        label: 'Active',
+                        value: (templates?.data ?? []).filter((t) => t.is_active).length,
+                    },
+                ]}
             />
             <PageShell>
                 {/* Filters */}

@@ -61,10 +61,15 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
     return (
         <AppLayout>
             <Head title="Price Books" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={BookOpen}
                 title="Price Books"
                 description="Manage pricing structures and rate schedules for services."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total books', value: stats?.total ?? 0 },
+                    { label: 'Active items', value: stats?.active_items ?? 0 },
+                    { label: 'Default book', value: stats?.default_book ?? 'None' },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

@@ -1,10 +1,10 @@
+import { PageHero, type PageHeroBadge } from '@/components/page';
 import ShiftTimelineSummary from '@/components/shift-timeline-summary';
 import {
     TimelineInteractions,
     type Comment,
     type ReactionGroup,
 } from '@/components/timeline-interactions';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -169,72 +169,32 @@ export default function TimelineIndex(props: Props) {
 
             <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
                 {/* Hero Header */}
-                {isClient && c && (
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                            <Avatar className="h-20 w-20 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-24 md:w-24">
-                                <AvatarImage
-                                    src={
-                                        c.avatar ??
-                                        c.profile_photo_url ??
-                                        undefined
-                                    }
-                                    alt={name}
-                                />
-                                <AvatarFallback className="bg-primary-foreground/10 text-xl font-bold text-primary-foreground md:text-2xl">
-                                    {getInitials(name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 text-center md:text-left">
-                                <h1 className="text-2xl font-bold md:text-3xl">
-                                    {name}
-                                </h1>
-                                {c.preferred_name &&
-                                    c.preferred_name !== name && (
-                                        <p className="mt-0.5 text-sm text-primary-foreground/60">
-                                            Preferred: {c.preferred_name}
-                                        </p>
-                                    )}
-                                {c.nhi_number && (
-                                    <p className="mt-0.5 text-sm text-primary-foreground/60">
-                                        NHI: {c.nhi_number}
-                                    </p>
-                                )}
-                                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                    <Badge
-                                        className={
-                                            c.status === 'active'
-                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
-                                        }
-                                    >
-                                        {c.status}
-                                    </Badge>
-                                    {c.funding_type && (
-                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                            {c.funding_type}
-                                        </Badge>
-                                    )}
-                                    {c.service_context && (
-                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                            {c.service_context.name}
-                                        </Badge>
-                                    )}
-                                    {c.site && (
-                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                            <Home className="mr-1 h-3 w-3" />
-                                            {c.site.name}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
+                {isClient && c && (() => {
+                    const badges: PageHeroBadge[] = [
+                        { label: c.status, tone: c.status === 'active' ? 'success' : 'default' },
+                    ];
+                    if (c.funding_type) badges.push({ label: c.funding_type });
+                    if (c.service_context) badges.push({ label: c.service_context.name });
+                    if (c.site) badges.push({ label: c.site.name, icon: Home });
+                    return (
+                        <PageHero
+                            avatar={{
+                                src: c.avatar ?? c.profile_photo_url ?? undefined,
+                                fallback: getInitials(name),
+                            }}
+                            title={name}
+                            description={
+                                [
+                                    c.preferred_name && c.preferred_name !== name ? `Preferred: ${c.preferred_name}` : null,
+                                    c.nhi_number ? `NHI: ${c.nhi_number}` : null,
+                                ].filter(Boolean).join(' · ')
+                            }
+                            badges={badges}
+                            actions={
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     asChild
                                 >
                                     <Link href={`/operations/clients/${c.id}`}>
@@ -242,10 +202,10 @@ export default function TimelineIndex(props: Props) {
                                         Back
                                     </Link>
                                 </Button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                            }
+                        />
+                    );
+                })()}
 
                 {/* Filters */}
                 <Card className="shadow-sm">

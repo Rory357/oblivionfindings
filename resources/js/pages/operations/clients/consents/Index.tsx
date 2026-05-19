@@ -29,6 +29,7 @@ import {
     Clock,
     FileCheck,
     Plus,
+    Shield,
     ShieldCheck,
     Upload,
     XCircle,
@@ -111,10 +112,17 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
             { title: 'Consents' },
         ]}>
             <Head title={`Consents - ${name}`} />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Shield}
                 title="Consent Management"
                 description={`Manage consent records for ${name}.`}
                 backHref={`/operations/clients/${client.id}`}
+                stats={[
+                    { label: 'Total', value: s.total },
+                    { label: 'Active', value: s.active },
+                    { label: 'Expiring', value: s.expiring_soon },
+                    { label: 'Expired', value: s.expired },
+                ]}
                 actions={
                     <Button className="gap-1.5 bg-primary hover:bg-primary" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
                         <Plus className="h-4 w-4" /> Record Consent

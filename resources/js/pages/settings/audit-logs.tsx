@@ -24,6 +24,7 @@ import {
     Clock,
     Download,
     FileText,
+    History,
     Search,
     TrendingUp,
 } from 'lucide-react';
@@ -264,11 +265,17 @@ export default function AuditLogs({
             <Head title="Audit Logs" />
             <SettingsLayout>
                 <div className="space-y-6">
-                    <PageHero variant="compact"
+                    <PageHero
+                        icon={History}
                         title="Audit Logs"
                         description="Track all changes made across the system"
+                        stats={[
+                            { label: 'Today', value: stats.today },
+                            { label: 'This week', value: stats.this_week },
+                            { label: 'This month', value: stats.this_month },
+                        ]}
                         actions={
-                            <Button variant="outline" asChild>
+                            <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                                 <a href={exportHref} dusk="audit-export-link">
                                     <Download className="mr-2 h-4 w-4" />
                                     Export CSV

@@ -270,9 +270,24 @@ export default function FeedbackIndex({
             <Head title={`${site.name} — Quality & Feedback`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={MessageSquare}
+                    backHref={`/sites/${site.id}`}
+                    backLabel="Back to site"
                     title={`${site.name} — Quality & Feedback`}
                     description="Manage whanau, client, and staff feedback for continuous quality improvement"
+                    stats={[
+                        { label: 'Total', value: stats.total },
+                        {
+                            label: 'Avg rating',
+                            value: stats.average_rating ?? '—',
+                        },
+                        { label: 'Open', value: stats.open },
+                        {
+                            label: 'Response rate',
+                            value: `${stats.response_rate}%`,
+                        },
+                    ]}
                     actions={
                         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                             <DialogTrigger asChild>

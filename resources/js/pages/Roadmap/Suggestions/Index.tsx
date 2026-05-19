@@ -17,6 +17,7 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
+import { Lightbulb } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -142,10 +143,21 @@ export default function SuggestionIndex({ items, filters, managers, can }: Props
     return (
         <AppLayout>
             <Head title="Roadmap Suggestions" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Lightbulb}
                 title="Roadmap Suggestions"
                 description="Triage backlog for operational signals that should become roadmap work."
-                backHref="/roadmap/dashboard"
+                stats={[
+                    { label: 'Total', value: items.data?.length ?? 0 },
+                    {
+                        label: 'Pending triage',
+                        value: items.data?.filter((s) => s.status === 'triage_pending').length ?? 0,
+                    },
+                    {
+                        label: 'Accepted',
+                        value: items.data?.filter((s) => s.status === 'accepted').length ?? 0,
+                    },
+                ]}
             />
             <PageShell>
                 <Card className="mb-4">

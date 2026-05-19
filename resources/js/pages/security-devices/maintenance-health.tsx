@@ -142,9 +142,16 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
             <Head title="Maintenance & Health - Security & Devices" />
 
             <PageShell>
-                <PageHero variant="compact"
-                    title={<span className="flex items-center gap-3"><Wrench className="h-6 w-6 text-primary" /> Maintenance & Health</span>}
+                <PageHero
+                    icon={Wrench}
+                    title="Maintenance & Health"
                     description="Device maintenance scheduling, health monitoring, and operational attention tracking."
+                    stats={[
+                        { label: 'Overdue', value: stats.overdue },
+                        { label: 'Upcoming', value: stats.upcoming },
+                        { label: 'Attention', value: totalAttention },
+                        { label: 'Critical', value: stats.critical },
+                    ]}
                 />
 
                 {/* ── Stats row ─────────────────────────────── */}

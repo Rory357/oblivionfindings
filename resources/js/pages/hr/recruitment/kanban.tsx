@@ -63,12 +63,22 @@ export default function RecruitmentKanban({ columns, stages, can }: Props) {
         >
             <Head title="Recruitment Kanban" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={LayoutGrid}
                     title="Recruitment Pipeline"
                     description={`Kanban view - ${totalCandidates} candidates across ${stages.length} stages`}
+                    stats={[
+                        { label: 'Candidates', value: totalCandidates },
+                        { label: 'Stages', value: stages.length },
+                    ]}
                     actions={
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
                                 <Link href="/hr/recruitment">
                                     <List className="mr-2 h-4 w-4" />
                                     List View

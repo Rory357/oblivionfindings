@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +11,7 @@ import {
     CheckCircle2,
     Clock,
     Eye,
+    MessageCircle,
     MessageSquare,
     Plus,
     Send,
@@ -159,65 +161,31 @@ export default function FeedbackIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="360 Feedback" />
 
-            <div className="space-y-6 p-4 lg:p-6">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute -top-4 left-1/3 h-28 w-28 rounded-full bg-primary-foreground/5" />
-
-                    <div className="relative flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                360-Degree Feedback
-                            </h1>
-                            <p className="mt-1 text-primary-foreground/70">
-                                Manage and respond to feedback requests across
-                                your team
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-6">
-                                {pendingTotal > 0 && (
-                                    <>
-                                        <div className="text-center">
-                                            <div className="text-3xl font-bold">
-                                                {pendingTotal}
-                                            </div>
-                                            <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                                Pending
-                                            </div>
-                                        </div>
-                                        <div className="h-10 w-px bg-primary-foreground/20" />
-                                    </>
-                                )}
-
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {responseRate}%
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Response Rate
-                                    </div>
-                                </div>
-                            </div>
-
-                            {can.manage && (
-                                <Button
-                                    size="sm"
-                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
-                                    asChild
-                                >
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={MessageCircle}
+                        title="360-Degree Feedback"
+                        description="Manage and respond to feedback requests across your team."
+                        stats={[
+                            { label: 'Pending', value: pendingTotal },
+                            { label: 'Response rate', value: `${responseRate}%` },
+                            { label: 'Total', value: totalCount },
+                            { label: 'Completed', value: completedCount },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button size="sm" asChild>
                                     <Link href="/hr/feedback/request">
                                         <Plus className="h-4 w-4" />
                                         Request Feedback
                                     </Link>
                                 </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     {[
                         {
@@ -475,7 +443,7 @@ export default function FeedbackIndex({
                 {requests.links?.length > 3 && (
                     <LaravelPagination links={requests.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -28,6 +28,7 @@ import {
     CheckCircle2,
     ClipboardList,
     GripVertical,
+    Package,
     Plus,
     Star,
     X,
@@ -166,18 +167,37 @@ export default function InterviewKits({ kits, roles, can }: Props) {
         >
             <Head title="Interview Kits" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Package}
                     title="Interview Kits"
                     description="Structured scorecards and interview criteria for consistent hiring decisions."
+                    stats={[
+                        { label: 'Total', value: kits.total },
+                        {
+                            label: 'Active',
+                            value: kits.data.filter((k) => k.is_active).length,
+                        },
+                        { label: 'Roles', value: roles.length },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
                                 <Link href="/hr/recruitment">
                                     <ArrowLeft className="mr-2 h-4 w-4" />
                                     Pipeline
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
                                 <Link href="/hr/recruitment/jobs">Jobs</Link>
                             </Button>
                             {can.manage && (

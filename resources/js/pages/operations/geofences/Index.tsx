@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, MapPin, Pencil, Plus, Search } from 'lucide-react';
+import { Eye, MapPin, MapPinned, Pencil, Plus, Search } from 'lucide-react';
 
 type Geofence = {
     id: number;
@@ -40,10 +40,17 @@ export default function GeofencesIndex({ geofences = { data: [], links: [], curr
     return (
         <AppLayout>
             <Head title="Geofences" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={MapPinned}
                 title="Geofences"
                 description="Manage geofence zones for electronic visit verification."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total zones', value: geofences?.total ?? 0 },
+                    {
+                        label: 'Active',
+                        value: (geofences?.data ?? []).filter((g) => g.is_active).length,
+                    },
+                ]}
             />
             <PageShell>
                 {/* Filters */}

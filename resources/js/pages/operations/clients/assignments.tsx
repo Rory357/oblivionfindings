@@ -8,7 +8,15 @@ import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, Search, Star, UserPlus, Users, X } from 'lucide-react';
+import {
+    CheckCircle2,
+    Search,
+    Star,
+    UserPlus,
+    Users,
+    UsersRound,
+    X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export default function ClientAssignments({
@@ -89,10 +97,17 @@ export default function ClientAssignments({
             ]}
         >
             <Head title={`Assign Workers - ${name}`} />
-            <PageHero variant="compact"
+            <PageHero
+                icon={UsersRound}
                 title="Assign Workers"
                 description={`Manage which support workers are assigned to ${client.first_name}.`}
                 backHref={`/operations/clients/${client.id}`}
+                backLabel={`Back to ${client.first_name}`}
+                stats={[
+                    { label: 'Assigned', value: assignedWorkers.length },
+                    { label: 'Available', value: unassignedWorkers.length },
+                    { label: 'Total workers', value: workers?.length ?? 0 },
+                ]}
                 actions={
                     <Button
                         className="gap-1.5 bg-primary hover:bg-primary"

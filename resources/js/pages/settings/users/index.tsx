@@ -248,12 +248,19 @@ export default function UsersIndex({
 
     const content = (
         <div className="space-y-6">
-                    <PageHero variant="compact"
+                    <PageHero
+                        icon={Users}
                         title="System Users"
                         description="Manage user accounts, roles, and access across your organisation"
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Active', value: stats.active },
+                            { label: 'Pending', value: stats.pending },
+                            { label: 'Staff', value: stats.staff },
+                        ]}
                         actions={
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" onClick={handleExportCsv}>
+                                <Button variant="outline" onClick={handleExportCsv} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                                     <Download className="mr-2 h-4 w-4" />
                                     Export CSV
                                 </Button>

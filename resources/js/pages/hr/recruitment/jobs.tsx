@@ -26,6 +26,7 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
+    Briefcase,
     BriefcaseBusiness,
     CheckCircle2,
     Clock3,
@@ -275,18 +276,35 @@ export default function RecruitmentJobs({
         >
             <Head title="Job Requisitions" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Briefcase}
                     title="Job Requisitions"
                     description="Create and publish roles to the public careers page."
+                    stats={[
+                        { label: 'Open', value: summary.open_requisitions },
+                        { label: 'Published', value: summary.published_jobs },
+                        { label: 'Active candidates', value: summary.active_candidates },
+                        { label: 'Hired', value: summary.hired_candidates },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
                                 <Link href="/hr/recruitment">
                                     <ArrowLeft className="mr-2 h-4 w-4" />
                                     Pipeline
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
                                 <Link href="/careers" target="_blank">
                                     <ExternalLink className="mr-2 h-4 w-4" />
                                     Careers Page

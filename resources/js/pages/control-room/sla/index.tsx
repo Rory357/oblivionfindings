@@ -26,6 +26,7 @@ import {
     Plus,
     Shield,
     ShieldAlert,
+    Timer,
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -1000,13 +1001,24 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
         >
             <Head title="SLA Management - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Timer}
                     title="SLA Management"
                     description="Configure service level agreements for alert acknowledgement, response, and resolution times."
+                    stats={[
+                        { label: 'Total SLAs', value: slaDefinitions.length },
+                        { label: 'Active', value: activeCount },
+                        { label: 'Alerts matched', value: totalAlerts },
+                        { label: 'Inactive', value: slaDefinitions.length - activeCount },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
                             <Link href="/control-room/sla/breaches">
-                                <Button variant="outline" size="sm">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
                                     <AlertTriangle className="mr-2 h-4 w-4" />
                                     Breach Report
                                 </Button>

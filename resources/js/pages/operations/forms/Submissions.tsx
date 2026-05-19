@@ -23,10 +23,11 @@ export default function CustomFormSubmissions({ form, submissions }: Props) {
     return (
         <AppLayout>
             <Head title={`${form.name} submissions`} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title={`${form.name} submissions`}
                 description="Review recent submissions captured against this form."
-                backHref={`/operations/forms/${form.id}`}
+                backHref="/operations/forms"
             />
             <PageShell>
                 <Card>

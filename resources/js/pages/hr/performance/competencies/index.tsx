@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,92 +85,46 @@ export default function CompetencyIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Competency Framework" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Competency Framework
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Define and manage organisational competencies
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                        <Link href="/hr/performance">
-                            <Button size="sm" variant="outline">
-                                Dashboard
-                            </Button>
-                        </Link>
-                        {can.manage && (
-                            <>
-                                <Button size="sm" asChild variant="outline">
-                                    <Link href="/hr/performance/competencies?assess=1">
-                                        <Users className="mr-1.5 h-4 w-4" />
-                                        Assess
-                                    </Link>
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() => setShowForm(!showForm)}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Competency
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {/* KPI Summary Cards */}
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                    <Card className="border-l-4 border-l-blue-500 bg-status-info-bg">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-status-info">
-                                    Total Competencies
-                                </p>
-                                <div className="rounded-full bg-status-info-bg p-1.5">
-                                    <Target className="h-4 w-4 text-status-info" />
-                                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Target}
+                        title="Competency Framework"
+                        description="Define and manage organisational competencies."
+                        stats={[
+                            { label: 'Total competencies', value: competencies.length },
+                            { label: 'Categories', value: categories.length },
+                            { label: 'Staff profiles', value: staff.length },
+                        ]}
+                        actions={
+                            <div className="flex gap-2">
+                                <Link href="/hr/performance">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        Dashboard
+                                    </Button>
+                                </Link>
+                                {can.manage && (
+                                    <>
+                                        <Button size="sm" asChild variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                            <Link href="/hr/performance/competencies?assess=1">
+                                                <Users className="mr-1.5 h-4 w-4" />
+                                                Assess
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setShowForm(!showForm)}
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add Competency
+                                        </Button>
+                                    </>
+                                )}
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-status-info">
-                                {competencies.length}
-                            </span>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-primary/10/40 border-l-4 border-l-purple-500">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-primary">
-                                    Categories
-                                </p>
-                                <div className="rounded-full bg-primary/10 p-1.5">
-                                    <Target className="h-4 w-4 text-primary" />
-                                </div>
-                            </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-primary">
-                                {categories.length}
-                            </span>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-l-4 border-l-emerald-500 bg-status-success-bg">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-status-success">
-                                    Staff Profiles
-                                </p>
-                                <div className="rounded-full bg-status-success-bg p-1.5">
-                                    <Users className="h-4 w-4 text-status-success" />
-                                </div>
-                            </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-status-success">
-                                {staff.length}
-                            </span>
-                        </CardContent>
-                    </Card>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {showForm && (
                     <Card>
                         <CardHeader>
@@ -337,7 +292,7 @@ export default function CompetencyIndex({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

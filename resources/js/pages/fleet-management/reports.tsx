@@ -12,7 +12,7 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
+    BarChart3,
     Car,
     Clock,
     Download,
@@ -90,16 +90,30 @@ export default function FleetReports({
         >
             <Head title="Fleet Reports" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={BarChart3}
+                    backHref="/fleet-management"
                     title="Fleet Reports"
                     description="Vehicle usage, trips, and fuel statistics"
+                    stats={[
+                        { label: 'Trips', value: trip_stats.total_trips },
+                        {
+                            label: 'Distance',
+                            value: `${trip_stats.total_distance_km.toLocaleString()} km`,
+                        },
+                        {
+                            label: 'Fuel cost',
+                            value: `$${fuel_stats.total_cost.toLocaleString()}`,
+                        },
+                        { label: 'Hours', value: trip_stats.total_hours },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
                             <Select
                                 value={period}
                                 onValueChange={handlePeriodChange}
                             >
-                                <SelectTrigger className="w-32">
+                                <SelectTrigger className="w-32 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -117,15 +131,10 @@ export default function FleetReports({
                                 variant="outline"
                                 size="sm"
                                 onClick={handleExport}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                             >
                                 <Download className="mr-2 h-4 w-4" />
                                 Export CSV
-                            </Button>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/fleet-management">
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Dashboard
-                                </Link>
                             </Button>
                         </div>
                     }

@@ -151,10 +151,15 @@ export default function JobBoardIndex({
     return (
         <AppLayout>
             <Head title="Job Board" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Briefcase}
                 title="Job Board"
                 description="Open shifts and positions available for support workers."
-                backHref="/operations"
+                stats={[
+                    { label: 'Open positions', value: stats?.open ?? 0 },
+                    { label: 'Claimed', value: stats?.claimed ?? 0 },
+                    { label: 'Filled today', value: stats?.filled_today ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

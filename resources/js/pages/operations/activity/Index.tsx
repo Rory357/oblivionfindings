@@ -80,7 +80,15 @@ export default function ActivityFeed({ activities, filter }: Props) {
     return (
         <AppLayout>
             <Head title="Activity Feed" />
-            <PageHero variant="compact" title="Activity Feed" description={`Recent operational activity across shifts, timesheets, and ${clientPlural.toLowerCase()}.`} backHref="/operations" />
+            <PageHero
+                icon={Activity}
+                title="Activity Feed"
+                description={`Recent operational activity across shifts, timesheets, and ${clientPlural.toLowerCase()}.`}
+                stats={[
+                    { label: 'Events', value: activities.length },
+                    { label: 'Filter', value: filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1) },
+                ]}
+            />
             <PageShell>
                 {/* Filters */}
                 <div className="mb-4 flex flex-wrap gap-1.5">

@@ -218,14 +218,30 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
             <Head title="My Tasks - Control Room" />
 
             <PageShell>
-                <PageHero variant="compact" title="My Tasks" subtitle="Your personal control room dashboard" actions={
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/my-tasks">
-                            <Calendar className="mr-2 h-4 w-4" />
-                            View Full My Day
-                        </Link>
-                    </Button>
-                } />
+                <PageHero
+                    icon={ListChecks}
+                    title="My Tasks"
+                    description="Your personal control room dashboard"
+                    stats={[
+                        { label: 'Open alerts', value: stats.my_open },
+                        { label: 'Resolved today', value: stats.my_resolved_today },
+                        { label: 'Critical', value: stats.my_critical },
+                        { label: 'Follow-ups', value: my_followups.length },
+                    ]}
+                    actions={
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                        >
+                            <Link href="/my-tasks">
+                                <Calendar className="mr-2 h-4 w-4" />
+                                View Full My Day
+                            </Link>
+                        </Button>
+                    }
+                />
 
                 {/* KPI Row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

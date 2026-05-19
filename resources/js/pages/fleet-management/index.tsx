@@ -13,6 +13,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { Car } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export default function FleetManagementIndex({ vehicles }) {
@@ -74,9 +75,35 @@ export default function FleetManagementIndex({ vehicles }) {
         >
             <Head title="Fleet Management" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Car}
                     title="Fleet Management"
                     description="Live vehicle status, trip activity, and signals."
+                    stats={[
+                        { label: 'Vehicles', value: vehicles?.length ?? 0 },
+                        {
+                            label: 'Active trips',
+                            value:
+                                vehicles?.reduce(
+                                    (sum, v) => sum + (v.open_trip_count ?? 0),
+                                    0,
+                                ) ?? 0,
+                        },
+                        {
+                            label: 'Online',
+                            value:
+                                vehicles?.filter(
+                                    (v) => v.state?.status === 'online',
+                                ).length ?? 0,
+                        },
+                        {
+                            label: 'Consent blocked',
+                            value:
+                                vehicles?.filter(
+                                    (v) => v.state?.consent_blocked,
+                                ).length ?? 0,
+                        },
+                    ]}
                 />
 
                 <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">

@@ -15,6 +15,7 @@ import {
     Clock,
     ClipboardCheck,
     FileText,
+    LayoutDashboard,
     Plus,
     TrendingDown,
     TrendingUp,
@@ -113,9 +114,16 @@ export default function OperationsDashboard({ stats, client_status_breakdown, sh
     return (
         <AppLayout>
             <Head title="Operations" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={LayoutDashboard}
                 title="Operations Dashboard"
                 description="Overview of clients, shifts, timesheets, and operational activity."
+                stats={[
+                    { label: 'Active clients', value: stats.active_clients },
+                    { label: 'Shifts today', value: stats.shifts_today_total },
+                    { label: 'Hours this week', value: stats.hours_this_week },
+                    { label: 'Unassigned', value: stats.unassigned_shifts },
+                ]}
             />
             <PageShell>
                 {/* ── Quick Actions ─────────────────────────────────────── */}

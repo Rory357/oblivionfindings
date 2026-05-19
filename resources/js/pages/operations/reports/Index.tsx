@@ -73,10 +73,11 @@ export default function ReportsIndex() {
     return (
         <AppLayout>
             <Head title="Operations Reports" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={BarChart3}
                 title="Reports & Analytics"
                 description={`Operational reports across ${clientPlural.toLowerCase()}, staff, shifts, billing, and compliance.`}
-                backHref="/operations"
+                stats={[{ label: 'Reports available', value: reportTypes.length }]}
             />
             <PageShell>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

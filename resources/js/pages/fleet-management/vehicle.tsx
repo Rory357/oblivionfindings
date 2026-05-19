@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Truck } from 'lucide-react';
 import { useEffect } from 'react';
 
 export default function FleetVehicle({
@@ -61,14 +62,18 @@ export default function FleetVehicle({
         >
             <Head title={`Fleet • ${asset.name ?? 'Vehicle'}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Truck}
+                    backHref="/fleet-management"
+                    backLabel="Back to fleet"
                     title={asset.name ?? 'Vehicle'}
                     description="Live status, signals, and recent trips."
-                    actions={
-                        <Button variant="outline" asChild>
-                            <Link href="/fleet-management">Back to Fleet</Link>
-                        </Button>
-                    }
+                    stats={[
+                        { label: 'Status', value: state?.status ?? 'offline' },
+                        { label: 'Speed', value: `${state?.speed_kph ?? 0} kph` },
+                        { label: 'Signals', value: signals?.length ?? 0 },
+                        { label: 'Trips', value: trips?.length ?? 0 },
+                    ]}
                 />
 
                 <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">

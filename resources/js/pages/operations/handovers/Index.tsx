@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, Clock, GitBranch, Search, Users } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle2, Clock, GitBranch, Search, Users } from 'lucide-react';
 
 type Handover = {
     id: number;
@@ -75,10 +75,21 @@ export default function HandoversIndex({
     return (
         <AppLayout>
             <Head title="Shift Handovers" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={ArrowLeftRight}
                 title="Shift Handovers"
                 description="Handover notes between outgoing and incoming shift staff."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: handovers?.total ?? 0 },
+                    {
+                        label: 'Submitted',
+                        value: (handovers?.data ?? []).filter((h) => h.status === 'submitted').length,
+                    },
+                    {
+                        label: 'Acknowledged',
+                        value: (handovers?.data ?? []).filter((h) => h.status === 'acknowledged').length,
+                    },
+                ]}
             />
             <PageShell>
                 <div className="mb-4 flex flex-wrap items-center gap-2">

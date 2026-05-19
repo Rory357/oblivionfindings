@@ -82,7 +82,17 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
     return (
         <AppLayout>
             <Head title="Billing" />
-            <PageHero variant="compact" title="Billing" description="Manage billing entries, revenue tracking, and payment status." backHref="/operations" />
+            <PageHero
+                icon={Receipt}
+                title="Billing"
+                description="Manage billing entries, revenue tracking, and payment status."
+                stats={[
+                    { label: 'Billed this month', value: formatCurrency(s.billed_this_month) },
+                    { label: 'Outstanding', value: formatCurrency(s.outstanding) },
+                    { label: 'Paid this month', value: formatCurrency(s.paid_this_month) },
+                    { label: 'Pending', value: s.pending_count },
+                ]}
+            />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

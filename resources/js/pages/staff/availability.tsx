@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Calendar } from 'lucide-react';
 
 import { PageHero } from '@/components/page';
 type Availability = {
@@ -48,9 +49,14 @@ export default function StaffAvailability({ user, availability, canManage }: Pro
             <Head title={`Availability: ${user.name}`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Calendar}
                     title="Availability"
                     description={`${user.name} • ${user.email}`}
+                    stats={[
+                        { label: 'Blocks', value: availability.length },
+                        { label: 'Days covered', value: new Set(availability.map((a) => a.day_of_week)).size },
+                    ]}
                 />
 
                 <div className="flex items-center justify-end gap-2">

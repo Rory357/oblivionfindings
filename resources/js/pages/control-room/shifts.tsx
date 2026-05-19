@@ -27,6 +27,7 @@ import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRightLeft,
+    Calendar,
     CheckCircle,
     Clock,
     MessageSquarePlus,
@@ -273,9 +274,16 @@ export default function ControlRoomShifts({
         >
             <Head title="Active Shifts - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Calendar}
                     title="Active Shifts"
                     description="Shift management, operator notes, and handover workflow."
+                    stats={[
+                        { label: 'Active shift', value: activeShift ? 1 : 0 },
+                        { label: 'Open alerts', value: openAlertsCount },
+                        { label: 'Critical', value: criticalAlertsCount },
+                        { label: 'Recent shifts', value: recentShifts.length },
+                    ]}
                     actions={
                         can.manage && !activeShift ? (
                             <Dialog

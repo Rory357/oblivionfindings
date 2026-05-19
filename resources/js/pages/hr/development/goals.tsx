@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
+import { Target } from 'lucide-react';
 import { FormEvent } from 'react';
 
 type GoalRow = {
@@ -144,9 +145,25 @@ export default function DevelopmentGoals({
         >
             <Head title="Development Goals" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Target}
                     title="Development Goals"
                     description="Track growth plans, competency progression, and manager coaching outcomes."
+                    stats={[
+                        { label: 'Total', value: goals.total },
+                        {
+                            label: 'In progress',
+                            value: goals.data.filter((g) => g.status === 'in_progress').length,
+                        },
+                        {
+                            label: 'Completed',
+                            value: goals.data.filter((g) => g.status === 'completed').length,
+                        },
+                        {
+                            label: 'Blocked',
+                            value: goals.data.filter((g) => g.status === 'blocked').length,
+                        },
+                    ]}
                 />
 
                 <div className="flex items-center gap-2">

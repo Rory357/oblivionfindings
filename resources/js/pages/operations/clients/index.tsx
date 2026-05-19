@@ -17,7 +17,7 @@ import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { MapPin, Pencil } from 'lucide-react';
+import { MapPin, Pencil, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 export default function ClientsIndex({ clients }) {
@@ -75,13 +75,21 @@ export default function ClientsIndex({ clients }) {
             <Head title={labels?.['client.plural'] ?? 'Clients'} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Users}
                     title={labels?.['client.plural'] ?? 'Clients'}
                     description={
                         role === 'support_worker'
                             ? 'Only clients assigned to you are shown.'
                             : 'View and manage client profiles, documents, medical info, and assignments.'
                     }
+                    stats={[
+                        { label: 'Total', value: clients.length },
+                        {
+                            label: 'Active',
+                            value: (clients as any[]).filter((c) => c.status === 'active').length,
+                        },
+                    ]}
                     actions={
                         canManage ? (
                             <Button asChild>

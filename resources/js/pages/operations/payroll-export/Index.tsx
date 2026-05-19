@@ -98,10 +98,18 @@ export default function PayrollExportIndex({
     return (
         <AppLayout>
             <Head title="Payroll Export" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Download}
                 title="Payroll Export"
                 description="Generate and manage payroll export files."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total exports', value: stats?.total ?? 0 },
+                    {
+                        label: 'Hours this period',
+                        value: `${(stats?.hours_this_period ?? 0).toLocaleString('en-NZ')} hrs`,
+                    },
+                    { label: 'Amount this period', value: nzd.format(stats?.amount_this_period ?? 0) },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

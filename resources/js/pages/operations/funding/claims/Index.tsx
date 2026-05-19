@@ -12,7 +12,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarDays, FileText, Plus } from 'lucide-react';
+import { CalendarDays, FileCheck, FileText, Plus } from 'lucide-react';
 
 const ANY = '__ANY__';
 const nzd = new Intl.NumberFormat('en-NZ', {
@@ -75,10 +75,25 @@ export default function FundingClaimsIndex({
     return (
         <AppLayout>
             <Head title="Funding Claims" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={FileCheck}
                 title="Funding Claims"
                 description="Track draft, submitted, and approved claims against live service agreements."
-                backHref="/operations/funding"
+                stats={[
+                    { label: 'Total claims', value: rows.length },
+                    {
+                        label: 'Submitted',
+                        value: rows.filter((c) => c.status === 'submitted').length,
+                    },
+                    {
+                        label: 'Approved',
+                        value: rows.filter((c) => c.status === 'approved').length,
+                    },
+                    {
+                        label: 'Paid',
+                        value: rows.filter((c) => c.status === 'paid').length,
+                    },
+                ]}
             />
             <PageShell>
                 <div className="flex flex-wrap items-center gap-2">

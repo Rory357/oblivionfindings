@@ -60,10 +60,21 @@ export default function CalendarSyncIndex({ connections = { data: [], links: [],
     return (
         <AppLayout>
             <Head title="Calendar Sync" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Calendar}
                 title="Calendar Sync"
                 description="Manage calendar synchronisation connections."
-                backHref="/operations"
+                stats={[
+                    { label: 'Connections', value: connections?.total ?? 0 },
+                    {
+                        label: 'Connected',
+                        value: (connections?.data ?? []).filter((c) => c.status === 'connected').length,
+                    },
+                    {
+                        label: 'Errors',
+                        value: (connections?.data ?? []).filter((c) => c.status === 'error').length,
+                    },
+                ]}
             />
             <PageShell>
                 {/* Actions */}

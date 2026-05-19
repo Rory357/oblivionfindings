@@ -82,10 +82,16 @@ export default function EvvIndex({ records = { data: [], links: [], current_page
     return (
         <AppLayout>
             <Head title="Electronic Visit Verification" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={MapPin}
                 title="Electronic Visit Verification"
                 description="Track and verify support worker visits with GPS and time validation."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: stats?.total ?? 0 },
+                    { label: 'Verified', value: stats?.verified ?? 0 },
+                    { label: 'Pending', value: stats?.pending ?? 0 },
+                    { label: 'Flagged', value: stats?.flagged ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats + Donut */}

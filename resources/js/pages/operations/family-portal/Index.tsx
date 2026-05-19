@@ -52,10 +52,17 @@ export default function FamilyPortalIndex({ clients = { data: [], links: [], cur
     return (
         <AppLayout>
             <Head title="Family Portal" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Home}
                 title="Family Portal"
                 description="Manage client portal access and notification settings for families."
-                backHref="/operations"
+                stats={[
+                    { label: 'Clients', value: clients?.total ?? 0 },
+                    {
+                        label: 'Portal active',
+                        value: (clients?.data ?? []).filter((c) => c.portal_enabled).length,
+                    },
+                ]}
             />
             <PageShell>
                 {/* Search */}

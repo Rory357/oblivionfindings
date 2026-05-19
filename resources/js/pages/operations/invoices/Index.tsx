@@ -73,7 +73,17 @@ export default function InvoicesIndex({ invoices = { data: [], links: [], curren
     return (
         <AppLayout>
             <Head title="Invoices" />
-            <PageHero variant="compact" title="Invoices" description="Create and manage invoices for clients and funding bodies." backHref="/operations" />
+            <PageHero
+                icon={FileText}
+                title="Invoices"
+                description="Create and manage invoices for clients and funding bodies."
+                stats={[
+                    { label: 'Draft', value: s.draft },
+                    { label: 'Sent', value: s.sent },
+                    { label: 'Paid', value: s.paid },
+                    { label: 'Overdue', value: s.overdue },
+                ]}
+            />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { CalendarClock, ChevronDown, Plus } from 'lucide-react';
+import { CalendarClock, ChevronDown, Clock, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 interface TimeEntry {
@@ -137,11 +137,21 @@ export default function TimeEntries({ entries, filters, can }: Props) {
             <Head title="Time Entries" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Clock}
                     title="Time Entries"
                     description="View and manage clock entries that feed period timesheets."
-                    backHref="/hr/time"
-                    backLabel="Back to Timekeeping"
+                    stats={[
+                        { label: 'Total', value: entries.total },
+                        {
+                            label: 'Submitted',
+                            value: entries.data.filter((e) => e.status === 'submitted').length,
+                        },
+                        {
+                            label: 'Approved',
+                            value: entries.data.filter((e) => e.status === 'approved').length,
+                        },
+                    ]}
                 />
 
                 {/* Date Range Filter */}

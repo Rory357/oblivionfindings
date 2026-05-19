@@ -32,6 +32,7 @@ import {
     CheckCircle,
     Clock,
     ShieldCheck,
+    TrendingUp,
     Users,
     Wifi,
     WifiOff,
@@ -145,12 +146,19 @@ export default function ControlRoomStats({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Live Statistics - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={TrendingUp}
                     title="Live Statistics"
                     description="Real-time KPIs and analytics for the control room."
+                    stats={[
+                        { label: 'SLA compliance', value: `${kpis.sla_compliance_pct}%` },
+                        { label: 'Avg acknowledge', value: `${kpis.avg_acknowledge_minutes}m` },
+                        { label: 'Open alerts', value: kpis.open_alerts },
+                        { label: 'Alerts today', value: kpis.alerts_today },
+                    ]}
                     actions={
                         <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
                                 <span className="relative flex h-2 w-2">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
@@ -158,7 +166,7 @@ export default function ControlRoomStats({
                                 Auto-refreshing
                             </div>
                             <Select value={period} onValueChange={handlePeriodChange}>
-                                <SelectTrigger className="w-[160px]">
+                                <SelectTrigger className="w-[160px] border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

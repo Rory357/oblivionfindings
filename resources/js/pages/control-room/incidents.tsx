@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { PageHero } from '@/components/page';
 import {
+    AlertOctagon,
     AlertTriangle,
     Bell,
     ChevronLeft,
@@ -212,9 +213,16 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
         >
             <Head title="Incident Tracker - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={AlertOctagon}
                     title="Incident Tracker"
                     description="Live feed of incidents across all modules."
+                    stats={[
+                        { label: 'Total', value: stats.total },
+                        { label: 'Critical', value: stats.critical },
+                        { label: 'High', value: stats.high },
+                        { label: 'Unresolved', value: stats.unresolved },
+                    ]}
                 />
 
                 {/* Stats Cards */}

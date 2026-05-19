@@ -60,10 +60,15 @@ export default function FormsIndex({ forms, filters, stats }: Props) {
     return (
         <AppLayout>
             <Head title="Forms" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={FileText}
                 title="Forms"
                 description="Create and manage custom forms for data collection."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: stats?.total ?? 0 },
+                    { label: 'Active', value: stats?.active ?? 0 },
+                    { label: 'Submissions this week', value: stats?.submissions_this_week ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

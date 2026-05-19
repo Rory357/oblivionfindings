@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle } from 'lucide-react';
 
 type ShiftRow = {
     id: number;
@@ -486,18 +487,18 @@ export default function RosteringConflicts({
         >
             <Head title="Rostering conflict queue" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={AlertTriangle}
+                    backHref="/operations/rostering"
+                    backLabel="Back to rostering"
                     title="Conflict queue"
                     description={`Work through overlaps, leave clashes, open coverage, and replacements for ${weekStart} to ${weekEnd}.`}
-                    actions={
-                        <div className="flex gap-2">
-                            <Button variant="outline" asChild>
-                                <Link href="/operations/rostering">
-                                    Back to rostering
-                                </Link>
-                            </Button>
-                        </div>
-                    }
+                    stats={[
+                        { label: 'Staff overlaps', value: staffOverlaps.length },
+                        { label: 'Leave clashes', value: timeOffConflicts.length },
+                        { label: 'Coverage gaps', value: coverageGaps.length },
+                        { label: 'Open shifts', value: openShifts.length },
+                    ]}
                 />
 
                 <div className="grid gap-3 md:grid-cols-6">

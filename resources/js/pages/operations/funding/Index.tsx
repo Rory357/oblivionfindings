@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ArrowRight, DollarSign, FileText, PieChart, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Banknote, DollarSign, FileText, PieChart, TrendingUp } from 'lucide-react';
 
 type Props = {
     stats: {
@@ -47,7 +47,17 @@ export default function FundingIndex({ stats = {} as any, claims_by_status = {} 
     return (
         <AppLayout>
             <Head title="Funding" />
-            <PageHero variant="compact" title="Funding Dashboard" description="Track budgets, utilisation, and claims across all service agreements." backHref="/operations" />
+            <PageHero
+                icon={Banknote}
+                title="Funding Dashboard"
+                description="Track budgets, utilisation, and claims across all service agreements."
+                stats={[
+                    { label: 'Total budget', value: formatCurrency(s.total_budget) },
+                    { label: 'Utilised', value: `${s.utilisation_percent}%` },
+                    { label: 'Remaining', value: formatCurrency(s.total_remaining) },
+                    { label: 'Pending claims', value: s.pending_claims },
+                ]}
+            />
             <PageShell>
                 {/* KPIs */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -68,10 +68,17 @@ export default function NotificationsIndex({ notifications = { data: [], links: 
     return (
         <AppLayout>
             <Head title="Notifications" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Bell}
                 title="Notifications"
                 description="View and manage your notifications."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: notifications?.total ?? 0 },
+                    {
+                        label: 'Unread',
+                        value: (notifications?.data ?? []).filter((n) => !n.is_read).length,
+                    },
+                ]}
             />
             <PageShell>
                 {/* Filters + Actions */}

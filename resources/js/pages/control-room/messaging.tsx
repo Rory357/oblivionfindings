@@ -27,6 +27,7 @@ import {
     AlertTriangle,
     Check,
     CheckCheck,
+    MessageSquare,
     MessageSquarePlus,
     Send,
     User,
@@ -301,9 +302,16 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
         >
             <Head title="Messaging - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={MessageSquare}
                     title="Messaging"
                     description="Message field staff and manage alert-linked conversations."
+                    stats={[
+                        { label: 'Conversations', value: threads.length },
+                        { label: 'Unread', value: threads.reduce((sum, t) => sum + t.unread_count, 0) },
+                        { label: 'Alert threads', value: threads.filter((t) => t.type === 'alert').length },
+                        { label: 'Direct threads', value: threads.filter((t) => t.type === 'direct').length },
+                    ]}
                 />
 
                 <Card className="overflow-hidden">

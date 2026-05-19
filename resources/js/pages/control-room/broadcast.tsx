@@ -240,7 +240,16 @@ export default function ControlRoomBroadcast({
         >
             <Head title="Broadcast Messages" />
             <PageShell>
-                <PageHero variant="compact" title="Broadcast Messages" description="Send urgent messages to staff across multiple channels." />
+                <PageHero
+                    icon={Megaphone}
+                    title="Broadcast Messages"
+                    description="Send urgent messages to staff across multiple channels."
+                    stats={[
+                        { label: 'Total staff', value: totalStaff },
+                        { label: 'Broadcasts sent', value: broadcasts.total },
+                        { label: 'Channels', value: Object.keys(CHANNEL_LABELS).length },
+                    ]}
+                />
 
                 {/* Compose Section */}
                 {can.manage && (

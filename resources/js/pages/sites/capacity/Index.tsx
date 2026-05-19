@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageHero } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
-import { Users, Home, UserPlus, Clock, BarChart3 } from 'lucide-react';
+import { Users, Home, UserPlus, Clock, BarChart3, Gauge } from 'lucide-react';
 
 type Room = {
     id: number;
@@ -97,14 +97,18 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
             <Head title={`${site.name} — Capacity & Occupancy`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Gauge}
+                    backHref={`/sites/${site.id}`}
+                    backLabel="Back to site"
                     title={`${site.name} — Capacity & Occupancy`}
                     description="Monitor room assignments, occupancy levels, and waitlist status"
-                    actions={
-                        <Button asChild variant="secondary" size="sm">
-                            <Link href={`/sites/${site.id}`}>Back to Site</Link>
-                        </Button>
-                    }
+                    stats={[
+                        { label: 'Capacity', value: totalCapacity || '—' },
+                        { label: 'Occupied', value: currentOccupancy },
+                        { label: 'Available', value: availableSpaces },
+                        { label: 'Waitlist', value: waitlistCount },
+                    ]}
                 />
 
                 {/* Stats Row */}

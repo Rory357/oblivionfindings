@@ -116,9 +116,16 @@ export default function AlertsEvents({ stats, events, filters, filterOptions }: 
             <Head title="Alerts & Events - Security & Devices" />
 
             <PageShell>
-                <PageHero variant="compact"
-                    title={<span className="flex items-center gap-3"><Bell className="h-6 w-6 text-primary" /> Alerts & Events</span>}
+                <PageHero
+                    icon={Bell}
+                    title="Alerts & Events"
                     description="Read-only device event stream. For alert triage and escalation, use Control Room."
+                    stats={[
+                        { label: 'Events (24h)', value: stats.total24h },
+                        { label: 'Critical', value: stats.critical24h },
+                        { label: 'Warning', value: stats.warning24h },
+                        { label: 'Unprocessed', value: stats.unprocessed },
+                    ]}
                 />
 
                 {/* Stats */}

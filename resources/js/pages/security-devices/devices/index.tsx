@@ -8,6 +8,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    Cctv,
     Cpu,
     MonitorOff,
     Plus,
@@ -69,9 +70,16 @@ export default function DevicesIndex({ devices, stats, filters, filterOptions }:
             <Head title="Devices - Security & Devices" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Cctv}
                     title="Devices"
                     description="Canonical device registry across all hardware domains."
+                    stats={[
+                        { label: 'Total', value: stats.total },
+                        { label: 'Active', value: stats.active },
+                        { label: 'Offline', value: stats.offline },
+                        { label: 'Attention', value: stats.attention },
+                    ]}
                     actions={
                         <Button asChild size="sm">
                             <Link href="/security-devices/devices/create">

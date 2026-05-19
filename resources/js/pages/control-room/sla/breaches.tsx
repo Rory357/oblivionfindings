@@ -16,7 +16,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     Clock,
     Filter,
     ShieldAlert,
@@ -159,17 +158,12 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
         >
             <Head title="SLA Breach Report - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    variant="compact"
                     title="SLA Breach Report"
                     description="View and analyse SLA breaches across all alert types."
-                    actions={
-                        <Link href="/control-room/sla">
-                            <Button variant="outline" size="sm">
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back to SLA Management
-                            </Button>
-                        </Link>
-                    }
+                    backHref="/control-room/sla"
+                    backLabel="Back to SLA Management"
                 />
 
                 {/* Stats Cards */}

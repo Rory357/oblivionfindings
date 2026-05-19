@@ -22,6 +22,7 @@ import {
     Info,
     MapPin,
     MinusCircle,
+    Radio,
     Search,
     Shield,
     ShieldCheck,
@@ -388,31 +389,53 @@ export default function ControlRoomIndex({
         >
             <Head title="Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Radio}
                     title="Control Room"
                     description="Centralized alert management and triage system."
+                    stats={[
+                        { label: 'Open alerts', value: stats.open },
+                        { label: 'Critical', value: stats.critical },
+                        { label: 'SLA compliance', value: `${sla_compliance_pct}%` },
+                        { label: 'Avg response', value: `${avg_response_minutes}m` },
+                    ]}
                     actions={
                         <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
                                 <span className="relative flex h-2 w-2">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
                                 </span>
                                 Live
                             </div>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Link href="/control-room/map">
                                     <MapPin className="mr-2 h-4 w-4" />
                                     Map
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Link href="/control-room/shifts">
                                     <Clock className="mr-2 h-4 w-4" />
                                     Shifts
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Link href="/control-room/escalations">
                                     <TrendingUp className="mr-2 h-4 w-4" />
                                     Queues

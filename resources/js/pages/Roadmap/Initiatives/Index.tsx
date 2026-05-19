@@ -15,6 +15,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { Compass } from 'lucide-react';
 import { useState } from 'react';
 import {
     formatDate,
@@ -92,10 +93,25 @@ export default function InitiativeIndex({ items, filters }: Props) {
     return (
         <AppLayout>
             <Head title="Roadmap Initiatives" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Compass}
                 title="Roadmap Initiatives"
                 description="Prioritised initiative register for roadmap planning and governance review."
-                backHref="/roadmap/dashboard"
+                stats={[
+                    { label: 'Total', value: items.data?.length ?? 0 },
+                    {
+                        label: 'In progress',
+                        value: items.data?.filter((i) => i.status === 'in_progress').length ?? 0,
+                    },
+                    {
+                        label: 'Approved',
+                        value: items.data?.filter((i) => i.status === 'approved').length ?? 0,
+                    },
+                    {
+                        label: 'Blocked',
+                        value: items.data?.filter((i) => i.status === 'blocked').length ?? 0,
+                    },
+                ]}
             />
             <PageShell>
                 <Card className="mb-4">

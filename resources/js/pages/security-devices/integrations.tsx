@@ -17,7 +17,6 @@ import {
     CheckCircle2,
     Clock,
     Database,
-    Link2,
     Plug,
     Radio,
     Shield,
@@ -138,19 +137,19 @@ export default function IntegrationsHub({ providers, stats, can }: Props) {
             <Head title="APIs & Integrations - Security & Devices" />
 
             <PageShell>
-                <PageHero variant="compact"
-                    title={
-                        <span className="flex items-center gap-3">
-                            <span className="rounded-xl border bg-primary/5 p-2 text-primary">
-                                <Link2 className="h-5 w-5" />
-                            </span>
-                            <span>APIs & Integrations</span>
-                        </span>
-                    }
+                <PageHero
+                    icon={Plug}
+                    title="APIs & Integrations"
                     description="Provider credentials, site mapping, sync controls, and exceptions. Devices pages show the result of sync; this hub controls it."
+                    stats={[
+                        { label: 'Connected', value: stats.providers_connected },
+                        { label: 'Imported', value: stats.imported_devices },
+                        { label: 'Events 24h', value: stats.events_24h },
+                        { label: 'Errored', value: stats.providers_errored },
+                    ]}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">Source of truth</Badge>
+                            <Badge variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">Source of truth</Badge>
                             {stats.providers_errored > 0 ? (
                                 <Badge variant="destructive" className="gap-1">
                                     <AlertTriangle className="h-3 w-3" />

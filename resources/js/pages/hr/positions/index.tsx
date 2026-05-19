@@ -94,9 +94,24 @@ export default function PositionsIndex({
             <Head title="Positions" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Briefcase}
                     title="Positions"
                     description="Manage job positions, headcount budgets and organisational structure."
+                    stats={[
+                        { label: 'Positions', value: positions.total },
+                        {
+                            label: 'Vacancies',
+                            value: positions.data.reduce((sum, p) => sum + p.vacancies, 0),
+                        },
+                        {
+                            label: 'Headcount',
+                            value: positions.data.reduce(
+                                (sum, p) => sum + p.current_headcount,
+                                0,
+                            ),
+                        },
+                    ]}
                     actions={
                         can.manage ? (
                             <Button asChild>

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
-import { Calendar, CheckCircle, Clock, Search, User, XCircle } from 'lucide-react';
+import { Calendar, CalendarCheck, CheckCircle, Clock, Search, User, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 type TimeOff = {
@@ -71,10 +71,15 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
     return (
         <AppLayout>
             <Head title="Staff Availability" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={CalendarCheck}
                 title="Staff Availability"
                 description="View staff availability, time-off, and scheduling constraints for rostering."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total staff', value: filtered.length },
+                    { label: 'Available today', value: availableNow },
+                    { label: 'On leave', value: onLeave },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

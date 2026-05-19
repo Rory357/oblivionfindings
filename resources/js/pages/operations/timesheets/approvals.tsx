@@ -7,6 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     CheckCircle2,
+    ClipboardCheck,
     Clock3,
     Eye,
     FileClock,
@@ -111,10 +112,27 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
     return (
         <AppLayout>
             <Head title="Timesheet Approvals" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={ClipboardCheck}
                 title="Approval Queue"
                 description="Review submitted timesheets without being redirected out of the approvals workflow."
                 backHref="/operations/timesheets"
+                backLabel="Back to timesheets"
+                stats={[
+                    { label: 'Awaiting review', value: rows.length },
+                    { label: 'Selected', value: selectedIds.length },
+                    {
+                        label: 'Total hours',
+                        value: rows
+                            .reduce((sum, t) => {
+                                if (typeof t.hours === 'number') return sum + t.hours;
+                                if (typeof t.duration_minutes === 'number')
+                                    return sum + t.duration_minutes / 60;
+                                return sum;
+                            }, 0)
+                            .toFixed(1),
+                    },
+                ]}
             />
             <PageShell>
                 <div className="flex flex-wrap items-center gap-2">

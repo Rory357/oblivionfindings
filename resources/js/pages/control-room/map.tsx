@@ -15,6 +15,7 @@ import 'leaflet/dist/leaflet.css';
 import {
     Activity,
     AlertTriangle,
+    Map,
     MapPin,
     Radio,
     RefreshCw,
@@ -499,16 +500,22 @@ export default function ControlRoomMap({
             <style dangerouslySetInnerHTML={{ __html: pulseStyle }} />
 
             <div className="w-full space-y-4 p-4">
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Map}
                     title="Live Map"
                     description="Real-time positions of tracked vehicles and residents."
-                    backHref="/control-room"
-                    backLabel="Control Room"
+                    stats={[
+                        { label: 'Total devices', value: stats.total_devices },
+                        { label: 'Online', value: stats.online },
+                        { label: 'Offline', value: stats.offline },
+                        { label: 'Active alerts', value: stats.active_alerts },
+                    ]}
                     actions={
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={manualRefresh}
+                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                         >
                             <RefreshCw className="mr-2 h-4 w-4" />
                             Refresh

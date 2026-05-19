@@ -132,18 +132,27 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Webhooks - HR Settings" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Webhook}
                     title="Webhooks"
                     description="Manage webhook endpoints for HR event notifications."
-                >
-                    <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                            <Button onClick={openCreate}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Webhook
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg">
+                    stats={[
+                        { label: 'Total', value: webhooks.length },
+                        {
+                            label: 'Active',
+                            value: webhooks.filter((w) => w.is_active).length,
+                        },
+                        { label: 'Available events', value: availableEvents.length },
+                    ]}
+                    actions={
+                        <Dialog open={open} onOpenChange={setOpen}>
+                            <DialogTrigger asChild>
+                                <Button onClick={openCreate}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add Webhook
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
                                 <DialogTitle>
                                     {editingId
@@ -226,7 +235,8 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                             </form>
                         </DialogContent>
                     </Dialog>
-                </PageHero>
+                    }
+                />
 
                 <Card>
                     <CardHeader>

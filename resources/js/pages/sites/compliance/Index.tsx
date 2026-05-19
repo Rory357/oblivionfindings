@@ -34,6 +34,7 @@ import {
     Pencil,
     Plus,
     Shield,
+    ShieldCheck,
     Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -365,11 +366,18 @@ export default function SiteComplianceIndex({
 
             <PageShell>
                 {/* Header */}
-                <PageHero variant="compact"
+                <PageHero
+                    icon={ShieldCheck}
                     title={`${site.name ?? 'Site'} \u2014 Compliance`}
                     description="Track certifications, compliance checks, and regulatory requirements"
                     backHref={`/sites/${site.id}`}
                     backLabel="Back to site"
+                    stats={[
+                        { label: 'Certifications', value: stats.total_certs ?? 0 },
+                        { label: 'Current', value: stats.current ?? 0 },
+                        { label: 'Expiring', value: stats.expiring ?? 0 },
+                        { label: 'Overdue checks', value: stats.checks_overdue ?? 0 },
+                    ]}
                 />
 
                 {/* Stats Row */}

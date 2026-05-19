@@ -69,9 +69,16 @@ export default function HeadcountIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Headcount Planning" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Users}
                     title="Headcount Planning"
                     description="Workforce planning, forecasting, and attrition analysis."
+                    stats={[
+                        { label: 'Headcount', value: current.total },
+                        { label: 'Total FTE', value: current.total_fte },
+                        { label: 'Vacancies', value: budgetVsActual.total_vacant },
+                        { label: 'Attrition risk', value: attritionRisk.length },
+                    ]}
                 />
                 <div className="grid gap-4 md:grid-cols-4">
                     <Card>

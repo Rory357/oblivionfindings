@@ -14,6 +14,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
+    BarChart3,
     CheckCircle,
     Clock,
     Download,
@@ -88,16 +89,23 @@ export default function ControlRoomReports({
         >
             <Head title="Control Room Reports" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={BarChart3}
                     title="Control Room Reports"
                     description="Alert statistics and performance metrics"
+                    stats={[
+                        { label: 'Total alerts', value: stats.total_alerts },
+                        { label: 'Resolution rate', value: `${stats.resolution_rate}%` },
+                        { label: 'Avg resolution', value: `${stats.avg_resolution_hours}h` },
+                        { label: 'Escalation rate', value: `${stats.escalation_rate}%` },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
                             <Select
                                 value={period}
                                 onValueChange={handlePeriodChange}
                             >
-                                <SelectTrigger className="w-32">
+                                <SelectTrigger className="w-32 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -115,11 +123,17 @@ export default function ControlRoomReports({
                                 variant="outline"
                                 size="sm"
                                 onClick={handleExport}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                             >
                                 <Download className="mr-2 h-4 w-4" />
                                 Export CSV
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Link href="/control-room">
                                     <ArrowLeft className="mr-2 h-4 w-4" />
                                     Dashboard

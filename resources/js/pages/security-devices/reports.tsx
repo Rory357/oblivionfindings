@@ -13,8 +13,8 @@ import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import {
     AlertOctagon,
+    BarChart3,
     Download,
-    FileText,
     HardDrive,
     Wrench,
 } from 'lucide-react';
@@ -68,17 +68,16 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Reports - Security & Devices" />
             <PageShell>
-                <PageHero variant="compact"
-                    title={
-                        <span className="flex items-center gap-3">
-                            <span className="rounded-xl border bg-primary/5 p-2 text-primary">
-                                <FileText className="h-5 w-5" />
-                            </span>
-                            <span>Reports</span>
-                        </span>
-                    }
+                <PageHero
+                    icon={BarChart3}
+                    title="Reports"
                     description="Stable CSV exports for inventory, events, and maintenance. A broader per-domain reporting surface lands with the dedicated Reporting module."
-                    actions={<Badge variant="outline">CSV exports</Badge>}
+                    stats={[
+                        { label: 'Devices', value: stats.devices },
+                        { label: `Events (${windowDays}d)`, value: stats.events_90d },
+                        { label: 'Maintenance', value: stats.maintenance },
+                    ]}
+                    actions={<Badge variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">CSV exports</Badge>}
                 />
 
                 <div className="grid gap-4 lg:grid-cols-3">

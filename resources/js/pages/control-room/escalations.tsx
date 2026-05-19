@@ -12,6 +12,7 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
+    AlertTriangle,
     ArrowUpRight,
     CheckCircle2,
     ChevronRight,
@@ -774,9 +775,15 @@ export default function EscalationQueue({
         >
             <Head title="Escalation Queue - Control Room" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={AlertTriangle}
                     title="Escalation Queue"
                     description="Kanban-style triage queue management with SLA tracking and escalation workflows."
+                    stats={[
+                        { label: 'Active queues', value: queues.length },
+                        { label: 'Total alerts', value: totalAlerts },
+                        { label: 'SLA breached', value: totalBreached },
+                    ]}
                 />
 
                 {/* Summary stats */}

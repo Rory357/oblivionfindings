@@ -39,6 +39,7 @@ import {
     Cpu,
     DoorOpen,
     ExternalLink,
+    HardDrive,
     HelpCircle,
     MapPin,
     Pencil,
@@ -401,23 +402,37 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
             <Head title={`${site.name} - Hardware`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={HardDrive}
+                    backHref={`/sites/${site.id}`}
+                    backLabel="Back to site"
                     title="Hardware at this location"
                     description="Read-only view of devices at this site, with room placement. Device management lives in Security & Devices."
+                    stats={[
+                        { label: 'Total', value: stats.total },
+                        { label: 'Online', value: stats.online },
+                        { label: 'Offline', value: stats.offline },
+                        { label: 'Unassigned', value: stats.unassigned },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
-                            <Badge variant="outline">
-                                {stats.total} device{stats.total !== 1 ? 's' : ''}
-                            </Badge>
                             {planForPins && (
-                                <Button asChild variant="outline">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
                                     <Link href={`/sites/${site.id}?tab=type-plan`}>
                                         <MapPin className="mr-1 h-4 w-4" />
                                         Open {typePlan?.tab_label ?? 'Plan'}
                                     </Link>
                                 </Button>
                             )}
-                            <Button asChild variant="outline">
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <a href={`/security-devices/devices?site_id=${site.id}`}>
                                     Manage in Security &amp; Devices
                                     <ArrowRight className="ml-1 h-4 w-4" />

@@ -31,7 +31,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Settings, Settings2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -153,18 +153,30 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Custom Fields - HR Settings" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Settings}
                     title="Custom Fields"
                     description="Define custom fields for employee profiles."
-                >
-                    <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                            <Button onClick={openCreate}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Field
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg">
+                    stats={[
+                        { label: 'Total', value: definitions.length },
+                        {
+                            label: 'Active',
+                            value: definitions.filter((d) => d.is_active).length,
+                        },
+                        {
+                            label: 'Required',
+                            value: definitions.filter((d) => d.is_required).length,
+                        },
+                    ]}
+                    actions={
+                        <Dialog open={open} onOpenChange={setOpen}>
+                            <DialogTrigger asChild>
+                                <Button onClick={openCreate}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add Field
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
                                 <DialogTitle>
                                     {editingId ? 'Edit Field' : 'Create Field'}
@@ -316,7 +328,8 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                             </form>
                         </DialogContent>
                     </Dialog>
-                </PageHero>
+                    }
+                />
 
                 <Card>
                     <CardHeader>

@@ -323,11 +323,15 @@ export default function PlaybooksIndex({
 
             <div className="flex flex-col gap-6 p-6">
                 <PageShell>
-                    <PageHero variant="compact"
+                    <PageHero
+                        icon={BookOpen}
                         title="Playbooks"
                         description="Create and manage response procedure playbooks for consistent incident handling."
-                        backHref="/control-room"
-                        backLabel="Control Room"
+                        stats={[
+                            { label: 'Total playbooks', value: playbooks.length },
+                            { label: 'Active', value: playbooks.filter((p) => p.is_active).length },
+                            { label: 'Total runs', value: playbooks.reduce((sum, p) => sum + p.runs_count, 0) },
+                        ]}
                         actions={
                             can.manage ? (
                                 <Dialog

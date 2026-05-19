@@ -6,7 +6,7 @@ import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { PageHero } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
-import { GitBranch, Plus, Search } from 'lucide-react';
+import { GitBranch, LayoutGrid, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { type FilterOption, type Paginated, FilterSelect } from '../devices/shared';
@@ -68,9 +68,14 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
             <Head title="Device Groups - Security & Devices" />
 
             <PageShell>
-                <PageHero variant="compact"
-                    title={<span className="flex items-center gap-3"><GitBranch className="h-6 w-6 text-primary" /> Device Groups</span>}
+                <PageHero
+                    icon={LayoutGrid}
+                    title="Device Groups"
                     description="Organise devices into logical groups for management, reporting, and operational visibility."
+                    stats={[
+                        { label: 'Groups', value: groups.meta.total },
+                        { label: 'Devices', value: groups.data.reduce((sum, g) => sum + g.devices_count, 0) },
+                    ]}
                     actions={
                         <Button asChild size="sm">
                             <Link href="/security-devices/device-groups/create">

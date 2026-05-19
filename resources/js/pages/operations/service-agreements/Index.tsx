@@ -14,7 +14,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, CalendarDays, DollarSign, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
+import { AlertTriangle, CalendarDays, DollarSign, Eye, FileSignature, FileText, Pencil, Plus, Search } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 
 const ANY = '__ANY__';
@@ -137,7 +137,17 @@ export default function ServiceAgreementsIndex({
     return (
         <AppLayout>
             <Head title="Service Agreements" />
-            <PageHero variant="compact" title="Service Agreements" description="Manage funding agreements, budgets, and service contracts." backHref="/operations" />
+            <PageHero
+                icon={FileSignature}
+                title="Service Agreements"
+                description="Manage funding agreements, budgets, and service contracts."
+                stats={[
+                    { label: 'Active', value: stats?.active ?? 0 },
+                    { label: 'Total budget', value: formatCurrency(stats?.total_budget ?? 0) },
+                    { label: 'Budget used', value: formatCurrency(stats?.total_used ?? 0) },
+                    { label: 'Expiring soon', value: stats?.expiring_soon ?? 0 },
+                ]}
+            />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

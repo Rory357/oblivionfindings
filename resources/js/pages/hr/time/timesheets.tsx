@@ -34,7 +34,7 @@ import { PageHero } from '@/components/page';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, ClipboardList, Send, XCircle } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, ClipboardList, Send, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface Timesheet {
@@ -207,11 +207,23 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
             <Head title="Period Timesheets" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={ClipboardCheck}
                     title="Period Timesheets"
                     description="Review and manage HR period timesheets."
-                    backHref="/hr/time"
-                    backLabel="Back to Timekeeping"
+                    stats={[
+                        { label: 'Total', value: timesheets.total },
+                        {
+                            label: 'Submitted',
+                            value: timesheets.data.filter((t) => t.status === 'submitted')
+                                .length,
+                        },
+                        {
+                            label: 'Approved',
+                            value: timesheets.data.filter((t) => t.status === 'approved')
+                                .length,
+                        },
+                    ]}
                 />
 
                 {/* Filters */}

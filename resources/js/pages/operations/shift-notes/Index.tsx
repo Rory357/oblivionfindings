@@ -23,6 +23,7 @@ import {
     FileText,
     Flag,
     Lock,
+    NotebookPen,
     Search,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -231,10 +232,16 @@ export default function ShiftNotesIndex({
     return (
         <AppLayout>
             <Head title="Shift Notes" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={NotebookPen}
                 title="Shift Notes"
                 description="Manager dashboard for shift documentation and audit trail."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: stats?.total ?? 0 },
+                    { label: 'Today', value: stats?.today ?? 0 },
+                    { label: 'This week', value: stats?.this_week ?? 0 },
+                    { label: 'Flagged', value: stats?.flagged ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats Row */}

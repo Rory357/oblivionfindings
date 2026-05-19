@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import { Car } from 'lucide-react';
 
 interface DriverRecord {
     id: number;
@@ -84,13 +86,21 @@ export default function DriversIndex({ records, summary, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Driver Eligibility" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">
-                        Driver Eligibility Register
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Car}
+                        title="Driver Eligibility Register"
+                        description="Staff driving licence status, eligibility, and expiry tracking."
+                        stats={[
+                            { label: 'Total', value: summary.total },
+                            { label: 'Eligible', value: summary.eligible },
+                            { label: 'Expiring', value: summary.expiring },
+                            { label: 'Suspended', value: summary.suspended },
+                        ]}
+                    />
+                }
+            >
                 {/* Summary Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <Card>
@@ -286,7 +296,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                         <LaravelPagination links={records.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

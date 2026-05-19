@@ -8,6 +8,7 @@ import { Head, Link } from '@inertiajs/react';
 import {
     CheckCircle2,
     Clock,
+    FileSignature,
     FileText,
     Plus,
     Send,
@@ -65,9 +66,16 @@ export default function ConsentRequestsIndex({
             <Head title={`Consent requests — ${client.full_name}`} />
             <PageShell>
                 <div data-test="consent-requests-index">
-                    <PageHero variant="compact"
+                    <PageHero
+                        icon={FileSignature}
                         title="Consent requests"
                         description={`Family-portal consent workflow for ${client.full_name}`}
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Pending', value: stats.pending },
+                            { label: 'Approved', value: stats.approved },
+                            { label: 'Declined', value: stats.declined },
+                        ]}
                         actions={
                             <Button asChild>
                                 <Link

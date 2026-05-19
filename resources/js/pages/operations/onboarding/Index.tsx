@@ -80,10 +80,16 @@ export default function OnboardingDashboard({ workflows = { data: [], links: [],
     return (
         <AppLayout>
             <Head title="Onboarding Pipeline" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={UserPlus}
                 title="Onboarding Pipeline"
                 description={`Overview of all ${clientsLabel.toLowerCase()} currently being onboarded.`}
-                backHref="/operations"
+                stats={[
+                    { label: 'Active', value: stats?.active ?? 0 },
+                    { label: 'Completed this month', value: stats?.completed_this_month ?? 0 },
+                    { label: 'Overdue steps', value: stats?.overdue_steps ?? 0 },
+                    { label: 'Avg days', value: stats?.avg_days ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

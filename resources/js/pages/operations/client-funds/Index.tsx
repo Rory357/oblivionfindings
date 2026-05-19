@@ -67,10 +67,15 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
     return (
         <AppLayout>
             <Head title={`${clientSingular} Funds`} />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Wallet}
                 title={`${clientSingular} Funds`}
                 description={`Manage ${clientSingular.toLowerCase()} trust funds, petty cash, and personal funds.`}
-                backHref="/operations"
+                stats={[
+                    { label: 'Total funds', value: stats?.total ?? 0 },
+                    { label: 'Total balance', value: nzd.format(stats?.total_balance ?? 0) },
+                    { label: 'Low balance', value: stats?.low_balance_alerts ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

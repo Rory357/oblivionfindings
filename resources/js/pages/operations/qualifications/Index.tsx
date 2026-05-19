@@ -45,10 +45,21 @@ export default function QualificationsIndex({ requirements = { data: [], links: 
     return (
         <AppLayout>
             <Head title="Qualifications" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Award}
                 title="Qualifications"
                 description="Manage qualification requirements by client and check worker compliance."
-                backHref="/operations"
+                stats={[
+                    { label: 'Requirements', value: requirements?.total ?? 0 },
+                    {
+                        label: 'Met',
+                        value: (requirements?.data ?? []).filter((r) => r.match_status === 'met').length,
+                    },
+                    {
+                        label: 'Unmet',
+                        value: (requirements?.data ?? []).filter((r) => r.match_status === 'unmet').length,
+                    },
+                ]}
             />
             <PageShell>
                 {/* Search */}

@@ -24,7 +24,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { Calendar, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -185,20 +185,27 @@ export default function CalendarIndex({
             <Head title="Company Calendar" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Calendar}
                     title="Company Calendar"
                     description="View company events, training, and approved leave."
-                >
-                    {can.manage && (
-                        <Button
-                            size="sm"
-                            onClick={() => setShowCreateDialog(true)}
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            New Event
-                        </Button>
-                    )}
-                </PageHero>
+                    stats={[
+                        { label: 'Events', value: events.length },
+                        { label: 'Leave', value: leaveEvents.length },
+                        { label: 'Sites', value: sites.length },
+                    ]}
+                    actions={
+                        can.manage && (
+                            <Button
+                                size="sm"
+                                onClick={() => setShowCreateDialog(true)}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New Event
+                            </Button>
+                        )
+                    }
+                />
 
                 {/* Legend */}
                 <div className="mb-4 flex flex-wrap items-center gap-3">

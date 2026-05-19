@@ -15,6 +15,7 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
+import { Gavel } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -87,10 +88,21 @@ export default function DecisionIndex({ items, filters, can }: Props) {
     return (
         <AppLayout>
             <Head title="Roadmap Decisions" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Gavel}
                 title="Roadmap Decisions"
                 description="Pending governance and roadmap decision requests."
-                backHref="/roadmap/dashboard"
+                stats={[
+                    { label: 'Total', value: items.data?.length ?? 0 },
+                    {
+                        label: 'Pending',
+                        value: items.data?.filter((d) => d.status === 'pending').length ?? 0,
+                    },
+                    {
+                        label: 'Approved',
+                        value: items.data?.filter((d) => d.status === 'approved').length ?? 0,
+                    },
+                ]}
             />
             <PageShell>
                 <Card className="mb-4">

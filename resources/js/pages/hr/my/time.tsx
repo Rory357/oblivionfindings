@@ -219,10 +219,22 @@ export default function MyTime({
             <Head title="My Time" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Clock}
                     title="My Time"
-                    backHref="/hr/my"
-                    backLabel="Back to My HR"
+                    description="Track your shifts, hours, and upcoming roster."
+                    stats={[
+                        {
+                            label: "Today",
+                            value: `${todayTotal.toFixed(1)}h`,
+                        },
+                        {
+                            label: 'This week',
+                            value: `${weeklySummary.total_hours}h`,
+                        },
+                        { label: 'Pending', value: pendingCount },
+                        { label: 'Upcoming shifts', value: upcomingShifts.length },
+                    ]}
                 />
 
                 {/* KPI Cards */}

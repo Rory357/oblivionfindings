@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, FileDown, Pencil, Phone, ShieldAlert, Users } from 'lucide-react';
+import { FileDown, Pencil, Phone, ShieldAlert, Siren, Users } from 'lucide-react';
 import { useState } from 'react';
 import SiteTypePlanBuilderDialog from '../plan/_builder-dialog';
 import { PlanThumbnail, type PlanLayout, type PlanPin } from '../plan/_thumbnail';
@@ -89,19 +89,32 @@ export default function SiteEmergencyPlanIndex({
         <AppLayout>
             <Head title={`${site.name} Emergency Plan`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Siren}
+                    backHref={`/sites/${site.id}/plan`}
+                    backLabel="Back to site plan"
                     title="Emergency Plan"
                     description={`${site.name} - ${organisation.name}`}
+                    stats={[
+                        { label: 'Status', value: ready ? 'Ready' : 'Draft' },
+                        { label: 'Emergency pins', value: emergencyPins.length },
+                        { label: 'Contacts', value: contacts.length },
+                        { label: 'Procedures', value: procedures.length },
+                    ]}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button asChild variant="outline">
-                                <Link href={`/sites/${site.id}/plan`}>
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Site Plan
-                                </Link>
-                            </Button>
                             {['a3', 'a4', 'a5'].map((paper) => (
-                                <Button key={paper} asChild variant={paper === 'a4' ? 'default' : 'outline'} disabled={!ready}>
+                                <Button
+                                    key={paper}
+                                    asChild
+                                    variant={paper === 'a4' ? 'default' : 'outline'}
+                                    disabled={!ready}
+                                    className={
+                                        paper === 'a4'
+                                            ? undefined
+                                            : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
+                                    }
+                                >
                                     <Link href={`/sites/${site.id}/emergency-plan.pdf?paper=${paper}`}>
                                         <FileDown className="mr-2 h-4 w-4" />
                                         {paper.toUpperCase()}
@@ -112,6 +125,7 @@ export default function SiteEmergencyPlanIndex({
                                 <Button
                                     type="button"
                                     variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     onClick={() => {
                                         setBuilderMode('emergency');
                                         setBuilderFocus(ready ? undefined : 'assembly_point');

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, DollarSign } from 'lucide-react';
+import { Banknote, CheckCircle2, DollarSign } from 'lucide-react';
 
 type Bonus = {
     id: number;
@@ -59,9 +59,21 @@ export default function BonusIndex({ bonuses, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bonus Payments" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Banknote}
                     title="Bonus Payments"
                     description="Track and manage employee bonuses and incentives."
+                    stats={[
+                        { label: 'Total', value: bonuses.total },
+                        {
+                            label: 'Pending',
+                            value: bonuses.data.filter((b) => b.status === 'pending').length,
+                        },
+                        {
+                            label: 'Paid',
+                            value: bonuses.data.filter((b) => b.status === 'paid').length,
+                        },
+                    ]}
                 />
                 <Card>
                     <CardHeader>

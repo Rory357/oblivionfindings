@@ -73,10 +73,16 @@ export default function MileageIndex({ claims = { data: [], links: [], current_p
     return (
         <AppLayout>
             <Head title="Mileage Claims" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Car}
                 title="Mileage Claims"
                 description="Track and manage travel distance claims for support workers."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total claims', value: stats?.total ?? 0 },
+                    { label: 'Pending approval', value: stats?.pending_approval ?? 0 },
+                    { label: 'Total km', value: `${(stats?.total_km ?? 0).toLocaleString('en-NZ')} km` },
+                    { label: 'Total amount', value: nzd.format(stats?.total_amount ?? 0) },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

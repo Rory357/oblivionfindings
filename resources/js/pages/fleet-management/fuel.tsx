@@ -26,7 +26,7 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency, formatDateTime } from '@/lib/fleet-utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Fuel, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface FuelLog {
@@ -130,9 +130,26 @@ export default function FleetFuelIndex({
         >
             <Head title="Fuel Logs" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Fuel}
+                    backHref="/fleet-management"
                     title="Fuel Logs"
                     description="Track fuel purchases and vehicle efficiency"
+                    stats={[
+                        { label: 'Fill-ups', value: stats.total_logs },
+                        {
+                            label: 'Litres',
+                            value: `${stats.total_litres.toLocaleString()}L`,
+                        },
+                        {
+                            label: 'Total cost',
+                            value: formatCurrency(stats.total_cost),
+                        },
+                        {
+                            label: 'Avg $/L',
+                            value: `$${stats.avg_cost_per_litre.toFixed(2)}`,
+                        },
+                    ]}
                     actions={
                         <div className="flex gap-2">
                             {can.manage && (
@@ -363,12 +380,6 @@ export default function FleetFuelIndex({
                                     </DialogContent>
                                 </Dialog>
                             )}
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/fleet-management">
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Back
-                                </Link>
-                            </Button>
                         </div>
                     }
                 />

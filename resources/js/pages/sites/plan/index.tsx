@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, FileDown, MapPinned, Pencil, Plus, ShieldAlert } from 'lucide-react';
+import { ArrowRight, FileDown, Map, MapPinned, Pencil, Plus, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import SiteTypePlanBuilderDialog from './_builder-dialog';
 import { PlanThumbnail } from './_thumbnail';
@@ -65,19 +65,54 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
         <AppLayout>
             <Head title={`${site.name} ${typePlan.tab_label}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Map}
+                    backHref={`/sites/${site.id}`}
+                    backLabel="Back to site"
                     title={typePlan.tab_label}
                     description={`${site.name} ${site.display_type}`}
+                    stats={[
+                        {
+                            label: 'Status',
+                            value:
+                                typePlan.status === 'draft_over_published'
+                                    ? 'Draft changes'
+                                    : typePlan.status === 'draft'
+                                      ? 'Draft'
+                                      : typePlan.status === 'published'
+                                        ? 'Published'
+                                        : 'Not started',
+                        },
+                        {
+                            label: 'Pins',
+                            value: Object.values(typePlan.pin_counts).reduce(
+                                (sum, c) => sum + (c ?? 0),
+                                0,
+                            ),
+                        },
+                        {
+                            label: 'Emergency layer',
+                            value: typePlan.has_emergency_layer ? 'Ready' : 'Pending',
+                        },
+                    ]}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button asChild variant="outline">
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Link href={typePlan.inventory_href}>
                                     {typePlan.inventory_label}
                                     <ArrowRight className="ml-2 h-4 w-4" />
                                 </Link>
                             </Button>
                             {typePlan.has_published && (
-                                <Button asChild variant="outline">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
                                     <Link href={`/sites/${site.id}/emergency-plan`}>
                                         <ShieldAlert className="mr-2 h-4 w-4" />
                                         Emergency Plan

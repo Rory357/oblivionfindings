@@ -21,7 +21,7 @@ import { useFormAutosave } from '@/hooks/use-form-autosave';
 import AppLayout from '@/layouts/app-layout';
 import { submitOffline } from '@/lib/offline-queue';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { BookOpen, Flag, MessageSquareText, Plus, Search } from 'lucide-react';
+import { BookOpen, Flag, MessageSquareText, NotebookPen, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const ANY = '__ANY__';
@@ -309,14 +309,15 @@ export default function ProgressNotesIndex({
     return (
         <AppLayout>
             <Head title="Progress Notes" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={NotebookPen}
                 title="Progress Notes"
                 description="Goal updates, observations, and progress tracking across all clients."
-                backHref={
-                    filters?.client_id
-                        ? `/operations/clients/${filters.client_id}`
-                        : '/operations'
-                }
+                stats={[
+                    { label: 'Total notes', value: stats?.total ?? 0 },
+                    { label: 'This week', value: stats?.this_week ?? 0 },
+                    { label: 'Flagged', value: stats?.flagged ?? 0 },
+                ]}
                 actions={
                     <Button
                         size="sm"

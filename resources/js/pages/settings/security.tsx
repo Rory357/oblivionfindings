@@ -64,9 +64,15 @@ export default function SecuritySettings({
             <Head title="Security Settings" />
             <SettingsLayout>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <PageHero variant="compact"
+                    <PageHero
+                        icon={Shield}
                         title="Security Settings"
                         description="Configure password policies, session security, and two-factor authentication for your organisation"
+                        stats={[
+                            { label: '2FA enabled', value: twoFaEnabled },
+                            { label: 'Total users', value: twoFaTotal },
+                            { label: 'Min length', value: form.data.password_min_length },
+                        ]}
                     />
 
                     {/* Password Policy */}

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, Clock, Plus, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Plus, Search, ShieldCheck } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -132,29 +133,31 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Vetting Register" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Vetting Register
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Staff background checks, DBS, and vetting records
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        {can.manage && (
-                            <Link href="/hr/compliance/vetting/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Check
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldCheck}
+                        title="Vetting Register"
+                        description="Staff background checks, DBS, and vetting records."
+                        stats={[
+                            { label: 'Total', value: summary.total },
+                            { label: 'Clear', value: summary.clear },
+                            { label: 'Expiring', value: summary.expiring },
+                            { label: 'Expired', value: summary.expired },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Link href="/hr/compliance/vetting/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Check
+                                    </Button>
+                                </Link>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 <div className="grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-3">
@@ -396,7 +399,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                 {checks?.links?.length ? (
                     <LaravelPagination links={checks.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

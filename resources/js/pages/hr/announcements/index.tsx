@@ -19,6 +19,7 @@ import {
     AlertTriangle,
     CheckCircle,
     Info,
+    Megaphone,
     Pin,
     Plus,
 } from 'lucide-react';
@@ -123,19 +124,36 @@ export default function AnnouncementsIndex({
             <Head title="Announcements" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Megaphone}
                     title="Announcements"
                     description="Company-wide announcements and communications."
-                >
-                    {can.manage && (
-                        <Link href="/hr/announcements/create">
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Announcement
-                            </Button>
-                        </Link>
-                    )}
-                </PageHero>
+                    stats={[
+                        { label: 'Total', value: announcements.data.length },
+                        {
+                            label: 'Pinned',
+                            value: announcements.data.filter((a) => a.is_pinned).length,
+                        },
+                        {
+                            label: 'Urgent',
+                            value: announcements.data.filter((a) => a.priority === 'urgent').length,
+                        },
+                        {
+                            label: 'Acknowledged',
+                            value: acknowledgedIds.length,
+                        },
+                    ]}
+                    actions={
+                        can.manage && (
+                            <Link href="/hr/announcements/create">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Announcement
+                                </Button>
+                            </Link>
+                        )
+                    }
+                />
 
                 {/* Filters */}
                 <Card className="mb-4">

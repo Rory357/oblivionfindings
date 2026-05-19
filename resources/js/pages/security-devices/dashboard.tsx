@@ -19,7 +19,6 @@ import {
     GitBranch,
     HeartPulse,
     Key,
-    LayoutDashboard,
     Link2,
     MonitorOff,
     Plus,
@@ -121,12 +120,19 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
             <Head title="Dashboard - Security & Devices" />
 
             <PageShell>
-                <PageHero variant="compact"
-                    title={<span className="flex items-center gap-3"><LayoutDashboard className="h-6 w-6 text-primary" /> Security & Devices</span>}
+                <PageHero
+                    icon={Cctv}
+                    title="Security & Devices"
                     description="Operational overview of hardware, device health, and maintenance posture."
+                    stats={[
+                        { label: 'Devices', value: stats.totalDevices },
+                        { label: 'Active', value: stats.active },
+                        { label: 'Attention', value: totalAttention },
+                        { label: 'Overdue', value: stats.overdueMaintenance },
+                    ]}
                     actions={
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
+                            <Button variant="outline" size="sm" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                                 <Link href="/security-devices/devices"><Cpu className="mr-2 h-4 w-4" /> All Devices</Link>
                             </Button>
                             <Button size="sm" asChild>

@@ -14,7 +14,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRightLeft, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
+import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
 
 const ANY = '__ANY__';
 
@@ -73,10 +73,16 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
     return (
         <AppLayout>
             <Head title="Quotes" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={Calculator}
                 title="Quotes"
                 description="Create and manage service quotes for clients."
-                backHref="/operations"
+                stats={[
+                    { label: 'Total', value: stats?.total ?? 0 },
+                    { label: 'Pending', value: stats?.pending ?? 0 },
+                    { label: 'Accepted', value: stats?.accepted ?? 0 },
+                    { label: 'Converted', value: stats?.converted ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

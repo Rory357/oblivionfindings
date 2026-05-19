@@ -70,10 +70,15 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
     return (
         <AppLayout>
             <Head title="Recurring Charges" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={RefreshCw}
                 title="Recurring Charges"
                 description="Manage recurring billing charges for clients."
-                backHref="/operations"
+                stats={[
+                    { label: 'Active', value: stats?.active ?? 0 },
+                    { label: 'Monthly total', value: nzd.format(stats?.monthly_total ?? 0) },
+                    { label: 'Next due', value: stats?.next_due ?? 0 },
+                ]}
             />
             <PageShell>
                 {/* Stats */}

@@ -27,7 +27,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, FileSearch } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileSearch, History } from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -177,9 +177,15 @@ export default function AuditLogIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Audit Log - HR Settings" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={History}
                     title="Audit Log"
                     description="View all HR module activity and changes."
+                    stats={[
+                        { label: 'Entries', value: logs.data.length },
+                        { label: 'Actions', value: actions.length },
+                        { label: 'Model types', value: modelTypes.length },
+                    ]}
                 />
 
                 {/* Filters */}

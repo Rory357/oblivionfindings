@@ -15,6 +15,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { CalendarRange } from 'lucide-react';
 import { useState } from 'react';
 import {
     type PaginationPayload,
@@ -64,10 +65,21 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
     return (
         <AppLayout>
             <Head title="Roadmap Quarterly Plans" />
-            <PageHero variant="compact"
+            <PageHero
+                icon={CalendarRange}
                 title="Roadmap Quarterly Plans"
                 description="Plan history by fiscal quarter, revision, status, and approval state."
-                backHref="/roadmap/dashboard"
+                stats={[
+                    { label: 'Total', value: items.data?.length ?? 0 },
+                    {
+                        label: 'Approved',
+                        value: items.data?.filter((p) => p.status === 'approved').length ?? 0,
+                    },
+                    {
+                        label: 'Draft',
+                        value: items.data?.filter((p) => p.status === 'draft').length ?? 0,
+                    },
+                ]}
             />
             <PageShell>
                 <Card className="mb-4">

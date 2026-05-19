@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHero } from '@/components/page';
 import { Head, useForm, usePage } from '@inertiajs/react';
+import { ClipboardList } from 'lucide-react';
 
 type Client = { id: number; first_name: string; last_name: string; status: string };
 
@@ -40,7 +41,15 @@ export default function StaffAssignments({ user, clients, assignedIds }: Props) 
             <Head title="Staff assignments" />
 
             <PageShell>
-                <PageHero variant="compact" title={`Assign ${clientPlural}`} description={`Assign ${clientPlural.toLowerCase()} to ${user.name}.`} />
+                <PageHero
+                    icon={ClipboardList}
+                    title={`Assign ${clientPlural}`}
+                    description={`Assign ${clientPlural.toLowerCase()} to ${user.name}.`}
+                    stats={[
+                        { label: 'Assigned', value: form.data.client_ids.length },
+                        { label: 'Available', value: clients.length },
+                    ]}
+                />
 
                 <form
                     onSubmit={(e) => {

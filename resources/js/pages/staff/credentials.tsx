@@ -4,6 +4,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Award } from 'lucide-react';
 
 import { PageHero } from '@/components/page';
 type Credential = {
@@ -43,9 +44,21 @@ export default function StaffCredentials({ user, credentials, canManage }: Props
             <Head title={`Credentials: ${user.name}`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Award}
                     title="Credentials"
                     description={`${user.name} • ${user.email}`}
+                    stats={[
+                        { label: 'Total', value: credentials?.length ?? 0 },
+                        {
+                            label: 'Expiring soon',
+                            value: (credentials ?? []).filter((c) => {
+                                if (!c.expires_at) return false;
+                                const days = (new Date(c.expires_at).getTime() - Date.now()) / 86_400_000;
+                                return days >= 0 && days <= 60;
+                            }).length,
+                        },
+                    ]}
                 />
 
                 <div className="flex items-center justify-end gap-2">

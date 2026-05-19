@@ -16,7 +16,7 @@ import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero } from '@/components/page';
-import { ArrowLeft, CheckCircle, Clock, MapPin, Trash2, User } from 'lucide-react';
+import { CheckCircle, Clock, MapPin, Route, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface Trip {
@@ -119,7 +119,10 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
         >
             <Head title={`Trip #${trip.id}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={Route}
+                    backHref={`/fleet/vehicles/${trip.asset_id}`}
+                    backLabel="Back to vehicle"
                     title={
                         <div className="flex items-center gap-3">
                             <span>Trip #{trip.id}</span>
@@ -134,6 +137,19 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                         </div>
                     }
                     description={trip.asset?.name || 'Unknown Vehicle'}
+                    stats={[
+                        {
+                            label: 'Distance',
+                            value: trip.distance_km
+                                ? `${trip.distance_km} km`
+                                : '-',
+                        },
+                        {
+                            label: 'Duration',
+                            value: formatDuration(trip.duration_s),
+                        },
+                        { label: 'Route points', value: points.length },
+                    ]}
                     actions={
                         <div className="flex gap-2">
                             {can.manage && trip.status === 'open' && (
@@ -158,12 +174,6 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                                     Delete
                                 </Button>
                             )}
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={`/fleet/vehicles/${trip.asset_id}`}>
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Back to Vehicle
-                                </Link>
-                            </Button>
                         </div>
                     }
                 />

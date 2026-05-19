@@ -16,7 +16,7 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Briefcase, Clock, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, Briefcase, Clock, TrendingUp, Users } from 'lucide-react';
 import {
     Area,
     AreaChart,
@@ -142,11 +142,23 @@ export default function RecruitmentAnalytics({
         >
             <Head title="Recruitment Analytics" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={BarChart3}
                     title="Recruitment Analytics"
                     description="Insights into your recruitment pipeline performance."
+                    stats={[
+                        { label: 'Total candidates', value: totalCandidates },
+                        { label: 'Avg time to hire', value: `${avgTimeToHire}d` },
+                        { label: 'Conversion', value: `${conversionRate}%` },
+                        { label: 'Open positions', value: activePositions },
+                    ]}
                     actions={
-                        <Button variant="outline" size="sm" asChild>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            asChild
+                        >
                             <Link href="/hr/recruitment">
                                 <ArrowLeft className="mr-2 h-4 w-4" />
                                 Back to Pipeline

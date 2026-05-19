@@ -120,7 +120,13 @@ export default function StaffShow({
             <Head title={`${staffLabel}: ${user.name}`} />
 
             <PageShell>
-                <PageHero variant="compact" title={user.name} description={user.email} />
+                <PageHero
+                    variant="compact"
+                    backHref="/staff"
+                    backLabel={staffLabel}
+                    title={user.name}
+                    description={user.email}
+                />
 
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">

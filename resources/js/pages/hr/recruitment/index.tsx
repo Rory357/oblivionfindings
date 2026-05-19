@@ -170,31 +170,58 @@ export default function RecruitmentIndex({
         >
             <Head title="Recruitment Pipeline" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={UserPlus}
                     title="Recruitment Pipeline"
                     description="Track candidates through the hiring process."
+                    stats={[
+                        { label: 'Active', value: todayStats.total_active },
+                        { label: 'New this week', value: todayStats.new_this_week },
+                        { label: 'Interviews today', value: todayStats.interviews_today },
+                        { label: 'Offers pending', value: todayStats.offers_pending },
+                    ]}
                     actions={
                         can.manage ? (
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    asChild
+                                >
                                     <Link href="/hr/recruitment/kanban">
                                         <LayoutGrid className="mr-2 h-4 w-4" />
                                         Kanban
                                     </Link>
                                 </Button>
-                                <Button variant="outline" size="sm" asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    asChild
+                                >
                                     <Link href="/hr/recruitment/analytics">
                                         <BarChart3 className="mr-2 h-4 w-4" />
                                         Analytics
                                     </Link>
                                 </Button>
-                                <Button variant="outline" size="sm" asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    asChild
+                                >
                                     <Link href="/hr/recruitment/jobs">
                                         <Briefcase className="mr-2 h-4 w-4" />
                                         Jobs
                                     </Link>
                                 </Button>
-                                <Button variant="outline" size="sm" asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    asChild
+                                >
                                     <Link href="/hr/recruitment/kits">
                                         <FileText className="mr-2 h-4 w-4" />
                                         Interview Kits

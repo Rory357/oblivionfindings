@@ -44,6 +44,7 @@ import {
     BarChart3,
     Calendar,
     CalendarDays,
+    CalendarOff,
     CheckCircle2,
     Clock,
     LayoutDashboard,
@@ -375,15 +376,23 @@ export default function LeaveIndex({
             <Head title="Leave Management" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    icon={CalendarOff}
                     title="Leave Management"
                     description="Manage leave requests, approvals, balances, and absence analytics."
+                    stats={[
+                        { label: 'Pending', value: sla.pending_total },
+                        { label: 'On leave today', value: dd.onLeaveToday.length },
+                        { label: 'Overdue', value: sla.overdue_count },
+                        { label: 'Absence rate', value: `${dd.absenceRate}%` },
+                    ]}
                     actions={
                         <div className="flex items-center gap-2">
                             {can.approve && (
                                 <Button
                                     variant="outline"
                                     size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     onClick={escalateNow}
                                 >
                                     Escalate Overdue
