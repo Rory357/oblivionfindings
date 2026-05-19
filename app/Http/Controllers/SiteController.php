@@ -6,21 +6,29 @@ use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Requests\StoreSiteRequest;
 use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Asset;
+use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
+use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
+use App\Models\SiteCoverageRequirement;
+use App\Models\SiteCredential;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
 use App\Models\SiteFacilityZone;
 use App\Models\SiteHoResource;
 use App\Models\SiteHouseRoom;
+use App\Models\SiteStaffRequirement;
+use App\Models\SiteVendor;
+use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
@@ -30,9 +38,12 @@ use App\Services\Sites\SiteReadinessService;
 use App\Services\Sites\SiteTypePlanService;
 use App\Services\UserSiteAccessService;
 use App\Support\NzRegions;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class SiteController extends Controller
 {
@@ -151,7 +162,7 @@ class SiteController extends Controller
             ->filter()
             ->unique()
             ->values();
-        $managers = \App\Models\User::whereIn('id', $managerIds)
+        $managers = User::whereIn('id', $managerIds)
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
@@ -295,7 +306,7 @@ class SiteController extends Controller
                         'status' => $r->assignedClient->status,
                         'profile_photo_url' => $r->assignedClient->profile_photo_url,
                         // Backwards-compatible flat label for older callers.
-                        'name' => trim(($r->assignedClient->first_name ?? '') . ' ' . ($r->assignedClient->last_name ?? '')),
+                        'name' => trim(($r->assignedClient->first_name ?? '').' '.($r->assignedClient->last_name ?? '')),
                     ] : null,
                     'history' => $r->history->map(fn ($h) => [
                         'id' => $h->id,
@@ -379,12 +390,13 @@ class SiteController extends Controller
                 ->map(function ($c) use ($clientRoomMap) {
                     $dob = $c->date_of_birth;
                     $age = $dob ? $dob->age : null;
+
                     return [
                         'id' => $c->id,
                         'first_name' => $c->first_name,
                         'last_name' => $c->last_name,
                         'preferred_name' => $c->preferred_name,
-                        'full_name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                        'full_name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                         'status' => $c->status,
                         'profile_photo_url' => $c->profile_photo_url,
                         'date_of_birth' => $dob?->toDateString(),
@@ -418,7 +430,7 @@ class SiteController extends Controller
                     'first_name' => $c->first_name,
                     'last_name' => $c->last_name,
                     'preferred_name' => $c->preferred_name,
-                    'full_name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                    'full_name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                     'status' => $c->status,
                 ])
                 ->values(),
@@ -435,6 +447,7 @@ class SiteController extends Controller
                 $communal = $site->houseRooms->where('is_assignable', false);
                 $occupied = $assignable->whereNotNull('assigned_client_id')->count();
                 $assignableCount = $assignable->count();
+
                 return [
                     'total' => $site->houseRooms->count(),
                     'bedrooms' => $assignableCount,
@@ -499,7 +512,7 @@ class SiteController extends Controller
             // per-permission rights so the in-tab dialogs only ever see
             // data the user is allowed to see.
             'vendors' => ($user?->canDo('vendors.view') ?? false)
-                ? \App\Models\SiteVendor::where('site_id', $site->id)
+                ? SiteVendor::where('site_id', $site->id)
                     ->where('is_active', true)
                     ->orderBy('service_type')
                     ->orderBy('company_name')
@@ -522,7 +535,7 @@ class SiteController extends Controller
                     ->all()
                 : [],
             'credentials' => ($user?->canDo('credentials.view') ?? false)
-                ? \App\Models\SiteCredential::where('site_id', $site->id)
+                ? SiteCredential::where('site_id', $site->id)
                     ->with('vendor:id,company_name,service_type')
                     ->orderBy('label')
                     ->get()
@@ -545,10 +558,10 @@ class SiteController extends Controller
                     ->all()
                 : [],
             'credentialCount' => ($user?->canDo('credentials.view') ?? false)
-                ? \App\Models\SiteCredential::where('site_id', $site->id)->count()
+                ? SiteCredential::where('site_id', $site->id)->count()
                 : 0,
             'hardwareCount' => (clone $siteDevices)->count(),
-            'integrationStatus' => \App\Models\Integration\IntegrationSiteConfig::where('site_id', $site->id)
+            'integrationStatus' => IntegrationSiteConfig::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->get()
                 ->map(fn ($c) => [
@@ -558,7 +571,7 @@ class SiteController extends Controller
                 ->values()
                 ->all(),
             'can_edit' => (bool) ($user && $user->canDo('sites.update') && $user->can('update', $site)),
-            'staffRequirements' => \App\Models\SiteStaffRequirement::where('site_id', $site->id)
+            'staffRequirements' => SiteStaffRequirement::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->orderByRaw("FIELD(category, 'mandatory', 'recommended', 'specialist')")
                 ->get()
@@ -570,7 +583,7 @@ class SiteController extends Controller
                     'certification_required' => (bool) $r->certification_required,
                     'expiry_period_months' => $r->expiry_period_months,
                 ]),
-            'coverageRequirements' => \App\Models\SiteCoverageRequirement::where('site_id', $site->id)
+            'coverageRequirements' => SiteCoverageRequirement::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->with(['serviceContext:id,name,type', 'preferredClient:id,first_name,last_name,site_id'])
                 ->orderByRaw("FIELD(day_of_week, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')")
@@ -604,8 +617,8 @@ class SiteController extends Controller
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
-            'fleet' => \Inertia\Inertia::optional(fn () => $this->buildSiteFleetData($site)),
-            'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
+            'fleet' => Inertia::optional(fn () => $this->buildSiteFleetData($site)),
+            'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
             'siteNotes' => $site->siteNotes->map(fn ($n) => [
                 'id' => $n->id,
                 'body' => $n->body,
@@ -636,7 +649,7 @@ class SiteController extends Controller
 
         $site->update($data);
 
-        \App\Services\AuditLogger::log('site.contact_info.update', $site, [
+        AuditLogger::log('site.contact_info.update', $site, [
             'site_id' => $site->id,
             'fields' => array_keys($data),
         ]);
@@ -663,7 +676,7 @@ class SiteController extends Controller
 
         $site->update($data);
 
-        \App\Services\AuditLogger::log('site.location.update', $site, [
+        AuditLogger::log('site.location.update', $site, [
             'site_id' => $site->id,
             'fields' => array_keys($data),
         ]);
@@ -682,7 +695,7 @@ class SiteController extends Controller
 
         $site->update($data);
 
-        \App\Services\AuditLogger::log('site.safety.update', $site, [
+        AuditLogger::log('site.safety.update', $site, [
             'site_id' => $site->id,
             'fields' => array_keys($data),
         ]);
@@ -690,7 +703,7 @@ class SiteController extends Controller
         return back()->with('success', 'Safety information updated.');
     }
 
-    private function buildHouseLedgerData(Site $site, ?\App\Models\User $user): ?array
+    private function buildHouseLedgerData(Site $site, ?User $user): ?array
     {
         if (! in_array($site->type, ['house', 'residential'], true)) {
             return null;
@@ -906,7 +919,7 @@ class SiteController extends Controller
         // Compliance: vehicles with expiring WOF/Rego
         $compliance = $vehicles->filter(function ($v) {
             foreach (['wof_expires_at', 'registration_expires_at'] as $field) {
-                if ($v[$field] && now()->diffInDays(\Carbon\Carbon::parse($v[$field]), false) <= 90) {
+                if ($v[$field] && now()->diffInDays(Carbon::parse($v[$field]), false) <= 90) {
                     return true;
                 }
             }
@@ -916,7 +929,7 @@ class SiteController extends Controller
             $items = [];
             foreach (['wof_expires_at' => 'WOF', 'registration_expires_at' => 'Registration'] as $field => $label) {
                 if ($v[$field]) {
-                    $days = now()->diffInDays(\Carbon\Carbon::parse($v[$field]), false);
+                    $days = now()->diffInDays(Carbon::parse($v[$field]), false);
                     if ($days <= 90) {
                         $items[] = [
                             'type' => $label,
@@ -949,7 +962,7 @@ class SiteController extends Controller
     {
         $this->authorize('create', Site::class);
 
-        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+        $users = User::select(['id', 'name'])->orderBy('name')->get();
 
         return inertia('sites/create', [
             'users' => $users,
@@ -1022,11 +1035,12 @@ class SiteController extends Controller
 
         foreach ($indices as $index) {
             $file = $request->file("documents.$index.file");
-            if (! $file instanceof \Illuminate\Http\UploadedFile) {
+            if (! $file instanceof UploadedFile) {
                 Log::info('saveDocuments: skipped index — no file', [
                     'index' => $index,
                     'meta' => $meta[$index] ?? null,
                 ]);
+
                 continue;
             }
 
@@ -1073,7 +1087,7 @@ class SiteController extends Controller
     {
         $this->authorize('update', $site);
 
-        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+        $users = User::select(['id', 'name'])->orderBy('name')->get();
 
         $site->load('contacts');
 
@@ -1313,6 +1327,7 @@ class SiteController extends Controller
                 if ($existing) {
                     $existing->update($payload);
                     $keepIds[] = $existing->id;
+
                     continue;
                 }
             }
@@ -1352,6 +1367,7 @@ class SiteController extends Controller
                 if ($existing) {
                     $existing->update($payload + ['name' => $name]);
                     $keepIds[] = $existing->id;
+
                     continue;
                 }
             }
@@ -1399,6 +1415,7 @@ class SiteController extends Controller
                 if ($existing) {
                     $existing->update($payload + ['name' => $name]);
                     $keepIds[] = $existing->id;
+
                     continue;
                 }
             }
@@ -1443,6 +1460,7 @@ class SiteController extends Controller
                 if ($existing) {
                     $existing->update($payload + ['name' => $name]);
                     $keepIds[] = $existing->id;
+
                     continue;
                 }
             }
@@ -1613,7 +1631,35 @@ class SiteController extends Controller
             'overdue_checklists_count' => (int) ($site->overdue_checklists_count ?? 0),
             'open_maintenance_count' => (int) ($site->open_maintenance_count ?? 0),
             'readiness' => $readinessService->slim($site),
+            'geofence_status' => $this->resolveGeofenceStatus($site),
         ];
+    }
+
+    /**
+     * Categorise a site's geofence state for the index list pill:
+     *   'active'    — at least one active site-scoped AssetGeofence.
+     *   'inactive'  — geofences exist but are all disabled.
+     *   'missing'   — type=house/facility with tracked residents but no fence.
+     *   'na'        — head office or otherwise not expected to have one.
+     */
+    private function resolveGeofenceStatus(Site $site): string
+    {
+        if (! Schema::hasTable('asset_geofences')) {
+            return 'na';
+        }
+
+        $geofences = AssetGeofence::query()
+            ->where('site_id', $site->id)
+            ->whereNull('asset_id')
+            ->get(['id', 'is_active']);
+
+        if ($geofences->isNotEmpty()) {
+            return $geofences->contains(fn ($g) => (bool) $g->is_active) ? 'active' : 'inactive';
+        }
+
+        $expected = in_array($site->type, ['house', 'residential', 'facility'], true);
+
+        return $expected ? 'missing' : 'na';
     }
 
     private function siteContactPayload(?SiteContact $contact): ?array

@@ -115,6 +115,38 @@ it('flags GTMAN (personal-tracker man-down) as a critical SOS event', function (
         ->and($frame->payload['sos_flag'])->toBeTrue();
 });
 
+it('extracts battery voltage, percentage and charging from a GL30 GTFRI trailing block', function () {
+    // Real frame captured from a live GL30MEU pendant (IMEI redacted).
+    // Trailing fields after cell_id 0017E102 are: mask=24, sats=0,
+    // voltage=4191mV, battery=100%, charging=1 (not_charging).
+    $frame = $this->parser->parse(
+        '+RESP:GTFRI,970204,867963069916998,,0,0,1,0,4.3,145,-105.0,'.
+        '175.241197,-37.723363,20260518224343,0530,0001,A310,0017E102,'.
+        '24,0,4191,100,1,,,20260518233812,085F$'
+    );
+
+    expect($frame->isValid())->toBeTrue()
+        ->and($frame->commandWord)->toBe('GTFRI')
+        ->and($frame->payload['event_type'])->toBe('location_report')
+        ->and($frame->payload['battery'])->toBe(100.0)
+        ->and($frame->payload['battery_voltage_mv'])->toBe(4191)
+        ->and($frame->payload['charging_status'])->toBe('not_charging');
+});
+
+it('does not invent battery values from a GTFRI frame with no voltage in the trail', function () {
+    // Same skeleton but mask=01 (only satellites appended); no voltage.
+    $frame = $this->parser->parse(
+        '+RESP:GTFRI,970204,867963069916998,,0,0,1,0,4.3,145,-105.0,'.
+        '175.241197,-37.723363,20260518224343,0530,0001,A310,0017E102,'.
+        '01,15,0.0,20260518233812,085F$'
+    );
+
+    expect($frame->isValid())->toBeTrue()
+        ->and($frame->payload['battery'])->toBeNull()
+        ->and($frame->payload['battery_voltage_mv'])->toBeNull()
+        ->and($frame->payload['charging_status'])->toBeNull();
+});
+
 it('flags GTBPL as a battery_low event with the battery percentage in field 4', function () {
     $frame = $this->parser->parse('+RESP:GTBPL,970204,861106050000000,GL30MEU,15,00,1,1,0.0,0,0.0,0.0,0.0,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0463$');
 

@@ -124,6 +124,25 @@ class FleetTelemetryIngestService
                 $meta = $device->meta ?? [];
                 $raw = $normalized['raw_payload'] ?? [];
 
+                // Populate model/name from the frame's device_name slot if
+                // the canonical device doesn't have one yet. Fallback to an
+                // IMEI-prefix hint so GL30-series pendants render correctly
+                // before the operator sets the name on the device.
+                $frameName = trim((string) ($raw['device_name'] ?? ''));
+                if ($frameName !== '') {
+                    if (empty($device->model)) {
+                        $deviceUpdates['model'] = $frameName;
+                    }
+                    if (empty($device->name)) {
+                        $deviceUpdates['name'] = $frameName;
+                    }
+                } elseif (empty($device->model) && ! empty($device->imei)) {
+                    $hint = $this->modelHintFromImei((string) $device->imei);
+                    if ($hint !== null) {
+                        $deviceUpdates['model'] = $hint;
+                    }
+                }
+
                 if ($normalized['battery_pct'] !== null) {
                     $deviceUpdates['battery_level'] = $normalized['battery_pct'];
                     $deviceUpdates['battery_updated_at'] = now();
@@ -336,6 +355,19 @@ class FleetTelemetryIngestService
 
         return $asset->category === 'personal_tracker'
             || $asset->categoryRef?->slug === 'personal_tracker';
+    }
+
+    protected function modelHintFromImei(string $imei): ?string
+    {
+        $hints = (array) config('queclink.imei_model_hints', [
+            '86796306' => 'GL30MEU',
+            '86110605' => 'GL30MEU',
+            '86469606' => 'GV500CG',
+        ]);
+
+        $prefix = substr($imei, 0, 8);
+
+        return $hints[$prefix] ?? null;
     }
 
     protected function normalisedSafetyEvent(array $normalized): ?string

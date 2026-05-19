@@ -323,8 +323,35 @@ class ResidentTrackingController extends Controller
             ->where('domain', 'tracking')
             ->first();
 
+        // Range pills: today | 24h | 7d | 30d | custom. Default 24h.
+        $range = $request->string('range')->toString() ?: '24h';
+        [$dateFrom, $dateTo] = $this->resolveHistoryRange(
+            $range,
+            $request->input('date_from'),
+            $request->input('date_to'),
+        );
+
+        $eventTypesInput = $request->input('event_types');
+        $eventTypes = is_array($eventTypesInput)
+            ? $eventTypesInput
+            : array_filter(array_map('trim', explode(',', (string) $eventTypesInput)));
+
+        $filters = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'event_types' => $eventTypes,
+        ];
+
         $locations = app(IntegrationEventHistoryService::class)
-            ->forDevice($device, $request->only(['date_from', 'date_to']), true);
+            ->forDevice($device, $filters, true);
+
+        $availableEventTypes = $locations
+            ->pluck('event_type')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $resident = $device ? $this->buildResidentPayload($device, $client->loadMissing(['site:id,name', 'houseGeofence']), []) : null;
 
         return Inertia::render('fleet-assets/resident-tracking/history', [
             'client' => [
@@ -333,6 +360,7 @@ class ResidentTrackingController extends Controller
                 'house' => $client->site?->name ?? 'Unknown',
                 'photo' => $client->profile_photo_url,
             ],
+            'resident' => $resident,
             'tracker' => $device ? [
                 'id' => $device->id,
                 'device_uid' => $device->device_uid,
@@ -342,8 +370,35 @@ class ResidentTrackingController extends Controller
                 'detail_url' => "/security-devices/devices/{$device->id}",
             ] : null,
             'locations' => $locations,
-            'filters' => $request->only(['date_from', 'date_to']),
+            'available_event_types' => $availableEventTypes,
+            'filters' => [
+                'range' => $range,
+                'date_from' => $dateFrom ? substr((string) $dateFrom, 0, 10) : null,
+                'date_to' => $dateTo ? substr((string) $dateTo, 0, 10) : null,
+                'event_types' => $eventTypes,
+            ],
         ]);
+    }
+
+    private function resolveHistoryRange(string $range, mixed $rawFrom, mixed $rawTo): array
+    {
+        $now = now();
+        switch ($range) {
+            case 'today':
+                return [$now->copy()->startOfDay()->toDateTimeString(), $now->toDateTimeString()];
+            case '24h':
+                return [$now->copy()->subDay()->toDateTimeString(), $now->toDateTimeString()];
+            case '7d':
+                return [$now->copy()->subDays(7)->toDateTimeString(), $now->toDateTimeString()];
+            case '30d':
+                return [$now->copy()->subDays(30)->toDateTimeString(), $now->toDateTimeString()];
+            case 'custom':
+            default:
+                return [
+                    $rawFrom ? (string) $rawFrom : null,
+                    $rawTo ? (string) $rawTo : null,
+                ];
+        }
     }
 
     public function locateNow(Request $request, Client $client, LocateNowService $locateNow)

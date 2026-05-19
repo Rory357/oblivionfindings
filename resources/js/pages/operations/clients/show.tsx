@@ -1,4 +1,5 @@
 import { ClientEditDialog } from '@/components/client-edit-dialog';
+import RecentClientsStrip from '@/components/client-profile/recent-clients-strip';
 import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
@@ -43,6 +44,11 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import {
+    CLIENT_TAB_GROUPS,
+    groupForTab,
+    type ClientTabGroupKey,
+} from '@/pages/operations/clients/tabs/_groups';
 import { formatDateTime } from '@/lib/date-format';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -1054,11 +1060,69 @@ export default function ClientShow({
 
                 <ClientSafetyRibbon safety={safety} className="mt-4" />
 
-                <div className="scrollbar-pretty -mx-4 mt-4 overflow-x-auto border-b px-4">
+                <div className="mt-3">
+                    <RecentClientsStrip
+                        currentClient={{
+                            id: client.id,
+                            name,
+                            photo: client.profile_photo_url ?? null,
+                            house: client.site?.name ?? null,
+                        }}
+                        currentTab={tab}
+                    />
+                </div>
+
+                <div className="scrollbar-pretty -mx-4 mt-3 overflow-x-auto border-b px-4">
                     <div className="flex w-max items-center gap-1 pb-0">
-                        {tabs
-                            .filter((t) => t.show)
-                            .map((t) => {
+                        {(() => {
+                            const groupOrder: Record<ClientTabGroupKey, number> = {
+                                live: 0,
+                                care: 1,
+                                records: 2,
+                                logistics: 3,
+                                compliance: 4,
+                                other: 5,
+                            };
+                            const visibleTabs = tabs
+                                .filter((t) => t.show)
+                                .slice()
+                                .sort((a, b) => {
+                                    const groupDiff =
+                                        groupOrder[groupForTab(a.key)] -
+                                        groupOrder[groupForTab(b.key)];
+                                    return groupDiff !== 0 ? groupDiff : 0;
+                                });
+                            const elements: React.ReactNode[] = [];
+                            let lastGroup: ClientTabGroupKey | null = null;
+
+                            for (const t of visibleTabs) {
+                                const group = groupForTab(t.key);
+                                if (group !== lastGroup) {
+                                    const groupMeta = CLIENT_TAB_GROUPS.find(
+                                        (g) => g.key === group,
+                                    );
+                                    if (lastGroup !== null) {
+                                        elements.push(
+                                            <span
+                                                key={`sep-${group}`}
+                                                aria-hidden
+                                                className="mx-1 h-5 w-px bg-border"
+                                            />,
+                                        );
+                                    }
+                                    if (groupMeta) {
+                                        elements.push(
+                                            <span
+                                                key={`label-${group}`}
+                                                className="hidden text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:inline"
+                                            >
+                                                {groupMeta.label}
+                                            </span>,
+                                        );
+                                    }
+                                    lastGroup = group;
+                                }
+
                                 const Icon = t.icon;
                                 const isActive = tab === t.key;
                                 const className = `inline-flex h-auto items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -1085,29 +1149,32 @@ export default function ClientShow({
                                 );
 
                                 if (!isClientNavigationTab(t)) {
-                                    return (
+                                    elements.push(
                                         <Link
                                             key={t.key}
                                             href={t.href}
                                             className={className}
                                         >
                                             {inner}
-                                        </Link>
+                                        </Link>,
+                                    );
+                                } else {
+                                    elements.push(
+                                        <Button
+                                            key={t.key}
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() => handleTabChange(t.key)}
+                                            className={className}
+                                        >
+                                            {inner}
+                                        </Button>,
                                     );
                                 }
+                            }
 
-                                return (
-                                    <Button
-                                        key={t.key}
-                                        type="button"
-                                        variant="ghost"
-                                        onClick={() => handleTabChange(t.key)}
-                                        className={className}
-                                    >
-                                        {inner}
-                                    </Button>
-                                );
-                            })}
+                            return elements;
+                        })()}
                     </div>
                 </div>
 

@@ -49,6 +49,7 @@ type Site = {
         critical_total: number;
         is_active_but_incomplete: boolean;
     };
+    geofence_status?: 'active' | 'inactive' | 'missing' | 'na';
 };
 
 type PageProps = {
@@ -456,11 +457,22 @@ export default function SitesIndex() {
                                                         <RiskBadge site={s} />
                                                     </td>
                                                     <td className="hidden px-4 py-3 xl:table-cell">
-                                                        {s.readiness ? (
-                                                            <Badge variant="outline" className={s.readiness.is_active_but_incomplete ? 'border-status-warning/30 bg-status-warning-bg text-status-warning' : 'border-status-success/30 bg-status-success-bg text-status-success'}>
-                                                                {s.readiness.score}% ready
-                                                            </Badge>
-                                                        ) : '—'}
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            {s.readiness ? (
+                                                                <Badge variant="outline" className={s.readiness.is_active_but_incomplete ? 'border-status-warning/30 bg-status-warning-bg text-status-warning' : 'border-status-success/30 bg-status-success-bg text-status-success'}>
+                                                                    {s.readiness.score}% ready
+                                                                </Badge>
+                                                            ) : '—'}
+                                                            {s.geofence_status === 'active' && (
+                                                                <span title="Geofence active" className="h-2 w-2 shrink-0 rounded-full bg-status-success" />
+                                                            )}
+                                                            {s.geofence_status === 'inactive' && (
+                                                                <span title="Geofence disabled" className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground" />
+                                                            )}
+                                                            {s.geofence_status === 'missing' && (
+                                                                <span title="Geofence missing — needed for resident tracking" className="h-2 w-2 shrink-0 rounded-full bg-status-warning animate-pulse" />
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <Badge

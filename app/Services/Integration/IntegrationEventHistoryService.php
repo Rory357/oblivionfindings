@@ -70,6 +70,15 @@ class IntegrationEventHistoryService
             $query->where('created_at', '<=', $filters['date_to'].' 23:59:59');
         }
 
+        if (! empty($filters['event_types'])) {
+            $types = is_array($filters['event_types'])
+                ? $filters['event_types']
+                : array_filter(array_map('trim', explode(',', (string) $filters['event_types'])));
+            if (! empty($types)) {
+                $query->whereIn('event_type', $types);
+            }
+        }
+
         return $query->orderByDesc('created_at')
             ->limit(500)
             ->get()
@@ -108,6 +117,15 @@ class IntegrationEventHistoryService
 
         if (! empty($filters['date_to'])) {
             $query->where('occurred_at', '<=', $filters['date_to'].' 23:59:59');
+        }
+
+        if (! empty($filters['event_types'])) {
+            $types = is_array($filters['event_types'])
+                ? $filters['event_types']
+                : array_filter(array_map('trim', explode(',', (string) $filters['event_types'])));
+            if (! empty($types)) {
+                $query->whereIn('event_type', $types);
+            }
         }
 
         return $query->orderByDesc('occurred_at')

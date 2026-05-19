@@ -19,7 +19,7 @@ class SiteGeofenceController extends Controller
         $geofence = AssetGeofence::query()
             ->where('site_id', $site->id)
             ->whereNull('asset_id')
-            ->first() ?? new AssetGeofence();
+            ->first() ?? new AssetGeofence;
 
         $geofence->fill($this->geofenceAttributes($data, $site));
         $geofence->save();
@@ -89,13 +89,27 @@ class SiteGeofenceController extends Controller
             'site_id' => $site->id,
             'name' => $data['name'],
             'type' => $data['type'],
-            'scope' => 'vehicle',
+            'scope' => $this->scopeForSite($site),
             'shape' => $data['shape'],
             'breach_type' => $data['breach_type'],
             'alert_config' => null,
             'time_rules' => null,
             'is_active' => (bool) ($data['is_active'] ?? true),
         ];
+    }
+
+    /**
+     * Derive a sensible default scope from the site's type. Residential
+     * houses get `house`; facilities get `asset`; everything else stays
+     * `site`. Operators can override later via the editor's scope field.
+     */
+    private function scopeForSite(Site $site): string
+    {
+        return match ($site->type) {
+            'house', 'residential' => 'house',
+            'facility' => 'asset',
+            default => 'site',
+        };
     }
 
     private function ensureSiteScopedGeofence(Site $site, AssetGeofence $geofence): void

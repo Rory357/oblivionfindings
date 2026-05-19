@@ -165,7 +165,12 @@ class AtTrackProtocolParser
             'frame_type' => $frameType,
             'command_word' => $commandWord,
             'event_type' => $this->eventTypeFromCommand($commandWord),
-            'battery' => $this->numOrNull($fields[4] ?? null),
+            // Battery is NOT at fields[4] for location-style commands such as
+            // GTFRI on GL30 — field 4 is report_id there. Specific handlers
+            // (GTBPL) set it explicitly. For GTFRI/GTSOS/etc. we scan the
+            // trailing fields by position_append_mask below.
+            'battery' => null,
+            'battery_voltage_mv' => null,
             'power_event' => null,
             'charging_status' => null,
         ];
@@ -289,7 +294,93 @@ class AtTrackProtocolParser
                 break;
         }
 
+        // Walk the trailing fields after the position_append_mask to recover
+        // satellites, battery voltage (mV), battery percentage, and charging
+        // status. The exact bit layout differs across Queclink families, so
+        // we use an empirical scan against well-known value ranges. This is
+        // safe because (a) the trailing block is bounded by send_time +
+        // count_number at the end, and (b) battery percentage 0–100 and
+        // voltage 2500–5500 mV almost never collide with other numeric
+        // fields in this region. See GL30MEUR01 protocol §6.2 for the canon.
+        $this->extractTrailingHealth($payload, $fields);
+
         return $payload;
+    }
+
+    /**
+     * Extract battery percentage, voltage, satellites, and charging status
+     * from the trailing fields of a location-style frame.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $fields
+     */
+    protected function extractTrailingHealth(array &$payload, array $fields): void
+    {
+        $count = count($fields);
+        if ($count < 22) {
+            return; // not enough fields for trailing health
+        }
+
+        // The trailing block sits between fields[18] (position_append_mask)
+        // and fields[N-2] (send_time). The last field is the count_number.
+        $tailStart = 18;
+        $tailEnd = $count - 3; // inclusive
+        if ($tailEnd <= $tailStart) {
+            return;
+        }
+
+        // GTBPL already sets battery from field 4 — don't clobber it.
+        $skipBattery = ($payload['command_word'] ?? null) === 'GTBPL'
+            && $payload['battery'] !== null;
+
+        // Strategy: anchor on battery voltage (mV). Battery voltage is the
+        // most distinctive value in the trailing block — a 4-digit integer
+        // in the 2500–5500 range that doesn't collide with mileage, hour
+        // meters, or satellite counts. Once we find it, battery percentage
+        // is typically the immediately-following field (0–100) and charging
+        // status the one after that (0–3). If no voltage is found, we make
+        // no claims about battery/charging from the trailing block — the
+        // command-specific handlers (e.g. GTBPL) remain authoritative.
+        $voltageIdx = null;
+        for ($i = $tailStart + 1; $i <= $tailEnd; $i++) {
+            $raw = $fields[$i] ?? null;
+            if ($raw === null || $raw === '' || ! is_numeric($raw)) {
+                continue;
+            }
+            $num = (float) $raw;
+            if ($num >= 2500 && $num <= 5500 && (int) $num == $num) {
+                $voltageIdx = $i;
+                $payload['battery_voltage_mv'] = (int) $num;
+                break;
+            }
+        }
+
+        if ($voltageIdx === null) {
+            return;
+        }
+
+        // Battery percentage: field immediately after voltage.
+        $batteryRaw = $fields[$voltageIdx + 1] ?? null;
+        if ($batteryRaw !== null && $batteryRaw !== '' && is_numeric($batteryRaw)) {
+            $num = (float) $batteryRaw;
+            if ($num >= 0 && $num <= 100 && (int) $num == $num && ! $skipBattery) {
+                $payload['battery'] = (float) $num;
+            }
+        }
+
+        // Charging status: field after battery percentage.
+        $chargingRaw = $fields[$voltageIdx + 2] ?? null;
+        if ($chargingRaw !== null && $chargingRaw !== '' && is_numeric($chargingRaw)) {
+            $num = (float) $chargingRaw;
+            if ((int) $num == $num && $num >= 0 && $num <= 3) {
+                $payload['charging_status'] = match ((int) $num) {
+                    2 => 'charging',
+                    1 => 'not_charging',
+                    3 => 'stopped_charging',
+                    default => null,
+                };
+            }
+        }
     }
 
     /**

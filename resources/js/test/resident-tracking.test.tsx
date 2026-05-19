@@ -202,7 +202,7 @@ it('renders the resident sidebar and queues Locate Now from a list row', async (
     );
 });
 
-it('keeps location history on the live point until all points are requested', async () => {
+it('renders the new history page with quick range pills and event filter', async () => {
     render(
         <ResidentTrackingHistory
             client={{
@@ -211,13 +211,17 @@ it('keeps location history on the live point until all points are requested', as
                 house: 'Harbour House',
                 photo: null,
             }}
+            resident={null}
             tracker={{
                 id: 12,
+                device_uid: 'GL30-TEST-9012',
                 name: 'Care tracker 867963069916998',
                 serial: null,
                 status: 'active',
+                detail_url: '/security-devices/devices/12',
             }}
-            filters={{}}
+            available_event_types={['location_report']}
+            filters={{ range: '24h', date_from: null, date_to: null, event_types: [] }}
             locations={[
                 {
                     lat: -37.723657,
@@ -235,23 +239,14 @@ it('keeps location history on the live point until all points are requested', as
                     battery: null,
                     event_type: 'location_report',
                 },
-                {
-                    lat: -37.723587,
-                    lng: 175.241568,
-                    timestamp: '2026-05-18T07:29:00Z',
-                    speed: 0,
-                    battery: null,
-                    event_type: 'location_report',
-                },
             ]}
         />,
     );
 
-    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '1');
-    expect(screen.getByText('Showing live point')).toBeVisible();
-
-    fireEvent.click(screen.getByRole('button', { name: /View all points/i }));
-
-    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '3');
-    expect(screen.getByText('Showing all 3 points')).toBeVisible();
+    // New UI exposes range pills + map shows all points as markers
+    expect(screen.getByRole('button', { name: /^Today$/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^24h$/i })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^7d$/i })).toBeVisible();
+    expect(screen.getByTestId('resident-map')).toHaveAttribute('data-marker-count', '2');
+    expect(screen.getByText(/points/i)).toBeVisible();
 });
