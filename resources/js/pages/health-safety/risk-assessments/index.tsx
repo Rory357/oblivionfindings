@@ -64,7 +64,6 @@ export default function RiskAssessmentsIndex({ assessments, filters }: Props) {
 
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Risk Assessments"
                     description={`${assessments.total} assessment${assessments.total !== 1 ? 's' : ''} registered`}
                     icon={<Shield className="h-7 w-7 text-white" />}

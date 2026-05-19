@@ -635,7 +635,6 @@ export default function HealthSafetyDashboard({
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Health & Safety Dashboard"
                     description="Real-time overview of workplace safety performance"
                     icon={<Shield className="h-7 w-7 text-white" />}

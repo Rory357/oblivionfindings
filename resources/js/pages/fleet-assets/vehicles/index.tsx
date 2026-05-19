@@ -162,7 +162,6 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
             <Head title="Vehicles" />
             <PageShell>
                 <PageHero
-                    category="fleet"
                     title={
                         <div className="flex items-center gap-2">
                             <span>Vehicles</span>

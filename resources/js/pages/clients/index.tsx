@@ -70,8 +70,7 @@ export default function ClientsIndex({ clients }) {
             <Head title={labels?.['client.plural'] ?? 'Clients'} />
 
             <PageShell>
-                <PageHero
-                    category="ops" variant="compact"
+                <PageHero variant="compact"
                     title={labels?.['client.plural'] ?? 'Clients'}
                     description={
                         role === 'support_worker'

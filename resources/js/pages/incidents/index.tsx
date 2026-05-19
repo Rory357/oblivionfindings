@@ -167,7 +167,6 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="incidents"
                     title={filters.type === 'near_miss' ? 'Near Misses' : 'Incidents'}
                     description={filters.type
                         ? `Filtered by type: ${filters.type.replace(/_/g, ' ')}`

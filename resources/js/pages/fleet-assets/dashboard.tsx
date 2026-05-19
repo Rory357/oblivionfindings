@@ -450,7 +450,6 @@ export default function FleetAssetsDashboard({
             <Head title="Fleet & Assets" />
             <PageShell>
                 <PageHero
-                    category="fleet"
                     title="Fleet & Assets"
                     description="Real-time fleet tracking, asset management, and operational insights."
                     icon={<Car className="h-7 w-7" />}

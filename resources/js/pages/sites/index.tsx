@@ -250,7 +250,6 @@ export default function SitesIndex() {
             <PageLayout
                 hero={
                     <PageHero
-                    category="sites"
                         title={sitePlural}
                         description={`Manage locations and facilities — ${sites.length} ${sites.length === 1 ? siteSingular.toLowerCase() : sitePlural.toLowerCase()} total`}
                         icon={Building2}

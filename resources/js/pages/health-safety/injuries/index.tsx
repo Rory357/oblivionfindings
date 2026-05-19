@@ -103,7 +103,6 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="incidents"
                     title="Injuries & Return to Work"
                     description="Track workplace injuries, RTW plans, and capacity assessments"
                     icon={<HeartPulse className="h-7 w-7 text-white" />}

@@ -290,7 +290,6 @@ export default function MaintenanceDashboard({
             <Head title="Maintenance Overview" />
             <PageShell>
                 <PageHero
-                    category="fleet"
                     title="Maintenance Overview"
                     description="Cost analytics and maintenance health at a glance."
                     actions={

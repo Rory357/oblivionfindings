@@ -126,7 +126,6 @@ export default function DrillsIndex({
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="incidents"
                     title="Emergency Drills"
                     description="Schedule, run, and track emergency evacuation drills"
                     icon={<CalendarClock className="h-7 w-7 text-white" />}

@@ -125,7 +125,6 @@ export default function SafeguardingIndex({ filters, concerns, stats }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="incidents"
                     title="Safeguarding Concerns"
                     description="Manage safeguarding concerns, investigations, and external referrals"
                     icon={<Shield className="h-7 w-7 text-white" />}

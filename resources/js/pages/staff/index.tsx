@@ -88,7 +88,6 @@ export default function StaffIndex({ users, filters }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="ops"
                     title="Staff"
                     description="Manage staff profiles, assignments, availability and access"
                     icon={<Users className="h-7 w-7 text-white" />}

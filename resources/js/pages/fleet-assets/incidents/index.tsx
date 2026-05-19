@@ -128,7 +128,6 @@ export default function IncidentIndex({ incidents: rawIncidents, vehicles, filte
             <Head title="Incident Reports" />
             <PageShell>
                 <PageHero
-                    category="incidents"
                     title="Incident Reports"
                     actions={
                         <div className="flex gap-2">

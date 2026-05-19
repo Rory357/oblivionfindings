@@ -212,7 +212,6 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Homes and Sites Hazards"
                     description="Cross-site hazard register and management"
                     icon={<ShieldAlert className="h-7 w-7 text-white" />}

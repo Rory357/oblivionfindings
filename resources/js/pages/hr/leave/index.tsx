@@ -375,8 +375,7 @@ export default function LeaveIndex({
             <Head title="Leave Management" />
 
             <PageShell>
-                <PageHero
-                    category="hr" variant="compact"
+                <PageHero variant="compact"
                     title="Leave Management"
                     description="Manage leave requests, approvals, balances, and absence analytics."
                     actions={

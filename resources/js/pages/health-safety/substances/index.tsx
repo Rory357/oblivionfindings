@@ -99,7 +99,6 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Chemical Register"
                     description="Manage hazardous substances, SDS documents, and storage locations"
                     icon={<FlaskConical className="h-7 w-7 text-white" />}

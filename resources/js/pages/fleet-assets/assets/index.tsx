@@ -125,7 +125,6 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
             <Head title="Assets" />
             <PageShell>
                 <PageHero
-                    category="fleet"
                     title="Assets"
                     description="Manage all organisational assets including vehicles, equipment, and property."
                     actions={

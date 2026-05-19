@@ -33,7 +33,6 @@ export function CateringHero({
     return (
         <PageHero
             icon={Utensils}
-            category="ops"
             title={title}
             description={subtitle}
             badges={badges.map((b) => ({

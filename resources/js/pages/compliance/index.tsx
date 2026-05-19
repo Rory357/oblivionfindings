@@ -125,7 +125,6 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Compliance Dashboard"
                     description="Exceptions, registers due, and audit evidence at a glance"
                     icon={<Shield className="h-7 w-7 text-white" />}

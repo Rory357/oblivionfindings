@@ -216,7 +216,6 @@ export default function RestraintsIndex({
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Restraints & Behaviour Support"
                     description="Record restraint events and manage behaviour support plans"
                     icon={<ShieldAlert className="h-7 w-7 text-white" />}

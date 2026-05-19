@@ -113,8 +113,7 @@ export default function OperationsDashboard({ stats, client_status_breakdown, sh
     return (
         <AppLayout>
             <Head title="Operations" />
-            <PageHero
-                    category="ops" variant="compact"
+            <PageHero variant="compact"
                 title="Operations Dashboard"
                 description="Overview of clients, shifts, timesheets, and operational activity."
             />

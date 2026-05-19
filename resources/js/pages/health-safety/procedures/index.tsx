@@ -111,7 +111,6 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    category="compliance"
                     title="Safe Work Procedures"
                     description="Manage safe work procedures and safety documentation"
                     icon={<FileText className="h-7 w-7 text-white" />}
