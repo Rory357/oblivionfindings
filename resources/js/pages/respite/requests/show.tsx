@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
@@ -19,20 +20,16 @@ export default function RespiteRequestShow({ request, booking }: Props) {
         ]}>
             <Head title="Respite Booking Request" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            {request.client?.first_name} {request.client?.last_name}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge variant="outline">{request.status}</Badge>
-                        </div>
-                    </div>
-                    <Link href="/respite" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to list
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/requests"
+                        title={`${request.client?.first_name ?? ''} ${request.client?.last_name ?? ''}`.trim() || 'Booking Request'}
+                        actions={<Badge variant="outline">{request.status}</Badge>}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -82,7 +79,7 @@ export default function RespiteRequestShow({ request, booking }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

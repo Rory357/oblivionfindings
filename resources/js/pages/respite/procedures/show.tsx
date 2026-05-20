@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Head } from '@inertiajs/react';
 
@@ -19,11 +20,16 @@ export default function RespiteProcedureShow({ template }: Props) {
         ]}>
             <Head title={`Procedure ${template.name}`} />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">{template.name}</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Version {template.version}</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/procedures"
+                        title={template.name}
+                        description={`Version ${template.version}`}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -67,7 +73,7 @@ export default function RespiteProcedureShow({ template }: Props) {
                         </details>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

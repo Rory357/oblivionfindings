@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target } from 'lucide-react';
 
 interface Plan {
     id: number;
@@ -52,11 +52,16 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
             ]}
         >
             <Head title={`Edit: ${plan.title}`} />
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <Target className="w-8 h-8 text-primary" />
-                    <h1 className="text-3xl font-bold text-foreground">Edit Strategic Plan</h1>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/governance/strategy"
+                        title="Edit Strategic Plan"
+                        description={plan.title}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader><CardTitle>Plan Details</CardTitle></CardHeader>
                     <CardContent>
@@ -106,7 +111,7 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

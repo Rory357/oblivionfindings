@@ -1,15 +1,15 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { show as showResolution, vote as voteResolution, open as openResolution, close as closeResolution } from '@/routes/governance/resolutions';
+import { vote as voteResolution, open as openResolution, close as closeResolution } from '@/routes/governance/resolutions';
 import { declare as declareConflictRoute } from '@/routes/governance/resolutions/conflict';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, MinusCircle, Users, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, MinusCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import axios from 'axios';
@@ -185,31 +185,36 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
     >
       <Head title={resolution.title} />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-foreground">{resolution.title}</h1>
-              <Badge className={cn(
-                resolution.status === 'open' && 'bg-status-success-bg text-status-success',
-                resolution.status === 'closed' && 'bg-primary/10 text-primary',
-                resolution.status === 'implemented' && 'bg-status-success-bg text-status-success',
-                resolution.status === 'archived' && 'bg-muted text-foreground',
-                resolution.status === 'draft' && 'bg-muted text-foreground',
-              )}>
-                {resolution.status}
-              </Badge>
-              {resolution.outcome && (
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/resolutions"
+            title={resolution.title}
+            description={resolution.resolution_reference}
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge className={cn(
-                  resolution.outcome === 'carried' ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'
+                  resolution.status === 'open' && 'bg-status-success-bg text-status-success',
+                  resolution.status === 'closed' && 'bg-primary/10 text-primary',
+                  resolution.status === 'implemented' && 'bg-status-success-bg text-status-success',
+                  resolution.status === 'archived' && 'bg-muted text-foreground',
+                  resolution.status === 'draft' && 'bg-muted text-foreground',
                 )}>
-                  {resolution.outcome}
+                  {resolution.status}
                 </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground">{resolution.resolution_reference}</p>
-          </div>
-
+                {resolution.outcome && (
+                  <Badge className={cn(
+                    resolution.outcome === 'carried' ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'
+                  )}>
+                    {resolution.outcome}
+                  </Badge>
+                )}
+              </div>
+            }
+          />
+        }
+      >
           {/* Context */}
           <Card className="mb-6">
             <CardHeader>
@@ -458,7 +463,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               </CardContent>
             </Card>
           )}
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

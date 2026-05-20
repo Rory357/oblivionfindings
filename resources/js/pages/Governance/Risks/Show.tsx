@@ -1,18 +1,18 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { index as risksIndex, update as updateRisk, accept as acceptRisk, close as closeRisk } from '@/routes/governance/risks';
+import { accept as acceptRisk } from '@/routes/governance/risks';
 import { add as addTreatment } from '@/routes/governance/risks/treatments';
-import { link as linkEvent } from '@/routes/governance/risks/events';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Shield, User, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { AlertTriangle, User, Calendar, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import axios from 'axios';
@@ -158,40 +158,35 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
     >
       <Head title={risk.title} />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Back Link */}
-          <div className="mb-4">
-            <Link href={risksIndex.url()} className="text-sm text-status-info hover:underline">
-              ← Back to Risk Register
-            </Link>
-          </div>
-
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex items-start gap-4">
-              <div className={cn('w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl', getRiskColor(risk.residual_score))}>
-                {risk.residual_score}
-              </div>
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-foreground">{risk.title}</h1>
-                  <Badge variant="outline">{risk.risk_reference}</Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={getRiskColor(risk.residual_score) + ' text-white'}>
-                    {getRiskLevel(risk.residual_score)}
-                  </Badge>
-                  <Badge variant="outline">{getCategoryLabel(risk.category)}</Badge>
-                  {!risk.within_appetite && (
-                    <Badge className="bg-primary/10 text-primary">Above Appetite</Badge>
-                  )}
-                  <Badge variant={risk.status === 'active' ? 'default' : 'secondary'}>
-                    {risk.status}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            {canEdit && (
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/risks"
+            title={
+              <span className="flex flex-wrap items-center gap-3">
+                <span className={cn('w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base', getRiskColor(risk.residual_score))}>
+                  {risk.residual_score}
+                </span>
+                {risk.title}
+                <Badge variant="outline">{risk.risk_reference}</Badge>
+              </span>
+            }
+            description={
+              <span className="flex flex-wrap items-center gap-2">
+                <Badge className={getRiskColor(risk.residual_score) + ' text-white'}>
+                  {getRiskLevel(risk.residual_score)}
+                </Badge>
+                <Badge variant="outline">{getCategoryLabel(risk.category)}</Badge>
+                {!risk.within_appetite && (
+                  <Badge className="bg-primary/10 text-primary">Above Appetite</Badge>
+                )}
+                <Badge variant={risk.status === 'active' ? 'default' : 'secondary'}>
+                  {risk.status}
+                </Badge>
+              </span>
+            }
+            actions={canEdit ? (
               <div className="flex gap-2">
                 <Dialog open={showTreatmentDialog} onOpenChange={setShowTreatmentDialog}>
                   <DialogTrigger asChild>
@@ -310,9 +305,10 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                   </Dialog>
                 )}
               </div>
-            )}
-          </div>
-
+            ) : null}
+          />
+        }
+      >
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
@@ -513,7 +509,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
               )}
             </div>
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

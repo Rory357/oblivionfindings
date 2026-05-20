@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
@@ -20,23 +21,23 @@ export default function DailyNoteShow({ note, wellbeingSummary, wellbeingScore }
         ]}>
             <Head title="Daily Note" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Daily Note &mdash; {note.stay?.client?.first_name} {note.stay?.client?.last_name}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge variant="outline">{note.shift_period}</Badge>
-                            {note.has_concerns && <Badge variant="outline">Concern</Badge>}
-                            {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
-                            {note.sensitive_flag && <Badge variant="outline">Sensitive</Badge>}
-                        </div>
-                    </div>
-                    <Link href="/respite/daily-notes" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to list
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/daily-notes"
+                        title={`Daily Note — ${note.stay?.client?.first_name ?? ''} ${note.stay?.client?.last_name ?? ''}`.trim()}
+                        actions={
+                            <div className="flex flex-wrap gap-2">
+                                <Badge variant="outline">{note.shift_period}</Badge>
+                                {note.has_concerns && <Badge variant="outline">Concern</Badge>}
+                                {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
+                                {note.sensitive_flag && <Badge variant="outline">Sensitive</Badge>}
+                            </div>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -130,7 +131,7 @@ export default function DailyNoteShow({ note, wellbeingSummary, wellbeingScore }
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

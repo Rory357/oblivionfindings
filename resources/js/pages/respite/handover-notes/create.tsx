@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import DictateButton from '@/components/dictate-button';
@@ -78,14 +79,17 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Handover Notes', href: '/respite/handover-notes' }, { title: 'New', href: '/respite/handover-notes/create' }]}>
             <Head title="New Handover Note" />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                    <div>
-                        <h1 className="text-lg font-semibold">New Handover Note</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">Record handover information for a respite stay.</div>
-                    </div>
-                    <DraftSavedIndicator savedAt={savedAt} />
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/handover-notes"
+                        title="New Handover Note"
+                        description="Record handover information for a respite stay."
+                        actions={<DraftSavedIndicator savedAt={savedAt} />}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 {resumePayload && (
@@ -168,7 +172,7 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                         </div>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

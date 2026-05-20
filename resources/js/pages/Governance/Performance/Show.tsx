@@ -1,17 +1,18 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { index as performanceIndex, assess as assessReview } from '@/routes/governance/performance';
+import { assess as assessReview } from '@/routes/governance/performance';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Target, TrendingUp, Star, Award, User, Calendar } from 'lucide-react';
+import { Target, TrendingUp, Star, Award, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 
@@ -183,38 +184,29 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
     >
       <Head title={`Performance Review - ${review.reviewee.name}`} />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Back Link */}
-          <div className="mb-4">
-            <Link href={performanceIndex.url()} className="text-sm text-status-info hover:underline">
-              ← Back to Performance Reviews
-            </Link>
-          </div>
-
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Award className="w-8 h-8 text-primary" />
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">Performance Review</h1>
-                  <p className="text-muted-foreground">{review.reviewee.name} - {review.review_cycle}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/performance"
+            title="Performance Review"
+            description={`${review.reviewee.name} - ${review.review_cycle}`}
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge className={getStatusColor(review.status)}>{review.status.replace('_', ' ')}</Badge>
                 {review.overall_rating && (
                   <Badge className={getRatingColor(review.overall_rating)}>
                     {getRatingLabel(review.overall_rating)}
                   </Badge>
                 )}
+                {review.status !== 'completed' && can_assess && (
+                  <Button onClick={() => setAssessmentOpen(true)}>Continue Review</Button>
+                )}
               </div>
-            </div>
-            {review.status !== 'completed' && can_assess && (
-              <Button onClick={() => setAssessmentOpen(true)}>Continue Review</Button>
-            )}
-          </div>
-
+            }
+          />
+        }
+      >
           {/* Overview Card */}
           <Card className="mb-6">
             <CardHeader>
@@ -417,7 +409,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
               )}
             </div>
           </div>
-      </div>
+      </PageLayout>
       <Dialog open={assessmentOpen} onOpenChange={setAssessmentOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>

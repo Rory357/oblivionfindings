@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,24 +31,16 @@ export default function RespiteBookingShow({ booking }: Props) {
         >
             <Head title="Respite Booking" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            {booking.client?.first_name}{' '}
-                            {booking.client?.last_name}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge variant="outline">{booking.status}</Badge>
-                        </div>
-                    </div>
-                    <Link
-                        href="/respite"
-                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                    >
-                        Back to list
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/bookings"
+                        title={`${booking.client?.first_name ?? ''} ${booking.client?.last_name ?? ''}`.trim() || 'Booking'}
+                        actions={<Badge variant="outline">{booking.status}</Badge>}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -102,7 +95,7 @@ export default function RespiteBookingShow({ booking }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

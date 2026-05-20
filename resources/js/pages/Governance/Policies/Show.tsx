@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
-import { BookOpen, CheckCircle, Shield, Clock } from 'lucide-react';
+import { CheckCircle, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Attestation {
@@ -61,32 +62,38 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
   return (
     <AppLayout>
       <Head title={policy.title} />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground">{policy.title}</h1>
-              <Badge variant="outline">v{policy.version}</Badge>
-              <Badge className={cn('text-xs', getStatusColor(policy.status))}>
-                {policy.status.replace('_', ' ')}
-              </Badge>
-            </div>
-            <p className="text-muted-foreground mt-1">{policy.category} policy</p>
-          </div>
-          <div className="flex gap-2">
-            {canEdit && policy.status === 'draft' && (
-              <Button onClick={handleApprove} variant="default">
-                <Shield className="w-4 h-4 mr-2" /> Approve
-              </Button>
-            )}
-            {canEdit && (
-              <Link href={`/governance/policies/${policy.id}/edit`}>
-                <Button variant="outline">Edit</Button>
-              </Link>
-            )}
-          </div>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/policies"
+            title={
+              <span className="flex flex-wrap items-center gap-3">
+                {policy.title}
+                <Badge variant="outline">v{policy.version}</Badge>
+                <Badge className={cn('text-xs', getStatusColor(policy.status))}>
+                  {policy.status.replace('_', ' ')}
+                </Badge>
+              </span>
+            }
+            description={`${policy.category} policy`}
+            actions={
+              <div className="flex gap-2">
+                {canEdit && policy.status === 'draft' && (
+                  <Button onClick={handleApprove} variant="default">
+                    <Shield className="w-4 h-4 mr-2" /> Approve
+                  </Button>
+                )}
+                {canEdit && (
+                  <Link href={`/governance/policies/${policy.id}/edit`}>
+                    <Button variant="outline">Edit</Button>
+                  </Link>
+                )}
+              </div>
+            }
+          />
+        }
+      >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <Card>
@@ -189,7 +196,7 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
             )}
           </div>
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

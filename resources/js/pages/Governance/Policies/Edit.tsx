@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -44,9 +45,16 @@ export default function PolicyEdit({ auth, policy }: Props) {
   return (
     <AppLayout>
       <Head title={`Edit: ${policy.title}`} />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Edit Policy</h1>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/policies"
+            title="Edit Policy"
+            description={policy.title}
+          />
+        }
+      >
         <form onSubmit={handleSubmit}>
           <Card>
             <CardContent className="p-6 space-y-6">
@@ -117,7 +125,7 @@ export default function PolicyEdit({ auth, policy }: Props) {
             </CardContent>
           </Card>
         </form>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

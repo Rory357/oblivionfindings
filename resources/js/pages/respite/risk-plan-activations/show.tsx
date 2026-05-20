@@ -3,11 +3,12 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 
 type Props = {
     activation: any;
@@ -41,18 +42,16 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: activation.plan_name, href: base }]}>
             <Head title="Risk Plan Activation" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">{activation.plan_name}</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {activation.stay?.client?.first_name} {activation.stay?.client?.last_name}
-                        </div>
-                    </div>
-                    <Link href="/respite/risk-plan-activations" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to list
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/risk-plan-activations"
+                        title={activation.plan_name}
+                        description={`${activation.stay?.client?.first_name ?? ''} ${activation.stay?.client?.last_name ?? ''}`.trim() || undefined}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -191,7 +190,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

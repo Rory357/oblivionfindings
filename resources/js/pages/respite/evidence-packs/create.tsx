@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, useForm } from '@inertiajs/react';
@@ -27,14 +28,16 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
         ]}>
             <Head title="New Evidence Pack" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New Evidence Pack</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Create an evidence collection for a respite stay.
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/evidence-packs"
+                        title="New Evidence Pack"
+                        description="Create an evidence collection for a respite stay."
+                    />
+                }
+            >
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -88,7 +91,7 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

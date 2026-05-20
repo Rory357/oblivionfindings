@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
@@ -36,13 +37,16 @@ export default function RespiteReferralCreate({ clients }: Props) {
         ]}>
             <Head title="New Respite Referral" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New Respite Referral</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Capture intake details for respite support.
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/referrals"
+                        title="New Respite Referral"
+                        description="Capture intake details for respite support."
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <form onSubmit={submit} className="space-y-4">
@@ -131,7 +135,7 @@ export default function RespiteReferralCreate({ clients }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

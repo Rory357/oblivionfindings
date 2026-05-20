@@ -1,10 +1,11 @@
 import { Head, useForm } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,9 +30,15 @@ export default function PolicyCreate({ auth }: PageProps) {
   return (
     <AppLayout>
       <Head title="Create Policy" />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Create Governance Policy</h1>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/policies"
+            title="Create Governance Policy"
+          />
+        }
+      >
         <form onSubmit={handleSubmit}>
           <Card>
             <CardContent className="p-6 space-y-6">
@@ -96,7 +103,7 @@ export default function PolicyCreate({ auth }: PageProps) {
             </CardContent>
           </Card>
         </form>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 
 type Props = {
     run: any;
@@ -37,16 +38,16 @@ export default function ProcedureRunShow({ run, staff }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Procedure Runs', href: '/respite/procedure-runs' }, { title: `Run #${run.id}`, href: base }]}>
             <Head title="Procedure Run" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">{run.template?.name || 'Procedure Run'}</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">Run #{run.id}</div>
-                    </div>
-                    <Link href="/respite/procedure-runs" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to list
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/procedure-runs"
+                        title={run.template?.name || 'Procedure Run'}
+                        description={`Run #${run.id}`}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -150,7 +151,7 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

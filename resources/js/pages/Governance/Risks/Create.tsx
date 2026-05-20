@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store as storeRisk } from '@/routes/governance/risks';
-import { AlertTriangle } from 'lucide-react';
 
 interface Props extends PageProps {
   categories: Array<{ value: string; label: string }>;
@@ -43,12 +43,15 @@ export default function CreateRisk({ auth }: Props) {
     >
       <Head title="New Risk" />
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <AlertTriangle className="w-8 h-8 text-status-warning" />
-            <h1 className="text-3xl font-bold text-foreground">New Risk</h1>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/risks"
+            title="New Risk"
+          />
+        }
+      >
           <Card>
             <CardHeader>
               <CardTitle>Risk Details</CardTitle>
@@ -163,7 +166,7 @@ export default function CreateRisk({ auth }: Props) {
               </form>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

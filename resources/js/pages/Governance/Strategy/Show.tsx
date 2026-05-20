@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as strategyIndex } from '@/routes/governance/strategy';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -122,35 +123,26 @@ export default function StrategyShow({ auth, plan }: Props) {
     >
       <Head title={plan.title} />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Back Link */}
-          <div className="mb-4">
-            <Link href={strategyIndex.url()} className="text-sm text-status-info hover:underline">
-              ← Back to Strategic Plans
-            </Link>
-          </div>
-
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Compass className="w-8 h-8 text-primary" />
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">{plan.title}</h1>
-                  <p className="text-muted-foreground">{plan.period_start} to {plan.period_end}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/strategy"
+            title={plan.title}
+            description={`${plan.period_start} to ${plan.period_end}`}
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{plan.planning_horizon.replace('_', ' ')} Plan</Badge>
                 <Badge className={getStatusColor(plan.status)}>{plan.status}</Badge>
                 <Badge variant="outline">v{plan.version_number}</Badge>
+                {plan.status === 'draft' && (
+                  <Button>Submit for Approval</Button>
+                )}
               </div>
-            </div>
-            {plan.status === 'draft' && (
-              <Button>Submit for Approval</Button>
-            )}
-          </div>
-
+            }
+          />
+        }
+      >
           {/* Vision & Mission */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <Card className="border-primary bg-primary/10">
@@ -309,7 +301,7 @@ export default function StrategyShow({ auth, plan }: Props) {
               </Card>
             )}
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

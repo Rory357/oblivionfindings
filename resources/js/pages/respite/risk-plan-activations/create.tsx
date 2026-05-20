@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Head, useForm } from '@inertiajs/react';
@@ -92,11 +93,16 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: 'New', href: '/respite/risk-plan-activations/create' }]}>
             <Head title="New Risk Plan Activation" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New Risk Plan Activation</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Activate a risk plan for a respite stay.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/risk-plan-activations"
+                        title="New Risk Plan Activation"
+                        description="Activate a risk plan for a respite stay."
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -165,7 +171,7 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                         <Button type="submit" disabled={processing}>{processing ? 'Saving...' : 'Create Activation'}</Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

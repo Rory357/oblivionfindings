@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
 type Template = {
     id: number;
@@ -50,18 +51,16 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Procedure Runs', href: '/respite/procedure-runs' }, { title: 'New Run', href: '/respite/procedure-runs/create' }]}>
             <Head title="New Procedure Run" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">New Procedure Run</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Start a procedure from an active template and attach it to a respite subject.
-                        </div>
-                    </div>
-                    <Link href="/respite/procedure-runs" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to Runs
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/procedure-runs"
+                        title="New Procedure Run"
+                        description="Start a procedure from an active template and attach it to a respite subject."
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <form
@@ -142,7 +141,7 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

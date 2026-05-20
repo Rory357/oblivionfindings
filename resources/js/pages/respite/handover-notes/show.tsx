@@ -2,9 +2,10 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 
 type Props = {
     note: any;
@@ -15,18 +16,16 @@ export default function HandoverNoteShow({ note }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Handover Notes', href: '/respite/handover-notes' }, { title: `Note #${note.id}`, href: `/respite/handover-notes/${note.id}` }]}>
             <Head title="Handover Note" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Handover Note #{note.id}</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {note.stay?.client?.first_name} {note.stay?.client?.last_name}
-                        </div>
-                    </div>
-                    <Link href="/respite/handover-notes" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to list
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/handover-notes"
+                        title={`Handover Note #${note.id}`}
+                        description={`${note.stay?.client?.first_name ?? ''} ${note.stay?.client?.last_name ?? ''}`.trim() || undefined}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -63,7 +62,7 @@ export default function HandoverNoteShow({ note }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

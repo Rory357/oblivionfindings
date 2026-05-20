@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Head, useForm } from '@inertiajs/react';
@@ -37,10 +38,15 @@ export default function RespiteProcedureCreate() {
         ]}>
             <Head title="New Procedure Template" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New Procedure Template</h1>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/procedures"
+                        title="New Procedure Template"
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <form
@@ -112,7 +118,7 @@ export default function RespiteProcedureCreate() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import DictateButton from '@/components/dictate-button';
@@ -145,17 +146,17 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
         ]}>
             <Head title="New Daily Note" />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                    <div>
-                        <h1 className="text-lg font-semibold">New Daily Note</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Record wellbeing observations and activities for a shift.
-                        </div>
-                    </div>
-                    <DraftSavedIndicator savedAt={savedAt} />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/respite/daily-notes"
+                        title="New Daily Note"
+                        description="Record wellbeing observations and activities for a shift."
+                        actions={<DraftSavedIndicator savedAt={savedAt} />}
+                    />
+                }
+            >
                 {resumePayload && (
                     <DraftResumePrompt
                         savedAt={resumePayload.savedAt}
@@ -356,7 +357,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                         </div>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
