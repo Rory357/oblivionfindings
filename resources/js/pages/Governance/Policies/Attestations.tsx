@@ -105,7 +105,6 @@ export default function PolicyAttestations({ auth, outstanding, completed, canMa
           <PageHero
             icon={BookOpen}
             category="governance"
-            variant="compact"
             title="Policy Attestations"
             description="Record that you have read and understood each approved governance policy."
             stats={[

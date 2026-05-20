@@ -57,7 +57,6 @@ export default function GovernanceSettingsIndex({ auth, settings, categories }: 
           <PageHero
             icon={SettingsIcon}
             category="governance"
-            variant="compact"
             title="Governance Settings"
             description="Configure escalation paths, spend approval thresholds, and variance alert rules."
           />

@@ -124,7 +124,6 @@ export default function GovernanceAuditLogIndex({ auth, entries, filters, entity
           <PageHero
             icon={History}
             category="governance"
-            variant="compact"
             title="Governance Audit Log"
             description="Cross-module changes and action events on governance entities. Filter, scroll, or export."
             stats={[
