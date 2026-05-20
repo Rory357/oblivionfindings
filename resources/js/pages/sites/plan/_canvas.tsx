@@ -31,6 +31,7 @@ import {
     type AttachedOpening,
 } from './_geometry';
 import {
+    SELECT_TOOL,
     distanceCanvasUnits,
     formatMeters,
     isEmergencyPlanKind,
@@ -121,6 +122,16 @@ type DragRef =
           centre: { x: number; y: number };
           baseRotation: number;
           startAngle: number;
+          committed: boolean;
+      }
+    | {
+          mode: 'door-resize';
+          pointerId: number;
+          origin: { x: number; y: number };
+          doorId: string;
+          base: PlanDoor;
+          rotationDeg: number;
+          side: 'left' | 'right';
           committed: boolean;
       };
 
@@ -589,6 +600,7 @@ export default function PlanCanvas(props: Props) {
                         ? constrainAngle(interaction.firstPoint, point)
                         : point;
                     dispatch({ type: 'complete_drawing_wall', point: second });
+                    dispatch({ type: 'set_tool', kind: SELECT_TOOL });
                 }
                 return;
             }
@@ -622,6 +634,7 @@ export default function PlanCanvas(props: Props) {
                     },
                     selectAfter: true,
                 });
+                dispatch({ type: 'set_tool', kind: SELECT_TOOL });
                 return;
             }
             if (activeKind === '__door') {
@@ -670,6 +683,7 @@ export default function PlanCanvas(props: Props) {
                     },
                     selectAfter: true,
                 });
+                dispatch({ type: 'set_tool', kind: SELECT_TOOL });
                 return;
             }
             if (activeKind === '__window') {
@@ -708,6 +722,7 @@ export default function PlanCanvas(props: Props) {
                     },
                     selectAfter: true,
                 });
+                dispatch({ type: 'set_tool', kind: SELECT_TOOL });
                 return;
             }
             if (activeKind === '__label') {
@@ -724,6 +739,9 @@ export default function PlanCanvas(props: Props) {
                     },
                     selectAfter: true,
                 });
+                // Switch to Select first (set_tool clears `editing`), THEN
+                // begin_edit so the inline editor sticks.
+                dispatch({ type: 'set_tool', kind: SELECT_TOOL });
                 dispatch({ type: 'begin_edit', target: { type: 'label', id } });
                 return;
             }
@@ -738,6 +756,7 @@ export default function PlanCanvas(props: Props) {
                     y: point.y,
                 };
                 dispatch({ type: 'add_pin', pin: newPin, selectAfter: true });
+                dispatch({ type: 'set_tool', kind: SELECT_TOOL });
                 return;
             }
 
@@ -856,6 +875,7 @@ export default function PlanCanvas(props: Props) {
                 kind: activeKind ?? 'evacuation_route',
                 subkind: activeSubkind ?? null,
             });
+            dispatch({ type: 'set_tool', kind: SELECT_TOOL });
         }
     }, [activeKind, activeSubkind, dispatch, interaction.mode]);
 
@@ -1070,6 +1090,32 @@ export default function PlanCanvas(props: Props) {
             };
         },
         [canvasHeight, canvasWidth, pointFromEvent],
+    );
+
+    const beginDoorResize = useCallback(
+        (
+            event: React.PointerEvent,
+            doorId: string,
+            base: PlanDoor,
+            rotationDeg: number,
+            side: 'left' | 'right',
+        ) => {
+            event.stopPropagation();
+            if (!structureInteractive) return;
+            const rawOrigin = pointFromEvent(event);
+            (event.target as Element).setPointerCapture(event.pointerId);
+            dragRef.current = {
+                mode: 'door-resize',
+                pointerId: event.pointerId,
+                origin: rawOrigin,
+                doorId,
+                base,
+                rotationDeg,
+                side,
+                committed: false,
+            };
+        },
+        [pointFromEvent, structureInteractive],
     );
 
     const handlePointerMove = useCallback(
@@ -1381,6 +1427,29 @@ export default function PlanCanvas(props: Props) {
                         });
                         break;
                 }
+                return;
+            }
+
+            if (drag.mode === 'door-resize') {
+                if (!drag.committed) {
+                    dispatch({ type: 'commit' });
+                    drag.committed = true;
+                }
+                const dxPx = (raw.x - drag.origin.x) * canvasWidth;
+                const dyPx = (raw.y - drag.origin.y) * canvasHeight;
+                const theta = (drag.rotationDeg * Math.PI) / 180;
+                // Project mouse delta onto wall direction (local +x of the door).
+                const dlxPx = dxPx * Math.cos(theta) + dyPx * Math.sin(theta);
+                const dlxNorm = dlxPx / canvasWidth;
+                const baseWidth = normaliseDoor(drag.base).width;
+                const delta = drag.side === 'right' ? 2 * dlxNorm : -2 * dlxNorm;
+                // Match the geometry clamp in `_geometry.openingWidth`.
+                const newWidth = clamp(baseWidth + delta, 0.02, 0.4);
+                dispatch({
+                    type: 'update_door',
+                    id: drag.doorId,
+                    patch: { width: newWidth },
+                });
                 return;
             }
         },
@@ -2044,6 +2113,36 @@ export default function PlanCanvas(props: Props) {
                                         )
                                     }
                                 />
+                                {onlySelected && structureInteractive && (
+                                    <>
+                                        <DoorWidthHandle
+                                            cx={x}
+                                            cy={cy}
+                                            onBegin={(event) =>
+                                                beginDoorResize(
+                                                    event,
+                                                    door.id,
+                                                    door,
+                                                    rotation,
+                                                    'left',
+                                                )
+                                            }
+                                        />
+                                        <DoorWidthHandle
+                                            cx={x + w}
+                                            cy={cy}
+                                            onBegin={(event) =>
+                                                beginDoorResize(
+                                                    event,
+                                                    door.id,
+                                                    door,
+                                                    rotation,
+                                                    'right',
+                                                )
+                                            }
+                                        />
+                                    </>
+                                )}
                                 {onlySelected &&
                                     structureInteractive &&
                                     !resolved.attached && (
@@ -2980,6 +3079,43 @@ function RotationHandle({
                 style={{ cursor: 'grab' }}
                 onPointerDown={onBegin}
                 onClick={(event) => event.stopPropagation()}
+            />
+        </g>
+    );
+}
+
+function DoorWidthHandle({
+    cx,
+    cy,
+    onBegin,
+}: {
+    cx: number;
+    cy: number;
+    onBegin: (event: React.PointerEvent) => void;
+}) {
+    return (
+        <g pointerEvents="auto">
+            {/* Generous transparent hit pad. */}
+            <rect
+                x={cx - 9}
+                y={cy - 9}
+                width={18}
+                height={18}
+                fill="transparent"
+                style={{ cursor: 'ew-resize' }}
+                onPointerDown={onBegin}
+                onClick={(event) => event.stopPropagation()}
+            />
+            {/* Visible handle. */}
+            <rect
+                x={cx - 4}
+                y={cy - 4}
+                width={8}
+                height={8}
+                fill="#ffffff"
+                stroke="#2563eb"
+                strokeWidth={2}
+                pointerEvents="none"
             />
         </g>
     );

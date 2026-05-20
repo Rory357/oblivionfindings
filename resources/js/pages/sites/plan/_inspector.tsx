@@ -927,7 +927,8 @@ function SelectionDetails({
                     <Input
                         type="number"
                         step="0.05"
-                        min="0.4"
+                        min="0.5"
+                        max="10"
                         value={Math.round(widthMetres * 100) / 100}
                         onChange={(event) => {
                             const m = Number.parseFloat(event.target.value);
@@ -1002,7 +1003,8 @@ function SelectionDetails({
                     <Input
                         type="number"
                         step="0.05"
-                        min="0.3"
+                        min="0.5"
+                        max="10"
                         value={Math.round(widthMetres * 100) / 100}
                         onChange={(event) => {
                             const m = Number.parseFloat(event.target.value);
