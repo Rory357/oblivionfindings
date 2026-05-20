@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -115,84 +116,88 @@ export default function VettingShow({ check, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Vetting: ${check.user.name}`} />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <Shield className="h-5 w-5 text-muted-foreground" />
-                            {check.check_type.replace(/_/g, ' ')}
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {check.user.name}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={getStatusColor(check.status)}>
-                                {check.status.replace(/_/g, ' ')}
-                            </Badge>
-                            {expired && (
-                                <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                    <AlertTriangle className="mr-1 h-3 w-3" />
-                                    Expired
-                                </Badge>
-                            )}
-                            {expiringSoon && !expired && (
-                                <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                    <Clock className="mr-1 h-3 w-3" />
-                                    Expiring Soon
-                                </Badge>
-                            )}
-                            {consentRecorded && (
-                                <Badge
-                                    variant="outline"
-                                    className="border-status-success/30 bg-status-success-bg text-status-success"
-                                >
-                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                    Consent Recorded
-                                </Badge>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link
-                            href="/hr/compliance/vetting"
-                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                        >
-                            Back to list
-                        </Link>
-                        {can.manage && (
-                            <Link
-                                href={`/hr/compliance/vetting/${check.id}/edit`}
-                            >
-                                <Button size="sm" variant="outline">
-                                    <Edit className="mr-1.5 h-4 w-4" />
-                                    Edit
-                                </Button>
-                            </Link>
-                        )}
-                        {can.manage &&
-                            (check.status === 'pending' ||
-                                check.status === 'requested') && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        if (
-                                            confirm(
-                                                'Mark this check as cleared?',
-                                            )
-                                        ) {
-                                            router.post(
-                                                `/hr/compliance/vetting/${check.id}/clear`,
-                                            );
-                                        }
-                                    }}
-                                >
-                                    <CheckCircle className="mr-1.5 h-4 w-4" />
-                                    Mark Cleared
-                                </Button>
-                            )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/compliance/vetting"
+                        title={
+                            <span className="flex items-center gap-2">
+                                <Shield className="h-5 w-5 text-muted-foreground" />
+                                {check.check_type.replace(/_/g, ' ')}
+                            </span>
+                        }
+                        description={
+                            <span className="flex flex-col gap-2">
+                                <span>{check.user.name}</span>
+                                <span className="flex flex-wrap gap-2">
+                                    <Badge
+                                        className={getStatusColor(check.status)}
+                                    >
+                                        {check.status.replace(/_/g, ' ')}
+                                    </Badge>
+                                    {expired && (
+                                        <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                            <AlertTriangle className="mr-1 h-3 w-3" />
+                                            Expired
+                                        </Badge>
+                                    )}
+                                    {expiringSoon && !expired && (
+                                        <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
+                                            <Clock className="mr-1 h-3 w-3" />
+                                            Expiring Soon
+                                        </Badge>
+                                    )}
+                                    {consentRecorded && (
+                                        <Badge
+                                            variant="outline"
+                                            className="border-status-success/30 bg-status-success-bg text-status-success"
+                                        >
+                                            <CheckCircle className="mr-1 h-3 w-3" />
+                                            Consent Recorded
+                                        </Badge>
+                                    )}
+                                </span>
+                            </span>
+                        }
+                        actions={
+                            <>
+                                {can.manage && (
+                                    <Link
+                                        href={`/hr/compliance/vetting/${check.id}/edit`}
+                                    >
+                                        <Button size="sm" variant="outline">
+                                            <Edit className="mr-1.5 h-4 w-4" />
+                                            Edit
+                                        </Button>
+                                    </Link>
+                                )}
+                                {can.manage &&
+                                    (check.status === 'pending' ||
+                                        check.status === 'requested') && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => {
+                                                if (
+                                                    confirm(
+                                                        'Mark this check as cleared?',
+                                                    )
+                                                ) {
+                                                    router.post(
+                                                        `/hr/compliance/vetting/${check.id}/clear`,
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <CheckCircle className="mr-1.5 h-4 w-4" />
+                                            Mark Cleared
+                                        </Button>
+                                    )}
+                            </>
+                        }
+                    />
+                }
+            >
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
@@ -470,7 +475,7 @@ export default function VettingShow({ check, can }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

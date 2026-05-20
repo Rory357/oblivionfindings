@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -110,9 +111,15 @@ export default function CreateExpense({ categories }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Expense Claim" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">New Expense Claim</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/expenses"
+                        title="New Expense Claim"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -396,7 +403,7 @@ export default function CreateExpense({ categories }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

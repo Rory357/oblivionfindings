@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -148,9 +149,15 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Survey" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">Create Survey</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/surveys"
+                        title="Create Survey"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Survey Details */}
                     <Card>
@@ -507,7 +514,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

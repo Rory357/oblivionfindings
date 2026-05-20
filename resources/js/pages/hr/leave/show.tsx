@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle, FileText, XCircle } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { CheckCircle, FileText, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface LeaveRequest {
@@ -77,18 +78,16 @@ export default function ShowLeave({ request, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Leave Request #${request.id}`} />
-            <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/leave">
-                        <Button variant="outline" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <h1 className="text-2xl font-bold">
-                        Leave Request #{request.id}
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/leave"
+                        title={`Leave Request #${request.id}`}
+                    />
+                }
+            >
+                <div className="mx-auto max-w-4xl space-y-6">
                 <div className="grid gap-6 md:grid-cols-3">
                     <Card className="md:col-span-2">
                         <CardHeader>
@@ -272,7 +271,8 @@ export default function ShowLeave({ request, can }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

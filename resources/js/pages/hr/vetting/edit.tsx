@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,7 +14,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -105,24 +105,17 @@ export default function EditVetting({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Edit Background Check" />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/hr/compliance/vetting/${check.id}`}>
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            Edit Background Check
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Update vetting record for {check.user.name}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/compliance/vetting"
+                        title="Edit Background Check"
+                        description={`Update vetting record for ${check.user.name}`}
+                    />
+                }
+            >
+                <div className="max-w-4xl space-y-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -505,7 +498,8 @@ export default function EditVetting({
                         </Button>
                     </div>
                 </form>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

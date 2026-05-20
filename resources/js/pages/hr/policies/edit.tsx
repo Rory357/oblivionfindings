@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,7 +16,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     FileCheck,
     FileText,
     Trash2,
@@ -179,25 +179,17 @@ export default function EditPolicy({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Policy - ${policy.title}`} />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/hr/policies/${policy.id}`}>
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <FileText className="h-6 w-6 text-status-info" />
-                        <div>
-                            <h1 className="text-2xl font-bold">Edit Policy</h1>
-                            <p className="text-muted-foreground">
-                                Update policy details
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/policies"
+                        title="Edit Policy"
+                        description="Update policy details"
+                    />
+                }
+            >
+                <div className="max-w-4xl space-y-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -583,7 +575,8 @@ export default function EditPolicy({
                         </Button>
                     </CardContent>
                 </Card>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

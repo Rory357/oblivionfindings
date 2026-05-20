@@ -1,10 +1,11 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Briefcase, Edit, GitBranch, Users } from 'lucide-react';
+import { Briefcase, Edit, GitBranch, Users } from 'lucide-react';
 
 type Employee = {
     id: number;
@@ -66,48 +67,52 @@ export default function ShowPosition({ position, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={position.title} />
-            <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href="/hr/positions">
-                            <Button variant="outline" size="icon">
-                                <ArrowLeft className="h-4 w-4" />
-                            </Button>
-                        </Link>
-                        <div>
-                            <h1 className="text-2xl font-bold">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/positions"
+                        title={
+                            <span className="flex items-center gap-2">
                                 {position.title}
-                            </h1>
-                            <p className="font-mono text-sm text-muted-foreground">
+                                {position.is_active ? (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-status-success/30 bg-status-success text-status-success"
+                                    >
+                                        Active
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-status-critical/30 bg-status-critical text-status-critical"
+                                    >
+                                        Inactive
+                                    </Badge>
+                                )}
+                            </span>
+                        }
+                        description={
+                            <span className="font-mono text-sm text-muted-foreground">
                                 {position.code}
-                            </p>
-                        </div>
-                        {position.is_active ? (
-                            <Badge
-                                variant="outline"
-                                className="border-status-success/30 bg-status-success text-status-success"
-                            >
-                                Active
-                            </Badge>
-                        ) : (
-                            <Badge
-                                variant="outline"
-                                className="border-status-critical/30 bg-status-critical text-status-critical"
-                            >
-                                Inactive
-                            </Badge>
-                        )}
-                    </div>
-                    {can.manage && (
-                        <Button asChild>
-                            <Link href={`/hr/positions/${position.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit Position
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
+                            </span>
+                        }
+                        actions={
+                            can.manage ? (
+                                <Button asChild>
+                                    <Link
+                                        href={`/hr/positions/${position.id}/edit`}
+                                    >
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit Position
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
+                <div className="mx-auto max-w-4xl space-y-6">
                 <div className="grid gap-6 md:grid-cols-3">
                     {/* Main Details */}
                     <Card className="md:col-span-2">
@@ -330,7 +335,8 @@ export default function ShowPosition({ position, can }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

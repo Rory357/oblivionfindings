@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -59,14 +60,16 @@ export default function CreateAsset({ categories }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Asset" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Create Asset</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Register a new company asset
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/assets"
+                        title="Create Asset"
+                        description="Register a new company asset"
+                    />
+                }
+            >
                 <Card>
                     <CardContent className="pt-6">
                         <form onSubmit={submit} className="space-y-4">
@@ -210,7 +213,7 @@ export default function CreateAsset({ categories }: Props) {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

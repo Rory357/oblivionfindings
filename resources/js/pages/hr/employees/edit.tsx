@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -94,16 +95,22 @@ export default function EmployeeEdit({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit ${profile.user.name}`} />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">
-                        Edit {profile.user.name}
-                    </h1>
-                    <Button variant="outline" asChild>
-                        <Link href={`/hr/people/${profile.id}`}>Cancel</Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/people"
+                        title={`Edit ${profile.user.name}`}
+                        actions={
+                            <Button variant="outline" asChild>
+                                <Link href={`/hr/people/${profile.id}`}>
+                                    Cancel
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Personal Info */}
                     <Card>
@@ -638,7 +645,7 @@ export default function EmployeeEdit({
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

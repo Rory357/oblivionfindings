@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -117,39 +118,44 @@ export default function PipShow({ pip, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={pip.title} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">{pip.title}</h1>
-                        <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{pip.employee?.name}</span>
-                            <span>|</span>
-                            <span>
-                                {formatDate(pip.start_date)} -{' '}
-                                {formatDate(pip.end_date)}
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance/pips"
+                        title={pip.title}
+                        description={
+                            <span className="flex items-center gap-2">
+                                <span>{pip.employee?.name}</span>
+                                <span>|</span>
+                                <span>
+                                    {formatDate(pip.start_date)} -{' '}
+                                    {formatDate(pip.end_date)}
+                                </span>
+                                <Badge
+                                    className={
+                                        statusColors[pip.status] || 'bg-muted'
+                                    }
+                                    variant="outline"
+                                >
+                                    {pip.status.replace('_', ' ')}
+                                </Badge>
                             </span>
-                            <Badge
-                                className={
-                                    statusColors[pip.status] || 'bg-muted'
-                                }
-                                variant="outline"
-                            >
-                                {pip.status.replace('_', ' ')}
-                            </Badge>
-                        </div>
-                    </div>
-
-                    {can.manage && pip.status !== 'completed' && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setCompleting(!completing)}
-                        >
-                            Complete PIP
-                        </Button>
-                    )}
-                </div>
-
+                        }
+                        actions={
+                            can.manage && pip.status !== 'completed' ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setCompleting(!completing)}
+                                >
+                                    Complete PIP
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Overview */}
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
@@ -431,7 +437,7 @@ export default function PipShow({ pip, can }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

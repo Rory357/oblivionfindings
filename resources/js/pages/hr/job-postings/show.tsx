@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +12,6 @@ import { type BreadcrumbItem } from '@/types';
 import type { JobPostingDetail, RecentApplication } from '@/types/job-postings';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
     BarChart3,
     CheckCircle2,
     Clock,
@@ -63,22 +63,14 @@ export default function JobPostingShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={posting.title} />
-            <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.visit('/hr/job-postings')}
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                {posting.title}
-                            </h1>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/job-postings"
+                        title={posting.title}
+                        description={
+                            <span className="flex flex-wrap items-center gap-2">
                                 <Badge
                                     variant="outline"
                                     className={config.className}
@@ -106,92 +98,100 @@ export default function JobPostingShow({
                                         <Lock className="h-3 w-3" /> Internal
                                     </Badge>
                                 )}
-                            </div>
-                        </div>
-                    </div>
-                    {can.manage && (
-                        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                            {posting.status === 'draft' && (
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        router.post(
-                                            `/hr/job-postings/${posting.id}/publish`,
-                                        )
-                                    }
-                                >
-                                    <Globe className="mr-1.5 h-4 w-4" /> Publish
-                                </Button>
-                            )}
-                            {posting.status === 'pending_approval' && (
+                            </span>
+                        }
+                        actions={
+                            can.manage ? (
                                 <>
-                                    <Button
-                                        size="sm"
-                                        onClick={() =>
-                                            router.post(
-                                                `/hr/job-postings/${posting.id}/approve`,
-                                            )
-                                        }
-                                    >
-                                        <CheckCircle2 className="mr-1.5 h-4 w-4" />{' '}
-                                        Approve
+                                    {posting.status === 'draft' && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/hr/job-postings/${posting.id}/publish`,
+                                                )
+                                            }
+                                        >
+                                            <Globe className="mr-1.5 h-4 w-4" />{' '}
+                                            Publish
+                                        </Button>
+                                    )}
+                                    {posting.status === 'pending_approval' && (
+                                        <>
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    router.post(
+                                                        `/hr/job-postings/${posting.id}/approve`,
+                                                    )
+                                                }
+                                            >
+                                                <CheckCircle2 className="mr-1.5 h-4 w-4" />{' '}
+                                                Approve
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    router.post(
+                                                        `/hr/job-postings/${posting.id}/reject-approval`,
+                                                    )
+                                                }
+                                            >
+                                                <XCircle className="mr-1.5 h-4 w-4" />{' '}
+                                                Reject
+                                            </Button>
+                                        </>
+                                    )}
+                                    {posting.status === 'published' && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/hr/job-postings/${posting.id}/close`,
+                                                )
+                                            }
+                                        >
+                                            <XCircle className="mr-1.5 h-4 w-4" />{' '}
+                                            Close
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link
+                                            href={`/hr/job-postings/${posting.id}/preview`}
+                                        >
+                                            <Eye className="mr-1.5 h-4 w-4" />{' '}
+                                            Preview
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link
+                                            href={`/hr/job-postings/${posting.id}/edit`}
+                                        >
+                                            <Pencil className="mr-1.5 h-4 w-4" />{' '}
+                                            Edit
+                                        </Link>
                                     </Button>
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>
                                             router.post(
-                                                `/hr/job-postings/${posting.id}/reject-approval`,
+                                                `/hr/job-postings/${posting.id}/duplicate`,
                                             )
                                         }
                                     >
-                                        <XCircle className="mr-1.5 h-4 w-4" />{' '}
-                                        Reject
+                                        <Copy className="mr-1.5 h-4 w-4" />{' '}
+                                        Duplicate
                                     </Button>
                                 </>
-                            )}
-                            {posting.status === 'published' && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        router.post(
-                                            `/hr/job-postings/${posting.id}/close`,
-                                        )
-                                    }
-                                >
-                                    <XCircle className="mr-1.5 h-4 w-4" /> Close
-                                </Button>
-                            )}
-                            <Button variant="outline" size="sm" asChild>
-                                <Link
-                                    href={`/hr/job-postings/${posting.id}/preview`}
-                                >
-                                    <Eye className="mr-1.5 h-4 w-4" /> Preview
-                                </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link
-                                    href={`/hr/job-postings/${posting.id}/edit`}
-                                >
-                                    <Pencil className="mr-1.5 h-4 w-4" /> Edit
-                                </Link>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    router.post(
-                                        `/hr/job-postings/${posting.id}/duplicate`,
-                                    )
-                                }
-                            >
-                                <Copy className="mr-1.5 h-4 w-4" /> Duplicate
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
+                            ) : undefined
+                        }
+                    />
+                }
+            >
+                <div className="mx-auto max-w-4xl space-y-6">
                 {/* Public URL */}
                 {publicUrl && posting.status === 'published' && (
                     <div className="flex items-center gap-2 rounded-lg border border-status-success/20 bg-status-success p-3">
@@ -535,7 +535,8 @@ export default function JobPostingShow({
                         </dl>
                     </CardContent>
                 </Card>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

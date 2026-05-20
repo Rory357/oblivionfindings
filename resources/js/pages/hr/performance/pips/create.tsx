@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -85,17 +86,16 @@ export default function PipCreate({ staff }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create PIP" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">
-                        Create Performance Improvement Plan
-                    </h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Set up a structured plan with milestones to support
-                        employee development
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance/pips"
+                        title="Create Performance Improvement Plan"
+                        description="Set up a structured plan with milestones to support employee development"
+                    />
+                }
+            >
                 <form onSubmit={submit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -360,7 +360,7 @@ export default function PipCreate({ staff }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

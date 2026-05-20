@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -107,76 +108,83 @@ export default function ExpenseShow({ claim, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Claim ${claim.claim_number}`} />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">{claim.title}</h1>
-                        <div className="mt-1 flex items-center gap-2">
-                            <span className="font-mono text-sm text-muted-foreground">
-                                {claim.claim_number}
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/expenses"
+                        title={claim.title}
+                        description={
+                            <span className="flex items-center gap-2">
+                                <span className="font-mono text-sm text-muted-foreground">
+                                    {claim.claim_number}
+                                </span>
+                                <Badge
+                                    variant="outline"
+                                    className={config.className}
+                                >
+                                    {config.label}
+                                </Badge>
                             </span>
-                            <Badge
-                                variant="outline"
-                                className={config.className}
-                            >
-                                {config.label}
-                            </Badge>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        {claim.status === 'draft' && (
-                            <Button
-                                size="sm"
-                                onClick={() =>
-                                    router.post(
-                                        `/hr/expenses/${claim.id}/submit`,
-                                    )
-                                }
-                            >
-                                <Send className="mr-1.5 h-3.5 w-3.5" />
-                                Submit
-                            </Button>
-                        )}
-                        {can.approve && (
+                        }
+                        actions={
                             <>
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        router.post(
-                                            `/hr/expenses/${claim.id}/approve`,
-                                        )
-                                    }
-                                >
-                                    <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                                    Approve
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => setShowRejectForm(true)}
-                                >
-                                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                    Reject
-                                </Button>
+                                {claim.status === 'draft' && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            router.post(
+                                                `/hr/expenses/${claim.id}/submit`,
+                                            )
+                                        }
+                                    >
+                                        <Send className="mr-1.5 h-3.5 w-3.5" />
+                                        Submit
+                                    </Button>
+                                )}
+                                {can.approve && (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/hr/expenses/${claim.id}/approve`,
+                                                )
+                                            }
+                                        >
+                                            <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
+                                            Approve
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={() =>
+                                                setShowRejectForm(true)
+                                            }
+                                        >
+                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                            Reject
+                                        </Button>
+                                    </>
+                                )}
+                                {can.manage && claim.status === 'approved' && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            router.post(
+                                                `/hr/expenses/${claim.id}/mark-paid`,
+                                            )
+                                        }
+                                    >
+                                        <DollarSign className="mr-1.5 h-3.5 w-3.5" />
+                                        Mark Paid
+                                    </Button>
+                                )}
                             </>
-                        )}
-                        {can.manage && claim.status === 'approved' && (
-                            <Button
-                                size="sm"
-                                onClick={() =>
-                                    router.post(
-                                        `/hr/expenses/${claim.id}/mark-paid`,
-                                    )
-                                }
-                            >
-                                <DollarSign className="mr-1.5 h-3.5 w-3.5" />
-                                Mark Paid
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {/* Rejection Form */}
                 {showRejectForm && (
                     <Card className="border-destructive/30">
@@ -383,7 +391,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

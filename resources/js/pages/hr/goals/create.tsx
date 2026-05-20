@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,14 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    Building2,
-    Lightbulb,
-    Target,
-    User,
-    Users,
-} from 'lucide-react';
+import { Building2, Lightbulb, Target, User, Users } from 'lucide-react';
 import { FormEvent, useMemo } from 'react';
 
 interface SelectOption {
@@ -133,35 +127,16 @@ export default function CreateGoal({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Objective" />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Green Gradient Header */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-success/80 p-6 text-white md:p-8">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-                    <div className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full bg-white/5" />
-                    <div className="relative flex items-center gap-4">
-                        <Link
-                            href="/hr/goals"
-                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 transition hover:bg-white/20"
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </Link>
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
-                                <Target className="h-6 w-6" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold md:text-2xl">
-                                    Create Objective
-                                </h1>
-                                <p className="text-sm text-status-success">
-                                    Define a new objective or key result for
-                                    your organisation
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/goals"
+                        title="Create Objective"
+                        description="Define a new objective or key result for your organisation"
+                    />
+                }
+            >
                 {/* Two-column layout */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Left column - Form */}
@@ -722,7 +697,7 @@ export default function CreateGoal({
                         </Card>
                     </div>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

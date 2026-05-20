@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +27,7 @@ import type {
     ScreeningQuestion,
 } from '@/types/job-postings';
 import { Head, useForm } from '@inertiajs/react';
-import { ArrowLeft, GripVertical, Plus, Trash2, X } from 'lucide-react';
+import { GripVertical, Plus, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 type Position = { id: number; title: string; department: string | null };
@@ -156,20 +157,18 @@ export default function CreateJobPosting({ positions, users, posting }: Props) {
             <Head
                 title={isEditing ? 'Edit Job Posting' : 'Create Job Posting'}
             />
-            <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
-                <div className="flex items-center gap-3">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.history.back()}
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <h1 className="text-2xl font-bold">
-                        {isEditing ? 'Edit Job Posting' : 'Create Job Posting'}
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/job-postings"
+                        title={
+                            isEditing ? 'Edit Job Posting' : 'Create Job Posting'
+                        }
+                    />
+                }
+            >
+                <div className="mx-auto max-w-3xl">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Card 1: Posting Details */}
                     <Card>
@@ -771,7 +770,8 @@ export default function CreateJobPosting({ positions, users, posting }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

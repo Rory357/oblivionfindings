@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,94 +130,105 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={policy.title} />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            {policy.title}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge
-                                className={getCategoryColor(policy.category)}
-                            >
-                                {policy.category.replace(/_/g, ' ')}
-                            </Badge>
-                            {policy.is_active ? (
-                                <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
-                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                    Active
-                                </Badge>
-                            ) : (
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/policies"
+                        title={
+                            <span className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-muted-foreground" />
+                                {policy.title}
+                            </span>
+                        }
+                        description={
+                            <span className="flex flex-wrap gap-2">
                                 <Badge
-                                    variant="outline"
-                                    className="text-muted-foreground"
+                                    className={getCategoryColor(
+                                        policy.category,
+                                    )}
                                 >
-                                    Inactive
+                                    {policy.category.replace(/_/g, ' ')}
                                 </Badge>
-                            )}
-                            {policy.requires_attestation && (
-                                <Badge
-                                    variant="outline"
-                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
-                                >
-                                    <ShieldCheck className="mr-1 h-3 w-3" />
-                                    Attestation Required
-                                </Badge>
-                            )}
-                            {policy.currentVersion && (
-                                <Badge variant="outline">
-                                    v{policy.currentVersion.version_number}
-                                </Badge>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link
-                            href="/hr/policies"
-                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                        >
-                            Back to list
-                        </Link>
-                        {policy.currentVersion?.document_path && (
+                                {policy.is_active ? (
+                                    <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
+                                        <CheckCircle className="mr-1 h-3 w-3" />
+                                        Active
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        variant="outline"
+                                        className="text-muted-foreground"
+                                    >
+                                        Inactive
+                                    </Badge>
+                                )}
+                                {policy.requires_attestation && (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                    >
+                                        <ShieldCheck className="mr-1 h-3 w-3" />
+                                        Attestation Required
+                                    </Badge>
+                                )}
+                                {policy.currentVersion && (
+                                    <Badge variant="outline">
+                                        v
+                                        {policy.currentVersion.version_number}
+                                    </Badge>
+                                )}
+                            </span>
+                        }
+                        actions={
                             <>
-                                <Link
-                                    href={`/hr/policies/${policy.id}/download`}
-                                    target="_blank"
-                                >
-                                    <Button size="sm" variant="outline">
-                                        <Eye className="mr-1.5 h-4 w-4" />
-                                        View Document
-                                    </Button>
-                                </Link>
-                                <Link
-                                    href={`/hr/policies/${policy.id}/download`}
-                                    download
-                                >
-                                    <Button size="sm" variant="outline">
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Download
-                                    </Button>
-                                </Link>
+                                {policy.currentVersion?.document_path && (
+                                    <>
+                                        <Link
+                                            href={`/hr/policies/${policy.id}/download`}
+                                            target="_blank"
+                                        >
+                                            <Button size="sm" variant="outline">
+                                                <Eye className="mr-1.5 h-4 w-4" />
+                                                View Document
+                                            </Button>
+                                        </Link>
+                                        <Link
+                                            href={`/hr/policies/${policy.id}/download`}
+                                            download
+                                        >
+                                            <Button size="sm" variant="outline">
+                                                <Download className="mr-1.5 h-4 w-4" />
+                                                Download
+                                            </Button>
+                                        </Link>
+                                    </>
+                                )}
+                                {can.manage && (
+                                    <Link
+                                        href={`/hr/policies/${policy.id}/edit`}
+                                    >
+                                        <Button size="sm" variant="outline">
+                                            <Edit className="mr-1.5 h-4 w-4" />
+                                            Edit Policy
+                                        </Button>
+                                    </Link>
+                                )}
+                                {can.attest &&
+                                    policy.requires_attestation && (
+                                        <Button
+                                            size="sm"
+                                            onClick={handleAttest}
+                                        >
+                                            <ShieldCheck className="mr-1.5 h-4 w-4" />
+                                            I Attest
+                                        </Button>
+                                    )}
                             </>
-                        )}
-                        {can.manage && (
-                            <Link href={`/hr/policies/${policy.id}/edit`}>
-                                <Button size="sm" variant="outline">
-                                    <Edit className="mr-1.5 h-4 w-4" />
-                                    Edit Policy
-                                </Button>
-                            </Link>
-                        )}
-                        {can.attest && policy.requires_attestation && (
-                            <Button size="sm" onClick={handleAttest}>
-                                <ShieldCheck className="mr-1.5 h-4 w-4" />I
-                                Attest
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {policy.description && (
                     <Card>
                         <CardContent className="pt-6">
@@ -391,7 +403,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

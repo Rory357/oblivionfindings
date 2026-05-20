@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,7 +14,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, Briefcase } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -75,24 +75,17 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New HR Case" />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/cases">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <Briefcase className="h-6 w-6 text-status-info" />
-                        <div>
-                            <h1 className="text-2xl font-bold">New HR Case</h1>
-                            <p className="text-muted-foreground">
-                                Open a new HR case for investigation or action
-                            </p>
-                        </div>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/cases"
+                        title="New HR Case"
+                        description="Open a new HR case for investigation or action"
+                    />
+                }
+            >
+                <div className="max-w-4xl space-y-6">
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
@@ -350,7 +343,8 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

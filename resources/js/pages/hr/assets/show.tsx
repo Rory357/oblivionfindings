@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -176,58 +177,65 @@ export default function AssetShow({ asset, employees, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${asset.asset_tag} - ${asset.name}`} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-lg font-semibold">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/assets"
+                        title={
+                            <span className="flex items-center gap-2">
                                 {asset.name}
-                            </h1>
-                            <Badge
-                                variant="outline"
-                                className="font-mono text-xs"
-                            >
-                                {asset.asset_tag}
-                            </Badge>
-                            <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[asset.status] ?? ''}`}
-                            >
-                                {asset.status}
-                            </span>
-                        </div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {categoryLabels[asset.category] || asset.category}
-                            {asset.make && ` - ${asset.make}`}
-                            {asset.model && ` ${asset.model}`}
-                        </div>
-                    </div>
-
-                    {can.manage && (
-                        <div className="flex gap-2">
-                            {asset.status === 'available' && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setAssignOpen(true)}
+                                <Badge
+                                    variant="outline"
+                                    className="font-mono text-xs"
                                 >
-                                    <UserPlus className="mr-1.5 h-4 w-4" />
-                                    Assign
-                                </Button>
-                            )}
-                            {asset.status === 'assigned' &&
-                                asset.current_assignment && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setReturnOpen(true)}
-                                    >
-                                        <RotateCcw className="mr-1.5 h-4 w-4" />
-                                        Return
-                                    </Button>
-                                )}
-                        </div>
-                    )}
-                </div>
-
+                                    {asset.asset_tag}
+                                </Badge>
+                                <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[asset.status] ?? ''}`}
+                                >
+                                    {asset.status}
+                                </span>
+                            </span>
+                        }
+                        description={
+                            <>
+                                {categoryLabels[asset.category] || asset.category}
+                                {asset.make && ` - ${asset.make}`}
+                                {asset.model && ` ${asset.model}`}
+                            </>
+                        }
+                        actions={
+                            can.manage ? (
+                                <>
+                                    {asset.status === 'available' && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setAssignOpen(true)}
+                                        >
+                                            <UserPlus className="mr-1.5 h-4 w-4" />
+                                            Assign
+                                        </Button>
+                                    )}
+                                    {asset.status === 'assigned' &&
+                                        asset.current_assignment && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setReturnOpen(true)
+                                                }
+                                            >
+                                                <RotateCcw className="mr-1.5 h-4 w-4" />
+                                                Return
+                                            </Button>
+                                        )}
+                                </>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Asset Details */}
                 <Card>
                     <CardHeader>
@@ -371,7 +379,7 @@ export default function AssetShow({ asset, employees, can }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Assign Dialog */}
             <Dialog open={assignOpen} onOpenChange={setAssignOpen}>

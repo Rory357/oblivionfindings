@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,7 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, FileCheck, FileText, Upload, X } from 'lucide-react';
+import { FileCheck, FileText, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -136,26 +137,17 @@ export default function CreatePolicy({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Policy" />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/policies">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <FileText className="h-6 w-6 text-status-info" />
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Create New Policy
-                            </h1>
-                            <p className="text-muted-foreground">
-                                Add a new policy to the library
-                            </p>
-                        </div>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/policies"
+                        title="Create New Policy"
+                        description="Add a new policy to the library."
+                    />
+                }
+            >
+                <div className="max-w-4xl space-y-6">
 
                 <form
                     onSubmit={handleSubmit}
@@ -570,7 +562,8 @@ export default function CreatePolicy({
                         </Button>
                     </div>
                 </form>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

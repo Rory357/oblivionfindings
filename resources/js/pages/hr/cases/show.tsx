@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     Briefcase,
     Calendar,
     Clock,
@@ -267,72 +267,72 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Case ${hrCase.case_number}`} />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <Briefcase className="h-5 w-5 text-muted-foreground" />
-                            {hrCase.case_number}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge
-                                className={
-                                    badgeClassByStatus[hrCase.status] ??
-                                    badgeClassByStatus.closed
-                                }
-                            >
-                                {hrCase.status.replace(/_/g, ' ')}
-                            </Badge>
-                            <Badge
-                                className={
-                                    badgeClassByCaseType[hrCase.case_type] ??
-                                    badgeClassByCaseType.other
-                                }
-                            >
-                                {hrCase.case_type.replace(/_/g, ' ')}
-                            </Badge>
-                            <Badge
-                                className={
-                                    badgeClassBySeverity[hrCase.severity] ??
-                                    badgeClassBySeverity.low
-                                }
-                            >
-                                {hrCase.severity}
-                            </Badge>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link
-                            href="/hr/cases"
-                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                        >
-                            <ArrowLeft className="mr-1 inline h-3.5 w-3.5" />
-                            Back to list
-                        </Link>
-                        {can.manage && !isClosed ? (
-                            <>
-                                <Link
-                                    href={`/hr/cases/${hrCase.id}/events/create`}
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/cases"
+                        title={
+                            <span className="flex items-center gap-2">
+                                <Briefcase className="h-5 w-5 text-muted-foreground" />
+                                {hrCase.case_number}
+                            </span>
+                        }
+                        description={
+                            <span className="flex flex-wrap gap-2">
+                                <Badge
+                                    className={
+                                        badgeClassByStatus[hrCase.status] ??
+                                        badgeClassByStatus.closed
+                                    }
                                 >
-                                    <Button size="sm" variant="outline">
-                                        <Calendar className="mr-1.5 h-4 w-4" />
-                                        Add Event
+                                    {hrCase.status.replace(/_/g, ' ')}
+                                </Badge>
+                                <Badge
+                                    className={
+                                        badgeClassByCaseType[
+                                            hrCase.case_type
+                                        ] ?? badgeClassByCaseType.other
+                                    }
+                                >
+                                    {hrCase.case_type.replace(/_/g, ' ')}
+                                </Badge>
+                                <Badge
+                                    className={
+                                        badgeClassBySeverity[hrCase.severity] ??
+                                        badgeClassBySeverity.low
+                                    }
+                                >
+                                    {hrCase.severity}
+                                </Badge>
+                            </span>
+                        }
+                        actions={
+                            can.manage && !isClosed ? (
+                                <>
+                                    <Link
+                                        href={`/hr/cases/${hrCase.id}/events/create`}
+                                    >
+                                        <Button size="sm" variant="outline">
+                                            <Calendar className="mr-1.5 h-4 w-4" />
+                                            Add Event
+                                        </Button>
+                                    </Link>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
+                                        onClick={closeCase}
+                                    >
+                                        <XCircle className="mr-1.5 h-4 w-4" />
+                                        Close Case
                                     </Button>
-                                </Link>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                    onClick={closeCase}
-                                >
-                                    <XCircle className="mr-1.5 h-4 w-4" />
-                                    Close Case
-                                </Button>
-                            </>
-                        ) : null}
-                    </div>
-                </div>
-
+                                </>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {goodFaithError || stageError ? (
                     <Card className="border-status-critical/30 bg-status-critical-bg">
                         <CardContent className="py-3 text-sm text-status-critical">
@@ -685,7 +685,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         </CardContent>
                     </Card>
                 ) : null}
-            </div>
+            </PageLayout>
 
             <Dialog
                 open={closeCaseDialogOpen}

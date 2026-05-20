@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, UserMinus } from 'lucide-react';
+import { UserMinus } from 'lucide-react';
 
 interface Employee {
     id: number;
@@ -50,18 +51,16 @@ export default function CreateOffboarding({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Start Offboarding Checklist" />
-            <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/offboarding">
-                        <Button variant="outline" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <h1 className="text-2xl font-bold">
-                        Start Offboarding Checklist
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/offboarding"
+                        title="Start Offboarding Checklist"
+                    />
+                }
+            >
+                <div className="mx-auto max-w-2xl space-y-6">
                 {employees.length === 0 ? (
                     <Card>
                         <CardContent className="p-8 text-center">
@@ -165,7 +164,8 @@ export default function CreateOffboarding({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }
