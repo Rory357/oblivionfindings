@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, User, Calendar, CheckCircle } from 'lucide-react';
+import { riskScoreColor, riskScoreLevel } from '@/lib/governance-status';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import axios from 'axios';
@@ -93,19 +94,8 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const getRiskColor = (score: number) => {
-    if (score >= 20) return 'bg-status-critical';
-    if (score >= 15) return 'bg-status-warning';
-    if (score >= 10) return 'bg-status-warning';
-    return 'bg-status-success';
-  };
-
-  const getRiskLevel = (score: number) => {
-    if (score >= 20) return 'Critical';
-    if (score >= 15) return 'High';
-    if (score >= 10) return 'Medium';
-    return 'Low';
-  };
+  const getRiskColor = riskScoreColor;
+  const getRiskLevel = riskScoreLevel;
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {

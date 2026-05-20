@@ -7,8 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Models\Concerns\AuditableChanges;
 class BoardEvaluation extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'title', 'evaluation_type', 'year', 'status', 'summary',
         'questions', 'aggregate_results', 'recommendations',

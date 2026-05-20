@@ -417,6 +417,27 @@ app(Schedule::class)
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
+// Spawn recurring governance meetings from active templates: weekly Monday 06:00
+app(Schedule::class)
+    ->command('governance:spawn-recurring-meetings')
+    ->timezone('Pacific/Auckland')
+    ->weeklyOn(1, '06:00')
+    ->withoutOverlapping();
+
+// Generate compliance obligations from upcoming donor-fund report deadlines: daily 06:15
+app(Schedule::class)
+    ->command('governance:sync-donor-fund-compliance')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:15')
+    ->withoutOverlapping();
+
+// Generate site risk-review action items 14 days ahead: daily 06:30
+app(Schedule::class)
+    ->command('governance:sync-site-risk-reviews')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:30')
+    ->withoutOverlapping();
+
 // Timesheet reconciliation: re-sync draft timesheets and re-evaluate submitted timesheets
 app(Schedule::class)
     ->job(new ReconcileTimesheetsJob)

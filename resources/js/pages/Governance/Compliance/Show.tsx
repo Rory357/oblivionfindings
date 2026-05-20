@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Calendar, User, Upload, CheckCircle, Clock, AlertTriangle, FileCheck } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 import { useState } from 'react';
 import axios from 'axios';
 
@@ -91,16 +92,8 @@ export default function ComplianceShow({ auth, obligation }: Props) {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'complete':
-        return 'bg-status-success-bg text-status-success';
-      case 'overdue':
-        return 'bg-status-critical-bg text-status-critical';
-      case 'due_soon':
-        return 'bg-status-warning-bg text-status-warning';
-      default:
-        return 'bg-muted text-foreground';
-    }
+    return governanceStatusColor(status);
+    // legacy switch removed — see lib/governance-status.ts
   };
 
   const daysRemaining = () => {

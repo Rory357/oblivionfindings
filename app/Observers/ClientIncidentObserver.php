@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
@@ -14,6 +15,7 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
     public function __construct(
         private readonly ComprehensiveAlertBridgeService $bridge,
         private readonly HsEventService $hsEventService,
+        private readonly IncidentEscalationService $governanceEscalation,
     ) {}
 
     /**
@@ -29,6 +31,7 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
         }
 
         $this->dispatchBridge($incident);
+        $this->maybeEscalateToGovernance($incident);
     }
 
     /**
@@ -46,6 +49,25 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
         }
 
         $this->dispatchBridge($incident, $this->isEscalation($incident));
+        $this->maybeEscalateToGovernance($incident);
+    }
+
+    /**
+     * Bridge a high/critical incident into the governance escalation track.
+     * Idempotent — the service deduplicates by (client_incident_id, reason).
+     * Failures are logged but never break the operational flow.
+     */
+    private function maybeEscalateToGovernance(ClientIncident $incident): void
+    {
+        try {
+            $this->governanceEscalation->escalateClientIncident($incident);
+        } catch (\Throwable $e) {
+            Log::warning('ClientIncidentObserver: governance escalation failed', [
+                'incident_id' => $incident->id,
+                'severity' => $incident->severity,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /* ------------------------------------------------------------------ */

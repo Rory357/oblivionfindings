@@ -6,7 +6,6 @@ use App\Models\User;
 use Database\Seeders\FinancePermissionsSeeder;
 use Database\Seeders\GovernancePermissionsSeeder;
 use Database\Seeders\RbacSeeder;
-
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(FinancePermissionsSeeder::class);

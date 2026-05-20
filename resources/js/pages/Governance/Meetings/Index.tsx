@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, MapPin, CalendarDays, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Meeting {
   id: number;
@@ -30,17 +31,7 @@ interface Props extends PageProps {
 }
 
 export default function MeetingsIndex({ auth, meetings }: Props) {
-  const getStatusColor = (status: string) => {
-    return {
-      scheduled: 'bg-status-info-bg text-status-info',
-      agenda_draft: 'bg-status-warning-bg text-status-warning',
-      agenda_final: 'bg-status-success-bg text-status-success',
-      in_progress: 'bg-primary/10 text-primary',
-      minutes_draft: 'bg-status-warning-bg text-status-warning',
-      minutes_approved: 'bg-status-success-bg text-status-success',
-      archived: 'bg-muted text-foreground',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getMeetingTypeLabel = (type: string) => {
     return {

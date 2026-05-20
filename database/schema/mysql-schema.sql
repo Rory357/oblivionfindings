@@ -1000,6 +1000,34 @@ CREATE TABLE `budget_adjustments` (
   CONSTRAINT `budget_adjustments_proposed_by_foreign` FOREIGN KEY (`proposed_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `budget_allocations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `budget_allocations` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `budget_id` bigint unsigned NOT NULL,
+  `budget_line_item_id` bigint unsigned DEFAULT NULL,
+  `site_id` bigint unsigned DEFAULT NULL,
+  `site_budget_line_id` bigint unsigned DEFAULT NULL,
+  `period_year_month` varchar(7) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `allocated_amount` decimal(14,2) NOT NULL,
+  `forecast_amount` decimal(14,2) DEFAULT NULL,
+  `actual_amount` decimal(14,2) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `budget_allocations_budget_line_item_id_foreign` (`budget_line_item_id`),
+  KEY `budget_allocations_created_by_foreign` (`created_by`),
+  KEY `budget_allocations_budget_id_period_year_month_index` (`budget_id`,`period_year_month`),
+  KEY `budget_allocations_site_id_period_year_month_index` (`site_id`,`period_year_month`),
+  CONSTRAINT `budget_allocations_budget_id_foreign` FOREIGN KEY (`budget_id`) REFERENCES `budgets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `budget_allocations_budget_line_item_id_foreign` FOREIGN KEY (`budget_line_item_id`) REFERENCES `budget_line_items` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `budget_allocations_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `budget_line_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -1011,6 +1039,7 @@ CREATE TABLE `budget_line_items` (
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `account_code` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `gl_account_id` bigint unsigned DEFAULT NULL,
+  `gl_account_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `budget_amount` decimal(12,2) NOT NULL,
   `forecast_amount` decimal(12,2) DEFAULT NULL,
   `actual_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
@@ -2542,6 +2571,7 @@ DROP TABLE IF EXISTS `compliance_obligations`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `compliance_obligations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `workforce_requirement_id` bigint unsigned DEFAULT NULL,
   `framework` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `obligation_code` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `obligation_title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2571,6 +2601,7 @@ CREATE TABLE `compliance_obligations` (
   KEY `compliance_obligations_framework_status_index` (`framework`,`status`),
   KEY `compliance_obligations_due_date_status_index` (`due_date`,`status`),
   KEY `compliance_obligations_owner_id_status_index` (`owner_id`,`status`),
+  KEY `compliance_obligations_workforce_requirement_id_index` (`workforce_requirement_id`),
   CONSTRAINT `compliance_obligations_completed_by_foreign` FOREIGN KEY (`completed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `compliance_obligations_owner_id_foreign` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`),
   CONSTRAINT `compliance_obligations_signed_off_by_foreign` FOREIGN KEY (`signed_off_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
@@ -4742,6 +4773,7 @@ DROP TABLE IF EXISTS `fin_bills`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `fin_bills` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `spend_approval_id` bigint unsigned DEFAULT NULL,
   `organization_id` bigint unsigned NOT NULL,
   `vendor_id` bigint unsigned NOT NULL,
   `purchase_order_id` bigint unsigned DEFAULT NULL,
@@ -4775,9 +4807,11 @@ CREATE TABLE `fin_bills` (
   KEY `fin_bills_vendor_id_index` (`vendor_id`),
   KEY `fin_bills_organization_id_index` (`organization_id`),
   KEY `fin_bills_currency_id_foreign` (`currency_id`),
+  KEY `fin_bills_spend_approval_id_index` (`spend_approval_id`),
   CONSTRAINT `fin_bills_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_bills_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_bills_currency_id_foreign` FOREIGN KEY (`currency_id`) REFERENCES `fin_currencies` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fin_bills_spend_approval_id_foreign` FOREIGN KEY (`spend_approval_id`) REFERENCES `spend_approvals` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_bills_vendor_id_foreign` FOREIGN KEY (`vendor_id`) REFERENCES `fin_vendors` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -5936,6 +5970,7 @@ DROP TABLE IF EXISTS `fin_purchase_orders`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `fin_purchase_orders` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `spend_approval_id` bigint unsigned DEFAULT NULL,
   `organization_id` bigint unsigned NOT NULL,
   `po_number` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `vendor_id` bigint unsigned NOT NULL,
@@ -5961,8 +5996,10 @@ CREATE TABLE `fin_purchase_orders` (
   KEY `fin_purchase_orders_created_by_foreign` (`created_by`),
   KEY `fin_purchase_orders_organization_id_status_index` (`organization_id`,`status`),
   KEY `fin_purchase_orders_organization_id_index` (`organization_id`),
+  KEY `fin_purchase_orders_spend_approval_id_index` (`spend_approval_id`),
   CONSTRAINT `fin_purchase_orders_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_purchase_orders_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fin_purchase_orders_spend_approval_id_foreign` FOREIGN KEY (`spend_approval_id`) REFERENCES `spend_approvals` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fin_purchase_orders_vendor_id_foreign` FOREIGN KEY (`vendor_id`) REFERENCES `fin_vendors` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -6979,7 +7016,7 @@ DROP TABLE IF EXISTS `governance_audit_log`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `governance_audit_log` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `user_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned DEFAULT NULL,
   `action` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `resource_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `resource_id` bigint unsigned NOT NULL,
@@ -7002,7 +7039,7 @@ CREATE TABLE `governance_change_log` (
   `change_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `entity_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `entity_id` bigint unsigned NOT NULL,
-  `user_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned DEFAULT NULL,
   `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `old_values` json DEFAULT NULL,
   `new_values` json DEFAULT NULL,
@@ -7163,6 +7200,26 @@ CREATE TABLE `governance_policies` (
   CONSTRAINT `governance_policies_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
   CONSTRAINT `governance_policies_owner_id_foreign` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`),
   CONSTRAINT `governance_policies_supersedes_policy_id_foreign` FOREIGN KEY (`supersedes_policy_id`) REFERENCES `governance_policies` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `governance_settings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `governance_settings` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` text COLLATE utf8mb4_unicode_ci,
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `updated_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `governance_settings_key_unique` (`key`),
+  KEY `governance_settings_updated_by_foreign` (`updated_by`),
+  KEY `governance_settings_category_index` (`category`),
+  CONSTRAINT `governance_settings_updated_by_foreign` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `hazardous_substances`;
@@ -17373,6 +17430,51 @@ CREATE TABLE `sites` (
   CONSTRAINT `sites_primary_contact_user_id_foreign` FOREIGN KEY (`primary_contact_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `spend_approvals`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `spend_approvals` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `reference` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` decimal(14,2) NOT NULL,
+  `currency` varchar(3) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NZD',
+  `source_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source_id` bigint unsigned DEFAULT NULL,
+  `site_id` bigint unsigned DEFAULT NULL,
+  `cost_centre_id` bigint unsigned DEFAULT NULL,
+  `funding_stream_id` bigint unsigned DEFAULT NULL,
+  `donor_fund_id` bigint unsigned DEFAULT NULL,
+  `budget_id` bigint unsigned DEFAULT NULL,
+  `budget_line_item_id` bigint unsigned DEFAULT NULL,
+  `status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `requested_by` bigint unsigned NOT NULL,
+  `submitted_at` timestamp NULL DEFAULT NULL,
+  `decided_by` bigint unsigned DEFAULT NULL,
+  `decided_at` timestamp NULL DEFAULT NULL,
+  `decision_notes` text COLLATE utf8mb4_unicode_ci,
+  `resolution_id` bigint unsigned DEFAULT NULL,
+  `requires_board` tinyint(1) NOT NULL DEFAULT '0',
+  `attachments` json DEFAULT NULL,
+  `valid_until` date DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `spend_approvals_reference_unique` (`reference`),
+  KEY `spend_approvals_source_type_source_id_index` (`source_type`,`source_id`),
+  KEY `spend_approvals_requested_by_foreign` (`requested_by`),
+  KEY `spend_approvals_decided_by_foreign` (`decided_by`),
+  KEY `spend_approvals_resolution_id_foreign` (`resolution_id`),
+  KEY `spend_approvals_status_category_index` (`status`,`category`),
+  KEY `spend_approvals_decided_at_index` (`decided_at`),
+  CONSTRAINT `spend_approvals_decided_by_foreign` FOREIGN KEY (`decided_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `spend_approvals_requested_by_foreign` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `spend_approvals_resolution_id_foreign` FOREIGN KEY (`resolution_id`) REFERENCES `resolutions` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `sso_group_mappings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -18449,7 +18551,6 @@ CREATE TABLE `workplace_injuries` (
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
-
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (1,'0001_01_01_000000_create_users_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (2,'0001_01_01_000001_create_cache_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (3,'0001_01_01_000002_create_jobs_table',1);
@@ -18993,3 +19094,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (540,'2026_05_18_12
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (541,'2026_05_19_000001_add_cancel_fields_to_queclink_pending_commands',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (542,'2026_05_19_000002_create_queclink_audit_events_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (543,'2026_05_19_104051_add_house_geofence_to_clients',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (544,'2026_05_20_100000_governance_audit_log_user_nullable_and_settings',2);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (545,'2026_05_20_100100_create_spend_approvals_and_budget_allocations',2);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (546,'2026_05_21_100000_demote_budget_line_item_gl_account_id_to_advisory',3);

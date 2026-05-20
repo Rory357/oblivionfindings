@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 import { useState, FormEvent } from 'react';
 
 interface LineItem {
@@ -72,6 +73,21 @@ interface Adjustment {
   review_notes: string | null;
 }
 
+interface BudgetAllocation {
+  id: number;
+  budget_line_item_id: number | null;
+  budget_line_item: { description: string; category: string } | null;
+  site_id: number | null;
+  site_budget_line_id: number | null;
+  period_year_month: string;
+  category: string | null;
+  allocated_amount: number;
+  forecast_amount: number | null;
+  actual_amount: number | null;
+  notes: string | null;
+  created_by: { id: number; name: string } | null;
+}
+
 interface Budget {
   id: number;
   fiscal_year: string;
@@ -88,6 +104,7 @@ interface Budget {
   created_by: { name: string } | null;
   line_items: LineItem[];
   adjustments: Adjustment[];
+  allocations: BudgetAllocation[];
 }
 
 interface Props extends PageProps {
@@ -104,6 +121,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
   const [editLineItemDialogOpen, setEditLineItemDialogOpen] = useState(false);
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
   const [actualsDialogOpen, setActualsDialogOpen] = useState(false);
+  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
 
   const lineItemForm = useForm({
     category: 'operations',
@@ -132,6 +150,32 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
     reason: '',
   });
 
+  const allocationForm = useForm({
+    budget_line_item_id: '',
+    period_year_month: '',
+    category: '',
+    allocated_amount: '',
+    forecast_amount: '',
+    notes: '',
+  });
+
+  const submitAllocation = (e: FormEvent) => {
+    e.preventDefault();
+    allocationForm.post(`/governance/budgets/${budget.id}/allocations`, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setAllocationDialogOpen(false);
+        allocationForm.reset();
+      },
+    });
+  };
+
+  const deleteAllocation = (allocationId: number) => {
+    router.delete(`/governance/budgets/${budget.id}/allocations/${allocationId}`, {
+      preserveScroll: true,
+    });
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NZ', {
       style: 'currency',
@@ -141,15 +185,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    return {
-      drafting: 'bg-muted text-foreground',
-      proposed: 'bg-status-warning-bg text-status-warning',
-      under_review: 'bg-status-info-bg text-status-info',
-      approved: 'bg-status-success-bg text-status-success',
-      rejected: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getCategoryLabel = (category: string) => {
     return categories?.[category] || category;
@@ -500,6 +536,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
               )}
             </TabsTrigger>
             <TabsTrigger value="summary">Category Summary</TabsTrigger>
+            <TabsTrigger value="allocations">Allocations ({(budget.allocations || []).length})</TabsTrigger>
           </TabsList>
 
           {/* ========== LINE ITEMS TAB ========== */}
@@ -973,6 +1010,188 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                 </Card>
               )}
             </div>
+          </TabsContent>
+
+          {/* ========== ALLOCATIONS TAB ========== */}
+          <TabsContent value="allocations">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Period Allocations</CardTitle>
+                  <CardDescription>
+                    Distribute this annual budget across sites and months. Each allocation links to a monthly site budget line (Finance side).
+                  </CardDescription>
+                </div>
+                {canEdit && (
+                  <Dialog open={allocationDialogOpen} onOpenChange={setAllocationDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Allocation
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent aria-describedby={undefined}>
+                      <DialogHeader>
+                        <DialogTitle>New Allocation</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={submitAllocation} className="space-y-3">
+                        <div>
+                          <Label htmlFor="alloc-period">Period (YYYY-MM)</Label>
+                          <Input
+                            id="alloc-period"
+                            placeholder="2026-07"
+                            pattern="\d{4}-(0[1-9]|1[0-2])"
+                            value={allocationForm.data.period_year_month}
+                            onChange={(e) => allocationForm.setData('period_year_month', e.target.value)}
+                            required
+                          />
+                          {allocationForm.errors.period_year_month && (
+                            <p className="mt-1 text-xs text-status-critical">{allocationForm.errors.period_year_month}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label htmlFor="alloc-line">Budget line (optional)</Label>
+                          <Select
+                            value={allocationForm.data.budget_line_item_id || 'none'}
+                            onValueChange={(v) => allocationForm.setData('budget_line_item_id', v === 'none' ? '' : v)}
+                          >
+                            <SelectTrigger id="alloc-line"><SelectValue placeholder="No line" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No line</SelectItem>
+                              {(budget.line_items || []).map((li) => (
+                                <SelectItem key={li.id} value={String(li.id)}>
+                                  {getCategoryLabel(li.category)} — {li.description}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="alloc-amount">Allocated (NZD)</Label>
+                            <Input
+                              id="alloc-amount"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={allocationForm.data.allocated_amount}
+                              onChange={(e) => allocationForm.setData('allocated_amount', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="alloc-forecast">Forecast (optional)</Label>
+                            <Input
+                              id="alloc-forecast"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={allocationForm.data.forecast_amount}
+                              onChange={(e) => allocationForm.setData('forecast_amount', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="alloc-category">Category (optional)</Label>
+                          <Input
+                            id="alloc-category"
+                            placeholder="payroll, rent, utilities..."
+                            value={allocationForm.data.category}
+                            onChange={(e) => allocationForm.setData('category', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="alloc-notes">Notes</Label>
+                          <Textarea
+                            id="alloc-notes"
+                            rows={2}
+                            value={allocationForm.data.notes}
+                            onChange={(e) => allocationForm.setData('notes', e.target.value)}
+                          />
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button type="button" variant="outline" onClick={() => setAllocationDialogOpen(false)}>Cancel</Button>
+                          <Button type="submit" disabled={allocationForm.processing}>
+                            {allocationForm.processing ? 'Saving…' : 'Save Allocation'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </CardHeader>
+              <CardContent>
+                {(budget.allocations || []).length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No allocations yet. Add allocations to link this annual budget to specific months and sites.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                          <th className="px-3 py-2">Period</th>
+                          <th className="px-3 py-2">Budget line</th>
+                          <th className="px-3 py-2">Category</th>
+                          <th className="px-3 py-2 text-right">Allocated</th>
+                          <th className="px-3 py-2 text-right">Actual</th>
+                          <th className="px-3 py-2 text-right">Variance</th>
+                          <th className="px-3 py-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(budget.allocations || []).map((alloc) => {
+                          const variance = (Number(alloc.actual_amount) || 0) - Number(alloc.allocated_amount);
+                          return (
+                            <tr key={alloc.id} className="border-b">
+                              <td className="px-3 py-2 font-mono">{alloc.period_year_month}</td>
+                              <td className="px-3 py-2">
+                                {alloc.budget_line_item?.description ?? <span className="text-muted-foreground">—</span>}
+                              </td>
+                              <td className="px-3 py-2">{alloc.category ?? '—'}</td>
+                              <td className="px-3 py-2 text-right font-medium">{formatCurrency(Number(alloc.allocated_amount))}</td>
+                              <td className="px-3 py-2 text-right">
+                                {alloc.actual_amount !== null ? formatCurrency(Number(alloc.actual_amount)) : '—'}
+                              </td>
+                              <td className={cn(
+                                'px-3 py-2 text-right',
+                                variance > 0 ? 'text-status-critical' : variance < 0 ? 'text-status-success' : 'text-muted-foreground',
+                              )}>
+                                {alloc.actual_amount !== null ? formatCurrency(variance) : '—'}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {canEdit && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteAllocation(alloc.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/50 font-semibold">
+                          <td className="px-3 py-2" colSpan={3}>Total allocated</td>
+                          <td className="px-3 py-2 text-right">
+                            {formatCurrency((budget.allocations || []).reduce((s, a) => s + Number(a.allocated_amount), 0))}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {formatCurrency((budget.allocations || []).reduce((s, a) => s + (Number(a.actual_amount) || 0), 0))}
+                          </td>
+                          <td className="px-3 py-2 text-right"></td>
+                          <td className="px-3 py-2 text-right"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

@@ -7,10 +7,12 @@ use App\Domain\Governance\Http\Requests\UpdateResolutionRequest;
 use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\Resolution;
+use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Domain\Governance\Services\VotingService;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ResolutionController extends Controller
@@ -126,13 +128,20 @@ class ResolutionController extends Controller
             return redirect()->back()->with('error', 'You must be an active board member to vote.');
         }
 
-        $this->votingService->castVote(
-            $resolution,
-            $boardMember,
-            $validated['vote'],
-            'electronic',
-            $validated['conflict_note'] ?? null
-        );
+        DB::transaction(function () use ($resolution, $boardMember, $validated) {
+            $this->votingService->castVote(
+                $resolution,
+                $boardMember,
+                $validated['vote'],
+                'electronic',
+                $validated['conflict_note'] ?? null
+            );
+            GovernanceAuditService::log('resolution.voted', 'Resolution', $resolution->id, [
+                'vote' => $validated['vote'],
+                'board_member_id' => $boardMember->id,
+                'conflict_note' => !empty($validated['conflict_note']),
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Vote recorded.');
     }
@@ -180,6 +189,9 @@ class ResolutionController extends Controller
             : null;
 
         $this->votingService->openVoting($resolution, $deadline);
+        GovernanceAuditService::log('resolution.voting_opened', 'Resolution', $resolution->id, [
+            'deadline' => $deadline?->toIso8601String(),
+        ]);
 
         return redirect()->back()->with('success', 'Voting opened.');
     }
@@ -192,7 +204,12 @@ class ResolutionController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $this->votingService->closeVoting($resolution, $validated['notes'] ?? null);
+        DB::transaction(function () use ($resolution, $validated) {
+            $this->votingService->closeVoting($resolution, $validated['notes'] ?? null);
+            GovernanceAuditService::log('resolution.voting_closed', 'Resolution', $resolution->id, [
+                'outcome' => $resolution->outcome,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Voting closed. Outcome: '.$resolution->outcome);
     }
@@ -210,11 +227,16 @@ class ResolutionController extends Controller
             return redirect()->back()->with('error', 'Resolution must be closed before finalizing.');
         }
 
-        if ($validated['status'] === 'implemented') {
-            $resolution->markImplemented($validated['notes'] ?? null);
-        } else {
-            $resolution->markArchived($validated['notes'] ?? null);
-        }
+        DB::transaction(function () use ($resolution, $validated) {
+            if ($validated['status'] === 'implemented') {
+                $resolution->markImplemented($validated['notes'] ?? null);
+            } else {
+                $resolution->markArchived($validated['notes'] ?? null);
+            }
+            GovernanceAuditService::log('resolution.finalized', 'Resolution', $resolution->id, [
+                'status' => $validated['status'],
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Resolution finalized.');
     }

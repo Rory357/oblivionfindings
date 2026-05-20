@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class Vote extends Model
 {
-    use HasFactory;
+    use HasFactory, AuditableChanges;
 
     protected $fillable = [
         'resolution_id',

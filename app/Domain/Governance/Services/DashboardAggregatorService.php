@@ -246,30 +246,73 @@ class DashboardAggregatorService
             ->latest('approved_by_board_at')
             ->first();
 
-        if (! $currentBudget) {
-            return [
-                'budget_utilization' => 0,
-                'variance' => 0,
-                'status' => 'unknown',
+        $base = [
+            'budget_utilization' => 0,
+            'variance' => 0,
+            'status' => 'unknown',
+        ];
+
+        if ($currentBudget) {
+            $utilization = $currentBudget->total_budget > 0
+                ? $currentBudget->getTotalActual() / $currentBudget->total_budget * 100
+                : 0;
+            $variance = $currentBudget->getVariancePercentage();
+            $roadmapWidget = $this->roadmapDashboardService?->governanceWidget(null) ?? [];
+            $governanceBudget = $roadmapWidget['governance_budget'] ?? null;
+
+            $base = [
+                'budget_utilization' => round($utilization, 1),
+                'variance' => round($variance, 1),
+                'status' => abs($variance) > 5 ? 'warning' : 'good',
+                'fiscal_year' => $currentBudget->fiscal_year,
+                'budget_total' => round((float) $currentBudget->total_budget, 2),
+                'actual_total' => round($currentBudget->getTotalActual(), 2),
+                'variance_amount' => round($currentBudget->getTotalVariance(), 2),
+                'governance_envelope_total' => $governanceBudget['total_budget'] ?? null,
+                'roadmap_forecast_total' => $roadmapWidget['budget']['forecast_total'] ?? null,
             ];
         }
 
-        $utilization = $currentBudget->getTotalActual() / $currentBudget->total_budget * 100;
-        $variance = $currentBudget->getVariancePercentage();
-        $roadmapWidget = $this->roadmapDashboardService?->governanceWidget(null) ?? [];
-        $governanceBudget = $roadmapWidget['governance_budget'] ?? null;
+        // Pending spend approvals (waiting on board / finance committee).
+        if (Schema::hasTable('spend_approvals')) {
+            $pendingApprovals = \App\Domain\Governance\Models\SpendApproval::query()
+                ->whereIn('status', ['draft', 'submitted'])
+                ->get();
+            $base['pending_spend_count'] = $pendingApprovals->count();
+            $base['pending_spend_total'] = round((float) $pendingApprovals->sum('amount'), 2);
+            $base['pending_board_approvals'] = $pendingApprovals
+                ->where('requires_board', true)
+                ->count();
+        }
 
-        return [
-            'budget_utilization' => round($utilization, 1),
-            'variance' => round($variance, 1),
-            'status' => abs($variance) > 5 ? 'warning' : 'good',
-            'fiscal_year' => $currentBudget->fiscal_year,
-            'budget_total' => round((float) $currentBudget->total_budget, 2),
-            'actual_total' => round($currentBudget->getTotalActual(), 2),
-            'variance_amount' => round($currentBudget->getTotalVariance(), 2),
-            'governance_envelope_total' => $governanceBudget['total_budget'] ?? null,
-            'roadmap_forecast_total' => $roadmapWidget['budget']['forecast_total'] ?? null,
-        ];
+        // Sites over budget — pulled via Finance's BudgetVarianceService (source of truth).
+        if (Schema::hasTable('site_budget_lines') && Schema::hasTable('fin_cost_allocations')) {
+            try {
+                $varianceService = app(\App\Domain\Finance\Services\BudgetVarianceService::class);
+                $period = now()->format('Y-m');
+                $org = $varianceService->organisationVariance(null, $period, $period);
+                $overBudgetSites = collect($org['sites'] ?? [])
+                    ->filter(fn ($s) => bccomp((string) ($s['variance'] ?? '0'), '0', 2) > 0);
+
+                $base['sites_over_budget_count'] = $overBudgetSites->count();
+                $base['sites_over_budget_amount'] = round((float) $overBudgetSites->sum(fn ($s) => (float) ($s['variance'] ?? 0)), 2);
+            } catch (\Throwable $e) {
+                // Service unavailable in this environment; skip silently.
+            }
+        }
+
+        // Funding gaps from donor funds (Finance source of truth).
+        if (Schema::hasTable('fin_donor_funds')) {
+            $gaps = DB::table('fin_donor_funds')
+                ->where('total_committed', '>', DB::raw('total_received'))
+                ->count();
+            $base['funding_gaps_count'] = $gaps;
+        }
+
+        // Final freshness signal.
+        $base['as_of'] = now()->toIso8601String();
+
+        return $base;
     }
 
     public function getItCyberMetrics(array $range): array

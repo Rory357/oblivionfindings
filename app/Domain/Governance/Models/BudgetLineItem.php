@@ -17,7 +17,12 @@ class BudgetLineItem extends Model
         'subcategory',
         'description',
         'account_code',
+        // `gl_account_id` is advisory only — Finance owns the chart of accounts.
+        // Prefer `gl_account_code` (cached string) for display; keep the id for
+        // legacy callers but never enforce a foreign-key relationship from
+        // Governance.
         'gl_account_id',
+        'gl_account_code',
         'budget_amount',
         'forecast_amount',
         'actual_amount',

@@ -12,7 +12,7 @@ class CeoBoardReportController extends Controller
 {
     public function index(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.ceo-reports.view'), 403);
+        $this->authorize('viewAny', CeoBoardReport::class);
 
         $reports = CeoBoardReport::with(['meeting', 'submittedBy'])
             ->orderByDesc('created_at')
@@ -26,7 +26,7 @@ class CeoBoardReportController extends Controller
 
     public function create(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.ceo-reports.manage'), 403);
+        $this->authorize('create', CeoBoardReport::class);
 
         $meetings = GovernanceMeeting::query()
             ->where('scheduled_at', '>=', now())
@@ -41,7 +41,7 @@ class CeoBoardReportController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.ceo-reports.manage'), 403);
+        $this->authorize('create', CeoBoardReport::class);
 
         $validated = $request->validate([
             'governance_meeting_id' => 'required|exists:governance_meetings,id',
@@ -66,7 +66,7 @@ class CeoBoardReportController extends Controller
 
     public function show(CeoBoardReport $report)
     {
-        abort_unless(request()->user()?->canDo('governance.ceo-reports.view'), 403);
+        $this->authorize('view', $report);
 
         $report->load(['meeting', 'submittedBy']);
 
@@ -77,7 +77,7 @@ class CeoBoardReportController extends Controller
 
     public function update(Request $request, CeoBoardReport $report)
     {
-        abort_unless($request->user()?->canDo('governance.ceo-reports.manage'), 403);
+        $this->authorize('update', $report);
 
         $validated = $request->validate([
             'operational_summary' => 'nullable|string',
@@ -96,7 +96,7 @@ class CeoBoardReportController extends Controller
 
     public function submit(CeoBoardReport $report)
     {
-        abort_unless(request()->user()?->canDo('governance.ceo-reports.manage'), 403);
+        $this->authorize('submit', $report);
 
         $report->submit();
 

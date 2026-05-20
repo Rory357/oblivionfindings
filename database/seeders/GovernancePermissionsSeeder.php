@@ -84,6 +84,18 @@ class GovernancePermissionsSeeder extends Seeder
             // Evidence Library
             ['key' => 'governance.evidence.view', 'description' => 'View Evidence Library'],
             ['key' => 'governance.evidence.manage', 'description' => 'Manage Evidence Library'],
+
+            // Audit Log
+            ['key' => 'governance.audit.view', 'description' => 'View Governance Audit Log'],
+
+            // Spend Approvals
+            ['key' => 'governance.spend.view', 'description' => 'View Spend Approvals'],
+            ['key' => 'governance.spend.request', 'description' => 'Request Spend Approval'],
+            ['key' => 'governance.spend.approve', 'description' => 'Approve Spend Requests'],
+
+            // Settings (governance configuration)
+            ['key' => 'governance.settings.view', 'description' => 'View Governance Settings'],
+            ['key' => 'governance.settings.manage', 'description' => 'Manage Governance Settings'],
         ];
 
         foreach ($permissions as $perm) {
@@ -152,6 +164,11 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.budgets.view',
                 'governance.budgets.create',
                 'governance.budgets.submit',
+                'governance.audit.view',
+                'governance.spend.view',
+                'governance.spend.request',
+                'governance.settings.view',
+                'governance.settings.manage',
             ];
             foreach ($secretaryPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
@@ -186,6 +203,8 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.clinical.view',
                 'governance.te-tiriti.view',
                 'governance.evidence.view',
+                'governance.audit.view',
+                'governance.spend.view',
             ];
             foreach ($memberPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
@@ -215,6 +234,7 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.documents.view',
                 'governance.clinical.view',
                 'governance.te-tiriti.view',
+                'governance.spend.view',
             ];
             foreach ($observerPerms as $key) {
                 $perm = Permission::where('key', $key)->first();

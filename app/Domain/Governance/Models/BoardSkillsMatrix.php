@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class BoardSkillsMatrix extends Model
 {
+    use AuditableChanges;
+
     protected $table = 'board_skills_matrix';
 
     protected $fillable = [

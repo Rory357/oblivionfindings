@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class MeetingAttendance extends Model
 {
-    use HasFactory;
+    use HasFactory, AuditableChanges;
 
     protected $table = 'meeting_attendances';
 

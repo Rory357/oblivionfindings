@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class BreakGlassAccess extends Model
 {
-    use HasFactory;
+    use HasFactory, AuditableChanges;
 
     protected $table = 'break_glass_accesses';
 

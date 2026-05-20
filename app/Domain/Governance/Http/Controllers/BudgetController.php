@@ -4,9 +4,12 @@ namespace App\Domain\Governance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Governance\Models\Budget;
-use App\Domain\Governance\Models\BudgetLineItem;
 use App\Domain\Governance\Models\BudgetAdjustment;
+use App\Domain\Governance\Models\BudgetAllocation;
+use App\Domain\Governance\Models\BudgetLineItem;
+use App\Domain\Governance\Services\GovernanceAuditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class BudgetController extends Controller
@@ -45,6 +48,8 @@ class BudgetController extends Controller
             'adjustments.proposedBy',
             'adjustments.approvedBy',
             'adjustments.lineItem',
+            'allocations.createdBy:id,name',
+            'allocations.budgetLineItem:id,description,category',
             'approvalResolution.votes',
             'proposedBy',
             'createdBy',
@@ -116,7 +121,13 @@ class BudgetController extends Controller
     {
         $this->authorize('propose', $budget);
 
-        $budget->propose($request->user()->id);
+        DB::transaction(function () use ($request, $budget) {
+            $budget->propose($request->user()->id);
+            GovernanceAuditService::log('budget.proposed', 'Budget', $budget->id, [
+                'fiscal_year' => $budget->fiscal_year,
+                'total_budget' => $budget->total_budget,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Budget proposed to board.');
     }
@@ -135,7 +146,17 @@ class BudgetController extends Controller
             return redirect()->back()->with('error', 'The board resolution has not been carried yet. Voting must be completed first.');
         }
 
-        $budget->approve($resolution->id);
+        if ($budget->status === 'approved') {
+            return redirect()->back()->with('error', 'Budget is already approved.');
+        }
+
+        DB::transaction(function () use ($budget, $resolution) {
+            $budget->approve($resolution->id);
+            GovernanceAuditService::log('budget.approved', 'Budget', $budget->id, [
+                'resolution_id' => $resolution->id,
+                'total_budget' => $budget->total_budget,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Budget approved by board.');
     }
@@ -211,6 +232,66 @@ class BudgetController extends Controller
         $budget->recalculateTotals();
 
         return redirect()->back()->with('success', 'Line item removed.');
+    }
+
+    // ---- Allocations (link annual budget → monthly site buckets) ----
+
+    public function storeAllocation(Request $request, Budget $budget)
+    {
+        $this->authorize('update', $budget);
+
+        $data = $request->validate([
+            'budget_line_item_id' => ['nullable', 'integer', 'exists:budget_line_items,id'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_budget_line_id' => ['nullable', 'integer'],
+            'period_year_month' => ['required', 'string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'allocated_amount' => ['required', 'numeric', 'min:0'],
+            'forecast_amount' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $data['budget_id'] = $budget->id;
+        $data['created_by'] = $request->user()->id;
+
+        $allocation = BudgetAllocation::create($data);
+
+        GovernanceAuditService::log('budget.allocation_created', 'BudgetAllocation', $allocation->id, [
+            'budget_id' => $budget->id,
+            'period' => $data['period_year_month'],
+            'amount' => $data['allocated_amount'],
+        ]);
+
+        return redirect()->back()->with('success', 'Allocation added.');
+    }
+
+    public function updateAllocation(Request $request, Budget $budget, BudgetAllocation $allocation)
+    {
+        $this->authorize('update', $budget);
+        abort_if($allocation->budget_id !== $budget->id, 404);
+
+        $data = $request->validate([
+            'site_id' => ['nullable', 'integer'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'allocated_amount' => ['sometimes', 'numeric', 'min:0'],
+            'forecast_amount' => ['nullable', 'numeric', 'min:0'],
+            'actual_amount' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $allocation->update($data);
+
+        return redirect()->back()->with('success', 'Allocation updated.');
+    }
+
+    public function destroyAllocation(Request $request, Budget $budget, BudgetAllocation $allocation)
+    {
+        $this->authorize('update', $budget);
+        abort_if($allocation->budget_id !== $budget->id, 404);
+
+        $allocation->delete();
+
+        return redirect()->back()->with('success', 'Allocation removed.');
     }
 
     // ---- Adjustments ----

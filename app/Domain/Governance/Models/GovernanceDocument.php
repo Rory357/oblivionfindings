@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+use App\Models\Concerns\AuditableChanges;
 class GovernanceDocument extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, AuditableChanges;
 
     protected $fillable = [
         'title', 'document_type', 'category', 'description', 'file_path',

@@ -14,7 +14,7 @@ class GovernancePolicyController extends Controller
 {
     public function index(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.policies.view'), 403);
+        $this->authorize('viewAny', GovernancePolicy::class);
 
         $policies = GovernancePolicy::query()
             ->withCount('attestations')
@@ -41,14 +41,14 @@ class GovernancePolicyController extends Controller
 
     public function create()
     {
-        abort_unless(request()->user()?->canDo('governance.policies.manage'), 403);
+        $this->authorize('create', GovernancePolicy::class);
 
         return Inertia::render('Governance/Policies/Create');
     }
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+        $this->authorize('create', GovernancePolicy::class);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -82,7 +82,7 @@ class GovernancePolicyController extends Controller
 
     public function show(GovernancePolicy $policy)
     {
-        abort_unless(request()->user()?->canDo('governance.policies.view'), 403);
+        $this->authorize('view', $policy);
 
         $policy->load(['attestations.user', 'approvedBy']);
 
@@ -100,7 +100,7 @@ class GovernancePolicyController extends Controller
 
     public function edit(GovernancePolicy $policy)
     {
-        abort_unless(request()->user()?->canDo('governance.policies.manage'), 403);
+        $this->authorize('update', $policy);
 
         return Inertia::render('Governance/Policies/Edit', [
             'policy' => $this->presentPolicy($policy),
@@ -109,7 +109,7 @@ class GovernancePolicyController extends Controller
 
     public function update(Request $request, GovernancePolicy $policy)
     {
-        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+        $this->authorize('update', $policy);
 
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
@@ -155,7 +155,7 @@ class GovernancePolicyController extends Controller
 
     public function approve(Request $request, GovernancePolicy $policy)
     {
-        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+        $this->authorize('approve', $policy);
 
         $policy->update([
             'status' => 'approved',
@@ -170,7 +170,7 @@ class GovernancePolicyController extends Controller
 
     public function attest(Request $request, GovernancePolicy $policy)
     {
-        abort_unless($request->user()?->canDo('governance.policies.view'), 403);
+        $this->authorize('attest', $policy);
 
         $validated = $request->validate([
             'acknowledged' => 'required|accepted',
@@ -189,12 +189,75 @@ class GovernancePolicyController extends Controller
             ]
         );
 
+        \App\Domain\Governance\Services\GovernanceAuditService::log(
+            'policy.attested',
+            'GovernancePolicy',
+            $policy->id,
+            ['user_id' => auth()->id(), 'version_number' => $policy->version_number]
+        );
+
         return redirect()->back()->with('success', 'Policy attestation recorded.');
+    }
+
+    /**
+     * Show all governance policies and the current user's attestation state
+     * for each — "things I still need to acknowledge" + "things I've already
+     * acknowledged". Manage permission also surfaces the org-wide attestation
+     * gap (% of board members who have attested per policy).
+     */
+    public function attestations(Request $request)
+    {
+        $this->authorize('viewAny', GovernancePolicy::class);
+
+        $userId = $request->user()->id;
+        $canManage = (bool) $request->user()?->canDo('governance.policies.manage');
+
+        $policies = GovernancePolicy::query()
+            ->where('status', 'approved')
+            ->orderBy('title')
+            ->get()
+            ->map(function (GovernancePolicy $policy) use ($userId, $canManage) {
+                $mine = $policy->attestations->firstWhere('user_id', $userId);
+
+                $totalRequired = BoardMember::active()->count();
+                $totalAttested = $canManage ? $policy->attestations->where('acknowledged', true)->count() : null;
+
+                return [
+                    'id' => $policy->id,
+                    'title' => $policy->title,
+                    'category' => $policy->category,
+                    'version' => (int) $policy->version_number,
+                    'effective_from' => $policy->effective_from?->toDateString(),
+                    'next_review_date' => $policy->next_review_date?->toDateString(),
+                    'my_attestation' => $mine ? [
+                        'acknowledged' => (bool) $mine->acknowledged,
+                        'acknowledged_at' => $mine->acknowledged_at?->toIso8601String(),
+                        'notes' => $mine->notes,
+                    ] : null,
+                    'total_required' => $totalRequired,
+                    'total_attested' => $totalAttested,
+                ];
+            });
+
+        $outstanding = $policies->filter(fn ($p) => empty($p['my_attestation']) || ! ($p['my_attestation']['acknowledged'] ?? false))->values();
+        $completed = $policies->filter(fn ($p) => ! empty($p['my_attestation']) && ($p['my_attestation']['acknowledged'] ?? false))->values();
+
+        return Inertia::render('Governance/Policies/Attestations', [
+            'policies' => $policies->values(),
+            'outstanding' => $outstanding,
+            'completed' => $completed,
+            'canManage' => $canManage,
+            'summary' => [
+                'outstanding_count' => $outstanding->count(),
+                'completed_count' => $completed->count(),
+                'board_member_count' => BoardMember::active()->count(),
+            ],
+        ]);
     }
 
     public function newVersion(Request $request, GovernancePolicy $policy)
     {
-        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+        $this->authorize('newVersion', $policy);
 
         $validated = $request->validate([
             'content' => 'required|string',

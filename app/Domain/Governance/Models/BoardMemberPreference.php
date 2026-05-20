@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class BoardMemberPreference extends Model
 {
-    use HasFactory;
+    use HasFactory, AuditableChanges;
 
     protected $fillable = [
         'board_member_id',

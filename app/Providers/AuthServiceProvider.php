@@ -26,14 +26,30 @@ use App\Domain\Hr\Policies\HrLeaveRequestPolicy;
 use App\Domain\Hr\Policies\HrPerformanceReviewPolicy;
 use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\Budget;
+use App\Domain\Governance\Models\BoardEvaluation;
+use App\Domain\Governance\Models\BoardMember;
+use App\Domain\Governance\Models\BoardMemberInterest;
+use App\Domain\Governance\Models\CeoBoardReport;
+use App\Domain\Governance\Models\ComplianceObligation;
+use App\Domain\Governance\Models\GovernanceDocument;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\GovernancePolicy;
+use App\Domain\Governance\Models\StrategicPlan;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Policies\ActionItemPolicy;
+use App\Domain\Governance\Policies\BoardEvaluationPolicy;
+use App\Domain\Governance\Policies\BoardMemberInterestPolicy;
+use App\Domain\Governance\Policies\BoardMemberPolicy;
 use App\Domain\Governance\Policies\BudgetPolicy;
+use App\Domain\Governance\Policies\CeoBoardReportPolicy;
+use App\Domain\Governance\Policies\ComplianceObligationPolicy;
+use App\Domain\Governance\Policies\GovernanceDocumentPolicy;
 use App\Domain\Governance\Policies\GovernanceMeetingPolicy;
+use App\Domain\Governance\Policies\GovernancePolicyPolicy;
 use App\Domain\Governance\Policies\ResolutionPolicy;
 use App\Domain\Governance\Policies\RiskRegisterEntryPolicy;
+use App\Domain\Governance\Policies\StrategicPlanPolicy;
 use App\Domain\Roadmap\Models\DecisionRequest as RoadmapDecisionRequest;
 use App\Domain\Roadmap\Models\Initiative as RoadmapInitiative;
 use App\Domain\Roadmap\Models\InitiativeBudget as RoadmapInitiativeBudget;
@@ -170,6 +186,14 @@ class AuthServiceProvider extends ServiceProvider
         RiskRegisterEntry::class => RiskRegisterEntryPolicy::class,
         ActionItem::class => ActionItemPolicy::class,
         Budget::class => BudgetPolicy::class,
+        ComplianceObligation::class => ComplianceObligationPolicy::class,
+        GovernancePolicy::class => GovernancePolicyPolicy::class,
+        StrategicPlan::class => StrategicPlanPolicy::class,
+        BoardEvaluation::class => BoardEvaluationPolicy::class,
+        BoardMemberInterest::class => BoardMemberInterestPolicy::class,
+        BoardMember::class => BoardMemberPolicy::class,
+        CeoBoardReport::class => CeoBoardReportPolicy::class,
+        GovernanceDocument::class => GovernanceDocumentPolicy::class,
         // HR
         HrEmployeeProfile::class => HrEmployeeProfilePolicy::class,
         HrLeaveRequest::class => HrLeaveRequestPolicy::class,

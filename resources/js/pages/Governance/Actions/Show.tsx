@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, Clock, AlertTriangle, User } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 import { complete as completeAction } from '@/routes/governance/actions';
 
 interface UserRef {
@@ -48,14 +49,7 @@ export default function ActionItemShow({ auth, action }: Props) {
   const isAssignee = action.assigned_to?.id === auth.user?.id;
   const canComplete = (canManage || isAssignee) && action.status !== 'complete';
 
-  const getStatusColor = (status: string) => {
-    return {
-      open: 'bg-status-info-bg text-status-info',
-      in_progress: 'bg-status-warning-bg text-status-warning',
-      complete: 'bg-status-success-bg text-status-success',
-      overdue: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getPriorityColor = (priority: string) => {
     return {

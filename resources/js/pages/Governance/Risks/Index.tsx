@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, TrendingUp, Shield, ShieldAlert, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { riskScoreColor, riskScoreLevel } from '@/lib/governance-status';
 import { useState } from 'react';
 
 interface Risk {
@@ -41,19 +42,8 @@ interface Props extends PageProps {
 export default function RiskIndex({ auth, risks, categories, summary, filters }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const getRiskColor = (score: number) => {
-    if (score >= 20) return 'bg-status-critical';
-    if (score >= 15) return 'bg-status-warning';
-    if (score >= 10) return 'bg-status-warning';
-    return 'bg-status-success';
-  };
-
-  const getRiskLevel = (score: number) => {
-    if (score >= 20) return 'Critical';
-    if (score >= 15) return 'High';
-    if (score >= 10) return 'Medium';
-    return 'Low';
-  };
+  const getRiskColor = riskScoreColor;
+  const getRiskLevel = riskScoreLevel;
 
   const totalStats = Object.values(summary).reduce((acc, cat) => ({
     total: acc.total + cat.total,
@@ -89,7 +79,7 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                 <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                   <Link href={risksHeatmap.url()}>Risk Heatmap</Link>
                 </Button>
-                {(auth.can as any)?.governance?.risks?.create && (
+                {auth.can?.governance?.risks?.create && (
                   <Button asChild>
                     <Link href={createRisk.url()}>New Risk</Link>
                   </Button>

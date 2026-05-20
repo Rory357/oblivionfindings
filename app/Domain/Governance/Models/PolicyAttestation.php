@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class PolicyAttestation extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'governance_policy_id', 'user_id', 'acknowledged', 'acknowledged_at', 'notes',
     ];

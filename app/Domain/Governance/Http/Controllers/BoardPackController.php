@@ -19,6 +19,41 @@ class BoardPackController extends Controller
         protected BoardPackPresenter $presenter,
     ) {}
 
+    public function index(Request $request)
+    {
+        $query = BoardPack::query()
+            ->with(['meeting:id,title,scheduled_at,meeting_type', 'generatedBy:id,name'])
+            ->latest('id');
+
+        if ($status = $request->string('status')->toString()) {
+            if ($status === 'distributed') {
+                $query->whereNotNull('distributed_at');
+            } elseif ($status === 'draft') {
+                $query->whereNull('distributed_at');
+            }
+        }
+
+        $packs = $query->paginate(25)->withQueryString();
+
+        return Inertia::render('Governance/Packs/Index', [
+            'packs' => [
+                'data' => $packs->items(),
+                'links' => $packs->linkCollection()->toArray(),
+                'current_page' => $packs->currentPage(),
+                'last_page' => $packs->lastPage(),
+                'total' => $packs->total(),
+            ],
+            'filters' => [
+                'status' => $request->string('status')->toString() ?: null,
+            ],
+            'summary' => [
+                'total' => BoardPack::count(),
+                'distributed' => BoardPack::whereNotNull('distributed_at')->count(),
+                'draft' => BoardPack::whereNull('distributed_at')->count(),
+            ],
+        ]);
+    }
+
     public function show(BoardPack $pack)
     {
         $pack->load(['meeting', 'snapshot', 'generatedBy']);
@@ -153,8 +188,14 @@ class BoardPackController extends Controller
             abort(403, 'You are not authorized to access this pack.');
         }
 
-        // Record download
+        // Record download (audit-tracked board pack viewing).
         $pack->recordDownload($boardMember->id);
+        \App\Domain\Governance\Services\GovernanceAuditService::log(
+            'board_pack.downloaded',
+            'BoardPack',
+            $pack->id,
+            ['board_member_id' => $boardMember->id, 'meeting_id' => $pack->meeting_id]
+        );
 
         // Return file
         if (!Storage::exists($pack->file_path)) {

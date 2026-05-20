@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { DollarSign, CheckCircle, AlertTriangle, Clock, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
+import { EmptyList } from '@/components/ui/empty-state';
 
 interface Budget {
   id: number;
@@ -30,15 +32,7 @@ interface Props extends PageProps {
 export default function BudgetsIndex({ auth, budgets }: Props) {
   const budgetItems = Array.isArray(budgets) ? budgets : budgets?.data ?? [];
 
-  const getStatusColor = (status: string) => {
-    return {
-      drafting: 'bg-muted text-foreground',
-      proposed: 'bg-status-warning-bg text-status-warning',
-      under_review: 'bg-status-info-bg text-status-info',
-      approved: 'bg-status-success-bg text-status-success',
-      rejected: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -134,20 +128,13 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
 
         {/* Budgets List */}
         {budgetItems.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-2 text-sm font-semibold text-foreground">No budgets yet</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Create your first budget to start financial planning.</p>
-                <div className="mt-6">
-                  <Button asChild>
-                    <Link href="/governance/budgets/create">Create Budget</Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <EmptyList
+            icon={DollarSign}
+            itemName="budget"
+            description="Create your first budget to start financial planning."
+            createHref="/governance/budgets/create"
+            createLabel="Create Budget"
+          />
         ) : (
           <div className="space-y-4">
             {budgetItems.map((budget) => {

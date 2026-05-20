@@ -37,6 +37,17 @@ class GovernancePresenter
             $this->widgetCard('hs_backbone', $widgets['hs_backbone'] ?? null, $freshness),
         ])->filter()->values();
 
+        $financialWidget = is_array($widgets['financial'] ?? null) ? $widgets['financial'] : [];
+        $spendCard = $this->presentSpendApprovalsCard($financialWidget, $freshness);
+        $sitesCard = $this->presentSitesOverBudgetCard($financialWidget, $freshness);
+
+        if ($spendCard) {
+            $cards->push($spendCard);
+        }
+        if ($sitesCard) {
+            $cards->push($sitesCard);
+        }
+
         $cardsByKey = $cards->keyBy('key');
 
         return [
@@ -49,6 +60,12 @@ class GovernancePresenter
                     'cards' => $this->cardsForKeys($cardsByKey, ['meeting_readiness', 'follow_through', 'decisions_required', 'roadmap']),
                 ],
                 [
+                    'key' => 'financial_governance',
+                    'title' => 'Financial Governance',
+                    'description' => 'Budget posture, sites over budget, pending spend approvals, donor funding.',
+                    'cards' => $this->cardsForKeys($cardsByKey, ['financial', 'sites_over_budget', 'spend_approvals']),
+                ],
+                [
                     'key' => 'assurance',
                     'title' => 'Assurance & Compliance',
                     'description' => 'Risk posture, changes, privacy, and upcoming obligations.',
@@ -57,8 +74,8 @@ class GovernancePresenter
                 [
                     'key' => 'operations',
                     'title' => 'Operations & People',
-                    'description' => 'Safety, staffing, and financial capacity.',
-                    'cards' => $this->cardsForKeys($cardsByKey, ['client_safety', 'operational_safety', 'workforce', 'financial']),
+                    'description' => 'Safety, staffing, and workforce posture.',
+                    'cards' => $this->cardsForKeys($cardsByKey, ['client_safety', 'operational_safety', 'workforce']),
                 ],
                 [
                     'key' => 'controls',
@@ -524,10 +541,28 @@ class GovernancePresenter
 
     protected function presentFinancialCard(array $widget, array $freshness): array
     {
+        $highlights = array_values(array_filter([
+            ! empty($widget['fiscal_year']) ? "Budget year {$widget['fiscal_year']}" : null,
+            isset($widget['sites_over_budget_count']) && $widget['sites_over_budget_count'] > 0
+                ? "{$widget['sites_over_budget_count']} site(s) over budget this month"
+                : null,
+            isset($widget['pending_spend_count']) && $widget['pending_spend_count'] > 0
+                ? "{$widget['pending_spend_count']} spend approval(s) pending"
+                : null,
+            isset($widget['pending_board_approvals']) && $widget['pending_board_approvals'] > 0
+                ? "{$widget['pending_board_approvals']} require board sign-off"
+                : null,
+            isset($widget['funding_gaps_count']) && $widget['funding_gaps_count'] > 0
+                ? "{$widget['funding_gaps_count']} donor fund(s) over-committed"
+                : null,
+            isset($widget['roadmap_forecast_total']) ? 'Roadmap forecast ' . $this->formatCurrency($widget['roadmap_forecast_total']) : null,
+            isset($widget['governance_envelope_total']) ? 'Governance envelope ' . $this->formatCurrency($widget['governance_envelope_total']) : null,
+        ]));
+
         return $this->makeCard(
             'financial',
             'Financial governance',
-            'Approved budget, actuals, variance, and roadmap envelope.',
+            'Approved budget, actuals, variance, sites over budget, and pending spend approvals.',
             $widget['status'] ?? 'unknown',
             'Governance budget and finance posted journals',
             $this->freshnessFor('financial', $freshness),
@@ -537,12 +572,73 @@ class GovernancePresenter
                 $this->metric('Budget total', $this->formatCurrency($widget['budget_total'] ?? null)),
                 $this->metric('Actuals', $this->formatCurrency($widget['actual_total'] ?? null)),
             ],
-            array_values(array_filter([
-                ! empty($widget['fiscal_year']) ? "Budget year {$widget['fiscal_year']}" : null,
-                isset($widget['roadmap_forecast_total']) ? 'Roadmap forecast ' . $this->formatCurrency($widget['roadmap_forecast_total']) : null,
-                isset($widget['governance_envelope_total']) ? 'Governance envelope ' . $this->formatCurrency($widget['governance_envelope_total']) : null,
-            ])),
+            $highlights,
             '/governance/budgets'
+        );
+    }
+
+    /**
+     * Build a Pending Spend Approvals card. Built directly from the financial
+     * widget so the dashboard surface can reach this without a separate
+     * snapshot key.
+     */
+    protected function presentSpendApprovalsCard(array $financialWidget, array $freshness): ?array
+    {
+        if (! array_key_exists('pending_spend_count', $financialWidget)) {
+            return null;
+        }
+
+        $pending = (int) ($financialWidget['pending_spend_count'] ?? 0);
+        $boardSignoff = (int) ($financialWidget['pending_board_approvals'] ?? 0);
+        $status = match (true) {
+            $pending === 0 => 'good',
+            $boardSignoff > 0 => 'warning',
+            default => 'in_progress',
+        };
+
+        return $this->makeCard(
+            'spend_approvals',
+            'Spend approvals',
+            'Items above the configured spend threshold awaiting board or finance-committee sign-off.',
+            $status,
+            'Governance spend approval workflow',
+            $this->freshnessFor('financial', $freshness),
+            [
+                $this->metric('Pending', $pending, $pending > 0 ? 'warning' : 'default'),
+                $this->metric('Board sign-off', $boardSignoff, $boardSignoff > 0 ? 'warning' : 'default'),
+                $this->metric('Pending value', $this->formatCurrency($financialWidget['pending_spend_total'] ?? 0)),
+            ],
+            [],
+            '/governance/spend-approvals'
+        );
+    }
+
+    /**
+     * Build a Sites Over Budget card.
+     */
+    protected function presentSitesOverBudgetCard(array $financialWidget, array $freshness): ?array
+    {
+        if (! array_key_exists('sites_over_budget_count', $financialWidget)) {
+            return null;
+        }
+
+        $count = (int) $financialWidget['sites_over_budget_count'];
+        $amount = (float) ($financialWidget['sites_over_budget_amount'] ?? 0);
+        $status = $count === 0 ? 'good' : ($count >= 3 ? 'critical' : 'warning');
+
+        return $this->makeCard(
+            'sites_over_budget',
+            'Sites over budget',
+            'Operational site/house budgets exceeding allocation this month (sourced from Finance variance).',
+            $status,
+            'Finance site budget lines',
+            $this->freshnessFor('financial', $freshness),
+            [
+                $this->metric('Sites', $count, $count > 0 ? 'warning' : 'default'),
+                $this->metric('Overspend', $this->formatCurrency($amount), $amount > 0 ? 'warning' : 'default'),
+            ],
+            [],
+            '/finance/budget-actuals'
         );
     }
 

@@ -11,14 +11,14 @@ class StrategicPlanController extends Controller
 {
     public function create()
     {
-        abort_unless(request()->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('create', StrategicPlan::class);
 
         return Inertia::render('Governance/Strategy/Create');
     }
 
     public function index(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.view'), 403);
+        $this->authorize('viewAny', StrategicPlan::class);
 
         $plans = StrategicPlan::query()
             ->withCount('goals')
@@ -32,7 +32,7 @@ class StrategicPlanController extends Controller
 
     public function show(Request $request, StrategicPlan $plan)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.view'), 403);
+        $this->authorize('view', $plan);
 
         $plan->load(['goals' => fn ($q) => $q->orderBy('order')]);
 
@@ -43,7 +43,7 @@ class StrategicPlanController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('create', StrategicPlan::class);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -73,7 +73,7 @@ class StrategicPlanController extends Controller
 
     public function update(Request $request, StrategicPlan $plan)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('update', $plan);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -103,7 +103,7 @@ class StrategicPlanController extends Controller
 
     public function addGoal(Request $request, StrategicPlan $plan)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('addGoal', $plan);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -127,7 +127,7 @@ class StrategicPlanController extends Controller
 
     public function approve(Request $request, StrategicPlan $plan)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('approve', $plan);
 
         $validated = $request->validate([
             'resolution_id' => 'required|exists:resolutions,id',
@@ -141,7 +141,7 @@ class StrategicPlanController extends Controller
 
     public function edit(StrategicPlan $plan)
     {
-        abort_unless(request()->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('update', $plan);
 
         $plan->load('goals');
 
@@ -152,7 +152,7 @@ class StrategicPlanController extends Controller
 
     public function createVersion(Request $request, StrategicPlan $plan)
     {
-        abort_unless($request->user()?->canDo('governance.strategy.manage'), 403);
+        $this->authorize('createVersion', $plan);
 
         $validated = $request->validate([
             'version_notes' => 'required|string|max:500',
@@ -166,7 +166,7 @@ class StrategicPlanController extends Controller
 
     public function changes(StrategicPlan $plan)
     {
-        abort_unless(request()->user()?->canDo('governance.strategy.view'), 403);
+        $this->authorize('viewChanges', $plan);
 
         $changeData = $plan->getChangesSinceLastSnapshot();
 

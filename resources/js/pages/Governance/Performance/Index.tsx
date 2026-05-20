@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Star, Target, TrendingUp, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Review {
   id: number;
@@ -30,15 +31,7 @@ interface Props extends PageProps {
 }
 
 export default function PerformanceIndex({ auth, reviews, review_cycles }: Props) {
-  const getStatusColor = (status: string) => {
-    return {
-      drafting: 'bg-muted text-foreground',
-      self_review: 'bg-status-info-bg text-status-info',
-      peer_review: 'bg-primary/10 text-primary',
-      board_review: 'bg-status-warning-bg text-status-warning',
-      completed: 'bg-status-success-bg text-status-success',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getRatingColor = (rating: string | null) => {
     return {
@@ -72,7 +65,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               { label: 'Current cycle', value: review_cycles[0]?.label ?? '—' },
             ]}
             actions={
-              (auth.can as any)?.governance?.performance?.create ? (
+              auth.can?.governance?.performance?.create ? (
                 <Button asChild>
                   <Link href={createPerformance.url()}>New Review</Link>
                 </Button>

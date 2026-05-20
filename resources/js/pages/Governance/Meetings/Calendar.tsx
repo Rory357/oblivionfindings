@@ -17,6 +17,7 @@ import {
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 import { PageProps } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -166,24 +167,7 @@ export default function MeetingsCalendar({
         );
     };
 
-    const getStatusColor = (status: string) => {
-        return (
-            {
-                scheduled:
-                    'bg-status-info-bg text-status-info border-status-info/30',
-                agenda_draft:
-                    'bg-status-warning-bg text-status-warning border-status-warning/30',
-                agenda_final:
-                    'bg-status-success-bg text-status-success border-status-success/30',
-                in_progress: 'bg-primary/10 text-primary border-primary',
-                minutes_draft:
-                    'bg-status-warning-bg text-status-warning border-status-warning/30',
-                minutes_approved:
-                    'bg-status-success-bg text-status-success border-status-success/30',
-                archived: 'bg-muted text-foreground border-border',
-            }[status] || 'bg-muted text-foreground border-border'
-        );
-    };
+    const getStatusColor = (status: string) => governanceStatusColor(status);
 
     const meetingTypeLabel = (type: string) => {
         return (
